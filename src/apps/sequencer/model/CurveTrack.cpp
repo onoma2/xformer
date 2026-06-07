@@ -22,12 +22,12 @@ void CurveTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_playMode);
     writer.write(_fillMode);
     writer.write(_muteMode);
-    writer.write(_slideTime.base);
-    writer.write(_offset.base);
-    writer.write(_rotate.base);
-    writer.write(_shapeProbabilityBias.base);
-    writer.write(_gateProbabilityBias.base);
-    writer.write(_curveRate.base);
+    writer.write(_slideTime);
+    writer.write(_offset);
+    writer.write(_rotate);
+    writer.write(_shapeProbabilityBias);
+    writer.write(_gateProbabilityBias);
+    writer.write(_curveRate);
     writer.write(_globalPhase);
     writeArray(writer, _sequences);
 }
@@ -36,12 +36,12 @@ void CurveTrack::read(VersionedSerializedReader &reader) {
     reader.read(_playMode);
     reader.read(_fillMode);
     reader.read(_muteMode, ProjectVersion::Version22);
-    reader.read(_slideTime.base, ProjectVersion::Version8);
-    reader.read(_offset.base, ProjectVersion::Version28);
-    reader.read(_rotate.base);
-    reader.read(_shapeProbabilityBias.base, ProjectVersion::Version15);
-    reader.read(_gateProbabilityBias.base, ProjectVersion::Version15);
-    reader.read(_curveRate.base);  // No version bump
+    reader.read(_slideTime, ProjectVersion::Version8);
+    reader.read(_offset, ProjectVersion::Version28);
+    reader.read(_rotate);
+    reader.read(_shapeProbabilityBias, ProjectVersion::Version15);
+    reader.read(_gateProbabilityBias, ProjectVersion::Version15);
+    reader.read(_curveRate);  // No version bump
 
     reader.read(_globalPhase);
 

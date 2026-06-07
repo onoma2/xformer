@@ -205,21 +205,21 @@ void CurveSequence::duplicateSteps() {
 
 void CurveSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_range);
-    writer.write(_divisor.base);
-    writer.write(_clockMultiplier.base);
+    writer.write(_divisor);
+    writer.write(_clockMultiplier);
     writer.write(_resetMeasure);
-    writer.write(_runMode.base);
-    writer.write(_firstStep.base);
-    writer.write(_lastStep.base);
+    writer.write(_runMode);
+    writer.write(_firstStep);
+    writer.write(_lastStep);
 
-    writer.write(_wavefolderFold.base);
-    writer.write(_wavefolderGain.base);
-    writer.write(_djFilter.base);
+    writer.write(_wavefolderFold);
+    writer.write(_wavefolderGain);
+    writer.write(_djFilter);
     writer.write(_xFade);  // Non-routable
-    writer.write(_chaosAmount.base);
-    writer.write(_chaosRate.base);
-    writer.write(_chaosParam1.base);
-    writer.write(_chaosParam2.base);
+    writer.write(_chaosAmount);
+    writer.write(_chaosRate);
+    writer.write(_chaosParam1);
+    writer.write(_chaosParam2);
     writer.write(_chaosAlgo);
     writer.write(_chaosRange);
 
@@ -229,24 +229,24 @@ void CurveSequence::write(VersionedSerializedWriter &writer) const {
 void CurveSequence::read(VersionedSerializedReader &reader) {
     reader.read(_range);
     if (reader.dataVersion() < ProjectVersion::Version10) {
-        reader.readAs<uint8_t>(_divisor.base);
+        reader.readAs<uint8_t>(_divisor);
     } else {
-        reader.read(_divisor.base);
+        reader.read(_divisor);
     }
-    reader.read(_clockMultiplier.base);
+    reader.read(_clockMultiplier);
     reader.read(_resetMeasure);
-    reader.read(_runMode.base);
-    reader.read(_firstStep.base);
-    reader.read(_lastStep.base);
+    reader.read(_runMode);
+    reader.read(_firstStep);
+    reader.read(_lastStep);
 
-    reader.read(_wavefolderFold.base);
-    reader.read(_wavefolderGain.base);
-    reader.read(_djFilter.base);
+    reader.read(_wavefolderFold);
+    reader.read(_wavefolderGain);
+    reader.read(_djFilter);
     reader.read(_xFade);  // Non-routable
-    reader.read(_chaosAmount.base);
-    reader.read(_chaosRate.base);
-    reader.read(_chaosParam1.base);
-    reader.read(_chaosParam2.base);
+    reader.read(_chaosAmount);
+    reader.read(_chaosRate);
+    reader.read(_chaosParam1);
+    reader.read(_chaosParam2);
     reader.read(_chaosAlgo);
     reader.read(_chaosRange);
 

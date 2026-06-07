@@ -108,13 +108,13 @@ public:
 
     // slideTime
 
-    int slideTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slideTime.base, 0, 100); }
-    void setSlideTime(int slideTime, bool routed = false) {
-        _slideTime.set(clamp(slideTime, 0, 100), routed);
+    int slideTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slideTime, 0, 100); }
+    void setSlideTime(int slideTime) {
+        _slideTime = clamp(slideTime, 0, 100);
     }
 
     void editSlideTime(int value, bool shift) {
-        setSlideTime(ModelUtils::adjustedByStep(_slideTime.base, value, 5, !shift));
+        setSlideTime(ModelUtils::adjustedByStep(_slideTime, value, 5, !shift));
     }
 
     void printSlideTime(StringBuilder &str) const {
@@ -124,14 +124,14 @@ public:
 
     // offset
 
-    int offset() const { return Routing::routedValueInt(ParamKey::Offset, _trackIndex, _offset.base, -500, 500); }
+    int offset() const { return Routing::routedValueInt(ParamKey::Offset, _trackIndex, _offset, -500, 500); }
     float offsetVolts() const { return offset() * 0.01f; }
-    void setOffset(int offset, bool routed = false) {
-        _offset.set(clamp(offset, -500, 500), routed);
+    void setOffset(int offset) {
+        _offset = clamp(offset, -500, 500);
     }
 
     void editOffset(int value, bool shift) {
-        setOffset(_offset.base + value * (shift ? 100 : 1));
+        setOffset(_offset + value * (shift ? 100 : 1));
     }
 
     void printOffset(StringBuilder &str) const {
@@ -141,13 +141,13 @@ public:
 
     // rotate
 
-    int rotate() const { return Routing::routedValueInt(ParamKey::Rotate, _trackIndex, _rotate.base, -64, 64); }
-    void setRotate(int rotate, bool routed = false) {
-        _rotate.set(clamp(rotate, -64, 64), routed);
+    int rotate() const { return Routing::routedValueInt(ParamKey::Rotate, _trackIndex, _rotate, -64, 64); }
+    void setRotate(int rotate) {
+        _rotate = clamp(rotate, -64, 64);
     }
 
     void editRotate(int value, bool shift) {
-        setRotate(_rotate.base + value);
+        setRotate(_rotate + value);
     }
 
     void printRotate(StringBuilder &str) const {
@@ -157,13 +157,13 @@ public:
 
     // shapeProbabilityBias
 
-    int shapeProbabilityBias() const { return Routing::routedValueInt(ParamKey::ShapeProbabilityBias, _trackIndex, _shapeProbabilityBias.base, -8, 8); }
-    void setShapeProbabilityBias(int shapeProbabilityBias, bool routed = false) {
-        _shapeProbabilityBias.set(clamp(shapeProbabilityBias, -8, 8), routed);
+    int shapeProbabilityBias() const { return Routing::routedValueInt(ParamKey::ShapeProbabilityBias, _trackIndex, _shapeProbabilityBias, -8, 8); }
+    void setShapeProbabilityBias(int shapeProbabilityBias) {
+        _shapeProbabilityBias = clamp(shapeProbabilityBias, -8, 8);
     }
 
     void editShapeProbabilityBias(int value, bool shift) {
-        setShapeProbabilityBias(_shapeProbabilityBias.base + value);
+        setShapeProbabilityBias(_shapeProbabilityBias + value);
     }
 
     void printShapeProbabilityBias(StringBuilder &str) const {
@@ -173,13 +173,13 @@ public:
 
     // gateProbabilityBias
 
-    int gateProbabilityBias() const { return Routing::routedValueInt(ParamKey::GateProbabilityBias, _trackIndex, _gateProbabilityBias.base, -CurveSequence::GateProbability::Range, CurveSequence::GateProbability::Range); }
-    void setGateProbabilityBias(int gateProbabilityBias, bool routed = false) {
-        _gateProbabilityBias.set(clamp(gateProbabilityBias, -CurveSequence::GateProbability::Range, CurveSequence::GateProbability::Range), routed);
+    int gateProbabilityBias() const { return Routing::routedValueInt(ParamKey::GateProbabilityBias, _trackIndex, _gateProbabilityBias, -CurveSequence::GateProbability::Range, CurveSequence::GateProbability::Range); }
+    void setGateProbabilityBias(int gateProbabilityBias) {
+        _gateProbabilityBias = clamp(gateProbabilityBias, -CurveSequence::GateProbability::Range, CurveSequence::GateProbability::Range);
     }
 
     void editGateProbabilityBias(int value, bool shift) {
-        setGateProbabilityBias(_gateProbabilityBias.base + value);
+        setGateProbabilityBias(_gateProbabilityBias + value);
     }
 
     void printGateProbabilityBias(StringBuilder &str) const {
@@ -204,13 +204,13 @@ public:
 
     // curveRate (speed multiplier: 0.0 = stop, 1.0 = normal, 4.0 = 4x)
 
-    float curveRate() const { return Routing::routedValueInt(ParamKey::CurveRate, _trackIndex, int(std::lround(_curveRate.base * 100.f)), 0, 400) / 100.f; }
-    void setCurveRate(float curveRate, bool routed = false) {
-        _curveRate.set(clamp(curveRate, 0.f, 4.f), routed);
+    float curveRate() const { return Routing::routedValueInt(ParamKey::CurveRate, _trackIndex, int(std::lround(_curveRate * 100.f)), 0, 400) / 100.f; }
+    void setCurveRate(float curveRate) {
+        _curveRate = clamp(curveRate, 0.f, 4.f);
     }
 
     void editCurveRate(int value, bool shift) {
-        setCurveRate(_curveRate.base + value * (shift ? 0.1f : 0.01f));
+        setCurveRate(_curveRate + value * (shift ? 0.1f : 0.01f));
     }
 
     void printCurveRate(StringBuilder &str) const {
@@ -267,12 +267,12 @@ private:
     Types::PlayMode _playMode;
     FillMode _fillMode;
     MuteMode _muteMode;
-    Routable<uint8_t> _slideTime;
-    Routable<int16_t> _offset;
-    Routable<int8_t> _rotate;
-    Routable<int8_t> _shapeProbabilityBias;
-    Routable<int8_t> _gateProbabilityBias;
-    Routable<float> _curveRate;  // Speed multiplier 0.0-4.0
+    uint8_t _slideTime;
+    int16_t _offset;
+    int8_t _rotate;
+    int8_t _shapeProbabilityBias;
+    int8_t _gateProbabilityBias;
+    float _curveRate;  // Speed multiplier 0.0-4.0
     float _globalPhase;
 
     CurveSequenceArray _sequences;

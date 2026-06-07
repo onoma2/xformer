@@ -229,9 +229,9 @@ public:
 
     // divisor
 
-    int divisor() const { return Routing::routedValueInt(ParamKey::Divisor, _trackIndex, _divisor.base, 1, 768); }
-    void setDivisor(int divisor, bool routed = false) {
-        _divisor.set(ModelUtils::clampDivisor(divisor), routed);
+    int divisor() const { return Routing::routedValueInt(ParamKey::Divisor, _trackIndex, _divisor, 1, 768); }
+    void setDivisor(int divisor) {
+        _divisor = ModelUtils::clampDivisor(divisor);
     }
 
     int indexedDivisor() const { return ModelUtils::divisorToIndex(divisor()); }
@@ -243,7 +243,7 @@ public:
     }
 
     void editDivisor(int value, bool shift) {
-        setDivisor(ModelUtils::adjustedByDivisor(_divisor.base, value, shift));
+        setDivisor(ModelUtils::adjustedByDivisor(_divisor, value, shift));
     }
 
     void printDivisor(StringBuilder &str) const {
@@ -253,13 +253,13 @@ public:
 
     // clockMultiplier
 
-    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier.base, 50, 150); }
-    void setClockMultiplier(int clockMultiplier, bool routed = false) {
-        _clockMultiplier.set(clamp(clockMultiplier, 50, 150), routed);
+    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier, 50, 150); }
+    void setClockMultiplier(int clockMultiplier) {
+        _clockMultiplier = clamp(clockMultiplier, 50, 150);
     }
 
     void editClockMultiplier(int value, bool shift) {
-        setClockMultiplier(_clockMultiplier.base + value * (shift ? 10 : 1));
+        setClockMultiplier(_clockMultiplier + value * (shift ? 10 : 1));
     }
 
     void printClockMultiplier(StringBuilder &str) const {
@@ -288,13 +288,13 @@ public:
 
     // runMode
 
-    Types::RunMode runMode() const { return Types::RunMode(Routing::routedValueInt(ParamKey::RunMode, _trackIndex, int(_runMode.base), 0, 5)); }
-    void setRunMode(Types::RunMode runMode, bool routed = false) {
-        _runMode.set(ModelUtils::clampedEnum(runMode), routed);
+    Types::RunMode runMode() const { return Types::RunMode(Routing::routedValueInt(ParamKey::RunMode, _trackIndex, int(_runMode), 0, 5)); }
+    void setRunMode(Types::RunMode runMode) {
+        _runMode = ModelUtils::clampedEnum(runMode);
     }
 
     void editRunMode(int value, bool shift) {
-        setRunMode(ModelUtils::adjustedEnum(Types::RunMode(int(_runMode.base)), value));
+        setRunMode(ModelUtils::adjustedEnum(Types::RunMode(int(_runMode)), value));
     }
 
     void printRunMode(StringBuilder &str) const {
@@ -305,20 +305,20 @@ public:
     // firstStep
 
     int firstStep() const {
-        return Routing::routedValueInt(ParamKey::FirstStep, _trackIndex, _firstStep.base, 0, CONFIG_STEP_COUNT - 1);
+        return Routing::routedValueInt(ParamKey::FirstStep, _trackIndex, _firstStep, 0, CONFIG_STEP_COUNT - 1);
     }
 
-    void setFirstStep(int firstStep, bool routed = false) {
-        // clamp in base domain so a base edit is bounded by the peer's base, not its
-        // override-aware getter (which is the moving routed window).
-        _firstStep.set(clamp(firstStep, 0, int(_lastStep.base)), routed);
+    void setFirstStep(int firstStep) {
+        // clamp against the stored peer value, not its override-aware getter
+        // (which is the moving routed window).
+        _firstStep = clamp(firstStep, 0, int(_lastStep));
     }
 
     void editFirstStep(int value, bool shift) {
         if (shift) {
             offsetFirstAndLastStep(value);
         } else {
-            setFirstStep(_firstStep.base + value);
+            setFirstStep(_firstStep + value);
         }
     }
 
@@ -331,18 +331,18 @@ public:
 
     int lastStep() const {
         // make sure last step is always >= first step even if stored value is invalid (due to routing changes)
-        return std::max(firstStep(), Routing::routedValueInt(ParamKey::LastStep, _trackIndex, _lastStep.base, 0, CONFIG_STEP_COUNT - 1));
+        return std::max(firstStep(), Routing::routedValueInt(ParamKey::LastStep, _trackIndex, _lastStep, 0, CONFIG_STEP_COUNT - 1));
     }
 
-    void setLastStep(int lastStep, bool routed = false) {
-        _lastStep.set(clamp(lastStep, int(_firstStep.base), CONFIG_STEP_COUNT - 1), routed);
+    void setLastStep(int lastStep) {
+        _lastStep = clamp(lastStep, int(_firstStep), CONFIG_STEP_COUNT - 1);
     }
 
     void editLastStep(int value, bool shift) {
         if (shift) {
             offsetFirstAndLastStep(value);
         } else {
-            setLastStep(_lastStep.base + value);
+            setLastStep(_lastStep + value);
         }
     }
 
@@ -387,12 +387,12 @@ public:
 
     // wavefolderFold
 
-    float wavefolderFold() const { return Routing::routedValueInt(ParamKey::WavefolderFold, _trackIndex, _wavefolderFold.base, 0, 100) * 0.01f; }
-    void setWavefolderFold(float value, bool routed = false) {
-        _wavefolderFold.set(clamp(int16_t(std::round(value * 100.f)), int16_t(0), int16_t(100)), routed);
+    float wavefolderFold() const { return Routing::routedValueInt(ParamKey::WavefolderFold, _trackIndex, _wavefolderFold, 0, 100) * 0.01f; }
+    void setWavefolderFold(float value) {
+        _wavefolderFold = clamp(int16_t(std::round(value * 100.f)), int16_t(0), int16_t(100));
     }
     void editWavefolderFold(int value, bool shift) {
-        setWavefolderFold(_wavefolderFold.base * 0.01f + value * (shift ? 0.1f : 0.01f));
+        setWavefolderFold(_wavefolderFold * 0.01f + value * (shift ? 0.1f : 0.01f));
     }
     void printWavefolderFold(StringBuilder &str) const {
         printRouted(str, Routing::Target::WavefolderFold);
@@ -401,12 +401,12 @@ public:
 
     // wavefolderGain
 
-    float wavefolderGain() const { return Routing::routedValueInt(ParamKey::WavefolderGain, _trackIndex, _wavefolderGain.base, 0, 200) * 0.01f; }
-    void setWavefolderGain(float value, bool routed = false) {
-        _wavefolderGain.set(clamp(int16_t(std::round(value * 100.f)), int16_t(0), int16_t(200)), routed);
+    float wavefolderGain() const { return Routing::routedValueInt(ParamKey::WavefolderGain, _trackIndex, _wavefolderGain, 0, 200) * 0.01f; }
+    void setWavefolderGain(float value) {
+        _wavefolderGain = clamp(int16_t(std::round(value * 100.f)), int16_t(0), int16_t(200));
     }
     void editWavefolderGain(int value, bool shift) {
-        setWavefolderGain(_wavefolderGain.base * 0.01f + value * (shift ? 0.1f : 0.01f));
+        setWavefolderGain(_wavefolderGain * 0.01f + value * (shift ? 0.1f : 0.01f));
     }
     void printWavefolderGain(StringBuilder &str) const {
         printRouted(str, Routing::Target::WavefolderGain);
@@ -415,12 +415,12 @@ public:
 
     // djFilter
 
-    float djFilter() const { return Routing::routedValueInt(ParamKey::DjFilter, _trackIndex, _djFilter.base, -100, 100) * 0.01f; }
-    void setDjFilter(float value, bool routed = false) {
-        _djFilter.set(clamp(int16_t(std::round(value * 100.f)), int16_t(-100), int16_t(100)), routed);
+    float djFilter() const { return Routing::routedValueInt(ParamKey::DjFilter, _trackIndex, _djFilter, -100, 100) * 0.01f; }
+    void setDjFilter(float value) {
+        _djFilter = clamp(int16_t(std::round(value * 100.f)), int16_t(-100), int16_t(100));
     }
     void editDjFilter(int value, bool shift) {
-        setDjFilter(_djFilter.base * 0.01f + value * (shift ? 0.1f : 0.01f));
+        setDjFilter(_djFilter * 0.01f + value * (shift ? 0.1f : 0.01f));
     }
     void printDjFilter(StringBuilder &str) const {
         printRouted(str, Routing::Target::DjFilter);
@@ -441,12 +441,12 @@ public:
 
     // chaos
 
-    int chaosAmount() const { return Routing::routedValueInt(ParamKey::ChaosAmount, _trackIndex, _chaosAmount.base, 0, 100); }
-    void setChaosAmount(int value, bool routed = false) {
-        _chaosAmount.set(clamp(value, 0, 100), routed);
+    int chaosAmount() const { return Routing::routedValueInt(ParamKey::ChaosAmount, _trackIndex, _chaosAmount, 0, 100); }
+    void setChaosAmount(int value) {
+        _chaosAmount = clamp(value, 0, 100);
     }
     void editChaosAmount(int value, bool shift) {
-        setChaosAmount(_chaosAmount.base + value * (shift ? 5 : 1));
+        setChaosAmount(_chaosAmount + value * (shift ? 5 : 1));
     }
     void printChaosAmount(StringBuilder &str) const {
         printRouted(str, Routing::Target::ChaosAmount);
@@ -463,12 +463,12 @@ public:
     void editChaosRange(int value, bool shift) { setChaosRange(ModelUtils::adjustedEnum(chaosRange(), value)); }
     void printChaosRange(StringBuilder &str) const { str(chaosRangeName(chaosRange())); }
 
-    int chaosRate() const { return Routing::routedValueInt(ParamKey::ChaosRate, _trackIndex, _chaosRate.base, 0, 127); }
-    void setChaosRate(int value, bool routed = false) {
-        _chaosRate.set(clamp(value, 0, 127), routed);
+    int chaosRate() const { return Routing::routedValueInt(ParamKey::ChaosRate, _trackIndex, _chaosRate, 0, 127); }
+    void setChaosRate(int value) {
+        _chaosRate = clamp(value, 0, 127);
     }
     void editChaosRate(int value, bool shift) {
-        setChaosRate(_chaosRate.base + value * (shift ? 5 : 1));
+        setChaosRate(_chaosRate + value * (shift ? 5 : 1));
     }
     float chaosHz() const {
         float normalized = chaosRate() / 127.f;
@@ -498,24 +498,24 @@ public:
         else str("%.0fHz", rate);
     }
 
-    int chaosParam1() const { return Routing::routedValueInt(ParamKey::ChaosParam1, _trackIndex, _chaosParam1.base, 0, 100); }
-    void setChaosParam1(int value, bool routed = false) {
-        _chaosParam1.set(clamp(value, 0, 100), routed);
+    int chaosParam1() const { return Routing::routedValueInt(ParamKey::ChaosParam1, _trackIndex, _chaosParam1, 0, 100); }
+    void setChaosParam1(int value) {
+        _chaosParam1 = clamp(value, 0, 100);
     }
     void editChaosParam1(int value, bool shift) {
-        setChaosParam1(_chaosParam1.base + value * (shift ? 5 : 1));
+        setChaosParam1(_chaosParam1 + value * (shift ? 5 : 1));
     }
     void printChaosParam1(StringBuilder &str) const {
         printRouted(str, Routing::Target::ChaosParam1);
         str("%d", chaosParam1());
     }
 
-    int chaosParam2() const { return Routing::routedValueInt(ParamKey::ChaosParam2, _trackIndex, _chaosParam2.base, 0, 100); }
-    void setChaosParam2(int value, bool routed = false) {
-        _chaosParam2.set(clamp(value, 0, 100), routed);
+    int chaosParam2() const { return Routing::routedValueInt(ParamKey::ChaosParam2, _trackIndex, _chaosParam2, 0, 100); }
+    void setChaosParam2(int value) {
+        _chaosParam2 = clamp(value, 0, 100);
     }
     void editChaosParam2(int value, bool shift) {
-        setChaosParam2(_chaosParam2.base + value * (shift ? 5 : 1));
+        setChaosParam2(_chaosParam2 + value * (shift ? 5 : 1));
     }
     void printChaosParam2(StringBuilder &str) const {
         printRouted(str, Routing::Target::ChaosParam2);
@@ -587,7 +587,7 @@ private:
     void setTrackIndex(int trackIndex) { _trackIndex = trackIndex; }
 
     void offsetFirstAndLastStep(int value) {
-        value = clamp(value, -int(_firstStep.base), CONFIG_STEP_COUNT - 1 - int(_lastStep.base));
+        value = clamp(value, -int(_firstStep), CONFIG_STEP_COUNT - 1 - int(_lastStep));
         if (value > 0) {
             editLastStep(value, false);
             editFirstStep(value, false);
@@ -599,24 +599,24 @@ private:
 
     int8_t _trackIndex = -1;
     Types::VoltageRange _range;
-    Routable<uint16_t> _divisor;
-    Routable<uint8_t> _clockMultiplier;
+    uint16_t _divisor;
+    uint8_t _clockMultiplier;
     uint8_t _resetMeasure;
-    Routable<Types::RunMode> _runMode;
-    Routable<uint8_t> _firstStep;
-    Routable<uint8_t> _lastStep;
+    Types::RunMode _runMode;
+    uint8_t _firstStep;
+    uint8_t _lastStep;
 
-    Routable<int16_t> _wavefolderFold;
-    Routable<int16_t> _wavefolderGain;
-    Routable<int16_t> _djFilter;
+    int16_t _wavefolderFold;
+    int16_t _wavefolderGain;
+    int16_t _djFilter;
     float _xFade;  // Non-routable, UI-only control
 
-    Routable<int8_t> _chaosAmount;
+    int8_t _chaosAmount;
     ChaosAlgorithm _chaosAlgo;
     ChaosRange _chaosRange;
-    Routable<int8_t> _chaosRate;
-    Routable<int8_t> _chaosParam1;
-    Routable<int8_t> _chaosParam2;
+    int8_t _chaosRate;
+    int8_t _chaosParam1;
+    int8_t _chaosParam2;
 
     StepArray _steps;
 
