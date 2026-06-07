@@ -454,6 +454,12 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     [int(Routing::Target::StochasticPatienceRhythm)]              = { 0,      100,    0,      100,    10      },
     [int(Routing::Target::StochasticMutate)]                = { 0,      100,    0,      100,    10      },
     [int(Routing::Target::StochasticJump)]                  = { 0,      100,    0,      100,    10      },
+    // 2026-06-08 routing revamp — pitch-shape + burst-detail targets (0..100)
+    [int(Routing::Target::StochasticRange)]                 = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::StochasticMarblesBias)]           = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::StochasticMarblesSpread)]         = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::StochasticBurstCount)]            = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::StochasticBurstRate)]             = { 0,      100,    0,      100,    10      },
 };
 
 float Routing::normalizeTargetValue(Routing::Target target, float value) {
