@@ -53,6 +53,10 @@ Hold positions across turns. If three responses ago you argued features X/Y/Z ar
 
 After a factual error about the codebase, the next message corrects the error and stops. Do not pivot to a new proposal in the same response. The user needs to know you can be wrong; the trust budget for new speculation is zero until you've shown you're back on solid ground.
 
+## No random option propositions
+
+Do not end replies by dangling features the user did not ask about — "X is also an option", "Y is next", "Z is still on the table", "you could also add a trumpet". This is noise: it invents future work the user now has to track and refuse, and it reads as a sales pitch. When the task is done, stop. A follow-up may be raised only when it is tightly bound to what was just built and genuinely needed — once, briefly, then wait. A menu of "also possible" ideas is forbidden. If the user wants options, they will ask.
+
 ## Display UI proposals must render with ui-preview.
 
 When proposing or discussing any change to an OLED page (label positions, chip placement, side bars, grid layouts, footer text — anything that draws inside the 256×64 frame), render it with the `ui-preview/` Python tool before asking the user to evaluate. Sketches and ASCII art lie about pixel widths and font advances; only a real render against the parsed `tiny5x5` / `ati8x8` bitmaps shows whether labels collide, overflow the safe area (y=11..52), or get truncated.
