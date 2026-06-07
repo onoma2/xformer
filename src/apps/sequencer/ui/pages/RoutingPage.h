@@ -37,10 +37,10 @@ private:
     int routeForBandParam(uint8_t paramKey, uint8_t trackMask) const;
     int tabBandParamCount() const;
 
-    // Static tab ring (fixed positions for muscle memory): 3 fixed bands, then 6 engine
-    // pages (TrackMode enum order, MidiCv + Stochastic excluded), then Bus.
+    // Static tab ring (fixed positions for muscle memory): 3 fixed bands, then 7 engine
+    // pages (MidiCv excluded — its params are all shared band keys), then Bus.
     static constexpr int kBandCount = 3;
-    static constexpr int kEngineCount = 6;
+    static constexpr int kEngineCount = 7;
     static constexpr int kBusTab = kBandCount + kEngineCount;   // 10
     static constexpr int kTabCount = kBusTab + 1;               // 11
     bool tabIsBus(int t) const { return t == kBusTab; }

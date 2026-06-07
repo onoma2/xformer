@@ -145,6 +145,17 @@ CASE("enginePageParams: Curve is the overflow case, keeps chaos + phase") {
     expectFalse(hasKey(keys, n, ParamKey::ClockMultiplier), "ClockMult excluded (Clock band)");
 }
 
+CASE("enginePageParams: Stochastic engine page = the 9 curated targets") {
+    uint8_t keys[32];
+    int n = RouteBrowse::enginePageParams(Track::TrackMode::Stochastic, keys, 32);
+    expectEqual(n, 9, "Stochastic: 17 table rows minus 8 shared");
+    expectTrue(hasKey(keys, n, ParamKey::Range), "Range kept");
+    expectTrue(hasKey(keys, n, ParamKey::MarblesBias), "Bias kept");
+    expectTrue(hasKey(keys, n, ParamKey::BurstRate), "BurstRate kept");
+    expectFalse(hasKey(keys, n, ParamKey::Octave), "Octave excluded (Pitch band)");
+    expectFalse(hasKey(keys, n, ParamKey::Rotate), "Rotate excluded (Pitch band)");
+}
+
 CASE("enginePageParams: MidiCv has no engine-page params (both are shared)") {
     uint8_t keys[32];
     int n = RouteBrowse::enginePageParams(Track::TrackMode::MidiCv, keys, 32);

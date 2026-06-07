@@ -171,6 +171,7 @@ Track::TrackMode RoutingPage::tabEngineMode(int t) const {
     static const Track::TrackMode modes[kEngineCount] = {
         Track::TrackMode::Note, Track::TrackMode::PhaseFlux, Track::TrackMode::Curve,
         Track::TrackMode::Tuesday, Track::TrackMode::DiscreteMap, Track::TrackMode::Indexed,
+        Track::TrackMode::Stochastic,
     };
     return modes[clamp(t - kBandCount, 0, kEngineCount - 1)];
 }
@@ -189,7 +190,7 @@ int RoutingPage::tabParams(int t, uint8_t *keys, int maxKeys) const {
 const char *RoutingPage::tabName(int t) const {
     static const char *names[kTabCount] = {
         "PITCH", "CLOCK", "GLOB",
-        "NOTE", "PHASEFLUX", "CURVE", "TUESDAY", "DISCMAP", "INDEXED",
+        "NOTE", "PHASEFLUX", "CURVE", "TUESDAY", "DISCMAP", "INDEXED", "STOCH",
         "BUS",
     };
     return names[clamp(t, 0, kTabCount - 1)];
