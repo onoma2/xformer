@@ -93,7 +93,8 @@ void Engine::update() {
         while (_usbMidi.recv(&cable, &message)) {}
 
         _cvInput.update();
-        _busCvWritten.fill(false);   // re-seed bus sum each frame (CV-router writes below)
+        _busCvWritten.fill(false);
+        _busCvWriters.fill(0);   // re-seed bus sum each frame (CV-router writes below)
         updateOverrides();
         _cvOutput.update();
         _gateOutput.update();
@@ -108,6 +109,7 @@ void Engine::update() {
 
     updateBusSafetyMode();
     _busCvWritten.fill(false);
+    _busCvWriters.fill(0);
 
     // process clock events
     while (Clock::Event event = _clock.checkEvent()) {
@@ -796,7 +798,7 @@ void Engine::updateCvRouteOutputs() {
             _cvRouteOutputs[lane] = clamp(out, -5.f, 5.f);
             break;
         case CvRoute::OutputDest::Bus:
-            setBusCv(lane, out);
+            setBusCv(lane, out, BusWriterCvRouter);
             _cvRouteOutputs[lane] = 0.f;
             break;
         case CvRoute::OutputDest::None:

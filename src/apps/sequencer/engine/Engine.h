@@ -124,17 +124,29 @@ public:
     const uint8_t gateOutput() const { return _gateOutput.gates(); }
 
     static constexpr int BusCvCount = 4;
+    // Per-lane writer-domain bits, set live at write, reset each frame. The bus page
+    // reads busWriters() to light R/C/T glyphs as routes/CV-router/Teletype drive a lane.
+    static constexpr uint8_t BusWriterRouting = 1 << 0;
+    static constexpr uint8_t BusWriterCvRouter = 1 << 1;
+    static constexpr uint8_t BusWriterTeletype = 1 << 2;
     float busCv(int index) const {
         if (index < 0 || index >= BusCvCount) {
             return 0.f;
         }
         return clamp(_busCv[index], -5.f, 5.f);
     }
+    uint8_t busWriters(int index) const {
+        if (index < 0 || index >= BusCvCount) {
+            return 0;
+        }
+        return _busCvWriters[index];
+    }
     float cvRouteOutput(int lane) const;
-    void setBusCv(int index, float volts) {
+    void setBusCv(int index, float volts, uint8_t writer = 0) {
         if (index < 0 || index >= BusCvCount) {
             return;
         }
+        _busCvWriters[index] |= writer;
         // Sum+clamp law: per-frame writers (routing/CV-router/Teletype) accumulate
         // UNCLAMPED onto the lane (first seeds/drops last frame, rest add); busCv()
         // clamps once at read, so the value is the order-free sum-then-clamp, not an
@@ -337,6 +349,7 @@ private:
     std::array<float, CvOutput::Channels> _cvOutputOverrideValues;
     std::array<float, BusCvCount> _busCv{};
     std::array<bool, BusCvCount> _busCvWritten{};
+    std::array<uint8_t, BusCvCount> _busCvWriters{};
     bool _busCvSafeMode = true;
     static constexpr float BusCvDecay = 0.9995f;
     std::array<float, CvRoute::LaneCount> _cvRouteOutputs{};

@@ -512,7 +512,7 @@ void RoutingEngine::updateSinks() {
                 float centivolts = Routing::denormalizeTargetValue(target, baseValue);
                 float volts = centivolts * 0.01f;  // Convert centivolts to volts
                 int busIndex = int(target) - int(Routing::Target::BusCv1);
-                _engine.setBusCv(busIndex, volts);
+                _engine.setBusCv(busIndex, volts, Engine::BusWriterRouting);
             } else if (Routing::isPerTrackTarget(target)) {
                 uint8_t tracks = route.tracks();
 

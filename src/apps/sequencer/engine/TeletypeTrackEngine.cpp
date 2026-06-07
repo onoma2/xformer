@@ -973,7 +973,7 @@ float TeletypeTrackEngine::busCv(int index) const {
 }
 
 void TeletypeTrackEngine::setBusCv(int index, float volts) {
-    _engine.setBusCv(index, volts);
+    _engine.setBusCv(index, volts, Engine::BusWriterTeletype);
 }
 
 float TeletypeTrackEngine::measureFraction() const {
