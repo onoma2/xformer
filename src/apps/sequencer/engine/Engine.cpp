@@ -93,6 +93,7 @@ void Engine::update() {
         while (_usbMidi.recv(&cable, &message)) {}
 
         _cvInput.update();
+        _busCvWritten.fill(false);   // re-seed bus sum each frame (CV-router writes below)
         updateOverrides();
         _cvOutput.update();
         _gateOutput.update();

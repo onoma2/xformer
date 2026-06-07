@@ -128,21 +128,22 @@ public:
         if (index < 0 || index >= BusCvCount) {
             return 0.f;
         }
-        return _busCv[index];
+        return clamp(_busCv[index], -5.f, 5.f);
     }
     float cvRouteOutput(int lane) const;
     void setBusCv(int index, float volts) {
         if (index < 0 || index >= BusCvCount) {
             return;
         }
-        // Sum+clamp law: per-frame writers (routing/CV-router/Teletype) stack onto the
-        // lane; first writer seeds (drops last frame), rest add, result clamps +-5V.
-        // _busCvWritten resets each frame, so the committed value is the order-free sum.
+        // Sum+clamp law: per-frame writers (routing/CV-router/Teletype) accumulate
+        // UNCLAMPED onto the lane (first seeds/drops last frame, rest add); busCv()
+        // clamps once at read, so the value is the order-free sum-then-clamp, not an
+        // order-biased running clamp. _busCvWritten resets each frame in both paths.
         if (!_busCvWritten[index]) {
             _busCvWritten[index] = true;
-            _busCv[index] = clamp(volts, -5.f, 5.f);
+            _busCv[index] = volts;
         } else {
-            _busCv[index] = clamp(_busCv[index] + volts, -5.f, 5.f);
+            _busCv[index] += volts;
         }
     }
 
