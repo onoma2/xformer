@@ -45,12 +45,12 @@ public:
     void setDivisor(int divisor) { _divisor = ModelUtils::clampDivisor(divisor); }
 
     // clockMultiplier
-    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier.base, 50, 150); }
-    void setClockMultiplier(int clockMultiplier, bool routed = false) {
-        _clockMultiplier.set(clamp(clockMultiplier, 50, 150), routed);
+    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier, 50, 150); }
+    void setClockMultiplier(int clockMultiplier) {
+        _clockMultiplier = clamp(clockMultiplier, 50, 150);
     }
     void editClockMultiplier(int value, bool shift) {
-        setClockMultiplier(_clockMultiplier.base + value * (shift ? 10 : 1));
+        setClockMultiplier(_clockMultiplier + value * (shift ? 10 : 1));
     }
     void printClockMultiplier(StringBuilder &str) const {
         printRouted(str, Routing::Target::ClockMult);
@@ -122,13 +122,13 @@ public:
         if (_melodyMode == StochasticSourceMode::Loop) _melodyValid = false;
     }
 
-    int complexity() const { return Routing::routedValueInt(ParamKey::Complexity, _trackIndex, _complexity.base, 0, 100); }
-    int complexityBase() const { return _complexity.base; }
-    void setComplexity(int complexity, bool routed = false) { _complexity.set(clamp(complexity, 0, 100), routed); }
+    int complexity() const { return Routing::routedValueInt(ParamKey::Complexity, _trackIndex, _complexity, 0, 100); }
+    int complexityBase() const { return _complexity; }
+    void setComplexity(int complexity) { _complexity = clamp(complexity, 0, 100); }
 
-    int contour() const { return Routing::routedValueInt(ParamKey::Contour, _trackIndex, _contour.base, -100, 100); }
-    int contourBase() const { return _contour.base; }
-    void setContour(int contour, bool routed = false) { _contour.set(clamp(contour, -100, 100), routed); }
+    int contour() const { return Routing::routedValueInt(ParamKey::Contour, _trackIndex, _contour, -100, 100); }
+    int contourBase() const { return _contour; }
+    void setContour(int contour) { _contour = clamp(contour, -100, 100); }
 
     // Phase 12: _repeatProb field repurposed as Repeat probability. Per-event
     // chance to reuse the previously-generated event verbatim (note, octave,
@@ -139,24 +139,24 @@ public:
 
     // Live-mode duration LUT entry index 0..7. Divisor-relative: see
     // StochasticTrackEngine::getDurationFraction() for the multiplier table.
-    int noteDuration() const { return Routing::routedValueInt(ParamKey::NoteDuration, _trackIndex, _noteDuration.base, 0, 7); }
-    int noteDurationBase() const { return _noteDuration.base; }
-    void setNoteDuration(int v, bool routed = false) { _noteDuration.set(clamp(v, 0, 7), routed); }
+    int noteDuration() const { return Routing::routedValueInt(ParamKey::NoteDuration, _trackIndex, _noteDuration, 0, 7); }
+    int noteDurationBase() const { return _noteDuration; }
+    void setNoteDuration(int v) { _noteDuration = clamp(v, 0, 7); }
 
     // Phase 11: storage may be signed (legacy patches); read always returns |v|.
-    int variation() const { int b = _variation.base; return Routing::routedValueInt(ParamKey::Variation, _trackIndex, b < 0 ? -b : b, 0, 100); }
-    int variationBase() const { int b = _variation.base; return b < 0 ? -b : b; }
+    int variation() const { int b = _variation; return Routing::routedValueInt(ParamKey::Variation, _trackIndex, b < 0 ? -b : b, 0, 100); }
+    int variationBase() const { int b = _variation; return b < 0 ? -b : b; }
     // Phase 11: variation is symmetric (sign meaningless). New writes clamp to
     // [0, 100]. Legacy patches with negative storage get abs()'d at getter.
-    void setVariation(int variation, bool routed = false) { _variation.set(clamp(variation, 0, 100), routed); }
+    void setVariation(int variation) { _variation = clamp(variation, 0, 100); }
 
-    int rest() const { return Routing::routedValueInt(ParamKey::Rest, _trackIndex, _rest.base, 0, 100); }
-    int restBase() const { return _rest.base; }
-    void setRest(int rest, bool routed = false) { _rest.set(clamp(rest, 0, 100), routed); }
+    int rest() const { return Routing::routedValueInt(ParamKey::Rest, _trackIndex, _rest, 0, 100); }
+    int restBase() const { return _rest; }
+    void setRest(int rest) { _rest = clamp(rest, 0, 100); }
 
-    int slide() const { return Routing::routedValueInt(ParamKey::Slide, _trackIndex, _slide.base, 0, 100); }
-    int slideBase() const { return _slide.base; }
-    void setSlide(int slide, bool routed = false) { _slide.set(clamp(slide, 0, 100), routed); }
+    int slide() const { return Routing::routedValueInt(ParamKey::Slide, _trackIndex, _slide, 0, 100); }
+    int slideBase() const { return _slide; }
+    void setSlide(int slide) { _slide = clamp(slide, 0, 100); }
 
     int burstRate() const { return _burstRate; }
     void setBurstRate(int rate) { _burstRate = clamp(rate, 0, 100); }
@@ -167,23 +167,23 @@ public:
     StochasticBurstHold burstHold() const { return _burstHold; }
     void setBurstHold(StochasticBurstHold pitch) { _burstHold = ModelUtils::clampedEnum(pitch); }
 
-    int sleep() const { return Routing::routedValueInt(ParamKey::Sleep, _trackIndex, _sleep.base, 0, 100); }
-    int sleepBase() const { return _sleep.base; }
-    void setSleep(int sleep, bool routed = false) { _sleep.set(clamp(sleep, 0, 100), routed); }
+    int sleep() const { return Routing::routedValueInt(ParamKey::Sleep, _trackIndex, _sleep, 0, 100); }
+    int sleepBase() const { return _sleep; }
+    void setSleep(int sleep) { _sleep = clamp(sleep, 0, 100); }
 
 
     // mutate — probability 0..100 that one randomly-picked step inside the
     // active window gets destructively re-rolled at each cycle-end. Unipolar.
-    int mutate() const { return Routing::routedValueInt(ParamKey::Mutate, _trackIndex, _mutate.base, 0, 100); }
-    int mutateBase() const { return _mutate.base; }
+    int mutate() const { return Routing::routedValueInt(ParamKey::Mutate, _trackIndex, _mutate, 0, 100); }
+    int mutateBase() const { return _mutate; }
     // Bipolar: -100..0 = Proteus destructive (regenerate one event), 0 = lock,
     // 0..+100 = Marbles permutation (swap two existing events). Magnitude is
     // probability per loop iteration.
-    void setMutate(int mutate, bool routed = false) { _mutate.set(clamp(mutate, 0, 100), routed); }
+    void setMutate(int mutate) { _mutate = clamp(mutate, 0, 100); }
 
-    int jump() const { return Routing::routedValueInt(ParamKey::Jump, _trackIndex, _jump.base, 0, 100); }
-    int jumpBase() const { return _jump.base; }
-    void setJump(int jump, bool routed = false) { _jump.set(clamp(jump, 0, 100), routed); }
+    int jump() const { return Routing::routedValueInt(ParamKey::Jump, _trackIndex, _jump, 0, 100); }
+    int jumpBase() const { return _jump; }
+    void setJump(int jump) { _jump = clamp(jump, 0, 100); }
 
     // Range — bipolar field width / jump-chance knob, 0..100 centered at 50.
     // 50 = single-octave field (no decision in Steps 3..5). >50 expands the
@@ -242,9 +242,9 @@ public:
     // knob 100 = off sentinel. No routing target (matches Repeat treatment).
     int patienceMelody() const { return _patienceMelody; }
     void setPatienceMelody(int value) { _patienceMelody = clamp(value, 0, 100); }
-    int patienceRhythm() const { return Routing::routedValueInt(ParamKey::PatienceRhythm, _trackIndex, _patienceRhythm.base, 0, 100); }
-    int patienceRhythmBase() const { return _patienceRhythm.base; }
-    void setPatienceRhythm(int value, bool routed = false) { _patienceRhythm.set(clamp(value, 0, 100), routed); }
+    int patienceRhythm() const { return Routing::routedValueInt(ParamKey::PatienceRhythm, _trackIndex, _patienceRhythm, 0, 100); }
+    int patienceRhythmBase() const { return _patienceRhythm; }
+    void setPatienceRhythm(int value) { _patienceRhythm = clamp(value, 0, 100); }
 
     // degreeRotation
     int legatoProb() const { return _legatoProb; }
@@ -273,9 +273,9 @@ public:
     void setTiltMelody(int value) { _tiltMelody = clamp(value, 0, 100); }
 
     // maskRhythm (deterministic loop playback thinning, V5 rename from density)
-    int maskRhythm() const { return Routing::routedValueInt(ParamKey::MaskRhythm, _trackIndex, _maskRhythm.base, 0, 100); }
-    int maskRhythmBase() const { return _maskRhythm.base; }
-    void setMaskRhythm(int value, bool routed = false) { _maskRhythm.set(clamp(value, 0, 100), routed); }
+    int maskRhythm() const { return Routing::routedValueInt(ParamKey::MaskRhythm, _trackIndex, _maskRhythm, 0, 100); }
+    int maskRhythmBase() const { return _maskRhythm; }
+    void setMaskRhythm(int value) { _maskRhythm = clamp(value, 0, 100); }
 
     // gateLength — repurposed from the Phase 11 `_gateLength` reserved field. Knob
     // 0..100 controls the spread of per-event gate length around a hardcoded
@@ -284,34 +284,34 @@ public:
     // audible-tick minimum so very short events still produce a real trigger.
     // Routing target keeps the legacy `StochasticGeneratorDensity` enum name
     // for save-file compatibility; UI label changes to "Gate Length".
-    int gateLength() const { return Routing::routedValueInt(ParamKey::StochasticGateLength, _trackIndex, _gateLength.base, 0, 100); }
-    int gateLengthBase() const { return _gateLength.base; }
-    void setGateLength(int value, bool routed = false) { _gateLength.set(clamp(value, 0, 100), routed); }
+    int gateLength() const { return Routing::routedValueInt(ParamKey::StochasticGateLength, _trackIndex, _gateLength, 0, 100); }
+    int gateLengthBase() const { return _gateLength; }
+    void setGateLength(int value) { _gateLength = clamp(value, 0, 100); }
 
     // tiltRhythm — paired with maskRhythm. 0..100, center 50 = pure salt cut,
     // 0 = max negative rank-cut, 100 = max positive rank-cut. Engine recovers
     // signed magnitude as (knob - 50) and uses |signed| * 2 as the rank weight.
-    int tiltRhythm() const { return Routing::routedValueInt(ParamKey::TiltRhythm, _trackIndex, _tiltRhythm.base, 0, 100); }
-    int tiltRhythmBase() const { return _tiltRhythm.base; }
-    void setTiltRhythm(int value, bool routed = false) { _tiltRhythm.set(clamp(value, 0, 100), routed); }
+    int tiltRhythm() const { return Routing::routedValueInt(ParamKey::TiltRhythm, _trackIndex, _tiltRhythm, 0, 100); }
+    int tiltRhythmBase() const { return _tiltRhythm; }
+    void setTiltRhythm(int value) { _tiltRhythm = clamp(value, 0, 100); }
 
     // burs
-    int burst() const { return Routing::routedValueInt(ParamKey::Burst, _trackIndex, _burst.base, 0, 100); }
-    int burstBase() const { return _burst.base; }
-    void setBurst(int burst, bool routed = false) { _burst.set(clamp(burst, 0, 100), routed); }
+    int burst() const { return Routing::routedValueInt(ParamKey::Burst, _trackIndex, _burst, 0, 100); }
+    int burstBase() const { return _burst; }
+    void setBurst(int burst) { _burst = clamp(burst, 0, 100); }
 
     // feel (Phase 16 P4, 2026-05-23) — knob 0..100, default 50. Detent
     // [45..55] = off (no scaling). knob < 45 lerps toward 3 beats per
     // cycle, knob > 55 lerps toward 5 beats per cycle. Generator reads
     // this in the post-walk scaling pass; inert until P5 wires it.
-    int feel() const { return Routing::routedValueInt(ParamKey::Feel, _trackIndex, _feel.base, 0, 100); }
-    int feelBase() const { return _feel.base; }
-    void setFeel(int feel, bool routed = false) { _feel.set(clamp(feel, 0, 100), routed); }
+    int feel() const { return Routing::routedValueInt(ParamKey::Feel, _trackIndex, _feel, 0, 100); }
+    int feelBase() const { return _feel; }
+    void setFeel(int feel) { _feel = clamp(feel, 0, 100); }
 
     // rotate
-    int rotate() const { return Routing::routedValueInt(ParamKey::Rotate, _trackIndex, _rotate.base, -64, 64); }
-    int rotateBase() const { return _rotate.base; }
-    void setRotate(int rotate, bool routed = false) { _rotate.set(clamp(rotate, -64, 64), routed); }
+    int rotate() const { return Routing::routedValueInt(ParamKey::Rotate, _trackIndex, _rotate, -64, 64); }
+    int rotateBase() const { return _rotate; }
+    void setRotate(int rotate) { _rotate = clamp(rotate, -64, 64); }
 
     // durationTickets — per-LUT-slot duration emphasis. Three states (mirror
     // of pitch tickets): -1 excludes the slot, 0 default-flat, 1..100 weight.
@@ -346,21 +346,21 @@ public:
 
 
     void printMaskRhythm(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticMask); str("%d%%", maskRhythm()); }
-    void editMaskRhythm(int value, bool shift) { setMaskRhythm(_maskRhythm.base + value); }
+    void editMaskRhythm(int value, bool shift) { setMaskRhythm(_maskRhythm + value); }
 
     // Level 1 Density macro: writes density only (no fan-out to rest)
     void printGateLength(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticGateLength); str("%d%%", gateLength()); }
     void editGateLength(int value, bool shift) {
-        setGateLength(_gateLength.base + value);
+        setGateLength(_gateLength + value);
     }
 
     void editComplexityMacro(int value, bool shift) {
-        int c = clamp(_complexity.base + value, 0, 100);
+        int c = clamp(_complexity + value, 0, 100);
         setComplexity(c);
     }
 
     void printTiltRhythm(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticTilt); str("%d%%", tiltRhythm()); }
-    void editTiltRhythm(int value, bool shift) { setTiltRhythm(_tiltRhythm.base + value); }
+    void editTiltRhythm(int value, bool shift) { setTiltRhythm(_tiltRhythm + value); }
 
     // Phase 12: append "*" when current noteDuration + divisor combo can't
     // produce audible burst (parentTicks < 96). Engine still gates Burst
@@ -375,22 +375,22 @@ public:
         if (parentTicks < kMinBurstParentTicks) str("%d%% *", burst());
         else str("%d%%", burst());
     }
-    void editBurst(int value, bool shift) { setBurst(_burst.base + value); }
+    void editBurst(int value, bool shift) { setBurst(_burst + value); }
 
     void printPatienceMelody(StringBuilder &str) const { str("%d%%", patienceMelody()); }
     void editPatienceMelody(int value, bool shift) { setPatienceMelody(patienceMelody() + value); }
 
     void printPatienceRhythm(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticPatienceRhythm); str("%d%%", patienceRhythm()); }
-    void editPatienceRhythm(int value, bool shift) { setPatienceRhythm(_patienceRhythm.base + value); }
+    void editPatienceRhythm(int value, bool shift) { setPatienceRhythm(_patienceRhythm + value); }
 
     void printLegatoProb(StringBuilder &str) const { str("%d%%", legatoProb()); }
     void editLegatoProb(int value, bool shift) { setLegatoProb(ModelUtils::adjustedByStep(legatoProb(), value, 1, !shift)); }
 
     void printComplexity(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticComplexity); str("%d%%", complexity()); }
-    void editComplexity(int value, bool shift) { setComplexity(_complexity.base + value); }
+    void editComplexity(int value, bool shift) { setComplexity(_complexity + value); }
 
     void printContour(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticContour); str("%+d%%", contour()); }
-    void editContour(int value, bool shift) { setContour(_contour.base + value); }
+    void editContour(int value, bool shift) { setContour(_contour + value); }
 
     void printNoteDuration(StringBuilder &str) const {
         printRouted(str, Routing::Target::StochasticNoteDuration);
@@ -405,26 +405,26 @@ public:
         int effectiveDivisor = (int(divisor()) * frac.num) / frac.den;
         ModelUtils::printDivisorShort(str, effectiveDivisor);
     }
-    void editNoteDuration(int value, bool shift) { setNoteDuration(_noteDuration.base + value); }
+    void editNoteDuration(int value, bool shift) { setNoteDuration(_noteDuration + value); }
 
     void printVariation(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticVariation); str("%d%%", variation()); }
-    void editVariation(int value, bool shift) { setVariation(_variation.base + value); }
+    void editVariation(int value, bool shift) { setVariation(_variation + value); }
 
     void printRest(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticRest); str("%d%%", rest()); }
-    void editRest(int value, bool shift) { setRest(_rest.base + value); }
+    void editRest(int value, bool shift) { setRest(_rest + value); }
 
     void printSlide(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticSlide); str("%d%%", slide()); }
-    void editSlide(int value, bool shift) { setSlide(_slide.base + value); }
+    void editSlide(int value, bool shift) { setSlide(_slide + value); }
 
     void printSleep(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticSleep); str("%d%%", sleep()); }
-    void editSleep(int value, bool shift) { setSleep(_sleep.base + value); }
+    void editSleep(int value, bool shift) { setSleep(_sleep + value); }
 
 
     void printMutate(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticMutate); str("%d%%", mutate()); }
-    void editMutate(int value, bool shift) { setMutate(_mutate.base + value); }
+    void editMutate(int value, bool shift) { setMutate(_mutate + value); }
 
     void printJump(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticJump); str("%d%%", jump()); }
-    void editJump(int value, bool shift) { setJump(_jump.base + value); }
+    void editJump(int value, bool shift) { setJump(_jump + value); }
 
     void printBurstHold(StringBuilder &str) const {
         switch (burstHold()) {
@@ -438,7 +438,7 @@ public:
     void editBurstHold(int value, bool shift) { setBurstHold(ModelUtils::adjustedEnum(burstHold(), value)); }
 
     void printRotate(StringBuilder &str) const { printRouted(str, Routing::Target::Rotate); str("%+d", rotate()); }
-    void editRotate(int value, bool shift) { setRotate(_rotate.base + value); }
+    void editRotate(int value, bool shift) { setRotate(_rotate + value); }
 
     void printRootNote(StringBuilder &str) const {
         if (rootNote() == -1) {
@@ -502,7 +502,7 @@ public:
         writer.write(_rootNote);
         writer.write(_divisor);
         writer.write(_resetMeasure);
-        _clockMultiplier.write(writer);
+        writer.write(_clockMultiplier);
 
         writer.write(_size);
         writer.write(_first);
@@ -523,30 +523,30 @@ public:
         writer.write(_marblesSpread);
         writer.write(_marblesBias);
         writer.write(_maskMelody);
-        _maskRhythm.write(writer);
-        _tiltRhythm.write(writer);
-        _burst.write(writer);
-        _feel.write(writer);
+        writer.write(_maskRhythm);
+        writer.write(_tiltRhythm);
+        writer.write(_burst);
+        writer.write(_feel);
         writer.write(uint8_t(0));   // reserved (was _minDegree)
         writer.write(uint8_t(0));   // reserved (was _maxDegree)
-        _rotate.write(writer);
-        _complexity.write(writer);
-        _contour.write(writer);
-        _noteDuration.write(writer);
-        _variation.write(writer);
-        _rest.write(writer);
-        _slide.write(writer);
+        writer.write(_rotate);
+        writer.write(_complexity);
+        writer.write(_contour);
+        writer.write(_noteDuration);
+        writer.write(_variation);
+        writer.write(_rest);
+        writer.write(_slide);
         writer.write(_burstRate);
         writer.write(_burstCount);
         writer.write(static_cast<uint8_t>(_burstHold));
-        _sleep.write(writer);
-        _patienceRhythm.write(writer);
-        _mutate.write(writer);
-        _jump.write(writer);
+        writer.write(_sleep);
+        writer.write(_patienceRhythm);
+        writer.write(_mutate);
+        writer.write(_jump);
         writer.write(_range);
         writer.write(static_cast<uint8_t>(_rhythmMode));
         writer.write(static_cast<uint8_t>(_melodyMode));
-        _gateLength.write(writer);
+        writer.write(_gateLength);
         for (int i = 0; i < 8; ++i) writer.write(_durationTickets[i]);
         writer.write(uint8_t(0));   // reserved (was StochasticLevel enum)
         writer.write(_tiltMelody);
@@ -565,7 +565,7 @@ public:
         _divisor = ModelUtils::clampDivisor(_divisor);
         reader.read(_resetMeasure);
         _resetMeasure = clamp(int(_resetMeasure), 0, 128);
-        _clockMultiplier.read(reader);
+        reader.read(_clockMultiplier);
 
         reader.read(_size);
         reader.read(_first);
@@ -597,19 +597,19 @@ public:
         _marblesBias = clamp(int(_marblesBias), 0, 100);
         reader.read(_maskMelody);
         _maskMelody = clamp(int(_maskMelody), 0, 100);
-        _maskRhythm.read(reader);
-        _tiltRhythm.read(reader);
-        _burst.read(reader);
-        _feel.read(reader);
+        reader.read(_maskRhythm);
+        reader.read(_tiltRhythm);
+        reader.read(_burst);
+        reader.read(_feel);
         { uint8_t reserved; reader.read(reserved); }   // was _minDegree
         { uint8_t reserved; reader.read(reserved); }   // was _maxDegree
-        _rotate.read(reader);
-        _complexity.read(reader);
-        _contour.read(reader);
-        _noteDuration.read(reader);
-        _variation.read(reader);
-        _rest.read(reader);
-        _slide.read(reader);
+        reader.read(_rotate);
+        reader.read(_complexity);
+        reader.read(_contour);
+        reader.read(_noteDuration);
+        reader.read(_variation);
+        reader.read(_rest);
+        reader.read(_slide);
         reader.read(_burstRate);
         _burstRate = clamp(int(_burstRate), 0, 100);
         reader.read(_burstCount);
@@ -617,10 +617,10 @@ public:
         uint8_t burstHold;
         reader.read(burstHold);
         _burstHold = burstHold < uint8_t(StochasticBurstHold::Last) ? static_cast<StochasticBurstHold>(burstHold) : StochasticBurstHold::HoldOver;
-        _sleep.read(reader);
-        _patienceRhythm.read(reader);
-        _mutate.read(reader);
-        _jump.read(reader);
+        reader.read(_sleep);
+        reader.read(_patienceRhythm);
+        reader.read(_mutate);
+        reader.read(_jump);
         reader.read(_range);
         _range = clamp(int(_range), 0, 100);
 
@@ -630,7 +630,7 @@ public:
         reader.read(melodyMode);
         _melodyMode = melodyMode < uint8_t(StochasticSourceMode::Last) ? static_cast<StochasticSourceMode>(melodyMode) : StochasticSourceMode::Loop;
 
-        _gateLength.read(reader);
+        reader.read(_gateLength);
         for (int i = 0; i < 8; ++i) {
             reader.read(_durationTickets[i]);
             _durationTickets[i] = clamp(int(_durationTickets[i]), -1, 100);
@@ -710,7 +710,7 @@ public:
         snap.rootNote = _rootNote;
         snap.divisor = _divisor;
         snap.resetMeasure = _resetMeasure;
-        snap.clockMultiplier = _clockMultiplier.base;
+        snap.clockMultiplier = _clockMultiplier;
         snap.size = _size;
         snap.first = _first;
         snap.rhythmValid = _rhythmValid;
@@ -726,25 +726,25 @@ public:
         snap.marblesBias = _marblesBias;
         snap.maskMelody = _maskMelody;
         snap.tiltMelody = _tiltMelody;
-        snap.maskRhythm = _maskRhythm.base;
-        snap.gateLength = _gateLength.base;
-        snap.tiltRhythm = _tiltRhythm.base;
-        snap.burst = _burst.base;
-        snap.feel = _feel.base;
-        snap.rotate = _rotate.base;
-        snap.complexity = _complexity.base;
-        snap.contour = _contour.base;
-        snap.noteDuration = _noteDuration.base;
-        snap.variation = _variation.base;
-        snap.rest = _rest.base;
-        snap.slide = _slide.base;
+        snap.maskRhythm = _maskRhythm;
+        snap.gateLength = _gateLength;
+        snap.tiltRhythm = _tiltRhythm;
+        snap.burst = _burst;
+        snap.feel = _feel;
+        snap.rotate = _rotate;
+        snap.complexity = _complexity;
+        snap.contour = _contour;
+        snap.noteDuration = _noteDuration;
+        snap.variation = _variation;
+        snap.rest = _rest;
+        snap.slide = _slide;
         snap.burstRate = _burstRate;
         snap.burstCount = _burstCount;
         snap.burstHold = uint8_t(_burstHold);
-        snap.sleep = _sleep.base;
-        snap.patienceRhythm = _patienceRhythm.base;
-        snap.mutate = _mutate.base;
-        snap.jump = _jump.base;
+        snap.sleep = _sleep;
+        snap.patienceRhythm = _patienceRhythm;
+        snap.mutate = _mutate;
+        snap.jump = _jump;
         snap.range = _range;
         snap.rhythmMode = uint8_t(_rhythmMode);
         snap.melodyMode = uint8_t(_melodyMode);
@@ -758,7 +758,7 @@ public:
         _rootNote = snap.rootNote;
         _divisor = snap.divisor;
         _resetMeasure = snap.resetMeasure;
-        _clockMultiplier.setBase(snap.clockMultiplier);
+        _clockMultiplier = snap.clockMultiplier;
         _size = snap.size;
         _first = snap.first;
         _rhythmValid = snap.rhythmValid;
@@ -774,25 +774,25 @@ public:
         _marblesBias = snap.marblesBias;
         _maskMelody = snap.maskMelody;
         _tiltMelody = snap.tiltMelody;
-        _maskRhythm.setBase(snap.maskRhythm);
-        _gateLength.setBase(snap.gateLength);
-        _tiltRhythm.setBase(snap.tiltRhythm);
-        _burst.setBase(snap.burst);
-        _feel.setBase(snap.feel);
-        _rotate.setBase(snap.rotate);
-        _complexity.setBase(snap.complexity);
-        _contour.setBase(snap.contour);
-        _noteDuration.setBase(snap.noteDuration);
-        _variation.setBase(snap.variation);
-        _rest.setBase(snap.rest);
-        _slide.setBase(snap.slide);
+        _maskRhythm = snap.maskRhythm;
+        _gateLength = snap.gateLength;
+        _tiltRhythm = snap.tiltRhythm;
+        _burst = snap.burst;
+        _feel = snap.feel;
+        _rotate = snap.rotate;
+        _complexity = snap.complexity;
+        _contour = snap.contour;
+        _noteDuration = snap.noteDuration;
+        _variation = snap.variation;
+        _rest = snap.rest;
+        _slide = snap.slide;
         _burstRate = snap.burstRate;
         _burstCount = snap.burstCount;
         _burstHold = StochasticBurstHold(snap.burstHold < uint8_t(StochasticBurstHold::Last) ? snap.burstHold : 0);
-        _sleep.setBase(snap.sleep);
-        _patienceRhythm.setBase(snap.patienceRhythm);
-        _mutate.setBase(snap.mutate);
-        _jump.setBase(snap.jump);
+        _sleep = snap.sleep;
+        _patienceRhythm = snap.patienceRhythm;
+        _mutate = snap.mutate;
+        _jump = snap.jump;
         _range = snap.range;
         _rhythmMode = StochasticSourceMode(snap.rhythmMode < uint8_t(StochasticSourceMode::Last) ? snap.rhythmMode : 0);
         _melodyMode = StochasticSourceMode(snap.melodyMode < uint8_t(StochasticSourceMode::Last) ? snap.melodyMode : 0);
@@ -811,7 +811,7 @@ private:
         _rootNote = -1;
         _divisor = 12;
         _resetMeasure = 0;
-        _clockMultiplier.setBase(100);
+        _clockMultiplier = 100;
 
         _size = 32;
         _first = 0;
@@ -834,25 +834,25 @@ private:
         _marblesBias = 50;
         _maskMelody = 100;
         _tiltMelody = 0;
-        _maskRhythm.setBase(100);
-        _gateLength.setBase(0);
-        _tiltRhythm.setBase(50);
-        _burst.setBase(0);
-        _feel.setBase(50);
-        _rotate.setBase(0);
-        _complexity.setBase(50);
-        _contour.setBase(0);
-        _noteDuration.setBase(5);   // LUT entry 5 = ×1 (= divisor)
-        _variation.setBase(16);     // audible variation at fresh roll
-        _rest.setBase(0);
-        _slide.setBase(0);
+        _maskRhythm = 100;
+        _gateLength = 0;
+        _tiltRhythm = 50;
+        _burst = 0;
+        _feel = 50;
+        _rotate = 0;
+        _complexity = 50;
+        _contour = 0;
+        _noteDuration = 5;   // LUT entry 5 = ×1 (= divisor)
+        _variation = 16;     // audible variation at fresh roll
+        _rest = 0;
+        _slide = 0;
         _burstRate = 50;
         _burstCount = 0;
         _burstHold = StochasticBurstHold::HoldOver;   // default matches today's "uniform burst, shared pitch"
-        _sleep.setBase(0);
-        _patienceRhythm.setBase(100);
-        _mutate.setBase(0);
-        _jump.setBase(0);
+        _sleep = 0;
+        _patienceRhythm = 100;
+        _mutate = 0;
+        _jump = 0;
         _range = 50;
         _rhythmMode = StochasticSourceMode::Live;
         _melodyMode = StochasticSourceMode::Live;
@@ -886,7 +886,7 @@ private:
     int8_t _rootNote = -1;
     uint8_t _divisor = 12;
     uint8_t _resetMeasure = 0;
-    Routable<uint8_t> _clockMultiplier;
+    uint8_t _clockMultiplier;
 
     uint8_t _size;
     uint8_t _first;
@@ -912,26 +912,26 @@ private:
     uint8_t _maskMelody;
     uint8_t _tiltMelody;
 
-    Routable<uint8_t> _maskRhythm;
-    Routable<uint8_t> _gateLength;
-    Routable<uint8_t> _tiltRhythm;
-    Routable<uint8_t> _burst;
-    Routable<uint8_t> _feel;
+    uint8_t _maskRhythm;
+    uint8_t _gateLength;
+    uint8_t _tiltRhythm;
+    uint8_t _burst;
+    uint8_t _feel;
 
-    Routable<int8_t> _rotate;
-    Routable<uint8_t> _complexity;
-    Routable<int8_t> _contour;
-    Routable<uint8_t> _noteDuration;
-    Routable<int8_t> _variation;
-    Routable<uint8_t> _rest;
-    Routable<uint8_t> _slide;
+    int8_t _rotate;
+    uint8_t _complexity;
+    int8_t _contour;
+    uint8_t _noteDuration;
+    int8_t _variation;
+    uint8_t _rest;
+    uint8_t _slide;
     uint8_t _burstRate;
     uint8_t _burstCount;
     StochasticBurstHold _burstHold;
-    Routable<uint8_t> _sleep;
-    Routable<uint8_t> _patienceRhythm;
-    Routable<uint8_t> _mutate;
-    Routable<uint8_t> _jump;
+    uint8_t _sleep;
+    uint8_t _patienceRhythm;
+    uint8_t _mutate;
+    uint8_t _jump;
     uint8_t _range;
 
     int8_t _durationTickets[8];
