@@ -1,6 +1,7 @@
 #include "UnitTest.h"
 
 #include "apps/sequencer/engine/StochasticGenerator.h"
+#include "apps/sequencer/engine/StochasticBurstHoldRandom.h"
 #include "apps/sequencer/model/StochasticSequence.h"
 #include "apps/sequencer/model/StochasticTrack.h"
 #include "apps/sequencer/model/Scale.h"
@@ -533,6 +534,23 @@ CASE("produces_valid_output_at_all_defaults") {
         if (deg >= 0) outCount++;
     }
     expectEqual(outCount, 100, "default config should always produce a valid degree");
+}
+
+CASE("burstHoldForCell: <=50 configured, >50 deterministic salted, axes independent") {
+    using BH = StochasticBurstHold;
+    expectTrue(stochasticBurstHoldForCell(50, BH::RollFit, 123, 0) == BH::RollFit, "50 -> configured");
+    expectTrue(stochasticBurstHoldForCell(0, BH::HoldOver, 123, 0) == BH::HoldOver, "0 -> configured");
+    auto a = stochasticBurstHoldForCell(80, BH::HoldFit, 777, 3);
+    auto b = stochasticBurstHoldForCell(80, BH::HoldFit, 777, 3);
+    expectTrue(a == b, "deterministic for same seed+index");
+    bool sawRoll = false, sawHold = false, sawFit = false, sawOver = false;
+    for (uint32_t i = 0; i < 64; ++i) {
+        auto m = stochasticBurstHoldForCell(99, BH::HoldFit, 42, i);
+        if (burstHoldIsRoll(m)) sawRoll = true; else sawHold = true;
+        if (burstHoldIsFit(m)) sawFit = true; else sawOver = true;
+    }
+    expectTrue(sawRoll && sawHold, "Roll/Hold both occur above 50");
+    expectTrue(sawFit && sawOver, "Fit/Over both occur above 50");
 }
 
 } // UNIT_TEST("StochasticGenerator")

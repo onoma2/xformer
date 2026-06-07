@@ -362,6 +362,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
             _lastStepContent = eval;
             _lastStepContentValid = true;
+            _lastStepIndex = uint8_t(stepIndex);
         }
 
         int activeNotes = scale.notesPerOctave();
@@ -481,7 +482,8 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         uint8_t clusterTailCount = 0;
 
         if (useRepeat && !isRest) {
-            StochasticGenerator::evaluateBurst(evalBursts, sequence, eval, track, scale, rootNote, note, durationTicks, _rng);
+            StochasticGenerator::evaluateBurst(evalBursts, sequence, eval, track, scale, rootNote, note, durationTicks, _rng,
+                                               sequence.melodySeed(), uint32_t(_lastStepIndex));
             for (int i = 0; i < kMaxBurst; ++i) if (evalBursts[i].valid) clusterTailCount++;
         }
 
@@ -518,7 +520,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                         uint32_t lowTick = childTick > tick + 2 ? childTick - 2 : tick;
 
                         int childNote = evalBursts[i].note;
-                        if (burstHoldIsRoll(sequence.burstHold())) {
+                        if (evalBursts[i].roll) {   // baked Roll/Hold, matches the note evaluateBurst generated
                             childNote += (_jumpRegister + track.octave()) * activeNotes + track.transpose();
                         }
                         float childCv = scale.noteToVolts(childNote) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);

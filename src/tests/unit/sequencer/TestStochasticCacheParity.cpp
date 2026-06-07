@@ -445,12 +445,17 @@ CASE("burst_knob_at_100_produces_cluster_cells") {
     int n = rebuildStepCache(cache, seq, 48, /*seed*/ 0xdead);
     expectEqual(n, 8);
 
-    // First cell sets the baseline duration. At least one of the remaining
-    // cells must be shorter — that's the cluster signature.
-    const uint32_t baselineDur = cache.runtimeSteps[0].durationTicks();
+    // Clustering shows up as duration variation. At least one cell must be
+    // shorter than the longest cell (the cluster signature). Relative to the max,
+    // not cell 0, because burst>50 randomizes Fit/Over per cell — cell 0 may itself
+    // be a cluster anchor, so it is no longer guaranteed to be the full baseline.
+    uint32_t maxDur = 0;
+    for (int i = 0; i < int(cache.count); ++i) {
+        maxDur = std::max(maxDur, cache.runtimeSteps[i].durationTicks());
+    }
     bool sawShorterCell = false;
-    for (int i = 1; i < int(cache.count); ++i) {
-        if (cache.runtimeSteps[i].durationTicks() < baselineDur) {
+    for (int i = 0; i < int(cache.count); ++i) {
+        if (cache.runtimeSteps[i].durationTicks() < maxDur) {
             sawShorterCell = true;
             break;
         }

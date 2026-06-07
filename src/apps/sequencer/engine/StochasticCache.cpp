@@ -1,6 +1,7 @@
 #include "StochasticCache.h"
 #include "StochasticTrackEngine.h"   // for getDurationFraction
 #include "StochasticGenerator.h"     // for generateDegree (burst-child notes)
+#include "StochasticBurstHoldRandom.h"
 #include "KeyedRng.h"
 #include "Config.h"                  // CONFIG_PPQN for Feel beat-ticks
 
@@ -162,7 +163,10 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
         // Decide this cell's duration. Cluster overrides the per-cell pick.
         uint32_t cellDur;
         bool isClusterTail = false;   // continuation cell of an in-flight cluster
-        const bool burstFit = burstHoldIsFit(seq.burstHold());
+        // Fit/Over axis: randomized per fired burst above 50% (salted by the rhythm
+        // seed + cell), else the configured mode. Independent of the pitch Roll/Hold.
+        const bool burstFit = burstHoldIsFit(
+            stochasticBurstHoldForCell(int(seq.burst()), seq.burstHold(), seed, uint32_t(i)));
 
         if (clusterRemaining > 0) {
             // Read this cell's duration from the cluster's pre-built array.
@@ -288,7 +292,8 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
         uint8_t cellDegree;
         uint8_t cellOctave;
         if (isClusterTail) {
-            if (bakeChildNotes && burstHoldIsRoll(seq.burstHold())) {
+            if (bakeChildNotes && burstHoldIsRoll(
+                    stochasticBurstHoldForCell(int(seq.burst()), seq.burstHold(), seq.melodySeed(), uint32_t(i)))) {
                 // Cluster-tail Generate pitch lives in the melody domain
                 // (melodySeed-keyed) so NewR does not shift cluster-tail
                 // pitches. Distinct salt from the anchor RNG so the two

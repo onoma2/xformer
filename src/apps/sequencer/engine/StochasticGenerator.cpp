@@ -1,5 +1,6 @@
 #include "StochasticGenerator.h"
 #include "StochasticTrackEngine.h"   // for getDurationFraction + kMaxBurst
+#include "StochasticBurstHoldRandom.h"
 #include "Config.h"                  // CONFIG_PPQN / CONFIG_SEQUENCE_PPQN
 
 #include <cmath>
@@ -257,8 +258,14 @@ void StochasticGenerator::generateMaskRanks(StochasticSequence &sequence, int si
     }
 }
 
-void StochasticGenerator::evaluateBurst(EvaluatedBurstNote *bursts, const StochasticSequence &sequence, const StochasticStepContent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int anchorNote, uint32_t durationTicks, Random &rng) {
+void StochasticGenerator::evaluateBurst(EvaluatedBurstNote *bursts, const StochasticSequence &sequence, const StochasticStepContent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int anchorNote, uint32_t durationTicks, Random &rng, uint32_t burstHoldSeed, uint32_t burstHoldCell) {
     int count = event.burstTails();
+
+    // Roll/Hold for this burst: randomized above 50% (salted by the melody seed +
+    // captured cell), else the configured mode. Baked onto each note so playback
+    // (TrackEngine Repeat) reads the same choice rather than re-deriving it.
+    const bool burstRoll = burstHoldIsRoll(
+        stochasticBurstHoldForCell(int(sequence.burst()), sequence.burstHold(), burstHoldSeed, burstHoldCell));
 
     // Cluster F eval-time safety net: regardless of what burstTails the event
     // stores (possibly generated at a longer duration), suppress burst if the
@@ -298,12 +305,13 @@ void StochasticGenerator::evaluateBurst(EvaluatedBurstNote *bursts, const Stocha
             bursts[i].tickOffset = offset;
             bursts[i].gateTicks = gate;
             
-            if (burstHoldIsRoll(sequence.burstHold())) {
+            if (burstRoll) {
                 StochasticGenerator::PitchGenState burstState{};
                 bursts[i].note = generateDegree(sequence, track, scale, burstState, rng);
             } else {
                 bursts[i].note = anchorNote;
             }
+            bursts[i].roll = burstRoll;
             bursts[i].valid = true;
         }
     }

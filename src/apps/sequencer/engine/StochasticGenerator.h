@@ -21,9 +21,10 @@ public:
         uint32_t gateTicks;
         int note;
         bool valid;
+        bool roll;      // baked Roll/Hold for this burst (playback reads this, not the live mode)
     };
 
-    static void evaluateBurst(EvaluatedBurstNote *bursts, const StochasticSequence &sequence, const StochasticStepContent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int anchorNote, uint32_t durationTicks, Random &rng);
+    static void evaluateBurst(EvaluatedBurstNote *bursts, const StochasticSequence &sequence, const StochasticStepContent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int anchorNote, uint32_t durationTicks, Random &rng, uint32_t burstHoldSeed, uint32_t burstHoldCell);
 
     // Pitch generation state passed through the per-slot picker. Tracks the
     // last absolute degree (for direction/contour) plus the recent class

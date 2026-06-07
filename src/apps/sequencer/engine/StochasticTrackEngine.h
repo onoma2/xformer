@@ -245,6 +245,7 @@ private:
     // Repeat path: holds the last-emitted event for replay on a Repeat hit.
     StochasticStepContent _lastStepContent;
     bool _lastStepContentValid = false;
+    uint8_t _lastStepIndex = 0;   // step a Repeat replays — seeds its burst-hold pick
 
     struct Gate {
         uint32_t tick;
