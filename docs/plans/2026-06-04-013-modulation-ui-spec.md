@@ -315,6 +315,34 @@ bespoke ADD/REMOVE set. Two halves:
   (+ edit-source / edit-depth variants). Supersedes the bus-hub landing slice's VIEW/ADD/SAFE/REMOVE
   footer.
 
+**2026-06-07 — static engine pages; Prob band folds in; SlideTime + Rotate ride Pitch.** §5 defined
+only the fixed bands and left the engine-specific params (~50) reachable from the param door only.
+Owner decision: surface them as **static engine pages** in the matrix tab ring.
+
+- **Static ring (fixed positions for muscle memory), 10 tabs, `%10`:** `PITCH · CLOCK · GLOB`
+  (3 fixed bands) → `NOTE · PHASEFLUX · CURVE · TUESDAY · DISCMAP · INDEXED` (6 engine pages,
+  TrackMode enum order) → `BUS`. Every page is always present regardless of which engines the
+  project uses (an engine page with no matching track shows all-ineligible cells) — rejected the
+  dynamic in-use-only ring as needless page-loading complexity, and a fixed position is the better
+  muscle-memory anchor. **MidiCv excluded** (its 2 params are both shared → empty page);
+  **Stochastic deferred** (its routing needs its own revamp).
+- **Fixed bands are Pitch / Clock / Global.** The **Prob/Bias band is removed** (its bias params are
+  Note/Curve-specific → fold into those engine pages). **SlideTime + Rotate fold into the Pitch
+  band** rather than getting their own tabs (no thin one-row pages). (`RouteBrowse::bandParams`.)
+- **Engine page = the mode's per-type table minus the shared Pitch(+SlideTime+Rotate)/Clock keys**
+  (`RouteBrowse::enginePageParams`, on `RouteFork::tableForMode`). Counts: Note 7, Curve **15**
+  (overflow), Tuesday 9, MidiCv 0. The existing `tabCellEligible` already gates a cell on the
+  track's engine owning the param, so an engine page's cells light only on that engine's columns —
+  no new eligibility logic.
+- **Row scrolling** (the new mechanic): ~4 rows fit, so engine pages scroll a 4-row window with a
+  right-edge scrollbar; the cursor drags the window. Gutter widened to 52px on engine tabs.
+- **Short labels:** rows whose full table name overruns the gutter use `RouteBrowse::shortLabel`
+  (C.Rate, Gate Bias, Algo, …), reusing each engine's own edit-page wording. Renders:
+  `ui-preview/engine/engine-curve-proposed.png` (overflow), `engine-note-proposed.png`.
+- **Reverse map generalized:** `RouteBrowse::paramKeyToTarget` now inverts
+  `RouteFork::targetToParamKey` by scan, so every engine key (not just band keys) resolves to a
+  Target for route creation. Same draft→COMMIT edit flow as the bands (§15 matrix-door rules).
+
 ---
 
 ## 16. Shipped state (2026-06-05) — phases 1-5 + hardware-tuning round

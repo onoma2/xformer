@@ -68,7 +68,7 @@ void RoutingPage::exit() {
 }
 
 void RoutingPage::draw(Canvas &canvas) {
-    if (_tabEditorTab == 4) {
+    if (tabIsBus(_tabEditorTab)) {
         drawBus(canvas);
     } else {
         drawTabEditor(canvas);
@@ -81,7 +81,7 @@ void RoutingPage::keyPress(KeyPressEvent &event) {
     if (event.key().pageModifier()) {
         return;
     }
-    if (_tabEditorTab == 4) {
+    if (tabIsBus(_tabEditorTab)) {
         handleBusKey(event);
     } else {
         handleTabEditorKey(event);
@@ -89,7 +89,7 @@ void RoutingPage::keyPress(KeyPressEvent &event) {
 }
 
 void RoutingPage::encoder(EncoderEvent &event) {
-    if (_tabEditorTab == 4) {           // bus tab
+    if (tabIsBus(_tabEditorTab)) {           // bus tab
         if (_matrixEditActive) {        // editing a lane: dial the draft source/depth
             if (_matrixView == MatrixView::Source) {
                 matrixEditSource(event.value(), event.pressed() || globalKeyState()[Key::Shift]);
@@ -110,15 +110,14 @@ void RoutingPage::encoder(EncoderEvent &event) {
             return;
         }
         // DEPTH view: dial the cursor cell's draft depth
-        auto band = RouteBrowse::Band(_tabEditorTab);
-        bool global = band == RouteBrowse::Band::Global;
         const Track &track = _project.track(_tabCol);
         uint8_t paramKey = 0;
         {
-            uint8_t keys[8];
-            int n = RouteBrowse::bandParams(band, keys, 8);
+            uint8_t keys[16];
+            int n = tabParams(_tabEditorTab, keys, 16);
             paramKey = (n > 0) ? keys[clamp(_tabEditorRow, 0, n - 1)] : 0;
         }
+        bool global = Routing::isProjectTarget(RouteBrowse::paramKeyToTarget(paramKey));
         if (tabCellEligible(track, paramKey)) {   // only eligible cells are editable
             int slot = global ? 0 : _tabCol;
             int newDepth = clamp(_matrixDraft.route.depthPct(slot) + event.value(), -100, 100);
@@ -135,18 +134,12 @@ void RoutingPage::encoder(EncoderEvent &event) {
         return;
     }
     int n = tabBandParamCount();         // nav: move the row cursor, re-point to that param's route
-    _tabEditorRow = clamp(_tabEditorRow + event.value(), 0, n - 1);
+    _tabEditorRow = clamp(_tabEditorRow + event.value(), 0, n > 0 ? n - 1 : 0);
+    const int visible = 4;               // keep the cursor inside the scroll window
+    if (_tabEditorRow < _tabScroll) _tabScroll = _tabEditorRow;
+    else if (_tabEditorRow >= _tabScroll + visible) _tabScroll = _tabEditorRow - visible + 1;
     tabRefocus();
     event.consume();
-}
-
-// Name for a band ParamKey: Global keys from the global table, the rest from Note
-// (which backs every per-track band param). Reuses the staged row names, no new strings.
-static const char *bandParamName(RouteBrowse::Band band, uint8_t key) {
-    const RouteParam::Table &tbl = (band == RouteBrowse::Band::Global)
-        ? GlobalParamTable::table() : NoteParamTable::table();
-    const RouteParam::Row *row = tbl.find(key);
-    return row ? row->name : "?";
 }
 
 // Draw a row name clipped to maxW px (drop trailing chars until it fits the gutter).
@@ -174,18 +167,63 @@ int RoutingPage::routeForBandParam(uint8_t paramKey, uint8_t trackMask) const {
     return -1;
 }
 
+Track::TrackMode RoutingPage::tabEngineMode(int t) const {
+    static const Track::TrackMode modes[kEngineCount] = {
+        Track::TrackMode::Note, Track::TrackMode::PhaseFlux, Track::TrackMode::Curve,
+        Track::TrackMode::Tuesday, Track::TrackMode::DiscreteMap, Track::TrackMode::Indexed,
+    };
+    return modes[clamp(t - kBandCount, 0, kEngineCount - 1)];
+}
+
+// Row keys for tab t: engine table (minus shared) for engine tabs, band keys for bands.
+int RoutingPage::tabParams(int t, uint8_t *keys, int maxKeys) const {
+    if (tabIsEngine(t)) {
+        return RouteBrowse::enginePageParams(tabEngineMode(t), keys, maxKeys);
+    }
+    if (tabIsBus(t)) {
+        return 0;
+    }
+    return RouteBrowse::bandParams(RouteBrowse::Band(t), keys, maxKeys);
+}
+
+const char *RoutingPage::tabName(int t) const {
+    static const char *names[kTabCount] = {
+        "PITCH", "CLOCK", "GLOB",
+        "NOTE", "PHASEFLUX", "CURVE", "TUESDAY", "DISCMAP", "INDEXED",
+        "BUS",
+    };
+    return names[clamp(t, 0, kTabCount - 1)];
+}
+
+// Row label: engine tab -> engine table name; band tab -> Global/Note table name.
+const char *RoutingPage::tabParamName(int t, uint8_t key) const {
+    const RouteParam::Table *tbl = nullptr;
+    if (tabIsEngine(t)) {
+        tbl = RouteFork::tableForMode(tabEngineMode(t));
+    } else if (RouteBrowse::Band(t) == RouteBrowse::Band::Global) {
+        tbl = &GlobalParamTable::table();
+    } else {
+        tbl = &NoteParamTable::table();
+    }
+    const char *shortName = RouteBrowse::shortLabel(key);
+    if (shortName) {
+        return shortName;
+    }
+    const RouteParam::Row *row = tbl ? tbl->find(key) : nullptr;
+    return row ? row->name : "?";
+}
+
 int RoutingPage::tabBandParamCount() const {
-    uint8_t keys[8];
-    return RouteBrowse::bandParams(RouteBrowse::Band(_tabEditorTab), keys, 8);
+    uint8_t keys[16];
+    return tabParams(_tabEditorTab, keys, 16);
 }
 
 // Enter edit on the cursor row. Routed row -> begin() copies the live route into the
 // draft; empty row -> create() reserves an inert slot (source None, depth 0). The live
 // route is untouched until COMMIT; the staged draft is what the grid renders and edits.
 void RoutingPage::matrixEnterEdit() {
-    uint8_t keys[8];
-    auto band = RouteBrowse::Band(_tabEditorTab);
-    int n = RouteBrowse::bandParams(band, keys, 8);
+    uint8_t keys[16];
+    int n = tabParams(_tabEditorTab, keys, 16);
     if (n == 0) return;
     uint8_t key = keys[clamp(_tabEditorRow, 0, n - 1)];
     Routing::Target target = RouteBrowse::paramKeyToTarget(key);
@@ -271,8 +309,8 @@ void RoutingPage::matrixExitEdit(bool commit) {
 // scope. The tab editor edits _route live; unrouted rows leave _tabRowRouted false
 // (cursor shows "+ADD", encoder-press creates).
 void RoutingPage::tabRefocus() {
-    uint8_t keys[8];
-    int n = RouteBrowse::bandParams(RouteBrowse::Band(_tabEditorTab), keys, 8);
+    uint8_t keys[16];
+    int n = tabParams(_tabEditorTab, keys, 16);
     _tabEditorRow = clamp(_tabEditorRow, 0, (n > 0 ? n - 1 : 0));
     _tabCol = clamp(_tabCol, 0, CONFIG_TRACK_COUNT - 1);
     // A matrix row = one route for the param across its tracks. Resolve it track-
@@ -296,6 +334,7 @@ void RoutingPage::tabRefocus() {
 void RoutingPage::enterTabEditor() {
     _tabEditorTab = 0;
     _tabEditorRow = 0;
+    _tabScroll = 0;
     _tabCol = clamp(_project.selectedTrackIndex(), 0, CONFIG_TRACK_COUNT - 1);
     _matrixEditActive = false;
     _matrixEditRow = -1;
@@ -316,11 +355,8 @@ static bool tabCellEligible(const Track &track, uint8_t paramKey) {
 }
 
 void RoutingPage::drawTabEditor(Canvas &canvas) {
-    const char *tabs[] = { "PITCH", "CLOCK", "PROB", "GLOB" };
-    auto band = RouteBrowse::Band(_tabEditorTab);
-
-    uint8_t keys[8];
-    int n = RouteBrowse::bandParams(band, keys, 8);
+    uint8_t keys[16];
+    int n = tabParams(_tabEditorTab, keys, 16);
     int cursorRow = clamp(_tabEditorRow, 0, (n > 0 ? n - 1 : 0));
     int cursorCol = clamp(_tabCol, 0, CONFIG_TRACK_COUNT - 1);
     uint8_t cursorKey = (n > 0) ? keys[cursorRow] : 0;
@@ -328,11 +364,13 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     WindowPainter::clear(canvas);
     canvas.setFont(Font::Tiny);
 
-    // header: band name bright, view tag dim, combine state (F3) far right
+    // header: tab name bright, view tag dim (centered, clear of long engine names),
+    // combine state (F3) far right
     canvas.setColor(Color::Bright);
-    canvas.drawText(2, 7, tabs[_tabEditorTab]);
+    canvas.drawText(2, 7, tabName(_tabEditorTab));
     canvas.setColor(Color::Medium);
-    canvas.drawText(40, 7, _matrixView == MatrixView::Source ? "SOURCE" : "DEPTH");
+    const char *viewTag = _matrixView == MatrixView::Source ? "SOURCE" : "DEPTH";
+    canvas.drawText((CONFIG_LCD_WIDTH - canvas.textWidth(viewTag)) / 2, 7, viewTag);
     // occupied-slot counter (always) far-right; combine indicator sits to its left
     int activeRoutes = 0;
     for (int r = 0; r < CONFIG_ROUTE_COUNT; ++r) {
@@ -358,10 +396,14 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     canvas.setColor(Color::Low);
     canvas.hline(0, 10, CONFIG_LCD_WIDTH);
 
-    // grid geometry: left label gutter + 8 evenly-spaced track columns
-    const int nameW = 38;
+    // grid geometry: left label gutter (wider on engine tabs for longer names) + 8
+    // track columns; a 4px scrollbar column on the right when the page overflows
+    const int top = 20, rowH = 8, visible = 4;
+    int scroll = clamp(_tabScroll, 0, n > visible ? n - visible : 0);
+    const int barW = (n > visible) ? 4 : 0;
+    const int nameW = tabIsEngine(_tabEditorTab) ? 52 : 38;
     const int gridL = nameW + 2;
-    const int colW = (CONFIG_LCD_WIDTH - gridL - 1) / 8;
+    const int colW = (CONFIG_LCD_WIDTH - gridL - 1 - barW) / 8;
 
     // column headers: track number + engine letter, cursor column bright,
     // else medium when the cursor row's param is eligible for that engine, dim if not
@@ -378,18 +420,19 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
         canvas.drawText(cx - canvas.textWidth(lbl) / 2, hdrY, lbl);
     }
 
-    // param rows: name in the gutter (cursor row bright), then 8 cells. Per cell:
+    // param rows (scroll window): name in the gutter (cursor row bright), then 8 cells.
     //   '-' ineligible, '.' eligible+unrouted, depth number when routed. The active
     //   draft row reads staged depths from _matrixDraft so edits show before commit.
-    const int top = 20, rowH = 8;
-    for (int r = 0; r < n; ++r) {
-        int y = top + r * rowH;
+    for (int vi = 0; vi < visible; ++vi) {
+        int r = scroll + vi;
+        if (r >= n) break;
+        int y = top + vi * rowH;
         uint8_t key = keys[r];
         bool cursorRowSel = r == cursorRow;
         bool draftRow = _matrixEditActive && r == _matrixEditRow;
         bool globalKey = Routing::isProjectTarget(RouteBrowse::paramKeyToTarget(key));
         canvas.setColor(cursorRowSel ? Color::Bright : Color::Medium);
-        drawClippedName(canvas, 2, y + 6, nameW - 2, bandParamName(band, key));
+        drawClippedName(canvas, 2, y + 6, nameW - 2, tabParamName(_tabEditorTab, key));
         // SOURCE view paints the row's single source on EVERY eligible cell (one source per row);
         // whether a track is actually applied is shown by DEPTH view. Resolve the row source once.
         Routing::Source rowSource = Routing::Source::None;
@@ -459,9 +502,10 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     // by-type grouping cue: under the cursor row, underline cells whose track shares
     // the cursor column's engine (the group a Shift+T on this column would toggle).
     // Per-track bands only; global rows have no per-track membership.
-    if (n > 0 && !Routing::isProjectTarget(RouteBrowse::paramKeyToTarget(cursorKey))) {
+    bool cursorVisible = n > 0 && cursorRow >= scroll && cursorRow < scroll + visible;
+    if (cursorVisible && !Routing::isProjectTarget(RouteBrowse::paramKeyToTarget(cursorKey))) {
         Track::TrackMode cursorMode = _project.track(cursorCol).trackMode();
-        int uy = top + cursorRow * rowH + 7;
+        int uy = top + (cursorRow - scroll) * rowH + 7;
         canvas.setColor(Color::Low);
         for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
             if (_project.track(t).trackMode() != cursorMode) continue;
@@ -469,6 +513,17 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
             int cx = gridL + t * colW + colW / 2;
             canvas.hline(cx - colW / 2 + 1, uy, colW - 2);
         }
+    }
+
+    // right-edge scrollbar when the page overflows the visible window
+    if (n > visible) {
+        int trackY = 19, trackH = top + visible * rowH - 19;
+        canvas.setColor(Color::Low);
+        canvas.vline(CONFIG_LCD_WIDTH - 2, trackY, trackH);
+        int thumbH = std::max(4, trackH * visible / n);
+        int thumbY = trackY + trackH * scroll / n;
+        canvas.setColor(Color::Bright);
+        canvas.fillRect(CONFIG_LCD_WIDTH - 3, thumbY, 3, thumbH);
     }
 
     bool editing = _matrixEditActive;
@@ -487,9 +542,8 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
     if (key.isTrack()) {
         int tn = key.track();
         if (key.shiftModifier() && _matrixEditActive) {
-            uint8_t keys[8];
-            auto editBand = RouteBrowse::Band(_tabEditorTab);
-            int en = RouteBrowse::bandParams(editBand, keys, 8);
+            uint8_t keys[16];
+            int en = tabParams(_tabEditorTab, keys, 16);
             uint8_t editKey = (en > 0) ? keys[clamp(_matrixEditRow, 0, en - 1)] : 0;
             if (!Routing::isProjectTarget(RouteBrowse::paramKeyToTarget(editKey))) {
                 int srcDepth = _matrixDraft.route.depthPct(_tabCol);
@@ -517,7 +571,8 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
         if (_matrixEditActive) {
             matrixExitEdit(false);
         }
-        _tabEditorTab = (_tabEditorTab + (key.isLeft() ? 4 : 1)) % 5;
+        _tabEditorTab = (_tabEditorTab + (key.isLeft() ? kTabCount - 1 : 1)) % kTabCount;
+        _tabScroll = 0;
         _tabEditorRow = 0;
         tabRefocus();
         event.consume();
@@ -619,9 +674,9 @@ void RoutingPage::drawBus(Canvas &canvas) {
         canvas.setColor(Color::Bright);
         canvas.drawText(VAL_R - canvas.textWidth("SAFE"), 7, "SAFE");
     }
+    canvas.setColor(Color::Low);          // structural lines are always dim
     canvas.hline(0, 10, CONFIG_LCD_WIDTH);
     canvas.vline(DIV, 11, CONFIG_LCD_HEIGHT - 22);
-    canvas.setColor(Color::Low);
     canvas.vline(SEP_X, 11, CONFIG_LCD_HEIGHT - 22);
 
     const int top = 14, rowH = 10;
@@ -718,7 +773,8 @@ void RoutingPage::handleBusKey(KeyPressEvent &event) {
         if (_matrixEditActive) {
             matrixExitEdit(false);
         }
-        _tabEditorTab = (_tabEditorTab + (key.isLeft() ? 4 : 1)) % 5;
+        _tabEditorTab = (_tabEditorTab + (key.isLeft() ? kTabCount - 1 : 1)) % kTabCount;
+        _tabScroll = 0;
         _tabEditorRow = 0;
         tabRefocus();
         event.consume();

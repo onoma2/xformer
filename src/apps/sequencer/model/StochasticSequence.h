@@ -189,7 +189,8 @@ public:
     // 50 = single-octave field (no decision in Steps 3..5). >50 expands the
     // candidate set up to 4 octaves. <50 keeps single octave plus a per-slot
     // octave-displacement chance. See PITCH-LAW-FINAL.md Step 3.
-    int range() const { return _range; }
+    int range() const { return Routing::routedValueInt(ParamKey::Range, _trackIndex, _range, 0, 100); }
+    int rangeBase() const { return _range; }
     void setRange(int range) { _range = clamp(range, 0, 100); }
 
     // degreeTickets

@@ -19,24 +19,29 @@ Routing::Route routeFor(Routing::Target target, uint8_t tracks) {
     r.setTracks(tracks);
     return r;
 }
+bool hasKey(const uint8_t *keys, int n, uint8_t key) {
+    for (int i = 0; i < n; ++i) {
+        if (keys[i] == key) return true;
+    }
+    return false;
+}
 }
 
 UNIT_TEST("RouteBrowse") {
 
-CASE("bandParams: PITCH lists the pitch band keys") {
+CASE("bandParams: PITCH lists pitch keys plus folded SlideTime + Rotate") {
     uint8_t keys[8];
     int n = RouteBrowse::bandParams(Band::Pitch, keys, 8);
-    expectEqual(n, 4, "4 pitch params");
+    expectEqual(n, 6, "6 pitch-band params");
     expectEqual(int(keys[0]), int(ParamKey::Scale), "Scale");
-    expectEqual(int(keys[1]), int(ParamKey::RootNote), "RootNote");
-    expectEqual(int(keys[2]), int(ParamKey::Transpose), "Transpose");
     expectEqual(int(keys[3]), int(ParamKey::Octave), "Octave");
+    expectEqual(int(keys[4]), int(ParamKey::SlideTime), "SlideTime folded in");
+    expectEqual(int(keys[5]), int(ParamKey::Rotate), "Rotate folded in");
 }
 
-CASE("bandParams: CLOCK / PROB / GLOBAL counts") {
+CASE("bandParams: CLOCK / GLOBAL counts") {
     uint8_t keys[8];
     expectEqual(RouteBrowse::bandParams(Band::Clock, keys, 8), 2, "Divisor, ClockMult");
-    expectEqual(RouteBrowse::bandParams(Band::Prob, keys, 8), 4, "4 biases");
     int g = RouteBrowse::bandParams(Band::Global, keys, 8);
     expectEqual(g, 4, "Tempo/Swing/CVRscan/CVRroute");
     expectEqual(int(keys[0]), int(ParamKey::Tempo), "Tempo first");
@@ -116,6 +121,34 @@ CASE("sourceList: honors maxOut") {
     int n = RouteBrowse::sourceList(Routing::Target::Transpose, out, 5);
     expectEqual(n, 5, "clamped to maxOut");
     expectEqual(int(out[0]), int(Routing::Source::None), "still in enum order");
+}
+
+CASE("enginePageParams: engine table minus the shared Pitch/Clock/SlideTime keys") {
+    uint8_t keys[32];
+    int n = RouteBrowse::enginePageParams(Track::TrackMode::Note, keys, 32);
+    expectEqual(n, 7, "Note: 15 table rows minus 8 shared");
+    expectTrue(hasKey(keys, n, ParamKey::GateProbabilityBias), "Gate bias kept (folded from Prob)");
+    expectTrue(hasKey(keys, n, ParamKey::RunMode), "Run Mode kept");
+    expectFalse(hasKey(keys, n, ParamKey::Scale), "Scale excluded (Pitch band)");
+    expectFalse(hasKey(keys, n, ParamKey::Rotate), "Rotate excluded (folded to Pitch band)");
+    expectFalse(hasKey(keys, n, ParamKey::Divisor), "Divisor excluded (Clock band)");
+    expectFalse(hasKey(keys, n, ParamKey::SlideTime), "SlideTime excluded (Pitch band)");
+}
+
+CASE("enginePageParams: Curve is the overflow case, keeps chaos + phase") {
+    uint8_t keys[32];
+    int n = RouteBrowse::enginePageParams(Track::TrackMode::Curve, keys, 32);
+    expectEqual(n, 15, "Curve: 19 table rows minus 4 shared (SlideTime/Rotate/Divisor/ClockMult)");
+    expectTrue(hasKey(keys, n, ParamKey::ChaosParam2), "ChaosParam2 kept");
+    expectTrue(hasKey(keys, n, ParamKey::Phase), "Phase kept");
+    expectFalse(hasKey(keys, n, ParamKey::Rotate), "Rotate excluded (folded to Pitch band)");
+    expectFalse(hasKey(keys, n, ParamKey::ClockMultiplier), "ClockMult excluded (Clock band)");
+}
+
+CASE("enginePageParams: MidiCv has no engine-page params (both are shared)") {
+    uint8_t keys[32];
+    int n = RouteBrowse::enginePageParams(Track::TrackMode::MidiCv, keys, 32);
+    expectEqual(n, 0, "MidiCv: SlideTime + Transpose are both shared -> empty page");
 }
 
 } // UNIT_TEST

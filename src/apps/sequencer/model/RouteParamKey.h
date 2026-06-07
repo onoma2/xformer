@@ -115,6 +115,12 @@ struct ParamKey {
         PatienceRhythm        = 142,
         NoteDuration          = 143,
         Feel                  = 144,   // dead-slot fix (wired here, no-op in old dispatch)
+        // 2026-06-08 Stochastic routing revamp — pitch-shape + burst-detail targets
+        Range                 = 145,
+        MarblesBias           = 146,
+        MarblesSpread         = 147,
+        BurstCount            = 148,
+        BurstRate             = 149,
 
         // --- PhaseFlux signature block (150..) ---
         // Nudges are new routables (no legacy Routing::Target); A/B inlets are

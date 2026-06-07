@@ -553,4 +553,23 @@ CASE("MidiCv transpose: getter clamps to field range +-100, not table +-60") {
     expectEqual(track.transpose(), 80, "stale clear -> base restored");
 }
 
+// Stochastic routing revamp — Range (pitch candidate-set width) becomes routable.
+CASE("Stochastic range: int base-anchored read via routedValueInt (0..100)") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Stochastic);
+    auto &seq = p.track(0).stochasticTrack().sequence(0);
+    seq.setRange(40);
+    expectEqual(seq.range(), 40, "no override -> base");
+
+    Routing::writeRouteOverride(ParamKey::Range, 0, 30.f);
+    expectEqual(seq.range(), 70, "override -> base + delta");
+
+    Routing::writeRouteOverride(ParamKey::Range, 0, 100.f);
+    expectEqual(seq.range(), 100, "clamps hi to 100");
+
+    Routing::clearRouteOverrides();
+    expectEqual(seq.range(), 40, "stale clear -> base restored");
+}
+
 } // UNIT_TEST

@@ -154,7 +154,14 @@ public:
         StochasticPatienceRhythm,
         StochasticMutate,
         StochasticJump,
-        StochasticLast = StochasticJump,
+        // 2026-06-08 routing revamp — pitch-shape + burst-detail targets (appended;
+        // targetSerialize decouples wire ID from enum position, so this is format-safe)
+        StochasticRange,
+        StochasticMarblesBias,
+        StochasticMarblesSpread,
+        StochasticBurstCount,
+        StochasticBurstRate,
+        StochasticLast = StochasticBurstRate,
 
         Last,
     };
@@ -227,6 +234,11 @@ public:
         case Target::StochasticPatienceRhythm:  return "Patience R";
         case Target::StochasticMutate:          return "Mutate";
         case Target::StochasticJump:            return "Jump";
+        case Target::StochasticRange:           return "Range";
+        case Target::StochasticMarblesBias:     return "Bias";
+        case Target::StochasticMarblesSpread:   return "Spread";
+        case Target::StochasticBurstCount:      return "Burst Count";
+        case Target::StochasticBurstRate:       return "Burst Rate";
 
         case Target::ChaosAmount:               return "Chaos Amount";
         case Target::ChaosRate:                 return "Chaos Rate";
@@ -324,6 +336,11 @@ public:
         case Target::StochasticPatienceRhythm:        return 76;
         case Target::StochasticMutate:          return 77;
         case Target::StochasticJump:            return 78;
+        case Target::StochasticRange:           return 80;
+        case Target::StochasticMarblesBias:     return 81;
+        case Target::StochasticMarblesSpread:   return 82;
+        case Target::StochasticBurstCount:      return 83;
+        case Target::StochasticBurstRate:       return 84;
 
         // Chaos Targets (39-42)
         case Target::ChaosAmount:               return 39;

@@ -246,7 +246,7 @@ private:
         case Size:          sequence.setSize(sequence.size() + value);    notifyWindowEdit(); break;
         case First:         sequence.setFirst(sequence.first() + value);  notifyWindowEdit(); break;
         case Rotate:        sequence.editRotate(value, shift); break;
-        case Range:         sequence.setRange(sequence.range() + value); break;
+        case Range:         sequence.setRange(sequence.rangeBase() + value); break;
         case Refresh:       sequence.refresh(); break;
         case LastItem:      break;
         }

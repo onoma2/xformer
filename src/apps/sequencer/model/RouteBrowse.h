@@ -11,48 +11,88 @@
 
 namespace RouteBrowse {
 
-    enum class Band { Pitch, Clock, Prob, Global };
+    enum class Band { Pitch, Clock, Global };
 
-    // Fill keys[] with the band's ParamKeys; returns the count written.
+    // Fill keys[] with the band's ParamKeys; returns the count written. The fixed bands
+    // are the cross-engine params; Prob/Bias is engine-specific and folds into the engine
+    // pages (enginePageParams). SlideTime + Rotate ride the Pitch band (no separate tab).
     inline int bandParams(Band band, uint8_t *keys, int maxKeys) {
-        static const uint8_t pitch[]  = { ParamKey::Scale, ParamKey::RootNote, ParamKey::Transpose, ParamKey::Octave };
+        static const uint8_t pitch[]  = { ParamKey::Scale, ParamKey::RootNote, ParamKey::Transpose,
+                                          ParamKey::Octave, ParamKey::SlideTime, ParamKey::Rotate };
         static const uint8_t clock[]  = { ParamKey::Divisor, ParamKey::ClockMultiplier };
-        static const uint8_t prob[]   = { ParamKey::GateProbabilityBias, ParamKey::RetriggerProbabilityBias,
-                                          ParamKey::LengthBias, ParamKey::NoteProbabilityBias };
         static const uint8_t global[] = { ParamKey::Tempo, ParamKey::Swing, ParamKey::CvRouteScan, ParamKey::CvRouteRoute };
         const uint8_t *src; int n;
         switch (band) {
-        case Band::Pitch:  src = pitch;  n = 4; break;
-        case Band::Clock:  src = clock;  n = 2; break;
-        case Band::Prob:   src = prob;   n = 4; break;
-        case Band::Global: src = global; n = 4; break;
-        default:           return 0;
+        case Band::Pitch:     src = pitch;  n = 6; break;
+        case Band::Clock:     src = clock;  n = 2; break;
+        case Band::Global:    src = global; n = 4; break;
+        default:              return 0;
         }
         if (n > maxKeys) n = maxKeys;
         for (int i = 0; i < n; ++i) keys[i] = src[i];
         return n;
     }
 
-    // Reverse of RouteFork::targetToParamKey for the band keys: the Routing::Target a
-    // new route should carry to back paramKey. None for unknown keys.
-    inline Routing::Target paramKeyToTarget(uint8_t key) {
-        switch (key) {
-        case ParamKey::Scale:                    return Routing::Target::Scale;
-        case ParamKey::RootNote:                 return Routing::Target::RootNote;
-        case ParamKey::Transpose:                return Routing::Target::Transpose;
-        case ParamKey::Octave:                   return Routing::Target::Octave;
-        case ParamKey::Divisor:                  return Routing::Target::Divisor;
-        case ParamKey::ClockMultiplier:          return Routing::Target::ClockMult;
-        case ParamKey::GateProbabilityBias:      return Routing::Target::GateProbabilityBias;
-        case ParamKey::RetriggerProbabilityBias: return Routing::Target::RetriggerProbabilityBias;
-        case ParamKey::LengthBias:               return Routing::Target::LengthBias;
-        case ParamKey::NoteProbabilityBias:      return Routing::Target::NoteProbabilityBias;
-        case ParamKey::Tempo:                    return Routing::Target::Tempo;
-        case ParamKey::Swing:                    return Routing::Target::Swing;
-        case ParamKey::CvRouteScan:              return Routing::Target::CvRouteScan;
-        case ParamKey::CvRouteRoute:             return Routing::Target::CvRouteRoute;
-        default:                                 return Routing::Target::None;
+    // Fill keys[] with an engine page's routable ParamKeys: the track mode's per-type
+    // table rows minus the keys the fixed Pitch/Clock/SlideTime bands already own
+    // (Global keys never appear in engine tables). Preserves table order. Returns count.
+    inline int enginePageParams(Track::TrackMode mode, uint8_t *keys, int maxKeys) {
+        const RouteParam::Table *table = RouteFork::tableForMode(mode);
+        if (!table) {
+            return 0;
         }
+        static const uint8_t shared[] = {
+            ParamKey::Scale, ParamKey::RootNote, ParamKey::Transpose, ParamKey::Octave,
+            ParamKey::Divisor, ParamKey::ClockMultiplier, ParamKey::SlideTime, ParamKey::Rotate,
+        };
+        int n = 0;
+        for (size_t i = 0; i < table->count() && n < maxKeys; ++i) {
+            uint8_t key = table->rows()[i].key;
+            bool isShared = false;
+            for (uint8_t s : shared) {
+                if (s == key) { isShared = true; break; }
+            }
+            if (!isShared) {
+                keys[n++] = key;
+            }
+        }
+        return n;
+    }
+
+    // Compact engine-page label for keys whose full table name overruns the row gutter,
+    // reusing the engine's own edit-page wording (Algo, …). nullptr = use the full name.
+    inline const char *shortLabel(uint8_t key) {
+        switch (key) {
+        case ParamKey::Algorithm:                return "Algo";
+        case ParamKey::CurveRate:                return "C.Rate";
+        case ParamKey::GateProbabilityBias:      return "Gate Bias";
+        case ParamKey::RetriggerProbabilityBias: return "Rtg Bias";
+        case ParamKey::LengthBias:               return "Len Bias";
+        case ParamKey::NoteProbabilityBias:      return "Note Bias";
+        case ParamKey::ShapeProbabilityBias:     return "Shp Bias";
+        case ParamKey::FirstStep:                return "First St";
+        case ParamKey::LastStep:                 return "Last St";
+        case ParamKey::StepTrill:                return "Stp Trill";
+        case ParamKey::GateLength:               return "Gate Len";
+        case ParamKey::GateOffset:               return "Gate Ofs";
+        default:                                 return nullptr;
+        }
+    }
+
+    // Reverse of RouteFork::targetToParamKey: the Routing::Target a new route should
+    // carry to back paramKey. Inverts the forward map by scan so every band AND engine
+    // key resolves (the engine pages route the full per-type tables). None for unknown.
+    inline Routing::Target paramKeyToTarget(uint8_t key) {
+        if (key == 0) {
+            return Routing::Target::None;
+        }
+        for (int t = 0; t < int(Routing::Target::Last); ++t) {
+            auto target = Routing::Target(t);
+            if (RouteFork::targetToParamKey(target) == key) {
+                return target;
+            }
+        }
+        return Routing::Target::None;
     }
 
     // Fill out[] with the sources the tab-editor source picker offers for a target:

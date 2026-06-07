@@ -82,6 +82,11 @@ namespace RouteFork {
         case Routing::Target::StochasticMutate:          return ParamKey::Mutate;
         case Routing::Target::StochasticJump:            return ParamKey::Jump;
         case Routing::Target::StochasticContour:         return ParamKey::Contour;
+        case Routing::Target::StochasticRange:           return ParamKey::Range;
+        case Routing::Target::StochasticMarblesBias:     return ParamKey::MarblesBias;
+        case Routing::Target::StochasticMarblesSpread:   return ParamKey::MarblesSpread;
+        case Routing::Target::StochasticBurstCount:      return ParamKey::BurstCount;
+        case Routing::Target::StochasticBurstRate:       return ParamKey::BurstRate;
         case Routing::Target::StochasticMask:            return ParamKey::MaskRhythm;
         case Routing::Target::StochasticTilt:            return ParamKey::TiltRhythm;
         case Routing::Target::StochasticGateLength:      return ParamKey::StochasticGateLength;
@@ -132,22 +137,30 @@ namespace RouteFork {
         return RouteApply::delta(h, 1.f, combine, depthPct, 5.f);
     }
 
+    // The per-type param table for a track mode, or nullptr for modes with no
+    // engine table (default/None). One source of truth for the mode->table map.
+    inline const RouteParam::Table *tableForMode(Track::TrackMode mode) {
+        switch (mode) {
+        case Track::TrackMode::Note:      return &NoteParamTable::table();
+        case Track::TrackMode::PhaseFlux: return &PhaseFluxParamTable::table();
+        case Track::TrackMode::Curve:     return &CurveParamTable::table();
+        case Track::TrackMode::Tuesday:   return &TuesdayParamTable::table();
+        case Track::TrackMode::Stochastic: return &StochasticParamTable::table();
+        case Track::TrackMode::DiscreteMap: return &DiscreteMapParamTable::table();
+        case Track::TrackMode::Indexed:   return &IndexedParamTable::table();
+        case Track::TrackMode::MidiCv:    return &MidiCvParamTable::table();
+        default:                          return nullptr;
+        }
+    }
+
     // True when (trackMode, target) is a migrated per-track param; fills paramKey
     // and the param's real range. Migrated: Note, PhaseFlux, Curve, Tuesday,
     // Stochastic, DiscreteMap, Indexed, MidiCv (all engines).
     inline bool migrated(Track::TrackMode mode, Routing::Target target,
                          uint8_t &paramKey, RouteParam::Range &range) {
-        const RouteParam::Table *table = nullptr;
-        switch (mode) {
-        case Track::TrackMode::Note:      table = &NoteParamTable::table(); break;
-        case Track::TrackMode::PhaseFlux: table = &PhaseFluxParamTable::table(); break;
-        case Track::TrackMode::Curve:     table = &CurveParamTable::table(); break;
-        case Track::TrackMode::Tuesday:   table = &TuesdayParamTable::table(); break;
-        case Track::TrackMode::Stochastic: table = &StochasticParamTable::table(); break;
-        case Track::TrackMode::DiscreteMap: table = &DiscreteMapParamTable::table(); break;
-        case Track::TrackMode::Indexed:   table = &IndexedParamTable::table(); break;
-        case Track::TrackMode::MidiCv:    table = &MidiCvParamTable::table(); break;
-        default:                          return false;
+        const RouteParam::Table *table = tableForMode(mode);
+        if (!table) {
+            return false;
         }
         uint8_t key = targetToParamKey(target);
         const RouteParam::Row *row = table->find(key);

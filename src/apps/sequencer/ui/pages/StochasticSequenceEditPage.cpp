@@ -668,7 +668,7 @@ void StochasticSequenceEditPage::editLiveStep(int step, int value, bool shift) {
     case 9:  seq.setContour(seq.contourBase() + v);                  notifyStochasticShapingEdit(); break;
     case 10: seq.setMarblesBias(seq.marblesBias() + v);              notifyStochasticShapingEdit(); break;
     case 11: seq.setMarblesSpread(seq.marblesSpread() + v);          notifyStochasticShapingEdit(); break;
-    case 12: seq.setRange(seq.range() + (shift ? value * 10 : value)); notifyStochasticShapingEdit(); break;
+    case 12: seq.setRange(seq.rangeBase() + (shift ? value * 10 : value)); notifyStochasticShapingEdit(); break;
     case 13: seq.setSlide(seq.slideBase() + v);                      notifyStochasticShapingEdit(); break;
     case 14: seq.setRepeatProb(seq.repeatProb() + v); break;
     case 15: seq.setBurstRate(seq.burstRate() + v);                  notifyStochasticShapingEdit(); break;

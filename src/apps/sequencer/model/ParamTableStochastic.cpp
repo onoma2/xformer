@@ -15,6 +15,7 @@ constexpr RouteParam::Row kRows[] = {
     { ParamKey::Rest,            "Rest",       {   0.f, 100.f }, RouteParam::Continuous },
     { ParamKey::Slide,           "Slide",      {   0.f, 100.f }, RouteParam::Continuous },
     { ParamKey::Burst,           "Burst",      {   0.f, 100.f }, RouteParam::Continuous },
+    { ParamKey::Range,           "Range",      {   0.f, 100.f }, RouteParam::Continuous },
     { ParamKey::Sleep,           "Sleep",      {   0.f, 100.f }, RouteParam::Continuous },
     { ParamKey::Mutate,          "Mutate",     {   0.f, 100.f }, RouteParam::Continuous },
     { ParamKey::Jump,            "Jump",       {   0.f, 100.f }, RouteParam::Continuous },
