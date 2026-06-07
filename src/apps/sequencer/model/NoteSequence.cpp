@@ -305,32 +305,32 @@ void NoteSequence::shiftSteps(const std::bitset<CONFIG_STEP_COUNT> &selected, in
     } else {
         // Rotate the base loop, not the override-aware getters: a route on
         // First/Last must not make the edited window flicker with the modulation.
-        ModelUtils::shiftSteps(_steps, _firstStep.base, _lastStep.base, direction);
+        ModelUtils::shiftSteps(_steps, _firstStep, _lastStep, direction);
     }
 }
 
 void NoteSequence::duplicateSteps() {
     // Operate on the base loop, not the override-aware getters: this writes base
     // LastStep, so reading the modulated range would lurch base under a route.
-    int first = _firstStep.base;
-    int last = _lastStep.base;
+    int first = _firstStep;
+    int last = _lastStep;
     ModelUtils::duplicateSteps(_steps, first, last);
     setLastStep(last + (last - first + 1));
 }
 
 void NoteSequence::write(VersionedSerializedWriter &writer) const {
-    writer.write(_scale.base);
-    writer.write(_rootNote.base);
-    writer.write(_divisor.base);
+    writer.write(_scale);
+    writer.write(_rootNote);
+    writer.write(_divisor);
     writer.write(_divisorY);
     writer.write(static_cast<uint8_t>(_divisorYSource));
     writer.write(_divisorYTrack);
-    writer.write(_clockMultiplier.base);
+    writer.write(_clockMultiplier);
     writer.write(_resetMeasure);
-    writer.write(_runMode.base);
+    writer.write(_runMode);
     writer.write(static_cast<uint8_t>(_mode));
-    writer.write(_firstStep.base);
-    writer.write(_lastStep.base);
+    writer.write(_firstStep);
+    writer.write(_lastStep);
     writer.write(_noteFirstStep);
     writer.write(_noteLastStep);
 
@@ -356,12 +356,12 @@ void NoteSequence::write(VersionedSerializedWriter &writer) const {
 }
 
 void NoteSequence::read(VersionedSerializedReader &reader) {
-    reader.read(_scale.base);
-    reader.read(_rootNote.base);
+    reader.read(_scale);
+    reader.read(_rootNote);
     if (reader.dataVersion() < ProjectVersion::Version10) {
-        reader.readAs<uint8_t>(_divisor.base);
+        reader.readAs<uint8_t>(_divisor);
     } else {
-        reader.read(_divisor.base);
+        reader.read(_divisor);
     }
     if (reader.dataVersion() >= ProjectVersion::Version34) {
         reader.read(_divisorY);
@@ -369,28 +369,28 @@ void NoteSequence::read(VersionedSerializedReader &reader) {
         reader.read(divYSource);
         _divisorYSource = ModelUtils::clampedEnum(DivYSource(divYSource));
         reader.read(_divisorYTrack);
-        reader.read(_clockMultiplier.base);
+        reader.read(_clockMultiplier);
         reader.read(_resetMeasure);
-        reader.read(_runMode.base);
+        reader.read(_runMode);
         uint8_t mode;
         reader.read(mode);
         _mode = static_cast<Mode>(mode);
-        reader.read(_firstStep.base);
-        reader.read(_lastStep.base);
+        reader.read(_firstStep);
+        reader.read(_lastStep);
         reader.read(_noteFirstStep);
         reader.read(_noteLastStep);
     } else {
-        reader.read(_clockMultiplier.base);
+        reader.read(_clockMultiplier);
         reader.read(_resetMeasure);
-        reader.read(_runMode.base);
-        reader.read(_firstStep.base);
-        reader.read(_lastStep.base);
-        _divisorY = _divisor.base;
+        reader.read(_runMode);
+        reader.read(_firstStep);
+        reader.read(_lastStep);
+        _divisorY = _divisor;
         _divisorYSource = DivYSource::Divisor;
         _divisorYTrack = 0;
         _mode = Mode::Linear;
-        _noteFirstStep = _firstStep.base;
-        _noteLastStep = _lastStep.base;
+        _noteFirstStep = _firstStep;
+        _noteLastStep = _lastStep;
     }
 
     readArray(reader, _steps);

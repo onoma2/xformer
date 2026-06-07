@@ -387,9 +387,9 @@ public:
 
     // scale
 
-    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, _scale.base, 0, 23); }
-    void setScale(int scale, bool routed = false) {
-        _scale.set(clamp(scale, -1, Scale::Count - 1), routed);
+    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, _scale, 0, 23); }
+    void setScale(int scale) {
+        _scale = clamp(scale, -1, Scale::Count - 1);
     }
 
     int indexedScale() const { return scale() + 1; }
@@ -398,7 +398,7 @@ public:
     }
 
     void editScale(int value, bool shift) {
-        setScale(_scale.base + value);
+        setScale(_scale + value);
     }
 
     void printScale(StringBuilder &str) const {
@@ -412,9 +412,9 @@ public:
 
     // rootNote
 
-    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, _rootNote.base, 0, 11); }
-    void setRootNote(int rootNote, bool routed = false) {
-        _rootNote.set(clamp(rootNote, -1, 11), routed);
+    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, _rootNote, 0, 11); }
+    void setRootNote(int rootNote) {
+        _rootNote = clamp(rootNote, -1, 11);
     }
 
     int indexedRootNote() const { return rootNote() + 1; }
@@ -423,7 +423,7 @@ public:
     }
 
     void editRootNote(int value, bool shift) {
-        setRootNote(_rootNote.base + value);
+        setRootNote(_rootNote + value);
     }
 
     void printRootNote(StringBuilder &str) const {
@@ -441,9 +441,9 @@ public:
 
     // divisor
 
-    int divisor() const { return Routing::routedValueInt(ParamKey::Divisor, _trackIndex, _divisor.base, 1, 768); }
-    void setDivisor(int divisor, bool routed = false) {
-        _divisor.set(ModelUtils::clampDivisor(divisor), routed);
+    int divisor() const { return Routing::routedValueInt(ParamKey::Divisor, _trackIndex, _divisor, 1, 768); }
+    void setDivisor(int divisor) {
+        _divisor = ModelUtils::clampDivisor(divisor);
     }
 
     int indexedDivisor() const { return ModelUtils::divisorToIndex(divisor()); }
@@ -455,7 +455,7 @@ public:
     }
 
     void editDivisor(int value, bool shift) {
-        setDivisor(ModelUtils::adjustedByDivisor(_divisor.base, value, shift));
+        setDivisor(ModelUtils::adjustedByDivisor(_divisor, value, shift));
     }
 
     void printDivisor(StringBuilder &str) const {
@@ -525,13 +525,13 @@ public:
 
     // clockMultiplier
 
-    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier.base, 50, 150); }
-    void setClockMultiplier(int clockMultiplier, bool routed = false) {
-        _clockMultiplier.set(clamp(clockMultiplier, 50, 150), routed);
+    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier, 50, 150); }
+    void setClockMultiplier(int clockMultiplier) {
+        _clockMultiplier = clamp(clockMultiplier, 50, 150);
     }
 
     void editClockMultiplier(int value, bool shift) {
-        setClockMultiplier(_clockMultiplier.base + value * (shift ? 10 : 1));
+        setClockMultiplier(_clockMultiplier + value * (shift ? 10 : 1));
     }
 
     void printClockMultiplier(StringBuilder &str) const {
@@ -560,13 +560,13 @@ public:
 
     // runMode
 
-    Types::RunMode runMode() const { return Types::RunMode(Routing::routedValueInt(ParamKey::RunMode, _trackIndex, int(_runMode.base), 0, 5)); }
-    void setRunMode(Types::RunMode runMode, bool routed = false) {
-        _runMode.set(ModelUtils::clampedEnum(runMode), routed);
+    Types::RunMode runMode() const { return Types::RunMode(Routing::routedValueInt(ParamKey::RunMode, _trackIndex, int(_runMode), 0, 5)); }
+    void setRunMode(Types::RunMode runMode) {
+        _runMode = ModelUtils::clampedEnum(runMode);
     }
 
     void editRunMode(int value, bool shift) {
-        setRunMode(ModelUtils::adjustedEnum(Types::RunMode(int(_runMode.base)), value));
+        setRunMode(ModelUtils::adjustedEnum(Types::RunMode(int(_runMode)), value));
     }
 
     void printRunMode(StringBuilder &str) const {
@@ -604,20 +604,20 @@ public:
     // firstStep
 
     int firstStep() const {
-        return Routing::routedValueInt(ParamKey::FirstStep, _trackIndex, _firstStep.base, 0, CONFIG_STEP_COUNT - 1);
+        return Routing::routedValueInt(ParamKey::FirstStep, _trackIndex, _firstStep, 0, CONFIG_STEP_COUNT - 1);
     }
 
-    void setFirstStep(int firstStep, bool routed = false) {
-        // clamp in base domain so a base edit is bounded by the peer's base, not its
-        // override-aware getter (which is the moving routed window).
-        _firstStep.set(clamp(firstStep, 0, int(_lastStep.base)), routed);
+    void setFirstStep(int firstStep) {
+        // clamp against the stored peer value, not its override-aware getter
+        // (which is the moving routed window).
+        _firstStep = clamp(firstStep, 0, int(_lastStep));
     }
 
     void editFirstStep(int value, bool shift) {
         if (shift) {
             offsetFirstAndLastStep(value);
         } else {
-            setFirstStep(_firstStep.base + value);
+            setFirstStep(_firstStep + value);
         }
     }
 
@@ -630,18 +630,18 @@ public:
 
     int lastStep() const {
         // make sure last step is always >= first step even if stored value is invalid (due to routing changes)
-        return std::max(firstStep(), Routing::routedValueInt(ParamKey::LastStep, _trackIndex, _lastStep.base, 0, CONFIG_STEP_COUNT - 1));
+        return std::max(firstStep(), Routing::routedValueInt(ParamKey::LastStep, _trackIndex, _lastStep, 0, CONFIG_STEP_COUNT - 1));
     }
 
-    void setLastStep(int lastStep, bool routed = false) {
-        _lastStep.set(clamp(lastStep, int(_firstStep.base), CONFIG_STEP_COUNT - 1), routed);
+    void setLastStep(int lastStep) {
+        _lastStep = clamp(lastStep, int(_firstStep), CONFIG_STEP_COUNT - 1);
     }
 
     void editLastStep(int value, bool shift) {
         if (shift) {
             offsetFirstAndLastStep(value);
         } else {
-            setLastStep(_lastStep.base + value);
+            setLastStep(_lastStep + value);
         }
     }
 
@@ -772,7 +772,7 @@ private:
     void setTrackIndex(int trackIndex) { _trackIndex = trackIndex; }
 
     void offsetFirstAndLastStep(int value) {
-        value = clamp(value, -int(_firstStep.base), CONFIG_STEP_COUNT - 1 - int(_lastStep.base));
+        value = clamp(value, -int(_firstStep), CONFIG_STEP_COUNT - 1 - int(_lastStep));
         if (value > 0) {
             editLastStep(value, false);
             editFirstStep(value, false);
@@ -783,18 +783,18 @@ private:
     }
 
     int8_t _trackIndex = -1;
-    Routable<int8_t> _scale;
-    Routable<int8_t> _rootNote;
-    Routable<uint16_t> _divisor;
+    int8_t _scale;
+    int8_t _rootNote;
+    uint16_t _divisor;
     uint16_t _divisorY;
     DivYSource _divisorYSource = DivYSource::Divisor;
     int8_t _divisorYTrack = 0;
-    Routable<uint8_t> _clockMultiplier;
+    uint8_t _clockMultiplier;
     uint8_t _resetMeasure;
-    Routable<Types::RunMode> _runMode;
+    Types::RunMode _runMode;
     Mode _mode;
-    Routable<uint8_t> _firstStep;
-    Routable<uint8_t> _lastStep;
+    uint8_t _firstStep;
+    uint8_t _lastStep;
     uint8_t _noteFirstStep;
     uint8_t _noteLastStep;
 

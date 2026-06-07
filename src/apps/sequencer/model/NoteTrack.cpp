@@ -25,14 +25,14 @@ void NoteTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_fillMode);
     writer.write(_fillMuted);
     writer.write(_cvUpdateMode);
-    writer.write(_slideTime.base);
-    writer.write(_octave.base);
-    writer.write(_transpose.base);
-    writer.write(_rotate.base);
-    writer.write(_gateProbabilityBias.base);
-    writer.write(_retriggerProbabilityBias.base);
-    writer.write(_lengthBias.base);
-    writer.write(_noteProbabilityBias.base);
+    writer.write(_slideTime);
+    writer.write(_octave);
+    writer.write(_transpose);
+    writer.write(_rotate);
+    writer.write(_gateProbabilityBias);
+    writer.write(_retriggerProbabilityBias);
+    writer.write(_lengthBias);
+    writer.write(_noteProbabilityBias);
     writeArray(writer, _sequences);
 }
 
@@ -43,14 +43,14 @@ void NoteTrack::read(VersionedSerializedReader &reader) {
     reader.read(_fillMode);
     reader.read(_fillMuted, ProjectVersion::Version26);
     reader.read(_cvUpdateMode, ProjectVersion::Version4);
-    reader.read(_slideTime.base);
-    reader.read(_octave.base);
-    reader.read(_transpose.base);
-    reader.read(_rotate.base);
-    reader.read(_gateProbabilityBias.base);
-    reader.read(_retriggerProbabilityBias.base);
-    reader.read(_lengthBias.base);
-    reader.read(_noteProbabilityBias.base);
+    reader.read(_slideTime);
+    reader.read(_octave);
+    reader.read(_transpose);
+    reader.read(_rotate);
+    reader.read(_gateProbabilityBias);
+    reader.read(_retriggerProbabilityBias);
+    reader.read(_lengthBias);
+    reader.read(_noteProbabilityBias);
 
     // There is a bug in previous firmware versions where writing the properties
     // of a note track did not update the hash value.

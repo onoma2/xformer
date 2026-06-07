@@ -118,13 +118,13 @@ public:
 
     // slideTime
 
-    int slideTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slideTime.base, 0, 100); }
-    void setSlideTime(int slideTime, bool routed = false) {
-        _slideTime.set(clamp(slideTime, 0, 100), routed);
+    int slideTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slideTime, 0, 100); }
+    void setSlideTime(int slideTime) {
+        _slideTime = clamp(slideTime, 0, 100);
     }
 
     void editSlideTime(int value, bool shift) {
-        setSlideTime(ModelUtils::adjustedByStep(_slideTime.base, value, 5, !shift));
+        setSlideTime(ModelUtils::adjustedByStep(_slideTime, value, 5, !shift));
     }
 
     void printSlideTime(StringBuilder &str) const {
@@ -134,13 +134,13 @@ public:
 
     // octave
 
-    int octave() const { return Routing::routedValueInt(ParamKey::Octave, _trackIndex, _octave.base, -10, 10); }
-    void setOctave(int octave, bool routed = false) {
-        _octave.set(clamp(octave, -10, 10), routed);
+    int octave() const { return Routing::routedValueInt(ParamKey::Octave, _trackIndex, _octave, -10, 10); }
+    void setOctave(int octave) {
+        _octave = clamp(octave, -10, 10);
     }
 
     void editOctave(int value, bool shift) {
-        setOctave(_octave.base + value);
+        setOctave(_octave + value);
     }
 
     void printOctave(StringBuilder &str) const {
@@ -150,13 +150,13 @@ public:
 
     // transpose
 
-    int transpose() const { return Routing::routedValueInt(ParamKey::Transpose, _trackIndex, _transpose.base, -60, 60); }
-    void setTranspose(int transpose, bool routed = false) {
-        _transpose.set(clamp(transpose, -100, 100), routed);
+    int transpose() const { return Routing::routedValueInt(ParamKey::Transpose, _trackIndex, _transpose, -60, 60); }
+    void setTranspose(int transpose) {
+        _transpose = clamp(transpose, -100, 100);
     }
 
     void editTranspose(int value, bool shift) {
-        setTranspose(_transpose.base + value);
+        setTranspose(_transpose + value);
     }
 
     void printTranspose(StringBuilder &str) const {
@@ -166,13 +166,13 @@ public:
 
     // rotate
 
-    int rotate() const { return Routing::routedValueInt(ParamKey::Rotate, _trackIndex, _rotate.base, -64, 64); }
-    void setRotate(int rotate, bool routed = false) {
-        _rotate.set(clamp(rotate, -64, 64), routed);
+    int rotate() const { return Routing::routedValueInt(ParamKey::Rotate, _trackIndex, _rotate, -64, 64); }
+    void setRotate(int rotate) {
+        _rotate = clamp(rotate, -64, 64);
     }
 
     void editRotate(int value, bool shift) {
-        setRotate(_rotate.base + value);
+        setRotate(_rotate + value);
     }
 
     void printRotate(StringBuilder &str) const {
@@ -182,13 +182,13 @@ public:
 
     // gateProbabilityBias
 
-    int gateProbabilityBias() const { return Routing::routedValueInt(ParamKey::GateProbabilityBias, _trackIndex, _gateProbabilityBias.base, -NoteSequence::GateProbability::Range, NoteSequence::GateProbability::Range); }
-    void setGateProbabilityBias(int gateProbabilityBias, bool routed = false) {
-        _gateProbabilityBias.set(clamp(gateProbabilityBias, -NoteSequence::GateProbability::Range, NoteSequence::GateProbability::Range), routed);
+    int gateProbabilityBias() const { return Routing::routedValueInt(ParamKey::GateProbabilityBias, _trackIndex, _gateProbabilityBias, -NoteSequence::GateProbability::Range, NoteSequence::GateProbability::Range); }
+    void setGateProbabilityBias(int gateProbabilityBias) {
+        _gateProbabilityBias = clamp(gateProbabilityBias, -NoteSequence::GateProbability::Range, NoteSequence::GateProbability::Range);
     }
 
     void editGateProbabilityBias(int value, bool shift) {
-        setGateProbabilityBias(_gateProbabilityBias.base + value);
+        setGateProbabilityBias(_gateProbabilityBias + value);
     }
 
     void printGateProbabilityBias(StringBuilder &str) const {
@@ -198,13 +198,13 @@ public:
 
     // retriggerProbabilityBias
 
-    int retriggerProbabilityBias() const { return Routing::routedValueInt(ParamKey::RetriggerProbabilityBias, _trackIndex, _retriggerProbabilityBias.base, -NoteSequence::RetriggerProbability::Range, NoteSequence::RetriggerProbability::Range); }
-    void setRetriggerProbabilityBias(int retriggerProbabilityBias, bool routed = false) {
-        _retriggerProbabilityBias.set(clamp(retriggerProbabilityBias, -NoteSequence::RetriggerProbability::Range, NoteSequence::RetriggerProbability::Range), routed);
+    int retriggerProbabilityBias() const { return Routing::routedValueInt(ParamKey::RetriggerProbabilityBias, _trackIndex, _retriggerProbabilityBias, -NoteSequence::RetriggerProbability::Range, NoteSequence::RetriggerProbability::Range); }
+    void setRetriggerProbabilityBias(int retriggerProbabilityBias) {
+        _retriggerProbabilityBias = clamp(retriggerProbabilityBias, -NoteSequence::RetriggerProbability::Range, NoteSequence::RetriggerProbability::Range);
     }
 
     void editRetriggerProbabilityBias(int value, bool shift) {
-        setRetriggerProbabilityBias(_retriggerProbabilityBias.base + value);
+        setRetriggerProbabilityBias(_retriggerProbabilityBias + value);
     }
 
     void printRetriggerProbabilityBias(StringBuilder &str) const {
@@ -214,13 +214,13 @@ public:
 
     // lengthBias
 
-    int lengthBias() const { return Routing::routedValueInt(ParamKey::LengthBias, _trackIndex, _lengthBias.base, -NoteSequence::Length::Range, NoteSequence::Length::Range); }
-    void setLengthBias(int lengthBias, bool routed = false) {
-        _lengthBias.set(clamp(lengthBias, -NoteSequence::Length::Range, NoteSequence::Length::Range), routed);
+    int lengthBias() const { return Routing::routedValueInt(ParamKey::LengthBias, _trackIndex, _lengthBias, -NoteSequence::Length::Range, NoteSequence::Length::Range); }
+    void setLengthBias(int lengthBias) {
+        _lengthBias = clamp(lengthBias, -NoteSequence::Length::Range, NoteSequence::Length::Range);
     }
 
     void editLengthBias(int value, bool shift) {
-        setLengthBias(_lengthBias.base + value);
+        setLengthBias(_lengthBias + value);
     }
 
     void printLengthBias(StringBuilder &str) const {
@@ -230,13 +230,13 @@ public:
 
     // noteProbabilityBias
 
-    int noteProbabilityBias() const { return Routing::routedValueInt(ParamKey::NoteProbabilityBias, _trackIndex, _noteProbabilityBias.base, -NoteSequence::NoteVariationProbability::Range, NoteSequence::NoteVariationProbability::Range); }
-    void setNoteProbabilityBias(int noteProbabilityBias, bool routed = false) {
-        _noteProbabilityBias.set(clamp(noteProbabilityBias, -NoteSequence::NoteVariationProbability::Range, NoteSequence::NoteVariationProbability::Range), routed);
+    int noteProbabilityBias() const { return Routing::routedValueInt(ParamKey::NoteProbabilityBias, _trackIndex, _noteProbabilityBias, -NoteSequence::NoteVariationProbability::Range, NoteSequence::NoteVariationProbability::Range); }
+    void setNoteProbabilityBias(int noteProbabilityBias) {
+        _noteProbabilityBias = clamp(noteProbabilityBias, -NoteSequence::NoteVariationProbability::Range, NoteSequence::NoteVariationProbability::Range);
     }
 
     void editNoteProbabilityBias(int value, bool shift) {
-        setNoteProbabilityBias(_noteProbabilityBias.base + value);
+        setNoteProbabilityBias(_noteProbabilityBias + value);
     }
 
     void printNoteProbabilityBias(StringBuilder &str) const {
@@ -283,14 +283,14 @@ private:
     FillMode _fillMode;
     bool _fillMuted;
     CvUpdateMode _cvUpdateMode;
-    Routable<uint8_t> _slideTime;
-    Routable<int8_t> _octave;
-    Routable<int8_t> _transpose;
-    Routable<int8_t> _rotate;
-    Routable<int8_t> _gateProbabilityBias;
-    Routable<int8_t> _retriggerProbabilityBias;
-    Routable<int8_t> _lengthBias;
-    Routable<int8_t> _noteProbabilityBias;
+    uint8_t _slideTime;
+    int8_t _octave;
+    int8_t _transpose;
+    int8_t _rotate;
+    int8_t _gateProbabilityBias;
+    int8_t _retriggerProbabilityBias;
+    int8_t _lengthBias;
+    int8_t _noteProbabilityBias;
 
     NoteSequenceArray _sequences;
 
