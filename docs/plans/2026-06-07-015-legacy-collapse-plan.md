@@ -36,9 +36,12 @@
   `_routedInput/_routedScanner/_routedIndexedA/B` ARE dead (getters read the override); `_routedSync`
   is NOT — it's the live Sync sink.
 
-**FLAGGED, separate (do NOT fix here):** `cvRouteScan()/cvRouteRoute()` read `_cvRoute.scan()/.route()`
-not the override, but CVR is in the global table → CVR modulation writes an override nothing reads
-(latent no-op). Its own fix; leave `Project::writeRouted` CVR cases intact in this collapse.
+**CORRECTION (2026-06-07):** an earlier claim that CVR read-side "is not migrated" was WRONG.
+`CvRoute::scan()/route()` DO read the override (`routedValueGlobalInt(ParamKey::CvRouteScan/Route,
+_scan.base, 0, 100)`), and `updateSinks`'s `isProjectTarget` branch writes the CVR override via
+`migratedGlobal`. CVR modulation works end to end. Consequently `Project::writeRouted` is fully dead
+(updateSinks handles project targets directly, never calling writeTarget for them) — removable
+cleanup, not a bug. The collapse left it in place; it can go in a follow-up.
 
 ## Slices
 
@@ -96,4 +99,5 @@ Keep `Track` shell fields, `CvRoute`, and (if not collapsed) `Project` tempo/swi
   meaningful persisted state); base round-trips exactly. A ProjectVersion-gated format compaction can
   drop the dead byte later.
 - `Routing::isRouted/setRouted` bitmask + the `Routable<T>` template stay (live shell + CvRoute).
-- CVR read-side not migrated (cvRouteScan/Route read `_cvRoute` directly) — its own fix.
+- `Project::writeRouted` is fully dead (Tempo/Swing removed; CVR handled by the override path, not
+  writeTarget) — removable cleanup, not a bug. CVR modulation itself works (corrected above).
