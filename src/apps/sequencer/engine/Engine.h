@@ -135,15 +135,14 @@ public:
         if (index < 0 || index >= BusCvCount) {
             return;
         }
-        _busCvWritten[index] = true;
-        if (_busCvSafeMode) {
-            float delta = volts - _busCv[index];
-            float maxDelta = BusCvSlewPerTick;
-            if (delta > maxDelta) delta = maxDelta;
-            if (delta < -maxDelta) delta = -maxDelta;
-            _busCv[index] = clamp(_busCv[index] + delta, -5.f, 5.f);
-        } else {
+        // Sum+clamp law: per-frame writers (routing/CV-router/Teletype) stack onto the
+        // lane; first writer seeds (drops last frame), rest add, result clamps +-5V.
+        // _busCvWritten resets each frame, so the committed value is the order-free sum.
+        if (!_busCvWritten[index]) {
+            _busCvWritten[index] = true;
             _busCv[index] = clamp(volts, -5.f, 5.f);
+        } else {
+            _busCv[index] = clamp(_busCv[index] + volts, -5.f, 5.f);
         }
     }
 
@@ -338,7 +337,6 @@ private:
     std::array<float, BusCvCount> _busCv{};
     std::array<bool, BusCvCount> _busCvWritten{};
     bool _busCvSafeMode = true;
-    static constexpr float BusCvSlewPerTick = 1.0f;
     static constexpr float BusCvDecay = 0.9995f;
     std::array<float, CvRoute::LaneCount> _cvRouteOutputs{};
 
