@@ -158,10 +158,12 @@ public:
     int slideBase() const { return _slide; }
     void setSlide(int slide) { _slide = clamp(slide, 0, 100); }
 
-    int burstRate() const { return _burstRate; }
+    int burstRate() const { return Routing::routedValueInt(ParamKey::BurstRate, _trackIndex, _burstRate, 0, 100); }
+    int burstRateBase() const { return _burstRate; }
     void setBurstRate(int rate) { _burstRate = clamp(rate, 0, 100); }
 
-    int burstCount() const { return _burstCount; }
+    int burstCount() const { return Routing::routedValueInt(ParamKey::BurstCount, _trackIndex, _burstCount, 0, 100); }
+    int burstCountBase() const { return _burstCount; }
     void setBurstCount(int count) { _burstCount = clamp(count, 0, 100); }
 
     StochasticBurstHold burstHold() const { return _burstHold; }
@@ -256,11 +258,13 @@ public:
     void setMarblesMode(MarblesMode mode) { _marblesMode = ModelUtils::clampedEnum(mode); }
 
     // marblesSpread
-    int marblesSpread() const { return _marblesSpread; }
+    int marblesSpread() const { return Routing::routedValueInt(ParamKey::MarblesSpread, _trackIndex, _marblesSpread, 0, 100); }
+    int marblesSpreadBase() const { return _marblesSpread; }
     void setMarblesSpread(int spread) { _marblesSpread = clamp(spread, 0, 100); }
 
     // marblesBias
-    int marblesBias() const { return _marblesBias; }
+    int marblesBias() const { return Routing::routedValueInt(ParamKey::MarblesBias, _trackIndex, _marblesBias, 0, 100); }
+    int marblesBiasBase() const { return _marblesBias; }
     void setMarblesBias(int bias) { _marblesBias = clamp(bias, 0, 100); }
 
     // maskMelody — pitch-centrality threshold. 0..100, 100=bypass. Acts at

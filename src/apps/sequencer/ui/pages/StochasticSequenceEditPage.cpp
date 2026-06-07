@@ -663,15 +663,15 @@ void StochasticSequenceEditPage::editLiveStep(int step, int value, bool shift) {
     case 4:  seq.setGateLength(seq.gateLengthBase() + v);            notifyStochasticShapingEdit(); break;
     case 5:  seq.setLegatoProb(seq.legatoProb() + v);                notifyStochasticShapingEdit(); break;
     case 6:  seq.setBurst(seq.burstBase() + v);                      notifyStochasticShapingEdit(); break;
-    case 7:  seq.setBurstCount(seq.burstCount() + v);                notifyStochasticShapingEdit(); break;
+    case 7:  seq.setBurstCount(seq.burstCountBase() + v);            notifyStochasticShapingEdit(); break;
     case 8:  seq.setComplexity(seq.complexityBase() + v);            notifyStochasticShapingEdit(); break;
     case 9:  seq.setContour(seq.contourBase() + v);                  notifyStochasticShapingEdit(); break;
-    case 10: seq.setMarblesBias(seq.marblesBias() + v);              notifyStochasticShapingEdit(); break;
-    case 11: seq.setMarblesSpread(seq.marblesSpread() + v);          notifyStochasticShapingEdit(); break;
+    case 10: seq.setMarblesBias(seq.marblesBiasBase() + v);          notifyStochasticShapingEdit(); break;
+    case 11: seq.setMarblesSpread(seq.marblesSpreadBase() + v);      notifyStochasticShapingEdit(); break;
     case 12: seq.setRange(seq.rangeBase() + (shift ? value * 10 : value)); notifyStochasticShapingEdit(); break;
     case 13: seq.setSlide(seq.slideBase() + v);                      notifyStochasticShapingEdit(); break;
     case 14: seq.setRepeatProb(seq.repeatProb() + v); break;
-    case 15: seq.setBurstRate(seq.burstRate() + v);                  notifyStochasticShapingEdit(); break;
+    case 15: seq.setBurstRate(seq.burstRateBase() + v);             notifyStochasticShapingEdit(); break;
     }
 }
 

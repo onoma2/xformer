@@ -13,29 +13,25 @@ UNIT_TEST("ParamTableStochastic") {
 CASE("table owns the expected keys with declared names and flags") {
     struct Spec { uint8_t key; const char *name; uint8_t flag; };
     const Spec specs[] = {
+        // shared band keys
         { ParamKey::Octave,          "Octave",     RouteParam::Continuous },
         { ParamKey::Transpose,       "Transpose",  RouteParam::Continuous },
         { ParamKey::SlideTime,       "Slide Time", RouteParam::Continuous },
-        { ParamKey::Complexity,      "Complexity", RouteParam::Continuous },
-        { ParamKey::Variation,       "Variation",  RouteParam::Continuous },
-        { ParamKey::Rest,            "Rest",       RouteParam::Continuous },
-        { ParamKey::Slide,           "Slide",      RouteParam::Continuous },
-        { ParamKey::Burst,           "Burst",      RouteParam::Continuous },
-        { ParamKey::Sleep,           "Sleep",      RouteParam::Continuous },
-        { ParamKey::Mutate,          "Mutate",     RouteParam::Continuous },
-        { ParamKey::Jump,            "Jump",       RouteParam::Continuous },
-        { ParamKey::Contour,         "Contour",    RouteParam::Continuous },
-        { ParamKey::MaskRhythm,      "Mask Rhy",   RouteParam::Continuous },
-        { ParamKey::TiltRhythm,      "Tilt Rhy",   RouteParam::Continuous },
-        { ParamKey::StochasticGateLength, "Gate Length", RouteParam::Continuous },
-        { ParamKey::PatienceRhythm,  "Patience",   RouteParam::Continuous },
-        { ParamKey::NoteDuration,    "Note Dur",   RouteParam::Discrete },
         { ParamKey::Rotate,          "Rotate",     RouteParam::Continuous },
-        { ParamKey::ClockMultiplier, "Clock Mult", RouteParam::Continuous },
-        { ParamKey::Feel,            "Feel",       RouteParam::Continuous },
         { ParamKey::Scale,           "Scale",      RouteParam::Discrete },
         { ParamKey::RootNote,        "Root Note",  RouteParam::Discrete },
         { ParamKey::Divisor,         "Divisor",    RouteParam::Discrete },
+        { ParamKey::ClockMultiplier, "Clock Mult", RouteParam::Continuous },
+        // engine page — the 9 curated routables (2026-06-08 revamp)
+        { ParamKey::Range,           "Range",      RouteParam::Continuous },
+        { ParamKey::MarblesBias,     "Bias",       RouteParam::Continuous },
+        { ParamKey::MarblesSpread,   "Spread",     RouteParam::Continuous },
+        { ParamKey::Variation,       "Variation",  RouteParam::Continuous },
+        { ParamKey::Rest,            "Rest",       RouteParam::Continuous },
+        { ParamKey::Burst,           "Burst",      RouteParam::Continuous },
+        { ParamKey::Contour,         "Contour",    RouteParam::Continuous },
+        { ParamKey::BurstCount,      "Burst Cnt",  RouteParam::Continuous },
+        { ParamKey::BurstRate,       "Burst Rate", RouteParam::Continuous },
     };
     const RouteParam::Table &t = StochasticParamTable::table();
     for (const auto &s : specs) {
@@ -46,8 +42,11 @@ CASE("table owns the expected keys with declared names and flags") {
     }
 }
 
-CASE("unowned keys do not resolve") {
+CASE("dropped routables no longer resolve") {
     const RouteParam::Table &t = StochasticParamTable::table();
+    expectTrue(t.find(ParamKey::Complexity) == nullptr, "Complexity dropped");
+    expectTrue(t.find(ParamKey::Mutate) == nullptr, "Mutate dropped");
+    expectTrue(t.find(ParamKey::Feel) == nullptr, "Feel dropped");
     expectTrue(t.find(0) == nullptr, "key 0 (None) not owned");
 }
 

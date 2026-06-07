@@ -233,8 +233,8 @@ private:
         case SlideProb:     sequence.editSlide(value, shift); break;
         case LegatoProb:    sequence.editLegatoProb(value, shift); break;
         case Burst:         sequence.editBurst(value, shift);                            notifyShapingEdit(); break;
-        case BurstCount:    sequence.setBurstCount(sequence.burstCount() + value);       notifyShapingEdit(); break;
-        case BurstRate:     sequence.setBurstRate(sequence.burstRate() + value);         notifyShapingEdit(); break;
+        case BurstCount:    sequence.setBurstCount(sequence.burstCountBase() + value);   notifyShapingEdit(); break;
+        case BurstRate:     sequence.setBurstRate(sequence.burstRateBase() + value);     notifyShapingEdit(); break;
         case BurstHold:    sequence.editBurstHold(value, shift);                       notifyShapingEdit(); break;
         case MaskRhythm:    sequence.editMaskRhythm(value, shift); break;
         case TiltRhythm:    sequence.editTiltRhythm(value, shift); break;

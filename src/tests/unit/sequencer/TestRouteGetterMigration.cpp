@@ -572,4 +572,28 @@ CASE("Stochastic range: int base-anchored read via routedValueInt (0..100)") {
     expectEqual(seq.range(), 40, "stale clear -> base restored");
 }
 
+CASE("Stochastic Bias/Spread/BurstCount/BurstRate: base-anchored routed reads") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Stochastic);
+    auto &seq = p.track(0).stochasticTrack().sequence(0);
+    seq.setMarblesBias(20);
+    seq.setMarblesSpread(60);
+    seq.setBurstCount(10);
+    seq.setBurstRate(80);
+
+    Routing::writeRouteOverride(ParamKey::MarblesBias, 0, 15.f);
+    Routing::writeRouteOverride(ParamKey::MarblesSpread, 0, -30.f);
+    Routing::writeRouteOverride(ParamKey::BurstCount, 0, 5.f);
+    Routing::writeRouteOverride(ParamKey::BurstRate, 0, 50.f);
+    expectEqual(seq.marblesBias(), 35, "Bias base+delta");
+    expectEqual(seq.marblesSpread(), 30, "Spread base+delta");
+    expectEqual(seq.burstCount(), 15, "BurstCount base+delta");
+    expectEqual(seq.burstRate(), 100, "BurstRate base+delta clamps to 100");
+
+    Routing::clearRouteOverrides();
+    expectEqual(seq.marblesBias(), 20, "Bias clear -> base");
+    expectEqual(seq.burstRate(), 80, "BurstRate clear -> base");
+}
+
 } // UNIT_TEST
