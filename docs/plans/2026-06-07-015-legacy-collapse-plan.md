@@ -74,3 +74,26 @@ Keep `Track` shell fields, `CvRoute`, and (if not collapsed) `Project` tempo/swi
 - No behavior change: deleted writeRouted/dispatch was unreachable; the override path already drives
   every migrated param.
 - Per-slice gate: STM32 release + sim clean (no new warnings) + Codex ALLOW. Owner flashes once at end.
+
+---
+
+## Status — DONE (2026-06-07)
+
+- **Slice 1** (`ab6cd3c1` + `6ac54637`): deleted the 8 engines' `writeRouted` + the `writeTarget`
+  trackMode dispatch; restored the still-live DiscreteMapSync handler (Codex caught the regression).
+  −12 KB flash. Codex ALLOW.
+- **Slices 2-9** (`6a195bee`, `c7726a39`, `a4f1c17a`, `35595517`, `f136c50a`, `c4d2ec27`, `8a91aabb`,
+  `ebcf1cc6`): all 8 engines' `Routable<T>` → plain `T`, 73 fields, −~3.8 KB. Serialization
+  roundtrip-proven (TestModel + all per-engine Test*Serialization PASS). Codex ALLOW (6/7 byte-
+  identical; Indexed `_rootNote` resolved — see below).
+- `Routable<T>` retained for: Track shell fields (`_runGate`/`_cvOutputRotate`/`_gateOutputRotate`),
+  `CvRoute`, `Project` tempo/swing.
+
+### Follow-ups (non-blocking)
+- **Indexed `_rootNote` vestigial byte**: it was serialized whole (`writer.write(Routable<int8_t>)`
+  = 2 bytes). To keep the format byte-aligned without a version bump, the collapse preserves 2 bytes
+  (write value twice, read + discard byte 2). Byte 2 was always the transient `routed` cache (never
+  meaningful persisted state); base round-trips exactly. A ProjectVersion-gated format compaction can
+  drop the dead byte later.
+- `Routing::isRouted/setRouted` bitmask + the `Routable<T>` template stay (live shell + CvRoute).
+- CVR read-side not migrated (cvRouteScan/Route read `_cvRoute` directly) — its own fix.
