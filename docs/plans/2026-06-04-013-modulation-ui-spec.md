@@ -288,6 +288,33 @@ exists for the param; it must NOT mint a separate per-track route. **MOD-** remo
 track from the shared route (frees it when last). This supersedes §2's "one source per param, per
 track" — the binding rule is one source per row (§5).
 
+**2026-06-07 — bus hub = the 5th tab, edited as a band row; bus value path joins the unified
+model.** §5 specced the band tabs but never the bus hub. Owner decision: the 4 CV bus lanes are a
+5th Left/Right tab whose lane edits reuse the **same draft→COMMIT flow as the band tabs**, not a
+bespoke ADD/REMOVE set. Two halves:
+
+- **Engine — bus migrated to the unified base-0 delta (was the last legacy value path).** The
+  routing engine's bus branch computed `route.min() + shaped·(max−min)` over the old
+  `{depth, bias, min/max window, full shaper switch}` set — the exact expanded model the per-track
+  collapse retired. Replaced with `RouteFork::busDelta(source, shaper(0), depthPct(0), combine)` =
+  `RouteApply::delta` over a ±5V range, base 0: **Modulate** is bipolar around 0V, **Absolute**
+  sweeps from 0V, depth 100 = full rail, depth 0 = inert. `setBusCv` still sums writers / clamps
+  ±5V at read. This makes the MOD/ABS toggle actually drive the lane (it was inert before) and
+  drops the min/max window for the bus, finishing the §16 "no window" collapse. TDD: `busDelta`
+  cases in `TestRouteFork`.
+- **UI — lane = a band row with no track-column axis.** Footer mirrors the band tabs:
+  **F1 VIEW** (depth↔source), **F2 EDIT** (nav↔edit; EDIT on an empty lane creates the route, on a
+  routed lane re-opens it — there is no ADD), **F3 MOD/ABS** while editing, **Shift+F3 SAFE**
+  (toggles + shows bus safety; SAFE leaves its standalone footer slot), **F4 CANCEL** / Shift+F4
+  REMOVE, **F5 COMMIT**. **One routing source per lane** (`findRouteForTarget(BusCvN)` → begin else
+  create; the engine *can* sum two routing routes onto a lane but the UI never mints a second — the
+  sum is across the routing / CV-router / Teletype domains, not multiple routing routes). Grid
+  connections zone, two groups split by a separator: group 1 = the routing source abbrev + its
+  depth (editable here); group 2 = **CVR / TT activity lights** (configured on the CV-router page /
+  in Teletype scripts, lit when writing this frame). Renders: `ui-preview/bus/bus-grid-proposed.png`
+  (+ edit-source / edit-depth variants). Supersedes the bus-hub landing slice's VIEW/ADD/SAFE/REMOVE
+  footer.
+
 ---
 
 ## 16. Shipped state (2026-06-05) — phases 1-5 + hardware-tuning round

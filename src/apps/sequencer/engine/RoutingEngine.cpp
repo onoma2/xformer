@@ -469,48 +469,9 @@ void RoutingEngine::updateSinks() {
             auto target = route.target();
 
             if (Routing::isBusTarget(target)) {
-                constexpr int kBusShaperTrack = 0;
-                float shapedSource = applyBiasDepthToSource(_sourceValues[routeIndex], route, kBusShaperTrack);
-                float biasNormalized = route.biasPct(kBusShaperTrack) * 0.01f;
-                auto shaper = route.shaper(kBusShaperTrack);
-                auto &st = routeState.shaperState[kBusShaperTrack];
-                float shaperOut = shapedSource;
-                switch (shaper) {
-                case Routing::Shaper::None:
-                    break;
-                case Routing::Shaper::Crease:
-                    shaperOut = applyCreaseSource(shapedSource, biasNormalized);
-                    break;
-                case Routing::Shaper::Location:
-                    shaperOut = applyLocation(shapedSource, st.locationState.location);
-                    break;
-                case Routing::Shaper::Envelope:
-                    shaperOut = applyEnvelope(shapedSource, st.envelopeState.envelope);
-                    break;
-                case Routing::Shaper::TriangleFold:
-                    shaperOut = applyTriangleFold(shapedSource, biasNormalized);
-                    break;
-                case Routing::Shaper::FrequencyFollower:
-                    shaperOut = applyFrequencyFollower(shapedSource, st.freqFollowState);
-                    break;
-                case Routing::Shaper::Activity:
-                    shaperOut = applyActivity(shapedSource, st.activityState);
-                    break;
-                case Routing::Shaper::ProgressiveDivider:
-                    shaperOut = applyProgressiveDivider(shapedSource, st.progDivState);
-                    break;
-                case Routing::Shaper::VcaNext: {
-                    int nextRouteIndex = (routeIndex + 1) % CONFIG_ROUTE_COUNT;
-                    float neighbor = _sourceValues[nextRouteIndex];
-                    shaperOut = 0.5f + (shapedSource - 0.5f) * neighbor;
-                    break;
-                }
-                case Routing::Shaper::Last:
-                    break;
-                }
-                float baseValue = route.min() + shaperOut * (route.max() - route.min());
-                float centivolts = Routing::denormalizeTargetValue(target, baseValue);
-                float volts = centivolts * 0.01f;  // Convert centivolts to volts
+                // Unified base-0 model: signed depthPct + combine, no min/max window.
+                float volts = RouteFork::busDelta(_sourceValues[routeIndex], route.shaper(0),
+                                                  route.depthPct(0), route.combine());
                 int busIndex = int(target) - int(Routing::Target::BusCv1);
                 _engine.setBusCv(busIndex, volts, Engine::BusWriterRouting);
             } else if (Routing::isPerTrackTarget(target)) {

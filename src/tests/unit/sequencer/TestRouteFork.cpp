@@ -182,4 +182,18 @@ CASE("migratedGlobal: non-project targets do not migrate here") {
     expectFalse(RouteFork::migratedGlobal(Routing::Target::Play, key, range), "engine trigger not global");
 }
 
+CASE("busDelta: unified base-0 +/-5V delta, Modulate bipolar / Absolute sweep") {
+    auto none = Routing::Shaper::None;
+    // Modulate: neutral at source-center, full +/-5V rail at depth 100
+    expectTrue(near(RouteFork::busDelta(0.5f, none, 100, Combine::Modulate), 0.f), "MOD center -> 0V");
+    expectTrue(near(RouteFork::busDelta(1.0f, none, 100, Combine::Modulate), 5.f), "MOD src 1 -> +5V");
+    expectTrue(near(RouteFork::busDelta(0.0f, none, 100, Combine::Modulate), -5.f), "MOD src 0 -> -5V");
+    // Absolute: sweep from base 0, source 0 -> 0V, source 1 -> +5V at depth 100
+    expectTrue(near(RouteFork::busDelta(0.0f, none, 100, Combine::Absolute), 0.f), "ABS src 0 -> 0V");
+    expectTrue(near(RouteFork::busDelta(1.0f, none, 100, Combine::Absolute), 5.f), "ABS src 1 -> +5V");
+    // depth scales linearly; depth 0 = inert
+    expectTrue(near(RouteFork::busDelta(1.0f, none, 0, Combine::Modulate), 0.f), "depth 0 -> 0V");
+    expectTrue(near(RouteFork::busDelta(1.0f, none, 50, Combine::Modulate), 2.5f), "MOD depth 50 -> +2.5V");
+}
+
 } // UNIT_TEST

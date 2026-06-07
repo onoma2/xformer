@@ -89,8 +89,17 @@ void RoutingPage::keyPress(KeyPressEvent &event) {
 }
 
 void RoutingPage::encoder(EncoderEvent &event) {
-    if (_tabEditorTab == 4) {           // bus tab: move the lane cursor 0..3
-        _busLane = clamp(_busLane + event.value(), 0, Engine::BusCvCount - 1);
+    if (_tabEditorTab == 4) {           // bus tab
+        if (_matrixEditActive) {        // editing a lane: dial the draft source/depth
+            if (_matrixView == MatrixView::Source) {
+                matrixEditSource(event.value(), event.pressed() || globalKeyState()[Key::Shift]);
+            } else {
+                int d = clamp(_matrixDraft.route.depthPct(0) + event.value(), -100, 100);
+                _matrixDraft.route.setDepthPct(0, d);
+            }
+        } else {                        // nav: move the lane cursor 0..3
+            _busLane = clamp(_busLane + event.value(), 0, Engine::BusCvCount - 1);
+        }
         event.consume();
         return;
     }
@@ -580,25 +589,46 @@ static void drawBusVoltBar(Canvas &canvas, int x, int y, int w, float volts, boo
 }
 
 void RoutingPage::drawBus(Canvas &canvas) {
-    const int DIV = 104;     // vertical divider x
+    const int DIV = 104;     // level-block divider x
     const int VAL_R = 98;    // right edge of the right-aligned value column
+    const int SRC_X = 110;   // group 1: routing source abbrev column
+    const int DPT_X = 130;   // group 1: routing depth column
+    const int SEP_X = 172;   // group separator
+    const int CVR_X = 178;   // group 2: CV-router activity light
+    const int TT_X = 210;    // group 2: Teletype activity light
+
+    bool editing = _matrixEditActive;
+    auto &routing = _project.routing();
 
     WindowPainter::clear(canvas);
     canvas.setFont(Font::Tiny);
 
-    // header: band name + zone labels, divider between LEVEL block and CONNECTIONS zone
+    // header: title, column labels (or SOURCE/DEPTH view tag while editing), SAFE state
     canvas.setColor(Color::Bright);
     canvas.drawText(3, 7, "BUS");
     canvas.setColor(Color::Low);
-    canvas.drawText(DIV + 4, 7, "<SOURCES");
-    canvas.drawText(CONFIG_LCD_WIDTH - canvas.textWidth("READERS>") - 3, 7, "READERS>");
+    if (editing) {
+        canvas.setColor(Color::Medium);
+        canvas.drawText(40, 7, _matrixView == MatrixView::Source ? "SOURCE" : "DEPTH");
+    } else {
+        canvas.drawText(SRC_X, 7, "SRC");
+        canvas.drawText(DPT_X, 7, "DEPTH");
+        canvas.drawText(CVR_X, 7, "LIVE");
+    }
+    if (_project.busSafety()) {
+        canvas.setColor(Color::Bright);
+        canvas.drawText(VAL_R - canvas.textWidth("SAFE"), 7, "SAFE");
+    }
     canvas.hline(0, 10, CONFIG_LCD_WIDTH);
     canvas.vline(DIV, 11, CONFIG_LCD_HEIGHT - 22);
+    canvas.setColor(Color::Low);
+    canvas.vline(SEP_X, 11, CONFIG_LCD_HEIGHT - 22);
 
     const int top = 14, rowH = 10;
     for (int lane = 0; lane < Engine::BusCvCount; ++lane) {
         int y = top + lane * rowH;
         bool focus = lane == _busLane;
+        bool editThis = editing && lane == _busLane;
         if (focus) {
             canvas.setColor(Color::Bright);
             canvas.fillRect(0, y - 1, 2, rowH - 1);
@@ -612,72 +642,82 @@ void RoutingPage::drawBus(Canvas &canvas) {
         FixedStringBuilder<8> vtxt(volts != 0.f ? "%+.1fV" : "0.0V", volts);
         canvas.drawText(VAL_R - canvas.textWidth(vtxt), y + 4, vtxt);
 
-        // CONNECTIONS zone: live R/C/T writer glyphs, then enumerable source/reader tokens
-        uint8_t writers = _engine.busWriters(lane);
-        int cx = DIV + 6;
-        struct { const char *g; uint8_t bit; } glyphs[] = {
-            { "R", Engine::BusWriterRouting },
-            { "C", Engine::BusWriterCvRouter },
-            { "T", Engine::BusWriterTeletype },
-        };
-        for (auto &g : glyphs) {
-            canvas.setColor((writers & g.bit) ? Color::Bright : Color::Low);
-            canvas.drawText(cx, y + 4, g.g);
-            cx += canvas.textWidth(g.g) + 4;
-        }
-        cx += 2;
-
-        // enumerable routing routes: sources that write this lane (bright), targets that read it (dim)
-        const auto &routing = _project.routing();
+        // group 1: the one routing source set here + its depth (draft while editing,
+        // else the committed route; "+" hint on an empty lane)
         Routing::Target laneTarget = Routing::Target(int(Routing::Target::BusCv1) + lane);
-        Routing::Source laneSource = Routing::Source(int(Routing::Source::BusCv1) + lane);
-        bool any = false;
-        for (int r = 0; r < CONFIG_ROUTE_COUNT && cx < CONFIG_LCD_WIDTH - 8; ++r) {
-            const auto &route = routing.route(r);
-            if (!route.active()) {
-                continue;
-            }
-            if (route.target() == laneTarget) {     // route writes the lane: show its source
-                FixedStringBuilder<8> tok;
-                Routing::printSourceAbbrev(route.source(), tok);
-                canvas.setColor(focus ? Color::Bright : Color::Medium);
-                canvas.drawText(cx, y + 4, tok);
-                cx += canvas.textWidth(tok) + 5;
-                any = true;
-            }
-        }
-        for (int r = 0; r < CONFIG_ROUTE_COUNT && cx < CONFIG_LCD_WIDTH - 8; ++r) {
-            const auto &route = routing.route(r);
-            if (!route.active()) {
-                continue;
-            }
-            if (route.source() == laneSource) {      // route reads the lane: show its target
-                const char *nm = Routing::targetName(route.target());
-                drawClippedName(canvas, cx, y + 4, CONFIG_LCD_WIDTH - 4 - cx, nm ? nm : "?");
-                cx += canvas.textWidth(nm ? nm : "?") + 5;
-                any = true;
+        Routing::Source src = Routing::Source::None;
+        int depth = 0;
+        bool routed = false;
+        if (editThis) {
+            src = _matrixDraft.route.source();
+            depth = _matrixDraft.route.depthPct(0);
+            routed = true;
+        } else {
+            int idx = RouteDraft::findRouteForTarget(routing, laneTarget);
+            if (idx >= 0) {
+                src = routing.route(idx).source();
+                depth = routing.route(idx).depthPct(0);
+                routed = true;
             }
         }
-        // enumerable CV-router lane links
-        const auto &cvRoute = _project.cvRoute();
-        if (cvRoute.outputDest(lane) == CvRoute::OutputDest::Bus || cvRoute.inputSource(lane) == CvRoute::InputSource::Bus) {
-            any = true;
+        if (routed && src != Routing::Source::None) {
+            bool srcHot = editThis && _matrixView == MatrixView::Source;
+            bool dptHot = editThis && _matrixView == MatrixView::Depth;
+            FixedStringBuilder<8> tok;
+            Routing::printSourceAbbrev(src, tok);
+            canvas.setColor(srcHot ? Color::Bright : Color::Medium);
+            canvas.drawText(SRC_X, y + 4, tok);
+            FixedStringBuilder<8> dtxt("%+d%%", depth);
+            canvas.setColor(dptHot ? Color::Bright : Color::Medium);
+            canvas.drawText(DPT_X, y + 4, dtxt);
+        } else if (editThis) {
+            canvas.setColor(Color::Bright);                 // fresh draft, no source picked yet
+            canvas.drawText(SRC_X, y + 4, "?");
+        } else {
+            canvas.setColor(Color::Low);                    // empty lane: EDIT here adds a source
+            canvas.drawText(SRC_X, y + 4, "+");
         }
 
-        if (!any && writers == 0) {
-            canvas.setColor(Color::Low);
-            canvas.drawText(DIV + 6 + 3 * (canvas.textWidth("R") + 4) + 2, y + 4, "IDLE");
-        }
+        // group 2: CVR / TT activity lights (set up elsewhere, lit when writing this frame)
+        uint8_t writers = _engine.busWriters(lane);
+        canvas.setColor((writers & Engine::BusWriterCvRouter) ? Color::Bright : Color::Low);
+        canvas.drawText(CVR_X, y + 4, "CVR");
+        canvas.setColor((writers & Engine::BusWriterTeletype) ? Color::Bright : Color::Low);
+        canvas.drawText(TT_X, y + 4, "TT");
     }
 
-    const char *fn[] = { "VIEW", "ADD", "SAFE", "REMOVE", nullptr };
-    WindowPainter::drawFooter(canvas, fn, pageKeyState(), _project.busSafety() ? int(Function::Combine) : -1);
+    bool canCommit = editing && RouteDraft::canCommit(_matrixDraft);
+    const char *combineLbl = (editing && _matrixDraft.route.combine() == RouteApply::Combine::Absolute) ? "ABS" : "MOD";
+    const char *fn[] = { "VIEW", "EDIT", editing ? combineLbl : nullptr, editing ? "CANCEL" : nullptr, canCommit ? "COMMIT" : nullptr };
+    WindowPainter::drawFooter(canvas, fn, pageKeyState(), editing ? int(Function::Edit) : -1);
+}
+
+// Begin editing the focused lane: re-open its committed routing route, or create a
+// fresh inert draft (one routing source per lane; bus target is global, scope 0).
+void RoutingPage::busEnterEdit() {
+    auto &routing = _project.routing();
+    Routing::Target target = Routing::Target(int(Routing::Target::BusCv1) + _busLane);
+    int idx = RouteDraft::findRouteForTarget(routing, target);
+    if (idx >= 0) {
+        _matrixDraft = RouteDraft::begin(routing, idx);
+    } else {
+        _matrixDraft = RouteDraft::create(routing, target, 0);
+        if (_matrixDraft.routeIndex < 0) {
+            showMessage("NO EMPTY ROUTES");
+            return;
+        }
+    }
+    _matrixEditActive = true;
+    _matrixEditRow = _busLane;
 }
 
 void RoutingPage::handleBusKey(KeyPressEvent &event) {
     const auto &key = event.key();
 
-    if (key.isLeft() || key.isRight()) {     // band cycle: leave/enter the bus tab
+    if (key.isLeft() || key.isRight()) {     // band cycle: discard draft, leave the bus tab
+        if (_matrixEditActive) {
+            matrixExitEdit(false);
+        }
         _tabEditorTab = (_tabEditorTab + (key.isLeft() ? 4 : 1)) % 5;
         _tabEditorRow = 0;
         tabRefocus();
@@ -687,10 +727,45 @@ void RoutingPage::handleBusKey(KeyPressEvent &event) {
 
     if (key.isFunction()) {
         switch (Function(key.function())) {
-        case Function::Combine: // F3 SAFE: toggle bus safety
-            _project.setBusSafety(!_project.busSafety());
+        case Function::View: // F1: cycle the lane view depth <-> source
+            _matrixView = _matrixView == MatrixView::Depth ? MatrixView::Source : MatrixView::Depth;
             break;
-        default: // VIEW / ADD / REMOVE deferred to the follow-up slice
+        case Function::Edit: // F2: nav <-> edit on the focused lane
+            if (_matrixEditActive) {
+                matrixExitEdit(false);
+            } else {
+                busEnterEdit();
+            }
+            break;
+        case Function::Combine: // F3: Shift = SAFE toggle; plain = MOD/ABS while editing
+            if (key.shiftModifier()) {
+                _project.setBusSafety(!_project.busSafety());
+            } else if (_matrixEditActive) {
+                _matrixDraft.route.setCombine(
+                    _matrixDraft.route.combine() == RouteApply::Combine::Absolute
+                        ? RouteApply::Combine::Modulate : RouteApply::Combine::Absolute);
+            }
+            break;
+        case Function::Cancel: // F4: Shift = REMOVE the lane's route; plain = discard draft
+            if (key.shiftModifier()) {
+                if (_matrixEditActive) {
+                    matrixExitEdit(false);
+                }
+                Routing::Target target = Routing::Target(int(Routing::Target::BusCv1) + _busLane);
+                int idx = RouteDraft::findRouteForTarget(_project.routing(), target);
+                if (idx >= 0) {
+                    _project.routing().route(idx).clear();
+                }
+            } else if (_matrixEditActive) {
+                matrixExitEdit(false);
+            }
+            break;
+        case Function::Commit: // F5: write the draft live (gated on canCommit)
+            if (_matrixEditActive && RouteDraft::canCommit(_matrixDraft)) {
+                matrixExitEdit(true);
+            }
+            break;
+        default:
             break;
         }
         event.consume();

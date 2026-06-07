@@ -478,6 +478,18 @@ def render_page(page: str, scale: int = 4):
     elif page == "bus":
         from pages_bus import render_bus
         render_bus(canvas)
+    elif page == "bus-grid-proposed":
+        from pages_bus import render_bus_grid_proposed
+        render_bus_grid_proposed(canvas)
+    elif page == "bus-nav-proposed":
+        from pages_bus import render_bus_nav_proposed
+        render_bus_nav_proposed(canvas)
+    elif page == "bus-edit-source-proposed":
+        from pages_bus import render_bus_edit_source_proposed
+        render_bus_edit_source_proposed(canvas)
+    elif page == "bus-edit-depth-proposed":
+        from pages_bus import render_bus_edit_depth_proposed
+        render_bus_edit_depth_proposed(canvas)
     else:
         raise ValueError(f"Unknown page: {page}")
 
@@ -514,7 +526,7 @@ def main():
                                  'routing-list', 'routing-list-mid', 'routing-list-end',
                                  'routing-hero', 'routing-hero-step', 'routing-scope', 'routing-scope-global', 'routing-unified', 'routing-unified-clock', 'routing-spread', 'routing-target', 'routing-scope-bytype', 'routing-unified-idx', 'routing-unified-idx1', 'routing-source', 'routing-source-gate', 'routing-tabscope', 'routing-tabscope-bytype', 'routing-depth', 'routing-depth-abs', 'routing-tablane', 'routing-rowbar',
                                  'mod-param-row', 'mod-param-depth', 'mod-spread', 'mod-source', 'mod-matrix', 'mod-matrix-bytype', 'mod-matrix-src',
-                                 'bus',
+                                 'bus', 'bus-grid-proposed', 'bus-nav-proposed', 'bus-edit-source-proposed', 'bus-edit-depth-proposed',
                                  # Pure reference screens
                                  'ref-prob-melod', 'ref-shredder', 'ref-euclid',
                                  'ref-delinquencer', 'ref-skylines', 'ref-prob-div',

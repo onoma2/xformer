@@ -123,6 +123,15 @@ namespace RouteFork {
         return RouteApply::delta(h, 1.f, combine, depthPct, inferRange(range));
     }
 
+    // Bus lanes are base-0 sinks on the unified model: one signed depthPct + combine,
+    // no min/max window. Returns volts to sum onto the lane (read clamps to +/-5V).
+    // Modulate = bipolar around 0V, Absolute = sweep from 0V; depth 100 = full rail.
+    inline float busDelta(float sourceValue, Routing::Shaper shaper, int depthPct,
+                          RouteApply::Combine combine) {
+        float h = RouteShaper::shape(shaper, sourceValue);
+        return RouteApply::delta(h, 1.f, combine, depthPct, 5.f);
+    }
+
     // True when (trackMode, target) is a migrated per-track param; fills paramKey
     // and the param's real range. Migrated: Note, PhaseFlux, Curve, Tuesday,
     // Stochastic, DiscreteMap, Indexed, MidiCv (all engines).

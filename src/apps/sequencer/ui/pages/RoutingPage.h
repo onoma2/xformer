@@ -25,7 +25,8 @@ private:
     void drawTabEditor(Canvas &canvas);
     void handleTabEditorKey(KeyPressEvent &event);
     void drawBus(Canvas &canvas);              // tab 4: bus hub display
-    void handleBusKey(KeyPressEvent &event);   // tab 4: lane cursor + SAFE + band cycle
+    void handleBusKey(KeyPressEvent &event);   // tab 4: lane cursor + edit + band cycle
+    void busEnterEdit();                        // begin/create the focused lane's draft
     void enterTabEditor();
     void tabRefocus();          // point _route at the cursor row's committed route (if routed)
     void matrixEnterEdit();     // encoder-press in nav: begin/create the per-row draft
