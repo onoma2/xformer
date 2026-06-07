@@ -475,6 +475,9 @@ def render_page(page: str, scale: int = 4):
     elif page == "mod-matrix-src":
         from pages_modulation import render_mod_matrix_src
         render_mod_matrix_src(canvas)
+    elif page == "bus":
+        from pages_bus import render_bus
+        render_bus(canvas)
     else:
         raise ValueError(f"Unknown page: {page}")
 
@@ -511,6 +514,7 @@ def main():
                                  'routing-list', 'routing-list-mid', 'routing-list-end',
                                  'routing-hero', 'routing-hero-step', 'routing-scope', 'routing-scope-global', 'routing-unified', 'routing-unified-clock', 'routing-spread', 'routing-target', 'routing-scope-bytype', 'routing-unified-idx', 'routing-unified-idx1', 'routing-source', 'routing-source-gate', 'routing-tabscope', 'routing-tabscope-bytype', 'routing-depth', 'routing-depth-abs', 'routing-tablane', 'routing-rowbar',
                                  'mod-param-row', 'mod-param-depth', 'mod-spread', 'mod-source', 'mod-matrix', 'mod-matrix-bytype', 'mod-matrix-src',
+                                 'bus',
                                  # Pure reference screens
                                  'ref-prob-melod', 'ref-shredder', 'ref-euclid',
                                  'ref-delinquencer', 'ref-skylines', 'ref-prob-div',
