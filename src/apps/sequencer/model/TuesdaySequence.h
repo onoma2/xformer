@@ -28,9 +28,9 @@ public:
 
     // algorithm
 
-    int algorithm() const { return Routing::routedValueInt(ParamKey::Algorithm, _trackIndex, _algorithm.base, 0, 14); }
-    void setAlgorithm(int algorithm, bool routed = false) {
-        _algorithm.set(clamp(algorithm, 0, 14), routed);
+    int algorithm() const { return Routing::routedValueInt(ParamKey::Algorithm, _trackIndex, _algorithm, 0, 14); }
+    void setAlgorithm(int algorithm) {
+        _algorithm = clamp(algorithm, 0, 14);
     }
 
     void editAlgorithm(int value, bool shift) {
@@ -41,7 +41,7 @@ public:
         // Find current algorithm position in valid array
         int currentIdx = -1;
         for (int i = 0; i < VALID_COUNT; i++) {
-            if (VALID_ALGORITHMS[i] == _algorithm.base) {
+            if (VALID_ALGORITHMS[i] == _algorithm) {
                 currentIdx = i;
                 break;
             }
@@ -65,13 +65,13 @@ public:
 
     // flow
 
-    int flow() const { return Routing::routedValueInt(ParamKey::Flow, _trackIndex, _flow.base, 0, 16); }
-    void setFlow(int flow, bool routed = false) {
-        _flow.set(clamp(flow, 0, 16), routed);
+    int flow() const { return Routing::routedValueInt(ParamKey::Flow, _trackIndex, _flow, 0, 16); }
+    void setFlow(int flow) {
+        _flow = clamp(flow, 0, 16);
     }
 
     void editFlow(int value, bool shift) {
-        setFlow(_flow.base + value);
+        setFlow(_flow + value);
     }
 
     void printFlow(StringBuilder &str) const {
@@ -81,13 +81,13 @@ public:
 
     // ornament
 
-    int ornament() const { return Routing::routedValueInt(ParamKey::Ornament, _trackIndex, _ornament.base, 0, 16); }
-    void setOrnament(int ornament, bool routed = false) {
-        _ornament.set(clamp(ornament, 0, 16), routed);
+    int ornament() const { return Routing::routedValueInt(ParamKey::Ornament, _trackIndex, _ornament, 0, 16); }
+    void setOrnament(int ornament) {
+        _ornament = clamp(ornament, 0, 16);
     }
 
     void editOrnament(int value, bool shift) {
-        setOrnament(_ornament.base + value);
+        setOrnament(_ornament + value);
     }
 
     void printOrnament(StringBuilder &str) const {
@@ -97,13 +97,13 @@ public:
 
     // power
 
-    int power() const { return Routing::routedValueInt(ParamKey::Power, _trackIndex, _power.base, 0, 16); }
-    void setPower(int power, bool routed = false) {
-        _power.set(clamp(power, 0, 16), routed);
+    int power() const { return Routing::routedValueInt(ParamKey::Power, _trackIndex, _power, 0, 16); }
+    void setPower(int power) {
+        _power = clamp(power, 0, 16);
     }
 
     void editPower(int value, bool shift) {
-        setPower(_power.base + value);
+        setPower(_power + value);
     }
 
     void printPower(StringBuilder &str) const {
@@ -130,7 +130,7 @@ public:
     void setLoopLength(int loopLength) {
         _loopLength = clamp(loopLength, 0, 29);
         // Re-clamp rotate to new loop length
-        setRotate(_rotate.base);
+        setRotate(_rotate);
     }
 
     void editLoopLength(int value, bool shift) {
@@ -144,13 +144,13 @@ public:
 
     // glide (slide probability 0-100%)
 
-    int glide() const { return Routing::routedValueInt(ParamKey::Glide, _trackIndex, _glide.base, 0, 100); }
-    void setGlide(int glide, bool routed = false) {
-        _glide.set(clamp(glide, 0, 100), routed);
+    int glide() const { return Routing::routedValueInt(ParamKey::Glide, _trackIndex, _glide, 0, 100); }
+    void setGlide(int glide) {
+        _glide = clamp(glide, 0, 100);
     }
 
     void editGlide(int value, bool shift) {
-        setGlide(_glide.base + value * (shift ? 10 : 1));
+        setGlide(_glide + value * (shift ? 10 : 1));
     }
 
     void printGlide(StringBuilder &str) const {
@@ -159,13 +159,13 @@ public:
     }
 
     // trill (re-trigger probability 0-100%)
-    int trill() const { return Routing::routedValueInt(ParamKey::Trill, _trackIndex, _trill.base, 0, 100); }
-    void setTrill(int trill, bool routed = false) {
-        _trill.set(clamp(trill, 0, 100), routed);
+    int trill() const { return Routing::routedValueInt(ParamKey::Trill, _trackIndex, _trill, 0, 100); }
+    void setTrill(int trill) {
+        _trill = clamp(trill, 0, 100);
     }
 
     void editTrill(int value, bool shift) {
-        setTrill(_trill.base + value * (shift ? 10 : 1));
+        setTrill(_trill + value * (shift ? 10 : 1));
     }
 
     void printTrill(StringBuilder &str) const {
@@ -174,13 +174,13 @@ public:
     }
 
     // stepTrill (intra-step subdivision count 0-100%)
-    int stepTrill() const { return Routing::routedValueInt(ParamKey::StepTrill, _trackIndex, _stepTrill.base, 0, 100); }
-    void setStepTrill(int stepTrill, bool routed = false) {
-        _stepTrill.set(clamp(stepTrill, 0, 100), routed);
+    int stepTrill() const { return Routing::routedValueInt(ParamKey::StepTrill, _trackIndex, _stepTrill, 0, 100); }
+    void setStepTrill(int stepTrill) {
+        _stepTrill = clamp(stepTrill, 0, 100);
     }
 
     void editStepTrill(int value, bool shift) {
-        setStepTrill(_stepTrill.base + value * (shift ? 10 : 1));
+        setStepTrill(_stepTrill + value * (shift ? 10 : 1));
     }
 
     void printStepTrill(StringBuilder &str) const {
@@ -222,13 +222,13 @@ public:
 
     // octave (-10 to +10)
 
-    int octave() const { return Routing::routedValueInt(ParamKey::Octave, _trackIndex, _octave.base, -10, 10); }
-    void setOctave(int octave, bool routed = false) {
-        _octave.set(clamp(octave, -10, 10), routed);
+    int octave() const { return Routing::routedValueInt(ParamKey::Octave, _trackIndex, _octave, -10, 10); }
+    void setOctave(int octave) {
+        _octave = clamp(octave, -10, 10);
     }
 
     void editOctave(int value, bool shift) {
-        setOctave(_octave.base + value);
+        setOctave(_octave + value);
     }
 
     void printOctave(StringBuilder &str) const {
@@ -238,13 +238,13 @@ public:
 
     // transpose (-11 to +11)
 
-    int transpose() const { return Routing::routedValueInt(ParamKey::Transpose, _trackIndex, _transpose.base, -11, 11); }
-    void setTranspose(int transpose, bool routed = false) {
-        _transpose.set(clamp(transpose, -11, 11), routed);
+    int transpose() const { return Routing::routedValueInt(ParamKey::Transpose, _trackIndex, _transpose, -11, 11); }
+    void setTranspose(int transpose) {
+        _transpose = clamp(transpose, -11, 11);
     }
 
     void editTranspose(int value, bool shift) {
-        setTranspose(_transpose.base + value);
+        setTranspose(_transpose + value);
     }
 
     void printTranspose(StringBuilder &str) const {
@@ -254,10 +254,10 @@ public:
 
     // divisor
 
-    int divisor() const { return Routing::routedValueInt(ParamKey::Divisor, _trackIndex, _divisor.base, 1, 768); }
-    int divisorBase() const { return _divisor.base; }
-    void setDivisor(int divisor, bool routed = false) {
-        _divisor.set(ModelUtils::clampDivisor(divisor), routed);
+    int divisor() const { return Routing::routedValueInt(ParamKey::Divisor, _trackIndex, _divisor, 1, 768); }
+    int divisorBase() const { return _divisor; }
+    void setDivisor(int divisor) {
+        _divisor = ModelUtils::clampDivisor(divisor);
     }
 
     int indexedDivisor() const { return ModelUtils::divisorToIndex(divisor()); }
@@ -269,7 +269,7 @@ public:
     }
 
     void editDivisor(int value, bool shift) {
-        setDivisor(ModelUtils::adjustedByDivisor(_divisor.base, value, shift));
+        setDivisor(ModelUtils::adjustedByDivisor(_divisor, value, shift));
     }
 
     void printDivisor(StringBuilder &str) const {
@@ -279,13 +279,13 @@ public:
 
     // clockMultiplier
 
-    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier.base, 50, 150); }
-    void setClockMultiplier(int clockMultiplier, bool routed = false) {
-        _clockMultiplier.set(clamp(clockMultiplier, 50, 150), routed);
+    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier, 50, 150); }
+    void setClockMultiplier(int clockMultiplier) {
+        _clockMultiplier = clamp(clockMultiplier, 50, 150);
     }
 
     void editClockMultiplier(int value, bool shift) {
-        setClockMultiplier(_clockMultiplier.base + value * (shift ? 10 : 1));
+        setClockMultiplier(_clockMultiplier + value * (shift ? 10 : 1));
     }
 
     void printClockMultiplier(StringBuilder &str) const {
@@ -353,13 +353,13 @@ public:
     }
 
     // gateLength (0-100% scaling for gate duration)
-    int gateLength() const { return Routing::routedValueInt(ParamKey::GateLength, _trackIndex, _gateLength.base, 0, 100); }
-    void setGateLength(int gateLength, bool routed = false) {
-        _gateLength.set(clamp(gateLength, 0, 100), routed);
+    int gateLength() const { return Routing::routedValueInt(ParamKey::GateLength, _trackIndex, _gateLength, 0, 100); }
+    void setGateLength(int gateLength) {
+        _gateLength = clamp(gateLength, 0, 100);
     }
 
     void editGateLength(int value, bool shift) {
-        setGateLength(_gateLength.base + value * (shift ? 10 : 1));
+        setGateLength(_gateLength + value * (shift ? 10 : 1));
     }
 
     void printGateLength(StringBuilder &str) const {
@@ -368,13 +368,13 @@ public:
     }
 
     // gateOffset (0-100% user override for algorithmic gate timing)
-    int gateOffset() const { return Routing::routedValueInt(ParamKey::GateOffset, _trackIndex, _gateOffset.base, 0, 100); }
-    void setGateOffset(int gateOffset, bool routed = false) {
-        _gateOffset.set(clamp(gateOffset, 0, 100), routed);
+    int gateOffset() const { return Routing::routedValueInt(ParamKey::GateOffset, _trackIndex, _gateOffset, 0, 100); }
+    void setGateOffset(int gateOffset) {
+        _gateOffset = clamp(gateOffset, 0, 100);
     }
 
     void editGateOffset(int value, bool shift) {
-        setGateOffset(_gateOffset.base + value * (shift ? 10 : 1));
+        setGateOffset(_gateOffset + value * (shift ? 10 : 1));
     }
 
     void printGateOffset(StringBuilder &str) const {
@@ -468,7 +468,7 @@ public:
     // rotate (bipolar shift for finite loops, limited by loop length)
 
     int rotate() const {
-        int v = Routing::routedValueInt(ParamKey::Rotate, _trackIndex, _rotate.base, -64, 64);
+        int v = Routing::routedValueInt(ParamKey::Rotate, _trackIndex, _rotate, -64, 64);
         int len = actualLoopLength();
         if (len > 0) {
             int maxRot = len - 1;
@@ -476,20 +476,20 @@ public:
         }
         return 0;
     }
-    void setRotate(int rotate, bool routed = false) {
+    void setRotate(int rotate) {
         int len = actualLoopLength();
         if (len > 0) {
             // Limit to loop length for easier use
             int maxRot = len - 1;
-            _rotate.set(clamp(rotate, -maxRot, maxRot), routed);
+            _rotate = clamp(rotate, -maxRot, maxRot);
         } else {
             // Infinite loop: no rotation
-            _rotate.set(0, routed);
+            _rotate = 0;
         }
     }
 
     void editRotate(int value, bool shift) {
-        setRotate(_rotate.base + value);
+        setRotate(_rotate + value);
     }
 
     void printRotate(StringBuilder &str) const {
@@ -523,29 +523,29 @@ private:
     }
 
     int8_t _trackIndex = -1;
-    Routable<uint8_t> _algorithm;
-    Routable<uint8_t> _flow;
-    Routable<uint8_t> _ornament;
-    Routable<uint8_t> _power;
+    uint8_t _algorithm;
+    uint8_t _flow;
+    uint8_t _ornament;
+    uint8_t _power;
     uint8_t _start = 0;  // Default: 0 (start from beginning)
     uint8_t _loopLength = 0;  // Default: infinite (evolving patterns)
-    Routable<uint8_t> _glide;  // Default 0% (no slides)
-    Routable<uint8_t> _trill;  // Default 0% (no trills/re-triggers)
-    Routable<uint8_t> _stepTrill;  // Default 0% (no intra-step subdivision)
+    uint8_t _glide;  // Default 0% (no slides)
+    uint8_t _trill;  // Default 0% (no trills/re-triggers)
+    uint8_t _stepTrill;  // Default 0% (no intra-step subdivision)
     int8_t _skew = 0;  // Default: 0 (even distribution)
     uint8_t _cvUpdateMode = Free;  // Default: Free (CV updates every step)
 
     // Sequence parameters
-    Routable<int8_t> _octave;  // Default: 0 (no transposition)
-    Routable<int8_t> _transpose;  // Default: 0 (no transposition)
-    Routable<uint16_t> _divisor;  // Default: 1/16 note
-    Routable<uint8_t> _clockMultiplier;
+    int8_t _octave;  // Default: 0 (no transposition)
+    int8_t _transpose;  // Default: 0 (no transposition)
+    uint16_t _divisor;  // Default: 1/16 note
+    uint8_t _clockMultiplier;
     uint8_t _resetMeasure = 8;  // Default: 8 bars
     int8_t _scale = -1;  // Default: -1 (Project Scale)
     int8_t _rootNote = -1;  // Default: -1 (use project root)
-    Routable<int8_t> _rotate;  // Default: 0 (no rotation)
-    Routable<uint8_t> _gateLength; // Default: 50% (Standard)
-    Routable<uint8_t> _gateOffset;  // Default: 0% (no gate timing offset)
+    int8_t _rotate;  // Default: 0 (no rotation)
+    uint8_t _gateLength; // Default: 50% (Standard)
+    uint8_t _gateOffset;  // Default: 0% (no gate timing offset)
     uint8_t _maskParameter = 0;  // Default: 0 (ALL = no skipping)
     uint8_t _timeMode = 0;  // Default: 0 (FREE mode)
     uint8_t _maskProgression = 0;  // Default: 0 (no progression)

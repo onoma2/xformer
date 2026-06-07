@@ -54,54 +54,48 @@ void TuesdaySequence::clear() {
     setPower(0);
     _start = 0;
     _loopLength = 0;
-    _glide.clear();
-    _glide.setBase(50); // Default 50%
-    _trill.clear();
-    _trill.setBase(50); // Default 50%
+    _glide = 50; // Default 50%
+    _trill = 50; // Default 50%
     _skew = 0;
     _cvUpdateMode = Free;
 
-    _octave.clear();
-    _transpose.clear();
-    _divisor.clear();
-    _divisor.setBase(12); // 1/16
-    _clockMultiplier.clear();
-    _clockMultiplier.setBase(100);
+    _octave = 0;
+    _transpose = 0;
+    _divisor = 12; // 1/16
+    _clockMultiplier = 100;
     _resetMeasure = 0;
     _scale = -1;  // Project
     _rootNote = -1;
-    _rotate.clear();
-    _gateLength.clear();
-    _gateLength.setBase(50);
-    _gateOffset.clear();
-    _gateOffset.setBase(0); // Default 0% (Quantized)
+    _rotate = 0;
+    _gateLength = 50;
+    _gateOffset = 0; // Default 0% (Quantized)
     _maskParameter = 0; // Default: ALL (no skipping)
     _timeMode = 0; // Default: FREE mode
     _maskProgression = 0; // Default: no progression
 }
 
 void TuesdaySequence::write(VersionedSerializedWriter &writer) const {
-    writer.write(_algorithm.base);
-    writer.write(_flow.base);
-    writer.write(_ornament.base);
-    writer.write(_power.base);
+    writer.write(_algorithm);
+    writer.write(_flow);
+    writer.write(_ornament);
+    writer.write(_power);
     writer.write(_start);
     writer.write(_loopLength);
-    writer.write(_glide.base);
-    writer.write(_trill.base);
-    writer.write(_stepTrill.base);
+    writer.write(_glide);
+    writer.write(_trill);
+    writer.write(_stepTrill);
     writer.write(_skew);
     writer.write(_cvUpdateMode);
-    writer.write(_octave.base);
-    writer.write(_transpose.base);
-    writer.write(_divisor.base);
-    writer.write(_clockMultiplier.base);
+    writer.write(_octave);
+    writer.write(_transpose);
+    writer.write(_divisor);
+    writer.write(_clockMultiplier);
     writer.write(_resetMeasure);
     writer.write(_scale);
     writer.write(_rootNote);
-    _rotate.write(writer);
-    _gateLength.write(writer);
-    _gateOffset.write(writer);
+    writer.write(_rotate);
+    writer.write(_gateLength);
+    writer.write(_gateOffset);
     writer.write(_maskParameter);
     writer.write(_timeMode);
     writer.write(_maskProgression);
@@ -109,27 +103,27 @@ void TuesdaySequence::write(VersionedSerializedWriter &writer) const {
 
 void TuesdaySequence::read(VersionedSerializedReader &reader) {
     // Defaults come from member initialization in TuesdayTrack.h
-    reader.read(_algorithm.base);
-    reader.read(_flow.base);
-    reader.read(_ornament.base);
-    reader.read(_power.base);
+    reader.read(_algorithm);
+    reader.read(_flow);
+    reader.read(_ornament);
+    reader.read(_power);
     reader.read(_start);
     reader.read(_loopLength);
-    reader.read(_glide.base);
-    reader.read(_trill.base);
-    reader.read(_stepTrill.base);
+    reader.read(_glide);
+    reader.read(_trill);
+    reader.read(_stepTrill);
     reader.read(_skew);
     reader.read(_cvUpdateMode);
-    reader.read(_octave.base);
-    reader.read(_transpose.base);
-    reader.read(_divisor.base);
-    reader.read(_clockMultiplier.base);
+    reader.read(_octave);
+    reader.read(_transpose);
+    reader.read(_divisor);
+    reader.read(_clockMultiplier);
     reader.read(_resetMeasure);
     reader.read(_scale);
     reader.read(_rootNote);
-    _rotate.read(reader);
-    _gateLength.read(reader);
-    _gateOffset.read(reader);
+    reader.read(_rotate);
+    reader.read(_gateLength);
+    reader.read(_gateOffset);
     reader.read(_maskParameter);
     reader.read(_timeMode);
     reader.read(_maskProgression);
