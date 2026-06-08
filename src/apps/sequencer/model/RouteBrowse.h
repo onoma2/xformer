@@ -96,15 +96,13 @@ namespace RouteBrowse {
     }
 
     // Fill out[] with the sources the tab-editor source picker offers for a target:
-    // every Source in enum order except MIDI (owned by the deferred learn unit) and the
-    // bus that would self-route the target. Returns the count written (<= maxOut).
+    // every Source in enum order except the bus that would self-route the target. MIDI
+    // is a plain value here; its fields are configured on the MIDI page. Returns the
+    // count written (<= maxOut).
     inline int sourceList(Routing::Target target, Routing::Source *out, int maxOut) {
         int n = 0;
         for (int s = 0; s < int(Routing::Source::Last) && n < maxOut; ++s) {
             auto source = Routing::Source(s);
-            if (source == Routing::Source::Midi) {
-                continue;
-            }
             if (Routing::isBusSelfRoute(source, target)) {
                 continue;
             }

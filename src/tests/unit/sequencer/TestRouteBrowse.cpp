@@ -90,22 +90,25 @@ CASE("paramKeyToTarget: unknown key -> None") {
     expectEqual(int(RouteBrowse::paramKeyToTarget(200)), int(Routing::Target::None), "out of range");
 }
 
-CASE("sourceList: CV-domain sources for a non-bus target, MIDI excluded") {
+CASE("sourceList: CV-domain sources plus MIDI for a non-bus target") {
     Routing::Source out[40];
     int n = RouteBrowse::sourceList(Routing::Target::Transpose, out, 40);
-    expectEqual(n, 33, "None + 4 CvIn + 8 CvOut + 4 Bus + 8 GateOut + 8 Mod");
+    expectEqual(n, 34, "None + 4 CvIn + 8 CvOut + 4 Bus + MIDI + 8 GateOut + 8 Mod");
     expectEqual(int(out[0]), int(Routing::Source::None), "None first");
     expectEqual(int(out[1]), int(Routing::Source::CvIn1), "CvIn1 second");
+    expectEqual(int(out[17]), int(Routing::Source::Midi), "MIDI after the 4 bus lanes");
     expectEqual(int(out[n - 1]), int(Routing::Source::Mod8), "Mod8 last");
+    bool hasMidi = false;
     for (int i = 0; i < n; ++i) {
-        expectFalse(out[i] == Routing::Source::Midi, "no MIDI entry");
+        if (out[i] == Routing::Source::Midi) hasMidi = true;
     }
+    expectTrue(hasMidi, "MIDI entry present");
 }
 
 CASE("sourceList: excludes the self-route bus for a bus target") {
     Routing::Source out[40];
     int n = RouteBrowse::sourceList(Routing::Target::BusCv2, out, 40);
-    expectEqual(n, 32, "33 minus BusCv2 self-route");
+    expectEqual(n, 33, "34 minus BusCv2 self-route");
     bool hasBus2 = false, hasBus1 = false, hasBus3 = false;
     for (int i = 0; i < n; ++i) {
         if (out[i] == Routing::Source::BusCv2) hasBus2 = true;
