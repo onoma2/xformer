@@ -37,10 +37,9 @@ class ModulatorRandomMode:
     Triggered = 1
 
 class ModulatorMode:
-    Free = 0
-    Sync = 1
-    Hold = 2
-    Retrigger = 3
+    Run = 0
+    Trig = 1
+    Gate = 2
 
 
 class MockModulator:
@@ -54,7 +53,8 @@ class MockModulator:
             'smooth': 100,
             'gate_track': 0,
             'random_mode': ModulatorRandomMode.Clocked,
-            'mode': ModulatorMode.Free,
+            'mode': ModulatorMode.Run,
+            'rate_domain': 'free',   # 'free' (wall-Hz) or 'tempo' (clock division)
             'attack': 900,
             'decay': 500,
             'sustain': 100,
@@ -72,6 +72,7 @@ class MockModulator:
     def gate_track(self): return self._data['gate_track']
     def random_mode(self): return self._data['random_mode']
     def mode(self): return self._data['mode']
+    def rate_domain(self): return self._data['rate_domain']
     def attack(self): return self._data['attack']
     def decay(self): return self._data['decay']
     def sustain(self): return self._data['sustain']
@@ -99,6 +100,11 @@ class MockModulator:
         return names.get(mode, "???")
 
     @staticmethod
+    def mode_name(mode):
+        names = {ModulatorMode.Run: "Run", ModulatorMode.Trig: "Trig", ModulatorMode.Gate: "Gate"}
+        return names.get(mode, "???")
+
+    @staticmethod
     def is_chaos_shape(shape):
         return shape in (ModulatorShape.ChaosLorenz, ModulatorShape.ChaosLatoocarfian)
 
@@ -120,7 +126,10 @@ class MockModulatorEngine:
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _format_rate(rate):
+def _format_rate(rate, domain='free'):
+    # Domain-keyed, mirroring Modulator::printRate: Free = centi-Hz, Tempo = division.
+    if domain == 'free':
+        return f"{rate // 100}.{rate % 100:02d}Hz"
     if rate >= 96:
         div = rate / 96.0
         if abs(div - round(div)) < 0.1:
@@ -129,7 +138,12 @@ def _format_rate(rate):
     return f"{hz:.1f}Hz"
 
 
-def _get_param_values(modulator, current_page):
+def _get_param_values(modulator, current_page, show_routing=False):
+    if show_routing:
+        # Routing overlay: MODE / GATE / TARGET / EVENT / CC NUM (mirrors ModulatorPage).
+        return (["MODE", "GATE", "TARGET", "EVENT", "CC NUM"],
+                [MockModulator.mode_name(modulator.mode()),
+                 f"T{modulator.gate_track() + 1}", "NONE", "Note", "N/A"])
     shape = modulator.shape()
     is_random = (shape == ModulatorShape.Random)
     is_triggered = is_random and (modulator.random_mode() == ModulatorRandomMode.Triggered)
@@ -160,7 +174,7 @@ def _get_param_values(modulator, current_page):
             labels = ["SHAPE", "RATE", "P1", "P2", "DEPTH"]
             values = [
                 MockModulator.shape_name(shape),
-                _format_rate(modulator.rate()),
+                _format_rate(modulator.rate(), modulator.rate_domain()),
                 f"{modulator.attack() // 20}",
                 f"{modulator.decay() // 20}",
                 f"{modulator.depth()}",
@@ -190,7 +204,7 @@ def _get_param_values(modulator, current_page):
         else:
             values = [
                 MockModulator.shape_name(shape),
-                _format_rate(modulator.rate()),
+                _format_rate(modulator.rate(), modulator.rate_domain()),
                 f"{modulator.depth()}",
                 f"{modulator.offset():+d}",
                 f"{modulator.phase()}\u00b0",
@@ -228,7 +242,7 @@ def _draw_waveform(canvas, modulator, engine, selected_modulator=0):
         y = scope_y - ((current_value - 64) * scope_height // 2) // 127
         canvas.hline(scope_x, y, scope_width)
         # Level bar
-        bar_x = waveform_x + waveform_w + 4
+        bar_x = waveform_x + waveform_w + 2  # match firmware (clears the value column)
         bar_width = 4
         canvas.set_color(Color.Medium)
         canvas.draw_rect(bar_x, waveform_y, bar_width, waveform_h)
@@ -333,7 +347,7 @@ def _draw_waveform(canvas, modulator, engine, selected_modulator=0):
 
         # Level bar
         current_value = engine.current_value(selected_modulator)
-        bar_x = waveform_x + waveform_w + 4
+        bar_x = waveform_x + waveform_w + 2  # match firmware (clears the value column)
         bar_width = 4
         canvas.set_color(Color.Medium)
         canvas.draw_rect(bar_x, waveform_y, bar_width, waveform_h)
@@ -481,7 +495,7 @@ def render_modulator_page_proposed_v2(canvas, modulator, engine,
     # ------------------------------------------------------------------
     # PROPOSED RIGHT PANEL: 2-row layout, Small font, no labels
     # ------------------------------------------------------------------
-    labels, values = _get_param_values(modulator, current_page)
+    labels, values = _get_param_values(modulator, current_page, show_routing)
 
     # Collect valid (non-empty) values with their original indices
     valid = [(i, v) for i, v in enumerate(values) if v]
@@ -585,12 +599,8 @@ def render_modulator_page_proposed_v2(canvas, modulator, engine,
                     tw = canvas.text_width(val)
                     canvas.draw_text(COL_R - tw, ROW3_Y, val)
 
-    # CV routing info (kept, shifted down to avoid collision)
-    if not show_routing:
-        canvas.set_font(Font.Tiny)
-        canvas.set_blend_mode(BlendMode.Set)
-        canvas.set_color(Color.Low)
-        canvas.draw_text(COL_L, 54, "-> CV1,CV3")
+    # CV routing info: firmware draws "-> CVn" at y=54 only when the modulator is
+    # actually assigned to a CV output. The mocks aren't, so it's omitted here.
 
 
 # ---------------------------------------------------------------------------
@@ -623,66 +633,27 @@ def render_modulator_current_chaos(canvas):
     render_modulator_page_current(canvas, mod, eng, selected_function=3, current_page=0)
 
 
-# --- PROPOSED: wall-clock rate domain + gate-mode rename ---
-
-_GATE_MODE_NAMES = {0: "Run", 1: "Trig", 2: "Gate"}
-
-
-def _format_free_rate(centi_hz):
-    return f"{centi_hz / 100.0:.2f}Hz"
-
-
-def _render_modulator_rate_domain(canvas, domain):
-    # Main page, Chaos shape, RATE selected. Free shows centi-Hz (default 0.05Hz);
-    # Tempo shows a clock division. Domain flips with press; a dim tag shows which.
-    mod = MockModulator(shape=ModulatorShape.ChaosLorenz, depth=80)
-    eng = MockModulatorEngine(current_value=80)
-    WindowPainter.clear(canvas)
-    WindowPainter.draw_header(canvas, track=0, mode="MOD 1 - MODULATOR")
-    WindowPainter.draw_active_function(canvas, "")
-    WindowPainter.draw_footer(canvas, ["SHAPE", "RATE", "P1", "P2", "DEPTH"], highlight=1)
-    param_x = 132            # clear of the level bar (x=124..128)
-    canvas.set_font(Font.Tiny)
-    canvas.set_blend_mode(BlendMode.Set)
-    canvas.set_color(Color.Medium)
-    canvas.draw_text(param_x, 18, "RATE")
-    canvas.set_font(Font.Small)
-    canvas.set_color(Color.Bright)
-    value = _format_free_rate(5) if domain == 'free' else "1/4"
-    canvas.draw_text(param_x, 30, value)
-    canvas.set_font(Font.Tiny)
-    canvas.set_color(Color.Low)
-    canvas.draw_text(param_x, 44, "FREE" if domain == 'free' else "TEMPO")
-    _draw_waveform(canvas, mod, eng, 0)
-
+# --- PROPOSED: wall-clock rate domain + gate-mode rename (on the real dashboard layout) ---
 
 def render_modulator_rate_free_proposed(canvas):
-    _render_modulator_rate_domain(canvas, 'free')
+    # RATE selected (F2), Free domain — value reads centi-Hz "0.05Hz". Re-press RATE flips domain.
+    mod = MockModulator(shape=ModulatorShape.Sine, rate=5, rate_domain='free', depth=50)
+    eng = MockModulatorEngine(current_value=64, current_phase=16384)
+    render_modulator_page_proposed_v2(canvas, mod, eng, selected_function=1)
 
 
 def render_modulator_rate_tempo_proposed(canvas):
-    _render_modulator_rate_domain(canvas, 'tempo')
+    # RATE selected, Tempo domain — value reads the clock division "1/4".
+    mod = MockModulator(shape=ModulatorShape.Sine, rate=96, rate_domain='tempo', depth=50)
+    eng = MockModulatorEngine(current_value=64, current_phase=16384)
+    render_modulator_page_proposed_v2(canvas, mod, eng, selected_function=1)
 
 
 def render_modulator_gatemodes_proposed(canvas):
-    # Routing overlay, MODE selected. Gate behavior renamed/reduced to Run/Trig/Gate.
-    mod = MockModulator(shape=ModulatorShape.Sine, mode=1)
+    # Routing overlay, MODE selected — gate behavior renamed/reduced to Run/Trig/Gate.
+    mod = MockModulator(shape=ModulatorShape.Sine, mode=ModulatorMode.Trig)
     eng = MockModulatorEngine(current_value=64)
-    WindowPainter.clear(canvas)
-    WindowPainter.draw_header(canvas, track=0, mode="MOD 1 - ROUTING")
-    WindowPainter.draw_footer(canvas, ["MODE", "GATE", "TARGET", "EVENT", "CC NUM"], highlight=0)
-    param_x = 132            # clear of the level bar (x=124..128)
-    canvas.set_font(Font.Tiny)
-    canvas.set_blend_mode(BlendMode.Set)
-    canvas.set_color(Color.Medium)
-    canvas.draw_text(param_x, 18, "MODE")
-    canvas.set_font(Font.Small)
-    canvas.set_color(Color.Bright)
-    canvas.draw_text(param_x, 30, _GATE_MODE_NAMES[1])
-    canvas.set_font(Font.Tiny)
-    canvas.set_color(Color.Low)
-    canvas.draw_text(param_x, 44, "Run / Trig / Gate")
-    _draw_waveform(canvas, mod, eng, 0)
+    render_modulator_page_proposed_v2(canvas, mod, eng, selected_function=0, show_routing=True)
 
 
 # --- PROPOSED v2 ---
