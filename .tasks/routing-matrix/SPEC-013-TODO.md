@@ -214,9 +214,10 @@ per-track targets the override fork doesn't claim. Removing it target-by-target.
       deleted in phase 9). Added ParamKeys 26-29 + bridges; folded by scope (Run/Reset→Clock,
       CvOutRot/GateOutRot→Global; scope resolves per-row not per-band); `tabCellEligible` always-
       eligible for the four. ui-preview band renderer rebuilt (`f09e9f35`).
-- [ ] **CvOutputCrossfade** (spec 019 slice 2, DEFERRED) — new appended Target, float group
+- [ ] **CvOutputCrossfade** (spec 019 slice 2, SOMEDAY/MAYBE) — new appended Target, float group
       position, crossfade adjacent members' CVs. Note: the CV-router `scan` already crossfades
-      CvIn/Bus/Mod lanes; this only adds direct track-CV morph across the group.
+      CvIn/Bus/Mod lanes; this only adds direct track-CV morph across the group. Demoted off the
+      active queue (2026-06-08); revisit only if a concrete need surfaces.
 - [x] **Dead-code + rename cleanup** (2026-06-08, `93592c4d`). Deleted dead accessors
       (`isGateOutputRotated`/`isCvOutputRotated`, the rotate get/set/edit/print clusters,
       `cvRotateInterpolate` get/set, the Run `writeTarget` case); serialized base/flag fields kept.
@@ -235,26 +236,27 @@ per-track targets the override fork doesn't claim. Removing it target-by-target.
       Mismatched (target,mode) routes are now clean no-ops. ~3.1 KB flash + shaperState .bss freed.
       Routing shaper lane = the stateless folds only; None/Fold/Crease(+offset) live via RouteShaper.
 
+## scaleSource — WIRED (2026-06-08, `1e6c5657`)
+Per-route dynamic depth gain (VcaNext replacement, R6) — was inert (stored/serialized, math
+hardcoded scale 1.0). Now a **unipolar [0,1] gain on the modulation depth**: `computeDelta`/
+`busDelta` take a `scaleValue` arg; `RoutingEngine` extracts `resolveSourceValue(route, source)`
+(shared with `updateSources`) and resolves `route.scaleSource()` per route into all three delta
+sinks (bus, per-track, global). **`None` → 1.0 bypass** (unset routes unchanged); CV-domain sources
+normalize through the route's own `cvSource` range (no second config field). **Self-reference
+forbidden:** engine bypasses to 1.0 when scaleSource is the route's own bus (`isBusSelfRoute`), and
+`RouteBrowse::scaleSourceList` drops the primary source + MIDI (no second MidiSource config) + the
+self-bus, keeps None. **UI = matrix SCALE view** (VIEW cycles SOURCE→DEPTH→SCALE→SHAPER), per-row
+scaleSource abbrev on every eligible cell (None = `.`), inline encoder cycle + Shift group-jump —
+`matrixEditScale`. Matrix-only (param door + bus/midi tabs untouched). TDD in TestRouteResolve
+(scaleValue) + TestRouteBrowse (scaleSourceList); render `ui-preview/engine/engine-curve-scale-
+proposed.png`. sim + STM32 950336 green. Not flashed.
+
+## Param-door source pick — INLINE (2026-06-08, `7118d546`)
+Deleted the modal `RouteSourceSelectPage` + `RouteSourceSelectListModel` (only the param door used
+them). F2 SRC now focuses the source for inline encoder cycling (Shift = source-family jump), press/
+F2 returns to depth; MODULATE on an empty param auto-enters source focus (first turn picks). Source
+token renders bright while focused. Mirrors the matrix's inline source edit. STM32 950144 green.
+
 ## Deferred / out of scope (spec §13)
-- **`scaleSource` wiring** (per-route VCA on the route's own modulation — the explicit VcaNext
-  replacement, R6). Fully inert today: `Route::scaleSource()` stored + serialized + `operator==`,
-  `RouteApply::scaled(h,v)=0.5+(h-0.5)·v` math exists, but `computeDelta`/`busDelta` hardcode the
-  scale value to **1.0**, nothing resolves the chosen source, no UI. **Scope:** one `Source` per
-  route (not per-track). **Meaning:** a dynamic/voltage-controlled **Depth** — in Modulate mode
-  `delta = base·depth·scaleValue·range`, so depth (static per-track knob) and scaleSource (live,
-  source-driven) are commutative gains on the route's modulation. To wire: (a) `computeDelta`
-  gains a `scaleValue` arg, engine resolves `_sourceValues[scaleSource]` (or the MIDI eval) and
-  passes it — **`None` → 1.0 bypass, NOT 0** (else unset routes collapse to neutral); (b) per-route
-  picker in the matrix (4th view or a field), reusing `RouteBrowse::sourceList`.
-  **CONSTRAINT (owner, no feedback on ARM):** forbid self-reference in the picker —
-  exclude (1) the route's own **bus target** (reuse `isBusSelfRoute(scaleSource, target)`, the
-  same guard the primary source already has — this is the only real feedback path: bus output →
-  scale → output within a frame; per-track param targets aren't sources so they can't feed back)
-  and (2) the route's own **primary source** (the squaring "scale myself" quirk). Plus an engine
-  guard: scaleSource resolving to the route's own bus → bypass (1.0). Note: this closes *direct*
-  self-reference only; arbitrary multi-route bus cycles aren't caught by a self-ref check (graph
-  cycle detection — already possible with primary sources today, and bounded by the ±5V per-frame
-  bus clamp), but scaleSource then adds **no new feedback surface** beyond the within-route case
-  we forbid.
 - Flat "every modulation" audit list; serialized-format cleanup (U7/§8 wire format); deleting
   `RouteListModel`/legacy RoutingPage editor (phase 9, mostly done).
