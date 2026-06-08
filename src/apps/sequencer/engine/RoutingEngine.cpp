@@ -245,8 +245,6 @@ RoutingEngine::RoutingEngine(Engine &engine, Model &model) :
     _routing(model.project().routing()),
     _project(model.project())
 {
-    _cvRotateValues.fill(0.f);
-    _cvRotateInterp.fill(false);
 }
 
 float RoutingEngine::routeSource(int index) const {
@@ -254,20 +252,6 @@ float RoutingEngine::routeSource(int index) const {
         return 0.f;
     }
     return clamp(_sourceValues[index], 0.f, 1.f);
-}
-
-bool RoutingEngine::cvRotateInterpolated(int trackIndex) const {
-    if (trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT) {
-        return false;
-    }
-    return _cvRotateInterp[trackIndex];
-}
-
-float RoutingEngine::cvRotateValue(int trackIndex) const {
-    if (trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT) {
-        return 0.f;
-    }
-    return _cvRotateValues[trackIndex];
 }
 
 void RoutingEngine::resetShaperState() {
@@ -426,10 +410,10 @@ void RoutingEngine::updateSources() {
 }
 
 void RoutingEngine::updateSinks() {
-    _cvRotateValues.fill(0.f);
-    _cvRotateInterp.fill(false);
     _gateRotateMask = 0;
     _gateRotateAmount = 0;
+    _cvRotateMask = 0;
+    _cvRotateAmount = 0;
     Routing::clearRouteOverrides();
 
     for (int routeIndex = 0; routeIndex < CONFIG_ROUTE_COUNT; ++routeIndex) {
@@ -484,6 +468,12 @@ void RoutingEngine::updateSinks() {
                 if (_gateRotateMask == 0) {
                     _gateRotateMask = route.tracks();
                     _gateRotateAmount = gateRotationFromSource(_sourceValues[routeIndex], route.depthPct(0), route.combine());
+                }
+            } else if (target == Routing::Target::CvOutputRotate) {
+                // Discrete CV group rotation (spec 019), mirror of gate.
+                if (_cvRotateMask == 0) {
+                    _cvRotateMask = route.tracks();
+                    _cvRotateAmount = gateRotationFromSource(_sourceValues[routeIndex], route.depthPct(0), route.combine());
                 }
             } else if (Routing::isPerTrackTarget(target)) {
                 uint8_t tracks = route.tracks();
@@ -557,14 +547,10 @@ void RoutingEngine::updateSinks() {
                         }
                         float routed = route.min() + shaperOut * routeSpan;
 
-                        // Remaining legacy-branch targets: CvOutputRotate / GateOutputRotate
-                        // (Run/Reset handled above on the clean path).
+                        // Fallthrough for non-migrated (target, mode) pairs. Run/Reset and the
+                        // CV/gate rotates are all handled on the clean path above; this is now
+                        // only reached by mismatched per-track targets (a no-op write).
                         _routing.writeTarget(target, (1 << trackIndex), routed);
-
-                        if (target == Routing::Target::CvOutputRotate) {
-                            _cvRotateValues[trackIndex] = Routing::denormalizeTargetValue(target, routed);
-                            _cvRotateInterp[trackIndex] = route.cvRotateInterpolate();
-                        }
                     }
                 }
             } else if (Routing::isEngineTarget(target)) {

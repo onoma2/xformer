@@ -612,11 +612,13 @@ void Engine::updateTrackOutputs() {
     int cvPool[CONFIG_CHANNEL_COUNT];
     int cvPoolSize = 0;
 
-    // Identify CV Pool
+    // Identify CV Pool: jacks whose track is in the CV rotation group (spec 019 — the
+    // CvOutputRotate route's mask).
+    uint8_t cvRotateMask = _routingEngine.cvRotateMask();
     for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
         int trackIndex = cvOutputTracks[i];
         if (trackIndex < CONFIG_TRACK_COUNT &&
-            _project.track(trackIndex).isCvOutputRotated()) {
+            (cvRotateMask & (1 << trackIndex))) {
             cvPool[cvPoolSize++] = i;
         }
     }
@@ -658,40 +660,9 @@ void Engine::updateTrackOutputs() {
         for (int k = 0; k < cvPoolSize; ++k) { if (cvPool[k] == i) { cvPoolIndex = k; break; } }
 
         if (cvPoolIndex != -1) {
-            // It's rotating!
-            int originalTrack = cvOutputTracks[i];
-            if (_routingEngine.cvRotateInterpolated(originalTrack) && cvPoolSize > 0) {
-                float rotation = _routingEngine.cvRotateValue(originalTrack);
-                float pos = float(cvPoolIndex) - rotation;
-                float wrapped = std::fmod(pos, float(cvPoolSize));
-                if (wrapped < 0.f) {
-                    wrapped += float(cvPoolSize);
-                }
-                int lowIndex = int(std::floor(wrapped));
-                float t = wrapped - float(lowIndex);
-                int highIndex = (lowIndex + 1) % cvPoolSize;
-                int lowOutputIndex = cvPool[lowIndex];
-                int highOutputIndex = cvPool[highIndex];
-                int lowTrack = cvOutputTrackIndex[lowOutputIndex];
-                int highTrack = cvOutputTrackIndex[highOutputIndex];
-                int lowSlot = cvOutputTrackSlot[lowOutputIndex];
-                int highSlot = cvOutputTrackSlot[highOutputIndex];
-                float lowValue = (lowTrack >= 0 && lowSlot >= 0) ? _trackEngines[lowTrack]->cvOutput(lowSlot) : 0.f;
-                float highValue = (highTrack >= 0 && highSlot >= 0) ? _trackEngines[highTrack]->cvOutput(highSlot) : 0.f;
-                float mixed = lowValue * (1.f - t) + highValue * t;
-                if (!_cvOutputOverride) {
-                    _cvOutput.setChannel(i, applyModulatorOffset(i, mixed));
-                }
-                continue;
-            } else {
-                int rotation = _project.track(originalTrack).cvOutputRotate();
-
-                // Wrap rotation within pool size
-                int rotatedIndex = (cvPoolIndex - rotation) % cvPoolSize;
-                if (rotatedIndex < 0) rotatedIndex += cvPoolSize;
-
-                cvSourceOutputIndex = cvPool[rotatedIndex];
-            }
+            // One group amount rotates the whole pool (discrete, mirror of gate; spec 019).
+            int rotatedIndex = rotatedGroupMember(cvPoolIndex, _routingEngine.cvRotateAmount(), cvPoolSize);
+            cvSourceOutputIndex = cvPool[rotatedIndex];
         }
 
         int cvOutputTrack = cvOutputTracks[cvSourceOutputIndex];

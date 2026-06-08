@@ -226,13 +226,8 @@ void Routing::writeTarget(Target target, uint8_t tracks, float normalized) {
             if (tracks & (1<<trackIndex)) {
                 auto &track = _project.track(trackIndex);
 
-                // Handle generic Track targets
-                if (target == Target::CvOutputRotate) {
-                    track.setCvOutputRotate(intValue, true);
-                    continue;
-                }
-                // GateOutputRotate is handled at route level in RoutingEngine (group
-                // rotation, spec 018) — no per-track write here.
+                // CvOutputRotate + GateOutputRotate are handled at route level in
+                // RoutingEngine (group rotation, spec 018/019) — no per-track write here.
                 if (target == Target::Run) {
                     track.setRunGate(floatValue > 0.55f, true);
                     continue;
