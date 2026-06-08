@@ -3,6 +3,7 @@
 #include "model/RouteParam.h"
 #include "model/RouteFork.h"
 
+#include "RouteShellTrigger.h"
 #include "Engine.h"
 #include "MidiUtils.h"
 #include "core/math/Math.h"
@@ -492,6 +493,19 @@ void RoutingEngine::updateSinks() {
                             continue;
                         }
 
+                        // Base-less shell triggers: consume the raw source (no bias/depth/
+                        // window/shaper). Reset = rising edge; Run = threshold toggle.
+                        if (target == Routing::Target::Reset) {
+                            if (RouteParam::gateRisingEdge(routeState.gateMask, trackIndex, _sourceValues[routeIndex])) {
+                                _engine.trackEngine(trackIndex).reset();
+                            }
+                            continue;
+                        }
+                        if (target == Routing::Target::Run) {
+                            _project.track(trackIndex).setRunGate(routeRunGate(_sourceValues[routeIndex]), true);
+                            continue;
+                        }
+
                         float shapedSource = applyBiasDepthToSource(_sourceValues[routeIndex], route, trackIndex);
                         float biasNormalized = route.biasPct(trackIndex) * 0.01f;
                         float shaperOut = shapedSource;
@@ -533,15 +547,9 @@ void RoutingEngine::updateSinks() {
                         }
                         float routed = route.min() + shaperOut * routeSpan;
 
-                        // Reset is a Trigger target: act on the rising edge only.
-                        if (target == Routing::Target::Reset) {
-                            if (RouteParam::gateRisingEdge(routeState.gateMask, trackIndex, routed)) {
-                                _engine.trackEngine(trackIndex).reset();
-                            }
-                        } else {
-                            // Normal target handling
-                            _routing.writeTarget(target, (1 << trackIndex), routed);
-                        }
+                        // Remaining legacy-branch targets: CvOutputRotate / GateOutputRotate
+                        // (Run/Reset handled above on the clean path).
+                        _routing.writeTarget(target, (1 << trackIndex), routed);
 
                         if (target == Routing::Target::CvOutputRotate) {
                             _cvRotateValues[trackIndex] = Routing::denormalizeTargetValue(target, routed);
