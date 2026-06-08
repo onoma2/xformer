@@ -117,18 +117,19 @@ public:
         _syncMode = ModelUtils::clampedEnum(mode);
     }
     void cycleSyncMode() {
+        // External retired (use a Reset route); enum value kept inert for file compat.
         auto next = static_cast<int>(_syncMode) + 1;
-        if (next >= static_cast<int>(SyncMode::Last)) next = 0;
+        if (next >= static_cast<int>(SyncMode::External)) next = 0;
         setSyncMode(static_cast<SyncMode>(next));
     }
     void editSyncMode(int value, bool /*shift*/) {
-        setSyncMode(static_cast<SyncMode>(clamp(int(_syncMode) + value, 0, int(SyncMode::Last) - 1)));
+        setSyncMode(static_cast<SyncMode>(clamp(int(_syncMode) + value, 0, int(SyncMode::ResetMeasure))));
     }
     void printSyncMode(StringBuilder &str) const {
         switch (_syncMode) {
         case SyncMode::Off:          str("Off"); break;
         case SyncMode::ResetMeasure: str("Reset"); break;
-        case SyncMode::External:     str("Ext"); break;
+        case SyncMode::External:     str("Off"); break;   // retired -> behaves as Off
         case SyncMode::Last:         break;
         }
     }

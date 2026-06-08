@@ -133,11 +133,6 @@ inline void applyStepModulation(
 
 } // anonymous namespace
 
-float IndexedTrackEngine::routedSync() const {
-    // Reuse DMap sync target for external resets
-    return _indexedTrack.routedSync();
-}
-
 void IndexedTrackEngine::resetSequenceState() {
     _sequenceState.reset();
     _stepsRemaining = std::max(0, _sequence->activeLength() - 1);
@@ -164,7 +159,6 @@ void IndexedTrackEngine::reset() {
     _sequence = &_indexedTrack.sequence(currentPattern);
     _cachedPattern = currentPattern;
 
-    _prevSync = routedSync();
     resetSequenceState();
 }
 
@@ -177,7 +171,6 @@ void IndexedTrackEngine::changePattern() {
 }
 
 void IndexedTrackEngine::restart() {
-    _prevSync = routedSync();
     resetSequenceState();
 }
 
@@ -189,7 +182,8 @@ TrackEngine::TickResult IndexedTrackEngine::tick(uint32_t tick) {
         _cachedPattern = currentPattern;
     }
 
-    // Sync handling (Off / ResetMeasure / External)
+    // Sync handling (External retired — use a Reset route instead; the enum value is
+    // kept inert for file compat and behaves as Off).
     switch (_sequence->syncMode()) {
     case IndexedSequence::SyncMode::ResetMeasure: {
         uint32_t resetDivisor = _sequence->resetMeasure() * _engine.measureDivisor();
@@ -198,16 +192,8 @@ TrackEngine::TickResult IndexedTrackEngine::tick(uint32_t tick) {
         }
         break;
     }
-    case IndexedSequence::SyncMode::External: {
-        float syncVal = routedSync();
-        if (_prevSync <= 0.f && syncVal > 0.f) {
-            // External sync reset detected
-            resetSequenceState();
-        }
-        _prevSync = syncVal;
-        break;
-    }
     case IndexedSequence::SyncMode::Off:
+    case IndexedSequence::SyncMode::External:
     case IndexedSequence::SyncMode::Last:
         break;
     }

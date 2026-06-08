@@ -102,7 +102,6 @@ private:
     // === Input ===
     float _currentInput = 0.0f;
     float _prevInput = 0.0f;
-    float _prevSync = 0.0f;
     bool _prevLoop = true;
 
     // === Threshold Cache ===

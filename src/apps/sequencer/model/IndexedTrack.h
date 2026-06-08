@@ -135,9 +135,6 @@ public:
     void write(VersionedSerializedWriter &writer) const;
     void read(VersionedSerializedReader &reader);
 
-    float routedSync() const { return _routedSync; }
-    void setRoutedSync(float v) { _routedSync = v; }
-
     inline bool isRouted(Routing::Target target) const { return Routing::isRouted(target, _trackIndex); }
     inline void printRouted(StringBuilder &str, Routing::Target target) const { Routing::printRouted(str, target, _trackIndex); }
 
@@ -153,7 +150,6 @@ private:
     CvUpdateMode _cvUpdateMode = CvUpdateMode::Gate;
     Types::PlayMode _playMode = Types::PlayMode::Aligned;
     IndexedSequenceArray _sequences;
-    float _routedSync = 0.f;
     int8_t _octave;
     int8_t _transpose;
     uint8_t _slideTime;

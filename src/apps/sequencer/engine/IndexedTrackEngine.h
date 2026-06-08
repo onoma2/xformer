@@ -56,7 +56,6 @@ private:
     void advanceStep();
     void triggerStep();
     float noteIndexToVoltage(int8_t noteIndex) const;
-    float routedSync() const;
 
     IndexedTrack &_indexedTrack;
     IndexedSequence *_sequence = nullptr;

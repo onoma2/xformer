@@ -221,28 +221,11 @@ void Routing::writeTarget(Target target, uint8_t tracks, float normalized) {
         _project.writeRouted(target, intValue, floatValue);
     } else if (isPlayStateTarget(target)) {
         _project.playState().writeRouted(target, tracks, intValue, floatValue);
-    } else if (isTrackTarget(target) || isSequenceTarget(target) || isTuesdayTarget(target) || isChaosTarget(target) || isWavefolderTarget(target) || isDiscreteMapTarget(target) || isIndexedTarget(target) || isStochasticTarget(target)) {
-        for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
-            if (tracks & (1<<trackIndex)) {
-                auto &track = _project.track(trackIndex);
-
-                // Run/Reset and CvOutput/GateOutputRotate are handled on the clean path in
-                // RoutingEngine (specs 017/018/019) — no per-track write here.
-                // DiscreteMapSync: live non-migrated inlet (external reset/sync sink);
-                // retired from the override model but still routed via writeTarget.
-                if (target == Target::DiscreteMapSync) {
-                    if (track.trackMode() == Track::TrackMode::DiscreteMap) {
-                        track.discreteMapTrack().setRoutedSync(floatValue);
-                    } else if (track.trackMode() == Track::TrackMode::Indexed) {
-                        track.indexedTrack().setRoutedSync(floatValue);
-                    }
-                    continue;
-                }
-            }
-        }
     } else if (isBusTarget(target)) {
         // handled in RoutingEngine (engine-owned bus)
     }
+    // Per-track engine params take the override path in RoutingEngine; the legacy
+    // per-track writeTarget branch is gone (its last user, DiscreteMapSync, retired).
 }
 
 void Routing::write(VersionedSerializedWriter &writer) const {

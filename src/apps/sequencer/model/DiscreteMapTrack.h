@@ -95,8 +95,6 @@ public:
     void setRoutedInput(float v) { _routedInput = v; }
     float routedScanner() const { return Routing::routedValue(ParamKey::DiscreteMapScanner, _trackIndex, 0.f, 0.f, 34.f); }
     void setRoutedScanner(float v) { _routedScanner = v; }
-    float routedSync() const { return _routedSync; }
-    void setRoutedSync(float v) { _routedSync = v; }
 
 private:
     void setTrackIndex(int trackIndex) {

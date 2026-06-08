@@ -27,7 +27,6 @@ void DiscreteMapTrackEngine::reset() {
     _prevInput = kPrevInputInit;
     _currentInput = kInternalRampMin;
 
-    _prevSync = _discreteMapTrack.routedSync();
     _resetTickOffset = 0;
     _prevLoop = _sequence ? _sequence->loop() : true;
     _activeStage = -1;
@@ -77,7 +76,6 @@ void DiscreteMapTrackEngine::restart() {
     _rampPhase = 0.0f;
     _running = true;
     _resetTickOffset = 0;
-    _prevSync = _discreteMapTrack.routedSync();
     _prevLoop = _sequence ? _sequence->loop() : true;
     _prevRangeHigh = _sequence ? _sequence->rangeHigh() : 0.0f;
     _prevRangeLow = _sequence ? _sequence->rangeLow() : 0.0f;
@@ -136,15 +134,8 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
         }
         break;
     }
-    case DiscreteMapSequence::SyncMode::External: {
-        float syncVal = _discreteMapTrack.routedSync();
-        if (_prevSync <= 0.f && syncVal > 0.f) {
-            resetRequested = true;
-        }
-        _prevSync = syncVal;
-        break;
-    }
     case DiscreteMapSequence::SyncMode::Off:
+    case DiscreteMapSequence::SyncMode::External:   // retired — inert, behaves as Off (use a Reset route)
     case DiscreteMapSequence::SyncMode::Last:
         break;
     }

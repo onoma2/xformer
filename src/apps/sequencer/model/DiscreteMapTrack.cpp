@@ -12,7 +12,6 @@ void DiscreteMapTrack::cvOutputName(int index, StringBuilder &str) const {
 void DiscreteMapTrack::clear() {
     _routedInput = 0.f;
     _routedScanner = 0.f;
-    _routedSync = 0.f;
     setCvUpdateMode(CvUpdateMode::Gate);  // Initialize default value
     setPlayMode(Types::PlayMode::Free);
     for (auto &sequence : _sequences) {
