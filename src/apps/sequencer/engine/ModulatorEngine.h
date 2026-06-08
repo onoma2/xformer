@@ -169,13 +169,9 @@ public:
         // Chaos shapes (Lorenz, Latoocarfian)
         if (modulator.shape() == Modulator::Shape::ChaosLorenz ||
             modulator.shape() == Modulator::Shape::ChaosLatoocarfian) {
-            // Gate mode handling
-            if (modulator.mode() == Modulator::Mode::Sync || modulator.mode() == Modulator::Mode::Retrigger) {
-                if (gate && !_lastGate[index]) {
-                    resetChaos(index, modulator.shape(), modulator.phase());
-                }
-                _lastGate[index] = gate;
-            } else if (modulator.mode() == Modulator::Mode::Hold) {
+            // Gate mode handling: Trig and Gate both re-seed the attractor on gate rising.
+            if (modulator.mode() == Modulator::Mode::Trig ||
+                modulator.mode() == Modulator::Mode::Gate) {
                 if (gate && !_lastGate[index]) {
                     resetChaos(index, modulator.shape(), modulator.phase());
                 }
@@ -186,10 +182,9 @@ public:
             uint32_t inc = (modulator.rateDomain() == Modulator::RateDomain::Free)
                 ? freePhaseIncrement(dt, modulator.rateHz(), _freeRemainder[index])
                 : 65536 / (modulator.rate() * 2);
-            bool shouldAdvance = (modulator.mode() == Modulator::Mode::Free) ||
-                                (modulator.mode() == Modulator::Mode::Sync) ||
-                                (modulator.mode() == Modulator::Mode::Retrigger) ||
-                                (modulator.mode() == Modulator::Mode::Hold && gate);
+            bool shouldAdvance = (modulator.mode() == Modulator::Mode::Run) ||
+                                (modulator.mode() == Modulator::Mode::Trig) ||
+                                (modulator.mode() == Modulator::Mode::Gate && gate);
 
             float rawValue = 0.f;
             if (shouldAdvance) {
@@ -274,23 +269,18 @@ public:
 
         // Standard LFO modes (Sine, Triangle, Saw, Square)
 
-        // Sync/Retrigger/Hold modes
-        if (modulator.mode() == Modulator::Mode::Sync) {
-            // Hard sync: reset phase on gate rising edge
-            if (gate && !_lastGate[index]) {
-                _phaseAccumulator[index] = 0;
-            }
-            _lastGate[index] = gate;
-        } else if (modulator.mode() == Modulator::Mode::Hold) {
-            // Hold: reset phase on gate rising edge, only advance while gate is high
-            if (gate && !_lastGate[index]) {
-                _phaseAccumulator[index] = 0;
-            }
-            _lastGate[index] = gate;
-        } else if (modulator.mode() == Modulator::Mode::Retrigger) {
-            // Soft retrigger: restart from phase offset on gate rising edge
+        // Gate modes: Trig restarts from the phase offset on gate rising (offset 0 = hard
+        // sync); Gate restarts at 0 and only advances while gate high (windowed).
+        if (modulator.mode() == Modulator::Mode::Trig) {
             if (gate && !_lastGate[index]) {
                 _phaseAccumulator[index] = static_cast<uint32_t>(modulator.phase()) * 65536 / 360;
+                _freeRemainder[index] = 0.f;
+            }
+            _lastGate[index] = gate;
+        } else if (modulator.mode() == Modulator::Mode::Gate) {
+            if (gate && !_lastGate[index]) {
+                _phaseAccumulator[index] = 0;
+                _freeRemainder[index] = 0.f;
             }
             _lastGate[index] = gate;
         }
@@ -300,13 +290,13 @@ public:
             ? freePhaseIncrement(dt, modulator.rateHz(), _freeRemainder[index])
             : 65536 / (modulator.rate() * 2);
 
-        if (modulator.mode() == Modulator::Mode::Hold) {
-            // Hold: only advance phase while gate is high
+        if (modulator.mode() == Modulator::Mode::Gate) {
+            // Gate: only advance phase while gate is high
             if (gate) {
                 _phaseAccumulator[index] += phaseIncrement;
             }
         } else {
-            // Free/Sync/Retrigger: always advance
+            // Run/Trig: always advance
             _phaseAccumulator[index] += phaseIncrement;
         }
 

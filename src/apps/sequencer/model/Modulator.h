@@ -45,21 +45,22 @@ public:
         return nullptr;
     }
 
+    // Gate behavior (orthogonal to the rate domain): Run = free-running (gate ignored);
+    // Trig = reset phase to offset on gate rising (a 0 offset gives hard sync); Gate =
+    // advance only while gate high, reset on rising (windowed).
     enum class Mode : uint8_t {
-        Free,
-        Sync,
-        Hold,
-        Retrigger,
+        Run,
+        Trig,
+        Gate,
         Last
     };
 
     static const char *modeName(Mode mode) {
         switch (mode) {
-        case Mode::Free:       return "Free";
-        case Mode::Sync:       return "Sync";
-        case Mode::Hold:       return "Hold";
-        case Mode::Retrigger:  return "Retrig";
-        case Mode::Last:       break;
+        case Mode::Run:   return "Run";
+        case Mode::Trig:  return "Trig";
+        case Mode::Gate:  return "Gate";
+        case Mode::Last:  break;
         }
         return nullptr;
     }
@@ -340,7 +341,7 @@ public:
         setSmooth(100);
         setGateTrack(0);
         setRandomMode(RandomMode::Clocked);
-        setMode(Mode::Free);
+        setMode(Mode::Run);
         setAttack(900);   // P1 = 45 for chaos
         setDecay(1240);  // P2 = 62 for chaos
         setSustain(100);
@@ -401,7 +402,7 @@ private:
     uint16_t _smooth = 100;
     uint8_t _gateTrack = 0;
     RandomMode _randomMode = RandomMode::Clocked;
-    Mode _mode = Mode::Free;
+    Mode _mode = Mode::Run;
     RateDomain _rateDomain = RateDomain::Free;
     uint16_t _attack = 100;
     uint16_t _decay = 100;
