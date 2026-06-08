@@ -143,7 +143,6 @@ set(sources
     ui/pages/ProjectPage.cpp
     ui/pages/QuickEditPage.cpp
     ui/pages/RoutingPage.cpp
-    ui/pages/RouteSourceSelectPage.cpp
     ui/pages/SongPage.cpp
     ui/pages/StartupPage.cpp
     ui/pages/SystemPage.cpp

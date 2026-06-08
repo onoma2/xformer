@@ -9,15 +9,16 @@
 #include "model/Track.h"
 #include "model/RouteResolve.h"
 #include "model/RouteDraft.h"
+#include "model/RouteBrowse.h"
 
 namespace {
 
 // Inline modulation edit state. The Draft holds a full Routing::Route (large), so it
 // lives at file scope — one global edit at a time, mirroring gRouteDepthQuickEditModel
 // in RoutingPage.cpp — rather than as a per-instance member multiplied across ~20 list
-// pages. gModEditActive gates whether the draft is live; gModEditDepth selects which
-// target (value vs depth) the encoder turn stages.
-enum class ModEditTarget { Value, Depth };
+// pages. gModEditActive gates whether the draft is live; gModEditTarget selects what
+// the encoder turn stages: the param value, the depth, or the source (inline cycle).
+enum class ModEditTarget { Value, Depth, Source };
 
 RouteDraft::Draft gModDraft;
 bool gModEditActive = false;
@@ -61,6 +62,18 @@ void drawSpreadBar(Canvas &canvas, int x, int y, int w, int h, int depthPct, boo
         canvas.setColor(selected ? Color::Bright : Color::Medium);
         canvas.fillRect(x + 1, depthPct >= 0 ? cy - span : cy, w - 1, span);
     }
+}
+
+// Group index of a source for Shift+encoder jumps (mirrors RoutingPage::sourceGroup):
+// 0 None, 1 CvIn, 2 CvOut, 3 BusCv, 4 GateOut, 5 Mod.
+int sourceGroup(Routing::Source source) {
+    if (source == Routing::Source::None) return 0;
+    if (source >= Routing::Source::CvIn1 && source <= Routing::Source::CvIn4) return 1;
+    if (source >= Routing::Source::CvOut1 && source <= Routing::Source::CvOut8) return 2;
+    if (Routing::isBusSource(source)) return 3;
+    if (source >= Routing::Source::GateOut1 && source <= Routing::Source::GateOut8) return 4;
+    if (Routing::isModulatorSource(source)) return 5;
+    return 0;
 }
 
 } // namespace
@@ -172,19 +185,14 @@ void ListPage::keyPress(KeyPressEvent &event) {
     if ((modRow || spreadOwned) && _edit && key.isFunction() && _manager.top() == this) {
         auto &routing = _project.routing();
         switch (key.function()) {
-        case 1: // F2 SRC
+        case 1: // F2 SRC: focus the source for inline encoder cycling; F2 again -> depth
             if (!gModEditActive) {
                 gModDraft = RouteDraft::begin(routing, routeIndex);
                 gModEditActive = true;
                 gModEditOwner = this;
             }
-            _manager.pages().routeSourceSelect.show(
-                _listModel->routingTarget(_selectedRow), gModDraft.route.source(),
-                [] (bool ok, Routing::Source picked) {
-                    if (ok && picked != Routing::Source::None && gModEditActive) {
-                        gModDraft.route.setSource(picked);
-                    }
-                });
+            gModEditTarget = (gModEditTarget == ModEditTarget::Source)
+                ? ModEditTarget::Depth : ModEditTarget::Source;
             event.consume();
             return;
         case 2: // F3 COMBINE
@@ -246,6 +254,8 @@ void ListPage::keyPress(KeyPressEvent &event) {
                     gModEditOwner = this;
                 }
                 gModEditTarget = ModEditTarget::Depth;
+            } else if (gModEditTarget == ModEditTarget::Source) {
+                gModEditTarget = ModEditTarget::Depth;   // press leaves source focus -> depth
             } else {
                 gModEditTarget = ModEditTarget::Value;
             }
@@ -257,17 +267,24 @@ void ListPage::keyPress(KeyPressEvent &event) {
 }
 
 void ListPage::encoder(EncoderEvent &event) {
+    bool sourceFocus = gModEditActive && this == gModEditOwner && gModEditTarget == ModEditTarget::Source;
     if (gModSpread && this == gModEditOwner && gModEditActive) {
-        int t = _project.selectedTrackIndex();
-        if (trackEligible(t)) {
-            int depth = clamp(gModDraft.route.depthPct(t) + event.value(), -100, 100);
-            gModDraft.route.setDepthPct(t, depth);
-            gModDraft.route.setTracks(gModDraft.route.tracks() | (1 << t));
+        if (sourceFocus) {
+            cycleModSource(event.value(), event.pressed() || globalKeyState()[Key::Shift]);
+        } else {
+            int t = _project.selectedTrackIndex();
+            if (trackEligible(t)) {
+                int depth = clamp(gModDraft.route.depthPct(t) + event.value(), -100, 100);
+                gModDraft.route.setDepthPct(t, depth);
+                gModDraft.route.setTracks(gModDraft.route.tracks() | (1 << t));
+            }
         }
         event.consume();
         return;
     }
-    if (_edit && gModEditActive && this == gModEditOwner && gModEditTarget == ModEditTarget::Depth) {
+    if (_edit && sourceFocus) {
+        cycleModSource(event.value(), event.pressed() || globalKeyState()[Key::Shift]);
+    } else if (_edit && gModEditActive && this == gModEditOwner && gModEditTarget == ModEditTarget::Depth) {
         int trackIndex = _project.selectedTrackIndex();
         int depth = clamp(gModDraft.route.depthPct(trackIndex) + event.value(), -100, 100);
         gModDraft.route.setDepthPct(trackIndex, depth);
@@ -348,9 +365,9 @@ void ListPage::drawCell(Canvas &canvas, int row, int column, int x, int y, int w
     canvas.setFont(Font::Small);
     canvas.setBlendMode(BlendMode::Set);
     bool highlight = column == int(_edit) && row == _selectedRow;
-    // During depth-edit the value cell isn't the focus (the bar is) — dim it. Owner-gated so
-    // the source picker (also a ListPage) keeps its own selection highlight.
-    if (highlight && gModEditActive && this == gModEditOwner && gModEditTarget == ModEditTarget::Depth) {
+    // While editing depth or source the value cell isn't the focus (the bar / source token is)
+    // — dim it. Owner-gated so another ListPage's draw keeps its own selection highlight.
+    if (highlight && gModEditActive && this == gModEditOwner && gModEditTarget != ModEditTarget::Value) {
         highlight = false;
     }
     canvas.setColor(highlight ? Color::Bright : Color::Medium);
@@ -408,15 +425,44 @@ void ListPage::beginNewModulation(Routing::Target target, int trackIndex) {
     }
     gModEditActive = true;
     gModEditOwner = this;
-    gModEditTarget = ModEditTarget::Depth;
+    gModEditTarget = ModEditTarget::Source;   // first encoder turn cycles the source inline
     _edit = true;
-    _manager.pages().routeSourceSelect.show(
-        target, gModDraft.route.source(),
-        [] (bool ok, Routing::Source picked) {
-            if (ok && picked != Routing::Source::None && gModEditActive) {
-                gModDraft.route.setSource(picked);
+}
+
+void ListPage::cycleModSource(int delta, bool group) {
+    if (delta == 0 || !gModEditActive) {
+        return;
+    }
+    Routing::Source list[int(Routing::Source::Last)];
+    Routing::Target target = _listModel->routingTarget(_selectedRow);
+    int n = RouteBrowse::sourceList(target, list, int(Routing::Source::Last));
+    if (n == 0) {
+        return;
+    }
+    Routing::Source cur = gModDraft.route.source();
+    int idx = 0;
+    for (int i = 0; i < n; ++i) {
+        if (list[i] == cur) { idx = i; break; }
+    }
+    int next = idx;
+    if (group) {
+        int curGroup = sourceGroup(list[idx]);
+        if (delta > 0) {
+            for (int i = idx + 1; i < n; ++i) {
+                if (sourceGroup(list[i]) != curGroup) { next = i; break; }
             }
-        });
+        } else {
+            int prevGroup = -1;
+            for (int i = idx - 1; i >= 0; --i) {
+                int g = sourceGroup(list[i]);
+                if (g != curGroup) { prevGroup = g; }
+                if (prevGroup >= 0 && (i == 0 || sourceGroup(list[i - 1]) != prevGroup)) { next = i; break; }
+            }
+        }
+    } else {
+        next = clamp(idx + (delta > 0 ? 1 : -1), 0, n - 1);
+    }
+    gModDraft.route.setSource(list[next]);
 }
 
 void ListPage::resetModEdit() {
@@ -456,6 +502,7 @@ void ListPage::drawModulatedRow(Canvas &canvas, int row, int y) {
     }
 
     bool depthFocus = editingThis && gModEditTarget == ModEditTarget::Depth;
+    bool srcFocus = editingThis && gModEditTarget == ModEditTarget::Source;
 
     canvas.setFont(Font::Small);
     canvas.setBlendMode(BlendMode::Set);
@@ -470,7 +517,7 @@ void ListPage::drawModulatedRow(Canvas &canvas, int row, int y) {
     FixedStringBuilder<8> srcStr;
     Routing::printSourceAbbrev(src, srcStr);
     int srcX = Width - 10 - canvas.textWidth(srcStr);
-    canvas.setColor(Color::Medium);
+    canvas.setColor(srcFocus ? Color::Bright : Color::Medium);
     canvas.drawText(srcX, y + 7, srcStr);
 
     // narrow bipolar depth bar between the value and the source
@@ -541,8 +588,10 @@ void ListPage::drawSpread(Canvas &canvas) {
     canvas.setColor(Color::Bright);
     canvas.drawText(2, 8, header);
     int hx = 4 + canvas.textWidth(header) + 4;
+    bool srcFocus = gModEditActive && gModEditOwner == this && gModEditTarget == ModEditTarget::Source;
     canvas.setColor(Color::Medium);
     canvas.drawText(hx, 8, "<");
+    canvas.setColor(srcFocus ? Color::Bright : Color::Medium);
     canvas.drawText(hx + 8, 8, srcStr);
     const char *spread = "SPREAD";
     canvas.drawText(Width - canvas.textWidth(spread) - 2, 8, spread);

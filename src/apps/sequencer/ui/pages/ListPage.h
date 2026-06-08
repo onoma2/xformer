@@ -55,9 +55,15 @@ private:
 
     void resetModEdit();
 
+    // SOURCE focus (F2): cycle the draft's source inline through sourceList() order,
+    // group=true (Shift+encoder) jumps to the adjacent source family. Mirrors the
+    // matrix's matrixEditSource — no modal picker page.
+    void cycleModSource(int delta, bool group);
+
     // Cancels the live draft and clears edit state, but only when this page owns
-    // the draft. Every navigate-away/leave site routes through here so the source
-    // picker (also a ListPage) can't wipe the owner's draft mid round-trip.
+    // the draft. The draft is file-scope shared across every ListPage instance, so
+    // each navigate-away/leave site routes through here, owner-gated, to avoid one
+    // page wiping another's live draft.
     void cancelModEditIfOwner();
 
 protected:
