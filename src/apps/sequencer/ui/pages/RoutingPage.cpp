@@ -136,14 +136,16 @@ void RoutingPage::encoder(EncoderEvent &event) {
             return;
         }
         if (_matrixView == MatrixView::Shaper) {    // SHAPER view: dial the row's shaper
-            // only the stateless folds live on the routing lane (None/Fold/Crease)
+            // only the stateless folds live on the routing lane (None/Fold/Crease + off-center)
             static const Routing::Shaper live[] = { Routing::Shaper::None,
-                Routing::Shaper::TriangleFold, Routing::Shaper::Crease };
+                Routing::Shaper::TriangleFold, Routing::Shaper::TriangleFold30, Routing::Shaper::TriangleFold70,
+                Routing::Shaper::Crease, Routing::Shaper::Crease10, Routing::Shaper::Crease90 };
+            const int liveCount = 7;
             int idx = 0;
-            for (int i = 0; i < 3; ++i) {
+            for (int i = 0; i < liveCount; ++i) {
                 if (_matrixDraft.route.shaper(0) == live[i]) { idx = i; break; }
             }
-            idx = clamp(idx + (event.value() > 0 ? 1 : -1), 0, 2);
+            idx = clamp(idx + (event.value() > 0 ? 1 : -1), 0, liveCount - 1);
             for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
                 _matrixDraft.route.setShaper(t, live[idx]);
             }
@@ -389,6 +391,19 @@ void RoutingPage::enterTabEditor() {
 
 // True when track t's engine owns paramKey (so a route there is meaningful). Global
 // band params have no track dimension: eligibility is the same for every column.
+// SHAPER-view cell token for the stateless folds on the routing lane.
+static const char *shaperToken(Routing::Shaper s) {
+    switch (s) {
+    case Routing::Shaper::TriangleFold:   return "FLD";
+    case Routing::Shaper::TriangleFold30: return "F30";
+    case Routing::Shaper::TriangleFold70: return "F70";
+    case Routing::Shaper::Crease:         return "CRS";
+    case Routing::Shaper::Crease10:       return "C10";
+    case Routing::Shaper::Crease90:       return "C90";
+    default:                              return "-";
+    }
+}
+
 static bool tabCellEligible(const Track &track, uint8_t paramKey) {
     Routing::Target target = RouteBrowse::paramKeyToTarget(paramKey);
     if (target == Routing::Target::None) return false;
@@ -529,8 +544,7 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
             if (_matrixView == MatrixView::Shaper) {   // row's shaper on every eligible cell
                 FixedStringBuilder<6> txt;
                 if (rowHasRoute) {
-                    txt(rowShaper == Routing::Shaper::TriangleFold ? "FLD"
-                        : rowShaper == Routing::Shaper::Crease ? "CRS" : "-");
+                    txt(shaperToken(rowShaper));
                 } else {
                     txt(".");
                 }

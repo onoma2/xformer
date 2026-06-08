@@ -230,6 +230,12 @@ static inline float applyShaper(Routing::Shaper shaper, float shapedSource, floa
     case Routing::Shaper::VcaNext:
         // VcaNext needs neighbor source value — handled in caller
         break;
+    case Routing::Shaper::TriangleFold30:
+    case Routing::Shaper::TriangleFold70:
+    case Routing::Shaper::Crease10:
+    case Routing::Shaper::Crease90:
+        // Off-center folds live on the override path (RouteShaper); legacy branch ignores them.
+        break;
     case Routing::Shaper::Last:
         break;
     }
@@ -543,6 +549,12 @@ void RoutingEngine::updateSinks() {
                             shaperOut = 0.5f + (shapedSource - 0.5f) * neighbor;
                             break;
                         }
+                        case Routing::Shaper::TriangleFold30:
+                        case Routing::Shaper::TriangleFold70:
+                        case Routing::Shaper::Crease10:
+                        case Routing::Shaper::Crease90:
+                            // Off-center folds run on the override path (RouteShaper), not here.
+                            break;
                         case Routing::Shaper::Last:
                             break;
                         }

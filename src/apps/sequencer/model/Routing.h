@@ -448,6 +448,12 @@ public:
         Activity,
         ProgressiveDivider,
         VcaNext,
+        // Off-center fold variants (spec: bias replacement as fixed shaper centers).
+        // Appended ordinals — files store the ordinal, the center constant is re-tunable.
+        TriangleFold30,   // fold center 0.3
+        TriangleFold70,   // fold center 0.7
+        Crease10,         // crease threshold 0.1
+        Crease90,         // crease threshold 0.9
         Last,
     };
 

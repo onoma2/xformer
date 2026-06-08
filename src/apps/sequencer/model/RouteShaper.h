@@ -23,32 +23,35 @@
 
 namespace RouteShaper {
 
-    // Fold around a fixed 0.5 center with a ±0.5 amplitude triangle (center-preserving).
-    inline float triangleFold(float h) {
-        float x = 2.f * (h - 0.5f);
+    // Fold around a movable center with a ±0.5 amplitude triangle. center = the fold
+    // turning point in source space (replaces the legacy bias-shifted center).
+    inline float triangleFold(float h, float center = 0.5f) {
+        float x = 2.f * (h - center);
         float folded = (x > 0.f) ? 1.f - 2.f * std::fabs(x - 0.5f)
                                  : -1.f + 2.f * std::fabs(x + 0.5f);
         return clamp(0.5f + 0.5f * folded, 0.f, 1.f);
     }
 
-    // Bias-free discontinuous fold: a fixed ±0.5 wrap at center (threshold locked at 0.5;
-    // bias is gone). Crease's harsh, aliasing cousin to TriangleFold.
-    inline float crease(float h) {
+    // Discontinuous fold: a fixed ±0.5 wrap at a movable threshold (bias is gone, the
+    // threshold is the fixed center). Crease's harsh, aliasing cousin to TriangleFold.
+    inline float crease(float h, float threshold = 0.5f) {
         constexpr float creaseAmount = 0.5f;
-        float creased = h + (h <= 0.5f ? creaseAmount : -creaseAmount);
+        float creased = h + (h <= threshold ? creaseAmount : -creaseAmount);
         return clamp(creased, 0.f, 1.f);
     }
 
-    // Shaper stage dispatch: the stateless folds (None/TriangleFold/Crease) live on the
-    // routing lane; the stateful shapers are identity here (they move to modulators).
+    // Shaper stage dispatch: the stateless folds live on the routing lane (None/Fold/Crease
+    // at center 0.5, plus fixed off-center variants — the bias replacement). The stateful
+    // shapers are identity here (they move to modulators).
     inline float shape(Routing::Shaper shaper, float h) {
         switch (shaper) {
-        case Routing::Shaper::TriangleFold:
-            return triangleFold(h);
-        case Routing::Shaper::Crease:
-            return crease(h);
-        default:
-            return h;
+        case Routing::Shaper::TriangleFold:   return triangleFold(h, 0.5f);
+        case Routing::Shaper::TriangleFold30: return triangleFold(h, 0.3f);
+        case Routing::Shaper::TriangleFold70: return triangleFold(h, 0.7f);
+        case Routing::Shaper::Crease:         return crease(h, 0.5f);
+        case Routing::Shaper::Crease10:       return crease(h, 0.1f);
+        case Routing::Shaper::Crease90:       return crease(h, 0.9f);
+        default:                              return h;
         }
     }
 

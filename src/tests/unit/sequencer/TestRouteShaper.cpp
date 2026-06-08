@@ -57,6 +57,19 @@ CASE("Crease is a bias-free discontinuous fold at center (+-0.5 wrap)") {
     expectTrue(near(RouteShaper::shape(Routing::Shaper::Crease, 0.75f), 0.25f), "0.75 -> 0.25");
 }
 
+CASE("off-center fold variants fold at their fixed center, not 0.5") {
+    // TriangleFold30/70: source = center -> 0.5 (the fold turning point)
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::TriangleFold30, 0.3f), 0.5f), "F30 center 0.3 -> 0.5");
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::TriangleFold70, 0.7f), 0.5f), "F70 center 0.7 -> 0.5");
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::TriangleFold30, 0.0f), 0.1f), "F30 at 0 -> 0.1");
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::TriangleFold70, 1.0f), 0.9f), "F70 at 1 -> 0.9");
+    // Crease10/90: threshold shifts where the +-0.5 wrap flips
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::Crease10, 0.1f), 0.6f), "C10 at threshold 0.1 -> 0.6");
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::Crease10, 0.5f), 0.0f), "C10 above threshold -> 0");
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::Crease90, 0.9f), 1.0f), "C90 at threshold 0.9 -> 1.0");
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::Crease90, 1.0f), 0.5f), "C90 above threshold -> 0.5");
+}
+
 CASE("the remaining (stateful) shapers fall through to identity — they move to modulators") {
     for (auto shaper : { Routing::Shaper::Location,
                          Routing::Shaper::Envelope, Routing::Shaper::FrequencyFollower,
