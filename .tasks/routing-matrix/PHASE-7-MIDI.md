@@ -1,5 +1,11 @@
 # Phase 7 — MIDI as a routing source (LEARN)
 
+> **DONE 2026-06-08** — shipped as commits `41a553f5`→`74b90565`→`d81c8dc9`→`84697813`→`ea183679`.
+> Design: `docs/plans/2026-06-08-016-midi-routing-source-design.md`. The flow shifted from the
+> original brainstorm: LEARN lives on a dedicated **MIDI tab** (12th, after BUS), not the grid —
+> the grid picks MIDI as a plain source, the page hosts capture + field editing. See STATUS.md.
+> This file is kept as the original resume prompt / design trail.
+
 Resume prompt for the modulation-matrix overhaul. Branch `refactor/routing-matrix`.
 
 ## Where we are
