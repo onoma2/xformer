@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sequoa</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#f1f3f5;color:#333;font-family:-apple-system,system-ui,"Segoe UI",sans-serif;font-size:13px;letter-spacing:.2px;user-select:none}
+  .app{max-width:1400px;margin:0 auto;padding:12px}
+  #clockwrap{height:14px;margin-bottom:9px}
+  .top{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:10px 14px;margin-bottom:10px;position:sticky;top:8px;z-index:20;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .logo{font-weight:800;letter-spacing:-.3px;font-size:16px}
+  .logo span{color:#2563eb}
+  .top .grp{display:flex;align-items:center;gap:6px}
+  .top .lab{color:#999;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px}
+  .top .v{color:#2563eb;font-family:ui-monospace,Menlo,monospace;font-weight:600;font-size:12px}
+  select.v{border:1px solid #d6dde6;border-radius:4px;padding:1px 4px;background:#fff;cursor:pointer}
+  .play{margin-left:auto;background:#16a34a;color:#fff;border:none;border-radius:6px;padding:7px 18px;font-weight:700;font-size:12px;letter-spacing:.5px;cursor:pointer}
+  .play.on{background:#dc2626}
+  .track{display:flex;flex-direction:column;background:#fff;border:1px solid #e0e0e0;border-left:4px solid #888;border-radius:8px;margin-bottom:9px;overflow:hidden}
+  .thead{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid #f0f0f0}
+  .idx{width:18px;height:18px;border-radius:4px;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .nm{font-weight:700;font-size:13px;letter-spacing:-.2px}
+  select.reload{font-weight:700;font-size:13px;letter-spacing:-.2px;color:#333;border:1px solid #e0e0e0;border-radius:5px;padding:1px 4px;background:#fafbfc;cursor:pointer}
+  .tag{color:#aaa;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .solo{margin-left:auto;font-size:12px;font-weight:700;letter-spacing:.5px;color:#a16207;background:#fef9e7;border:1px solid #f3e2a0;border-radius:9px;padding:1px 8px;cursor:pointer}
+  .solo.act{color:#fff;background:#eab308;border-color:#ca8a04}
+  .on{font-size:12px;font-weight:700;letter-spacing:.5px;color:#16a34a;background:#eafaf0;border:1px solid #b8ebcb;border-radius:9px;padding:1px 8px;cursor:pointer}
+  .on.off{color:#aaa;background:#f3f4f6;border-color:#e5e7eb}
+  .track.off .tbody{opacity:.4}
+  .tbody{display:flex;align-items:stretch}
+  .eparams{width:172px;flex-shrink:0;padding:9px 11px;border-right:1px solid #eee;display:flex;flex-direction:column;gap:7px;justify-content:center}
+  .elab{color:#b6bec7;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:1px}
+  .cr{display:flex;align-items:center;height:16px}
+  .cl{color:#999;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;min-width:80px}
+  .cv{color:#333;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:600}
+  .vizwrap{width:632px;flex-shrink:0;display:flex;align-items:center}
+  canvas{display:block}
+  .seg{display:flex;flex-direction:column;gap:2px}
+  .eparams input[type=range]{width:130px;margin:2px 0;accent-color:#2563eb}
+  .viz{cursor:crosshair}
+  .scrub{cursor:ns-resize}
+  .cv.scrub{border-bottom:1px dotted #c7ced6}
+  .v.scrub{border-bottom:1px dotted #9bb3e0}
+  .cv.dim{color:#cbd5e1}
+  .fchip.scrub:hover,.cv.scrub:hover,.v.scrub:hover{background:#f0f4f9}
+  /* accumulator pane */
+  .accwrap{width:262px;flex-shrink:0;border-left:1px solid #eee;padding:9px 12px;display:flex;flex-direction:column;gap:7px;background:#fcfcfd}
+  .acchead{display:flex;align-items:baseline;justify-content:space-between}
+  .accoff{font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:13px}
+  .accgrid{display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;margin-top:1px}
+  .accgrid .cl{min-width:0}
+  .accgrid .cr{justify-content:space-between}
+  .accgrid .cv{cursor:pointer}
+  /* math glyph */
+  .mathwrap{width:150px;flex-shrink:0;border-left:1px solid #eee;background:#fafbfc;display:flex;align-items:center}
+  /* voice-mod pane (note value -> cutoff/amp) */
+  .vmodwrap{width:120px;flex-shrink:0;border-left:1px solid #eee;background:#fcfcfd;padding:9px 11px;display:flex;flex-direction:column;gap:7px;justify-content:center}
+  .vmodwrap .cl{min-width:0}
+  .vmodwrap .cr{justify-content:space-between}
+  /* footer */
+  .tfoot{display:flex;flex-wrap:wrap;align-items:center;gap:5px;padding:7px 12px;border-top:1px solid #f0f0f0;background:#fbfcfd}
+  .fchip{display:flex;align-items:center;gap:5px;background:#fff;border:1px solid #e7eaee;border-radius:5px;padding:2px 7px}
+  .fchip.act{cursor:pointer}
+  .fk{color:#9aa3ad;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+  .fv{color:#333;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:600}
+  .fsep{width:1px;height:15px;background:#e0e4e9;margin:0 3px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="logo">SEQU<span>OA</span></div>
+    <div class="grp"><span class="lab">BPM</span><span class="v" id="bpm">120</span></div>
+    <div class="grp"><span class="lab">Clock</span><span class="v">INT</span></div>
+    <div class="grp"><span class="lab">Scale</span><select class="v" id="masterScale"></select></div>
+    <div class="grp"><span class="lab">Cycle</span><span class="v" id="cycle">—</span></div>
+    <button class="play" id="play">▶ PLAY</button>
+  </div>
+  <div id="clockwrap"><canvas id="clockviz"></canvas></div>
+  <div id="tracks"></div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   Partition-crosser core (k axes; k=1 in use). Cursor in [0,1)^k.
+   Per-axis ascending thresholds in (0,1) partition [0,1) into
+   stages. Cell = tuple of stage indices. Moving the cursor past a
+   threshold is a crossing; passing 1 wraps. Selection is one
+   comparator: stageOf(). Uniform OR free placement is just a
+   different threshold list — the engine difference lives here.
+   ============================================================ */
+function Crosser(axes) {
+  this.axes = axes.map(a => ({ thr: a.thresholds, phase: 0, stage: 0 }));
+}
+Crosser.prototype.stageOf = function (ax, phase) {
+  let s = 0, t = ax.thr;
+  while (s < t.length && phase >= t[s]) s++;          // the one invariant comparator
+  return s;
+};
+Crosser.prototype.setPhase = function (i, phase) {
+  const ax = this.axes[i];
+  const wrapped = phase - Math.floor(phase);
+  const prev = ax.stage;
+  const didWrap = Math.floor(phase) !== Math.floor(ax.phase) || phase < ax.phase;
+  ax.phase = wrapped;
+  ax.stage = this.stageOf(ax, wrapped);
+  return { stage: ax.stage, crossed: ax.stage !== prev || didWrap, wrapped: didWrap };
+};
+Crosser.prototype.cell = function () { return this.axes.map(a => a.stage); };
+
+/* ============================================================
+   Scale tables (cents within a repeat interval) + degree-indexed
+   readout. Tables from finished/o2f; here the sequencer holds a
+   discrete scale-degree, so we index the degree directly.
+   ============================================================ */
+const _edo = n => Array.from({ length: n }, (_, k) => 1200 * k / n);
+const SCALES = [
+  null,                                                     // 0 Off
+  { rep: 1200, deg: _edo(12) },                             // 1 Chromatic 12-TET
+  { rep: 1200, deg: [0, 200, 400, 500, 700, 900, 1100] },   // 2 Major
+  { rep: 1200, deg: [0, 200, 300, 500, 700, 800, 1000] },   // 3 Natural minor
+  { rep: 1200, deg: [0, 200, 300, 500, 700, 800, 1100] },   // 4 Harmonic minor
+  { rep: 1200, deg: [0, 200, 400, 700, 900] },              // 5 Major pentatonic
+  { rep: 1200, deg: [0, 200, 400, 600, 800, 1000] },        // 6 Whole-tone
+  { rep: 1200, deg: [0, 203.91, 386.31, 498.04, 701.96, 884.36, 1088.27] }, // 7 Just intonation
+  { rep: 1200, deg: _edo(24) },                             // 8 24-TET
+  { rep: 1200, deg: _edo(19) },                             // 9 19-TET
+  { rep: 1200, deg: _edo(31) },                             // 10 31-TET
+  { rep: 1901.955, deg: Array.from({ length: 13 }, (_, k) => 1901.955 * k / 13) }, // 11 Bohlen–Pierce
+];
+const SCALE_NAMES = ['Off','Chromatic 12-TET','Major','Natural minor','Harmonic minor',
+  'Major pentatonic','Whole-tone','Just intonation','24-TET','19-TET','31-TET','Bohlen–Pierce'];
+const TONIC_HZ = 65.40639; // C2
+const DEG_MAX = 12;        // editable degree range (y-axis of the step lane)
+function degToFreq(deg, scale) {
+  if (!scale) return TONIC_HZ * Math.pow(2, deg / 12);      // Off -> semitones
+  const L = scale.deg.length;
+  const oct = Math.floor(deg / L), idx = deg - oct * L;
+  const cents = oct * scale.rep + scale.deg[idx];
+  return TONIC_HZ * Math.pow(2, cents / 1200);
+}
+// One master scale, set at the top and inherited by every track (spec §3).
+// A track adds only its own scale-degree transpose within that scale.
+let masterScaleIdx = 2; // Major
+function readout(track, stage) {
+  const deg = track.values[stage] + track.transpose + (track.accVal || 0);
+  return { freq: degToFreq(deg, SCALES[masterScaleIdx]), deg: deg };
+}
+// Nearest 12-TET note name for a frequency (display only; non-12-TET scales approximate).
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+function noteName(freq) {
+  const midi = Math.round(69 + 12 * Math.log2(freq / 440));
+  return NOTE_NAMES[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
+}
+// Accumulator value projected at stage i, for the cycle's forward play order from the window start.
+function projectedAcc(tr, i) {
+  const [lo, hi] = activeWindow(tr);
+  if (!tr.acc.step || i < lo || i > hi) return 0;
+  let acc = 0, dir = 1; const lim = tr.acc.limit, ord = tr.acc.order || 'wrap';   // stage-level projection (pulse-advance climbs faster than shown)
+  for (let t = 1; t <= i - lo; t++) if (t % tr.acc.every === 0) { acc += tr.acc.step * dir; if (lim && Math.abs(acc) >= lim) { if (ord === 'pendulum') { acc = Math.sign(acc) * lim; dir = -dir; } else acc = 0; } }
+  return acc;
+}
+// "C1" set pitch, plus "(B1)" effective pitch when the accumulator shifts this stage.
+function stageNote(tr, i) {
+  const sc = SCALES[masterScaleIdx], setDeg = tr.values[i] + tr.transpose;
+  let s = noteName(degToFreq(setDeg, sc));
+  if (tr.acc.step) { const eff = setDeg + projectedAcc(tr, i); if (eff !== setDeg) s += '(' + noteName(degToFreq(eff, sc)) + ')'; }
+  return s;
+}
+
+/* ============================================================
+   Track placement: weights = per-stage time share. Thresholds are
+   the cumulative weight fractions; Even Grid (all weights 1) gives
+   uniform i/n, Weighted Hold gives the free partition.
+   ============================================================ */
+// Recompute thresholds/crosser from weights only — no runtime reset (used on live edits).
+function rebuildPlacement(tr) {
+  const W = tr.weights.reduce((a, b) => a + b, 0);
+  let cum = 0; const thr = [], start = [];
+  for (let i = 0; i < tr.weights.length; i++) {
+    start.push(cum / W);
+    cum += tr.weights[i];
+    if (i < tr.weights.length - 1) thr.push(cum / W);
+  }
+  tr.cumStart = start;
+  tr.crosser = new Crosser([{ thresholds: thr }]);
+}
+// Absolute mode: per-stage threshold positions tr.pos[]; play order = stages sorted by
+// position (independent + reorderable). seq[rank]=stage, gap[rank]=dwell fraction (wraps).
+function rebuildAbs(tr) {
+  const n = tr.steps;
+  tr.seq = tr.pos.map((_, i) => i).sort((a, b) => tr.pos[a] - tr.pos[b]);
+  const sp = tr.seq.map(i => tr.pos[i]);
+  tr.sortedPos = sp;
+  tr.gap = sp.map((p, r) => r < n - 1 ? sp[r + 1] - p : (1 - p) + sp[0]);
+}
+// Grow/shrink the stage arrays and rebuild placement (live, no runtime reset).
+function setStageCount(tr, n) {
+  n = Math.min(32, Math.max(1, n)); const cur = tr.steps;
+  if (n > cur) for (let i = cur; i < n; i++) { tr.weights.push(1); tr.values.push(tr.values.length ? tr.values[tr.values.length - 1] : 0); tr.gates.push(true); tr.dirs.push('both'); }
+  else if (n < cur) { tr.weights.length = n; tr.values.length = n; tr.gates.length = n; tr.dirs.length = n; }
+  tr.steps = n;
+  tr.last = Math.min(tr.last, n - 1); tr.first = Math.min(tr.first, tr.last);
+  rebuildPlacement(tr);
+  if (tr.widthMode === 'abs') { tr.pos = tr.cumStart.slice(); rebuildAbs(tr); }
+}
+// One k=2 axis: own length, placement (cumulative-fraction thresholds), order, rate, mover.
+function buildAxis(def) {
+  const steps = def.steps, weights = def.weights || Array(steps).fill(1);
+  const W = weights.reduce((a, b) => a + b, 0); let cum = 0; const cumStart = [];
+  for (let i = 0; i < steps; i++) { cumStart.push(cum / W); cum += weights[i]; }
+  const base = def.rateMul == null ? 1 : def.rateMul;
+  return { steps, weights, cumStart, order: def.order || 'fwd', baseRate: base, rateMul: base,
+    mover: def.mover || 'stepped', widthMode: 'len', first: 0, last: steps - 1, idx: 0, dir: 1, nextTime: 0, stage: 0 };
+}
+// Resize one k=2 axis (2..8); preserve existing cell pitches + mutes, re-fit the canvas (height tracks rows).
+function setGridDim(tr, ai, n) {
+  n = Math.max(2, Math.min(8, n));
+  tr.axisDefs[ai].steps = n;
+  const old = tr.axes[ai];
+  tr.axes[ai] = buildAxis(tr.axisDefs[ai]);
+  tr.axes[ai].rateMul = old.rateMul; tr.axes[ai].order = old.order;
+  tr.axes[ai].nextTime = old.nextTime; tr.axes[ai].dir = old.dir;   // keep scheduling position (no catch-up burst)
+  tr.axes[ai].idx = Math.min(old.idx, n - 1); tr.axes[ai].stage = Math.min(old.stage, n - 1);
+  const nx = tr.axes[0].steps, ny = tr.axes[1].steps, og = tr.grid, ogt = tr.gateGrid;
+  tr.grid = Array.from({ length: nx }, (_, x) => Array.from({ length: ny }, (_, y) => (og[x] && og[x][y] != null) ? og[x][y] : (x + 2 * y) % 8));
+  tr.gateGrid = Array.from({ length: nx }, (_, x) => Array.from({ length: ny }, (_, y) => (ogt[x] && ogt[x][y] != null) ? ogt[x][y] : true));
+  tr.steps = nx;
+  if (tr.vizEl) tr.vizCtx = fit(tr.vizEl, VIZ_W, gridH(tr));
+}
+function buildPlacement(tr) {
+  rebuildPlacement(tr);
+  tr.gates = tr.gates || tr.weights.map(() => true);   // per-stage gate on/off (off = rest)
+  tr.dirs = tr.dirs || tr.weights.map(() => 'both');   // per-stage ramp direction (Ramp Map): both | up | down
+  if (tr.on === undefined) tr.on = true;               // track on/off (off = runs but muted)
+  if (tr.solo === undefined) tr.solo = false;          // solo: when any track is soloed, only soloed tracks sound
+  tr.order = tr.order || 'fwd';                         // fwd | rev | ping
+  if (tr.rateMul === undefined) tr.rateMul = 1;
+  tr.acc = tr.acc || { step: 0, every: 1, limit: 0 };  // running scale-degree transpose
+  if (tr.acc.advanceAt === undefined) tr.acc.advanceAt = 'stage';  // stage | pulse (pulse only bites on depth-2)
+  if (tr.acc.order === undefined) tr.acc.order = 'wrap';           // wrap | pendulum (behaviour at the limit)
+  tr.accVal = 0; tr.accCount = 0; tr.accDir = 1; tr.dir = 1;
+  if (tr.first === undefined) tr.first = 0;             // window first stage
+  if (tr.last === undefined) tr.last = tr.steps - 1;    // window last stage; window = [first, last]
+  if (tr.reset === undefined) tr.reset = 1;             // measure-reset default: re-sync the cursor to the downbeat every 1 bar
+  tr.barStart = 0;
+  if (tr.slide === undefined) tr.slide = false;         // readout portamento
+  tr.prevFreq = 0;
+  tr.vmod = tr.vmod || { on: false, cut: 0, amp: 0, target: null };   // note value → cutoff/amp (bipolar); target voice (null = self)
+  if (tr.vmod.target === undefined) tr.vmod.target = null;
+  tr.vout = null;                                                      // published mod output (voiceFor falls back to base until set)
+  tr.mover = tr.mover || 'stepped';                      // stepped | continuous (free-rate ramp)
+  tr.depth = tr.depth || 1;                              // 1 = flat stage · 2 = stage→child nesting
+  if (tr.depth === 2) {
+    if (tr.childMode === 'curve') { tr.density = tr.density || tr.weights.map(() => 4); tr.curv = tr.curv || tr.weights.map(() => 0); }
+    else { tr.pulses = tr.pulses || tr.weights.map(() => 1); tr.pgate = tr.pgate || tr.weights.map(() => 'multi'); }
+  }
+  if (tr.widthMode === 'abs') { if (!tr.pos) tr.pos = tr.cumStart.slice(); rebuildAbs(tr); }
+  if (tr.k === 2) {                                       // two independently-clocked axes + a 2-D value grid
+    tr.axes = (tr.axisDefs || [{ steps: 4 }, { steps: 3 }]).map(buildAxis);
+    const nx = tr.axes[0].steps, ny = tr.axes[1].steps;
+    for (const ax of tr.axes) { ax.rateMul = ax.baseRate; ax.order = tr.order; }
+    tr.steps = nx;                                        // k=1 paths (accumulator, controls) read a single length
+    if (!tr.grid) tr.grid = Array.from({ length: nx }, (_, x) => Array.from({ length: ny }, (_, y) => (x + 2 * y) % 8));
+    if (!tr.gateGrid) tr.gateGrid = Array.from({ length: nx }, () => Array.from({ length: ny }, () => true));  // per-cell mute
+    tr.gateSource = tr.gateSource || 'cell';              // x | y | cell (cell-change)
+  }
+}
+
+/* ============================================================
+   Engines: each is one crosser config. Even Grid = uniform 16,
+   one gate each. Weighted Hold = free placement, value held.
+   ============================================================ */
+// Each engine — and the Custom slot — is one config of the same primitive. A preset is a
+// factory returning a fresh config, so reloading a slot never shares arrays with the slot it
+// replaced. Custom leaves k/mover/depth/child unlocked (the presets each pin them); U13's panel edits them.
+const PRESETS = {
+  evengrid: () => ({ id: 'evengrid', name: 'Even Grid', tag: 'x0x', col: '#2563eb',
+    steps: 16, weights: Array(16).fill(1),
+    values: [3, 6, 4, 8, 5, 7, 4, 6, 3, 7, 5, 8, 4, 6, 5, 7],
+    transpose: 0, gate: 0.25, rateMul: 1, viz: 'evengrid' }),
+  weighted: () => ({ id: 'weighted', name: 'Weighted Hold', tag: 'Metropolix · USTA', col: '#0d9488',
+    steps: 16, weights: Array(16).fill(1),
+    values: [3, 6, 4, 8, 5, 7, 4, 6, 3, 7, 5, 8, 4, 6, 5, 7],
+    transpose: 0, gate: 0.25, rateMul: 1, viz: 'weighted' }),
+  rampmap: () => ({ id: 'rampmap', name: 'Ramp Map', tag: 'DM', col: '#ea580c',
+    steps: 16, weights: Array(16).fill(1),
+    values: [3, 6, 4, 8, 5, 7, 4, 6, 3, 7, 5, 8, 4, 6, 5, 7],
+    transpose: 0, gate: 0.25, rateMul: 1, mover: 'continuous', viz: 'rampmap', widthMode: 'abs' }),
+  gridwalk: () => ({ id: 'gridwalk', name: 'Grid Walk', tag: 'René', col: '#16a34a',
+    k: 2, axisDefs: [{ steps: 4, rateMul: 1 }, { steps: 3, rateMul: 1 / 3 }],   // X clocks, Y ÷3 (independent)
+    steps: 4, weights: Array(4).fill(1), values: Array(4).fill(0),
+    transpose: 0, gate: 0.25, rateMul: 1, reset: 0, viz: 'gridwalk' }),
+  vectorscan: () => ({ id: 'vectorscan', name: 'Vector Scan', tag: '2D DM', col: '#ca8a04',
+    k: 2, axisDefs: [{ steps: 4, rateMul: 1, mover: 'continuous' }, { steps: 3, rateMul: 1.5, mover: 'continuous' }],
+    steps: 4, weights: Array(4).fill(1), values: Array(4).fill(0),
+    transpose: 0, gate: 0.25, rateMul: 1, reset: 0, viz: 'vectorscan' }),
+  pulsegrid: () => ({ id: 'pulsegrid', name: 'Pulse Grid', tag: 'Metropolix · ER-101', col: '#7c3aed',
+    steps: 5, weights: Array(5).fill(1), values: [3, 6, 4, 8, 5], depth: 2,
+    pulses: [2, 4, 1, 3, 2], pgate: ['multi', 'single', 'hold', 'multi', 'rest'],
+    transpose: 0, gate: 0.5, rateMul: 0.25, reset: 0, viz: 'pulsegrid' }),   // stage = a beat so pulses are musical
+  curvecloud: () => ({ id: 'curvecloud', name: 'Curve Cloud', tag: 'Flux', col: '#db2777',
+    steps: 4, weights: Array(4).fill(1), values: [3, 6, 4, 8], depth: 2, childMode: 'curve',
+    density: [6, 12, 4, 9], curv: [2, 6, -4, 0],
+    transpose: 0, gate: 0.5, rateMul: 0.25, reset: 0, viz: 'curvecloud' }),   // stage = a beat so density stays discrete
+  custom: () => ({ id: 'custom', name: 'Custom', tag: 'free', col: '#475569', custom: true,
+    k: 1, mover: 'stepped', depth: 1,
+    steps: 8, weights: Array(8).fill(1), values: [0, 2, 4, 5, 7, 9, 11, 12],
+    transpose: 0, gate: 0.25, rateMul: 1, viz: 'weighted' }),
+};
+const PRESET_ORDER = ['evengrid', 'weighted', 'rampmap', 'gridwalk', 'vectorscan', 'pulsegrid', 'curvecloud', 'custom'];
+const PRESET_NAMES = {}; PRESET_ORDER.forEach(id => PRESET_NAMES[id] = PRESETS[id]().name);
+const tracks = PRESET_ORDER.map(id => { const tr = PRESETS[id](); tr.presetId = id; return tr; });
+tracks.forEach(buildPlacement);
+// Blank slate: load silent — track muted, every gate off (pitches kept; enable to build up).
+function loadSilent(tr) {
+  tr.on = false;
+  if (tr.gates) tr.gates = tr.gates.map(() => false);
+  if (tr.gateGrid) tr.gateGrid = tr.gateGrid.map(c => c.map(() => false));
+  if (tr.pgate) tr.pgate = tr.pgate.map(() => 'rest');
+}
+tracks.forEach(loadSilent);
+
+/* ============================================================
+   Audio: native nodes, gate-driven AR/ASR voice (re-rigged from
+   finished/node-e triangle->LPF->amp). Base timbre fixed.
+   ============================================================ */
+let ctx = null, master = null, analyser = null;
+const TIMBRE = { cutoff: 2200, q: 1.0, peak: 0.26, attack: 0.006, release: 0.045 };
+const SLIDE_TIME = 0.06;   // portamento glide duration
+function initAudio() {
+  if (ctx) return;
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  master = ctx.createGain(); master.gain.value = 0.9;
+  analyser = ctx.createAnalyser(); analyser.fftSize = 2048;
+  master.connect(analyser); analyser.connect(ctx.destination);
+}
+function playVoice(freq, t, gateLen, slide, fromFreq, cutoff, peak) {
+  cutoff = cutoff || TIMBRE.cutoff; peak = peak || TIMBRE.peak;       // voice-mod overrides, else base timbre
+  if (window.SEQUOA && SEQUOA._tap) SEQUOA._tap.push({ f: +freq.toFixed(2), t: +t.toFixed(4), g: +gateLen.toFixed(4), c: +cutoff.toFixed(0), p: +peak.toFixed(3) });  // verification hook
+  const o = ctx.createOscillator(); o.type = 'triangle';
+  if (slide && fromFreq > 0) {                                // portamento from the previous note
+    o.frequency.setValueAtTime(fromFreq, t);
+    o.frequency.exponentialRampToValueAtTime(freq, t + Math.min(SLIDE_TIME, gateLen * 0.9));
+  } else o.frequency.setValueAtTime(freq, t);
+  const f = ctx.createBiquadFilter(); f.type = 'lowpass';
+  f.frequency.setValueAtTime(cutoff, t); f.Q.setValueAtTime(TIMBRE.q, t);
+  const g = ctx.createGain();
+  const a = TIMBRE.attack, r = TIMBRE.release, hold = Math.max(a, gateLen);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(peak, t + a);             // attack
+  g.gain.setValueAtTime(peak, t + hold);                   // sustain to gate-off (ASR)
+  g.gain.linearRampToValueAtTime(0.0001, t + hold + r);    // release
+  o.connect(f); f.connect(g); g.connect(master);
+  o.start(t); o.stop(t + hold + r + 0.02);
+}
+// Voice mod: when on, the note's scale-degree drives cutoff and level by bipolar amounts.
+// A track's output (vout) is published; it lands on whichever voice its target selects.
+function voiceParams(tr, deg) {
+  if (!tr.vmod || !tr.vmod.on) return { cutoff: TIMBRE.cutoff, peak: TIMBRE.peak };
+  const n = Math.max(0, Math.min(1, deg / DEG_MAX)) * 2 - 1;         // note value → −1..+1
+  return {
+    cutoff: Math.max(150, Math.min(14000, TIMBRE.cutoff * Math.pow(2, tr.vmod.cut * n * 2.5))),
+    peak: Math.max(0.05, Math.min(0.55, TIMBRE.peak * Math.pow(2, tr.vmod.amp * n * 1.5))),
+  };
+}
+// The cutoff/peak reaching THIS track's voice: the first track whose voice-mod targets it (target default = self).
+function voiceFor(tr) {
+  const ti = tracks.indexOf(tr);
+  for (const m of tracks) {
+    if (!m.vmod || !m.vmod.on) continue;
+    if ((m.vmod.target == null ? tracks.indexOf(m) : m.vmod.target) === ti) return m.vout || { cutoff: TIMBRE.cutoff, peak: TIMBRE.peak };
+  }
+  return { cutoff: TIMBRE.cutoff, peak: TIMBRE.peak };
+}
+
+/* ============================================================
+   Shared clock + stepped mover. Per-track lookahead scheduler:
+   each track advances independently (free polyrhythm). Stage dwell
+   = base unit x weight, so Weighted Hold's stages last unequal time.
+   ============================================================ */
+let BPM = 120;
+const LOOKAHEAD_MS = 25, SCHEDULE_AHEAD = 0.1;
+let playing = false, timer = null;
+function sixteenthDur() { return 60 / BPM / 4; }
+function baseUnit(tr) { return sixteenthDur() / tr.rateMul; }
+function stageDur(tr, i) { return (tr.widthMode === 'abs' && tr.gap) ? baseUnit(tr) * tr.steps * tr.gap[i] : baseUnit(tr) * tr.weights[i]; }
+function cycleDur(tr) { let s = 0; for (let i = 0; i < tr.steps; i++) s += stageDur(tr, i); return s; }
+function activeWindow(tr) { return [tr.first, Math.min(tr.steps - 1, tr.last)]; }
+function firstIdx(ax) { const [lo, hi] = activeWindow(ax); return ax.order === 'rev' ? hi : lo; }  // reverse starts at the window end
+function rampDir(tr) { return tr.order === 'rev' ? -1 : tr.order === 'ping' ? tr.dir : 1; }  // current ramp travel direction
+// 2-D grid value for a cell tuple; null = empty cell = rest.
+function cellValue(tr, cell) { const row = tr.grid[cell[0]]; if (!row) return null; const v = row[cell[1]]; return v == null ? null : v; }
+// A track sounds if it's on — unless any track is soloed, in which case only soloed tracks sound.
+function audible(tr) { return tracks.some(t => t.solo) ? tr.solo : tr.on; }
+function scheduleStep(tr, ev, cell, ai) {
+  if (!audible(tr)) return;                                  // track off / not in the solo set: no voice
+  if (tr.k === 2) {                                          // k=2: cell tuple -> grid value
+    if (!tr.gateGrid[cell[0]][cell[1]]) return;             // muted cell = rest
+    const v = cellValue(tr, cell); if (v == null) return;
+    const deg = v + tr.transpose + (tr.accVal || 0), freq = degToFreq(deg, SCALES[masterScaleIdx]);
+    if (tr.vmod.on) tr.vout = voiceParams(tr, deg);             // publish this track's mod output
+    const vp = voiceFor(tr);                                    // read whatever targets this voice
+    playVoice(freq, ev.time, stageDur(tr.axes[ai], ev.rank) * tr.gate, tr.slide, tr.prevFreq, vp.cutoff, vp.peak);
+    tr.prevFreq = freq; return;
+  }
+  const stage = ev.stage;
+  const flatGate = !(tr.depth === 2 && tr.childMode !== 'curve');   // per-stage gate; only Pulse Grid (depth-2 pulse) gates via pgate instead
+  if (flatGate) {
+    const g = tr.gates[stage];
+    if (g === 'tie') return;                                        // tied: the preceding note holds through this stage, no re-attack
+    if (!g) return;                                                 // rest
+  }
+  if (tr.viz === 'rampmap') { const d = tr.dirs[stage], rd = rampDir(tr); if ((d === 'up' && rd < 0) || (d === 'down' && rd > 0)) return; }  // wrong ramp direction
+  const { freq, deg } = readout(tr, stage);
+  if (tr.vmod.on) tr.vout = voiceParams(tr, deg);                // publish this track's mod output
+  const vp = voiceFor(tr);                                       // read whatever targets this voice
+  if (tr.depth === 2) { scheduleStage(tr, ev, freq, vp); return; }   // nested: subdivide the dwell into pulses
+  const extra = tr.gates[stage] === true ? tieExtend(tr, ev) : 0;  // hold across following tie stages (legato), else gate%
+  const len = extra > 0 ? stageDur(tr, ev.rank) + extra : stageDur(tr, ev.rank) * tr.gate;
+  playVoice(freq, ev.time, len, tr.slide, tr.prevFreq, vp.cutoff, vp.peak);
+  tr.prevFreq = freq;
+}
+// Curve warp: u in [0,1] bent by curvature c (>0 log-cluster early, <0 exp-cluster late, 0 linear).
+function curveWarp(u, c) { const f = c > 0 ? Math.log(1 + c * u) / Math.log(1 + c) : c < 0 ? (Math.exp(c * u) - 1) / (Math.exp(c) - 1) : u; return Math.max(0, Math.min(0.999, f)); }
+// Depth-2 nesting: a child crosser subdivides the stage dwell into leaves carrying the inherited
+// value. childMode 'pulse' = even pulses + gate type; 'curve' = D density triggers at warped positions.
+function scheduleStage(tr, ev, freq, vp) {
+  const stage = ev.stage, dwell = stageDur(tr, ev.rank), cut = vp ? vp.cutoff : TIMBRE.cutoff, pk = vp ? vp.peak : TIMBRE.peak;
+  const perPulse = tr.acc.step && (tr.acc.advanceAt || 'stage') === 'pulse';  // accumulate (and re-pitch) per child leaf
+  const leafFreq = () => perPulse ? readout(tr, stage).freq : freq;           // live accVal when pulse-advancing
+  if (tr.childMode === 'curve') {                            // curve density: D triggers warped within the dwell
+    const D = Math.max(1, Math.min(16, tr.density[stage])), c = tr.curv[stage];
+    for (let k = 0; k < D; k++) { const f = leafFreq(); playVoice(f, ev.time + curveWarp(k / D, c) * dwell, (dwell / D) * tr.gate, tr.slide, tr.prevFreq, cut, pk); tr.prevFreq = f; if (perPulse) accumulate(tr); }
+    return;
+  }
+  const np = Math.max(1, Math.min(8, tr.pulses[stage]));     // pulse cap ≤8
+  const gt = tr.pgate[stage];
+  if (gt === 'rest') return;
+  if (gt === 'hold') { const f = leafFreq(); playVoice(f, ev.time, dwell * tr.gate, tr.slide, tr.prevFreq, cut, pk); tr.prevFreq = f; if (perPulse) accumulate(tr); return; }
+  const leaf = dwell / np, count = gt === 'single' ? 1 : np;  // single = one hit · multi = every pulse
+  for (let p = 0; p < count; p++) { const f = leafFreq(); playVoice(f, ev.time + p * leaf, leaf * tr.gate, tr.slide, tr.prevFreq, cut, pk); tr.prevFreq = f; if (perPulse) accumulate(tr); }
+}
+// Accumulator: every `every` advances, add `step` degrees; at `limit` either wrap to 0
+// or bounce (pendulum). advanceAt = stage | pulse selects where this is called (see scheduleStage).
+function accumulate(tr) {
+  if (!tr.acc.step) return;
+  if (++tr.accCount >= tr.acc.every) {
+    tr.accCount = 0;
+    tr.accVal += tr.acc.step * (tr.accDir || 1);
+    const lim = tr.acc.limit;
+    if (lim && Math.abs(tr.accVal) >= lim) {
+      if ((tr.acc.order || 'wrap') === 'pendulum') { tr.accVal = Math.sign(tr.accVal) * lim; tr.accDir = -(tr.accDir || 1); }  // bounce between ±limit
+      else tr.accVal = 0;                                                                                                       // wrap to 0
+    }
+  }
+}
+// Order-aware index advance within the active window [loop.a, min(len-1, loop.b)].
+// Returns true on a cycle wrap (resets accumulator).
+function advance(tr) {
+  const [lo, hi] = activeWindow(tr);
+  if (hi <= lo) { tr.idx = lo; return true; }
+  if (tr.order === 'rev') { if (--tr.idx < lo) { tr.idx = hi; return true; } }
+  else if (tr.order === 'ping') {
+    tr.idx += tr.dir;
+    if (tr.idx >= hi) { tr.idx = hi; tr.dir = -1; }
+    else if (tr.idx <= lo) { tr.idx = lo; tr.dir = 1; return true; }
+  } else { if (++tr.idx > hi) { tr.idx = lo; return true; } }
+  return false;
+}
+// Peek the next rank in play order without mutating the track (tie look-ahead).
+function nextRank(tr, idx, dir) {
+  const [lo, hi] = activeWindow(tr);
+  if (hi <= lo) return { idx: lo, dir };
+  if (tr.order === 'rev') return { idx: idx - 1 < lo ? hi : idx - 1, dir };
+  if (tr.order === 'ping') { let n = idx + dir, d = dir; if (n >= hi) { n = hi; d = -1; } else if (n <= lo) { n = lo; d = 1; } return { idx: n, dir: d }; }
+  return { idx: idx + 1 > hi ? lo : idx + 1, dir };
+}
+// Total dwell of the consecutive 'tie' stages following ev — the on-note holds across them (legato).
+function tieExtend(tr, ev) {
+  let extra = 0, idx = ev.rank, dir = tr.dir, n = 0;
+  while (n++ < tr.steps) {
+    const r = nextRank(tr, idx, dir); idx = r.idx; dir = r.dir;
+    const stage = (tr.widthMode === 'abs' && tr.seq) ? tr.seq[idx] : idx;
+    if (tr.gates[stage] !== 'tie') break;
+    extra += stageDur(tr, idx);
+  }
+  return extra;
+}
+// Mover: advance one axis past its current event and return the just-emitted event.
+// The axis-like object is the track itself (k=1) or tr.axes[ai] (k=2); stepped and
+// continuous share this — over the same thresholds their crossing times coincide, so
+// mover type is only a viz/rate-granularity flavour. The genuinely new axis is k=2,
+// where two cursors run independent clocks and interleave.
+function moverNextEvent(tr, ai) {
+  const ax = tr.k === 2 ? tr.axes[ai] : tr;
+  const [lo, hi] = activeWindow(ax);                   // snap into window if loop/len changed mid-run
+  if (ax.idx < lo || ax.idx > hi) ax.idx = ax.order === 'rev' ? hi : lo;
+  const rank = ax.idx;
+  const stage = (ax.widthMode === 'abs' && ax.seq) ? ax.seq[rank] : rank;  // abs: play order by sorted position
+  const time = ax.nextTime;
+  ax.stage = stage;                                    // current sounding stage on this axis (for the cell tuple)
+  ax.nextTime += stageDur(ax, rank);
+  const wrapped = advance(ax);
+  return { time, rank, stage, wrapped };
+}
+// Emit one event: gate-source filter (k=2), schedule the voice, log the cell tuple,
+// then run the track-level accumulator / measure-reset off the emitting axis's wrap.
+function emitEvent(tr, ai, ev, prevCell) {
+  const ax = tr.k === 2 ? tr.axes[ai] : tr;
+  let pass = true, cell = [ev.stage];
+  if (tr.k === 2) {
+    cell = tr.axes.map(a => a.stage);
+    const gs = tr.gateSource || 'cell';                // x: axis-X crossings · y: axis-Y · cell: any cell change
+    pass = gs === 'x' ? ai === 0 : gs === 'y' ? ai === 1 : cell.some((v, i) => v !== prevCell[i]);
+  }
+  if (pass) {
+    scheduleStep(tr, ev, cell, ai);
+    tr.sched.push({ t: ev.time, s: ev.stage, cell });  // cell tuple for the playhead (k=1 -> [stage])
+    if (tr.sched.length > 64) tr.sched.shift();
+  }
+  if (ev.wrapped) { tr.accVal = 0; tr.accCount = 0; tr.accDir = 1; }
+  else if (pass && !(tr.depth === 2 && (tr.acc.advanceAt || 'stage') === 'pulse')) accumulate(tr);  // pulse-advance accumulates per leaf in scheduleStage instead
+  if (tr.reset > 0) {                                  // measure-reset: snap the cursor to the downbeat every N bars
+    const period = tr.reset * 16 * sixteenthDur();     // cycles loop freely between bars; only the straddling cycle is truncated
+    const nextBar = tr.startTime + (Math.floor((ev.time - tr.startTime + 1e-6) / period) + 1) * period;
+    if (ax.nextTime > nextBar - 1e-6) { ax.nextTime = nextBar; ax.idx = firstIdx(ax); ax.dir = 1; tr.accVal = 0; tr.accCount = 0; tr.accDir = 1; }
+  }
+}
+function scheduler() {
+  const ahead = ctx.currentTime + SCHEDULE_AHEAD;
+  for (const tr of tracks) {
+    const K = tr.k || 1, axes = K === 2 ? tr.axes : [tr];
+    while (true) {                                      // advance whichever axis has the earliest pending event
+      let ai = -1, best = Infinity;
+      for (let a = 0; a < K; a++) if (axes[a].nextTime < ahead && axes[a].nextTime < best) { best = axes[a].nextTime; ai = a; }
+      if (ai < 0) break;
+      const prevCell = K === 2 ? axes.map(a => a.stage) : null;
+      emitEvent(tr, ai, moverNextEvent(tr, ai), prevCell);
+    }
+  }
+  timer = setTimeout(scheduler, LOOKAHEAD_MS);
+}
+function start() {
+  initAudio();
+  if (ctx.state === 'suspended') ctx.resume();
+  if (playing) return;
+  playing = true;
+  const t0 = ctx.currentTime + 0.05;
+  for (const tr of tracks) {
+    tr.startTime = tr.nextTime = tr.barStart = t0; tr.idx = firstIdx(tr); tr.accVal = 0; tr.accCount = 0; tr.accDir = 1; tr.dir = 1; tr.prevFreq = 0; tr.sched = [];
+    if (tr.k === 2) for (const ax of tr.axes) { ax.nextTime = t0; ax.idx = firstIdx(ax); ax.dir = 1; ax.stage = (ax.widthMode === 'abs' && ax.seq) ? ax.seq[ax.idx] : ax.idx; }
+  }
+  scheduler();
+  const b = document.getElementById('play'); b.classList.add('on'); b.textContent = '■ STOP';
+}
+function stop() {
+  playing = false;
+  if (timer) { clearTimeout(timer); timer = null; }
+  const b = document.getElementById('play'); b.classList.remove('on'); b.textContent = '▶ PLAY';
+}
+// The stage sounding now = the latest scheduled entry whose time has passed.
+// Reads the actual (order/rate-aware) schedule, not a forward time sweep.
+function currentStep(tr) {
+  if (!playing || !ctx || !tr.sched) return -1;
+  const now = ctx.currentTime; let s = -1;
+  for (const e of tr.sched) { if (e.t <= now) s = e.s; else break; }
+  return s;
+}
+// The cell tuple sounding now (k=2 viz reads both axis cursors); k=1 -> [stage].
+function currentCell(tr) {
+  if (!playing || !ctx || !tr.sched) return null;
+  const now = ctx.currentTime; let c = null;
+  for (const e of tr.sched) { if (e.t <= now) c = e.cell; else break; }
+  return c;
+}
+// Smooth cursor phase 0..1 within the cycle (for the continuous-mover ramp viz).
+function cursorPhase(tr) {
+  if (!playing || !ctx || tr.startTime == null) return -1;
+  let p = ((ctx.currentTime - tr.startTime) / cycleDur(tr)) % 1;
+  if (p < 0) p += 1;
+  return tr.order === 'rev' ? 1 - p : p;
+}
+
+/* ============================================================
+   Viz: one renderer per engine. Even Grid = equal bars; Weighted
+   Hold = unequal-width bars with the held value line.
+   ============================================================ */
+function fit(cv, W, H) {
+  const d = window.devicePixelRatio || 1;
+  cv.width = W * d; cv.height = H * d; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  const x = cv.getContext('2d'); x.scale(d, d); x.W = W; x.H = H; x.textBaseline = 'middle'; return x;
+}
+function label(x, s) { x.fillStyle = '#9aa3ad'; x.font = '12px ui-monospace,Menlo,monospace'; x.textAlign = 'left'; x.fillText(s, 14, 15); }
+function vdash(x, px, y1, y2) { x.save(); x.setLineDash([3, 3]); x.strokeStyle = '#cbd5e1'; x.lineWidth = 1; x.beginPath(); x.moveTo(px, y1); x.lineTo(px, y2); x.stroke(); x.restore(); }
+function playhead(x, px, top, base, col) {
+  x.strokeStyle = col; x.lineWidth = 1.5; x.beginPath(); x.moveTo(px, top - 5); x.lineTo(px, base + 13); x.stroke();
+  x.beginPath(); x.arc(px, top - 5, 3, 0, 7); x.fillStyle = col; x.fill();
+}
+// k=2 grid geometry — height follows the row count so cells stay readable (4x3 up to 8x8).
+// Each cell: label band (top) · value bar (set pitch by drag) · gate strip (click to mute).
+const GRID_TOP = 24, GRID_CH = 46, GRID_LABEL = 12, GRID_GATE = 13;
+function gridH(tr) { return GRID_TOP + tr.axes[1].steps * GRID_CH + 14; }
+function gridGeom(tr) {
+  const nx = tr.axes[0].steps, ny = tr.axes[1].steps, L0 = 14, R0 = VIZ_W - 14, top = GRID_TOP, base = top + ny * GRID_CH;
+  return { nx, ny, L0, R0, top, base, cw: (R0 - L0) / nx, ch: GRID_CH };
+}
+// Which cell + zone is under the cursor (gate strip vs value bar) and the degree the bar maps to.
+function cellHit(tr, mx, my) {
+  const g = gridGeom(tr), c = Math.floor((mx - g.L0) / g.cw), r = Math.floor((my - g.top) / g.ch);
+  if (c < 0 || c >= g.nx || r < 0 || r >= g.ny) return null;
+  const ct = g.top + r * g.ch, gateY = ct + g.ch - GRID_GATE, barT = ct + GRID_LABEL, barB = gateY - 3;
+  const f = (barB - my) / (barB - barT);
+  return { c, r, onGate: my >= gateY, deg: Math.max(0, Math.min(DEG_MAX, Math.round(f * DEG_MAX))) };
+}
+// Shared cell layer for both k=2 engines: note label, value bar (pitch), gate square (mute), current-cell ring.
+function drawGridCells(x, tr, g, cell) {
+  const sc = SCALES[masterScaleIdx];
+  for (let c = 0; c < g.nx; c++) for (let r = 0; r < g.ny; r++) {
+    const cx = g.L0 + c * g.cw, cy = g.top + r * g.ch, on = cell && cell[0] === c && cell[1] === r, gOn = tr.gateGrid[c][r];
+    const barT = cy + GRID_LABEL, gateY = cy + g.ch - GRID_GATE, barB = gateY - 3, v = tr.grid[c][r];
+    x.strokeStyle = '#eef2f7'; x.lineWidth = 1; x.strokeRect(cx, cy, g.cw, g.ch);
+    txt(x, noteName(degToFreq(v + tr.transpose, sc)), cx + g.cw / 2, cy + 8, on ? tr.col : (gOn ? '#6b7682' : '#c2c9d1'), 8.5, 'center');
+    if (gOn) { const h = (v / DEG_MAX) * (barB - barT); x.fillStyle = on ? tr.col : '#d4dae1'; x.fillRect(cx + 4, barB - h, g.cw - 8, h); }
+    gateSquare(x, cx + g.cw / 2, tr.col, gOn, gateY - 5);
+    if (on) { x.strokeStyle = tr.col; x.lineWidth = 2; x.strokeRect(cx, cy, g.cw, g.ch); }
+  }
+}
+// Real-valued cycle phase of one k=2 axis (for the continuous Vector Scan cursor).
+function axPhase(tr, ai) {
+  if (!playing || !ctx || tr.startTime == null) return -1;
+  let p = ((ctx.currentTime - tr.startTime) / cycleDur(tr.axes[ai])) % 1;
+  return p < 0 ? p + 1 : p;
+}
+const VIZ = {
+  evengrid(x, tr, ph) {
+    const W = x.W, L0 = 14, R0 = W - 14, top = VIZ_TOP, base = VIZ_BASE, n = tr.steps, cw = (R0 - L0) / n;
+    x.clearRect(0, 0, W, x.H); label(x, n + ' equal steps · one gate each');
+    const maxDeg = DEG_MAX;
+    for (let i = 0; i < n; i++) {
+      const cx = L0 + i * cw;
+      x.strokeStyle = '#eef2f7'; x.lineWidth = 1; x.strokeRect(cx, top, cw, base - top);
+      const h = (tr.values[i] / maxDeg) * (base - top), on = tr.gates[i];
+      x.fillStyle = i === ph ? tr.col : (on ? '#d4dae1' : '#eef2f7'); x.fillRect(cx + 2, base - h, cw - 4, h);
+      gateSquare(x, cx + cw / 2, tr.col, on);
+      colNote(x, tr, stageNote(tr, i), cx + cw / 2, VIZ_BASE + 24, i === ph ? tr.col : '#9aa3ad');
+    }
+    if (ph >= 0) playhead(x, L0 + (ph + 0.5) * cw, top, base, tr.col);
+  },
+  weighted(x, tr, ph) {
+    const W = x.W, L0 = 14, R0 = W - 14, top = VIZ_TOP, base = VIZ_BASE, span = R0 - L0;
+    x.clearRect(0, 0, W, x.H); label(x, 'unequal stage widths · value held');
+    const tot = tr.weights.reduce((a, b) => a + b, 0), maxDeg = DEG_MAX;
+    let acc = L0;
+    tr.weights.forEach((w, i) => {
+      const ww = span * w / tot, lvl = base - (tr.values[i] / maxDeg) * (base - top), on = tr.gates[i];
+      x.fillStyle = i === ph ? tr.col : (on ? '#d4dae1' : '#eef2f7'); x.fillRect(acc + 1, lvl, ww - 2, base - lvl);
+      vdash(x, acc, top, base);
+      x.strokeStyle = i === ph ? tr.col : (on ? '#9aa3ad' : '#cbd5e1'); x.lineWidth = 2;
+      x.beginPath(); x.moveTo(acc + 1, lvl); x.lineTo(acc + ww - 1, lvl); x.stroke();
+      gateSquare(x, acc + ww / 2, tr.col, on);
+      colNote(x, tr, stageNote(tr, i), acc + ww / 2, VIZ_BASE + 24, i === ph ? tr.col : '#9aa3ad');
+      if (ww > 46) txt(x, +(w / (4 * tr.rateMul)).toFixed(2) + '♩', acc + ww / 2, VIZ_TOP + 7, '#9aa3ad', 12, 'center'); // stage duration (hidden when the stage is too narrow)
+      acc += ww;
+    });
+    vdash(x, R0, top, base);
+    if (ph >= 0) {
+      const cs = tr.cumStart[ph] * span, half = (tr.weights[ph] / tot) * span / 2;
+      playhead(x, L0 + cs + half, top, base, tr.col);
+    }
+  },
+  rampmap(x, tr, ph) {
+    const W = x.W, L0 = 14, R0 = W - 14, n = tr.steps, cw = (R0 - L0) / n, span = R0 - L0;
+    x.clearRect(0, 0, W, x.H); label(x, 'f(X) value · X width · continuous ramp (DM)');
+    // RAMP sweep — thin time bar at the very top
+    const cp = cursorPhase(tr);
+    ln(x, L0, 20, R0, 20, '#eef2f7', 1);
+    if (cp >= 0) { x.save(); x.globalAlpha = 0.4; ln(x, L0, 20, L0 + cp * span, 20, tr.col, 2); x.restore(); x.fillStyle = tr.col; x.beginPath(); x.arc(L0 + cp * span, 20, 2.5, 0, 7); x.fill(); }
+    txt(x, 'f(X)', L0, RM.t1 - 4, '#b6bec7', 8); txt(x, tr.widthMode === 'abs' ? 'X (pos)' : 'X (len)', L0, RM.t2 - 4, '#b6bec7', 8);
+    const maxW = Math.max.apply(null, tr.weights) || 1;
+    for (let i = 0; i < n; i++) {
+      const cx = L0 + i * cw, on = tr.gates[i], hl = i === ph;
+      x.strokeStyle = '#eef2f7'; x.lineWidth = 1; x.strokeRect(cx, RM.t1, cw, RM.b1 - RM.t1);     // f(X) value fader
+      const vh = (tr.values[i] / DEG_MAX) * (RM.b1 - RM.t1);
+      x.fillStyle = hl ? tr.col : '#d4dae1'; x.fillRect(cx + 2, RM.b1 - vh, cw - 4, vh);
+      x.strokeStyle = '#eef2f7'; x.strokeRect(cx, RM.t2, cw, RM.b2 - RM.t2);                       // X fader: abs position | rel length
+      const fh = tr.widthMode === 'abs' ? tr.pos[i] : tr.weights[i] / maxW;
+      const wh = fh * (RM.b2 - RM.t2);
+      x.fillStyle = hl ? tr.col + 'aa' : '#dde3ea'; x.fillRect(cx + 2, RM.b2 - wh, cw - 4, wh);
+      markerRamp(x, cx + cw / 2, RM.b2, tr.col, on, tr.dirs[i]);
+      colNote(x, tr, stageNote(tr, i), cx + cw / 2, RM.b2 + 24, hl ? tr.col : '#9aa3ad');
+    }
+  },
+  pulsegrid(x, tr, ph) {
+    const W = x.W, L0 = 14, R0 = W - 14, n = tr.steps, cw = (R0 - L0) / n;
+    x.clearRect(0, 0, W, x.H); label(x, 'stages → pulses · gate type · Σp/ΣP · drag pulses · click gate');
+    for (let i = 0; i < n; i++) {
+      const cx = L0 + i * cw, hl = i === ph, gt = tr.pgate[i], P = tr.pulses[i];
+      x.strokeStyle = '#eef2f7'; x.lineWidth = 1; x.strokeRect(cx, PG.t1, cw, PG.b1 - PG.t1);   // value fader
+      const vh = (tr.values[i] / DEG_MAX) * (PG.b1 - PG.t1);
+      x.fillStyle = hl ? tr.col : '#d4dae1'; x.fillRect(cx + 2, PG.b1 - vh, cw - 4, vh);
+      txt(x, stageNote(tr, i), cx + cw / 2, PG.t1 - 4, hl ? tr.col : '#9aa3ad', 8.5, 'center');
+      x.strokeStyle = '#eef2f7'; x.strokeRect(cx, PG.t2, cw, PG.b2 - PG.t2);                     // pulse-count fader
+      const pf = (P / 8) * (PG.b2 - PG.t2);
+      x.fillStyle = hl ? tr.col + '22' : '#f1f4f8'; x.fillRect(cx + 2, PG.b2 - pf, cw - 4, pf);
+      for (let k = 0; k < P; k++) {                                                              // pulse subdivisions, drawn per gate type
+        const px = cx + (k + 0.5) * cw / P, c = hl ? tr.col : '#9aa3ad';
+        if (gt === 'rest') { x.strokeStyle = '#cbd5e1'; x.lineWidth = 1.2; x.beginPath(); x.moveTo(px - 3, PG.b2 - 14); x.lineTo(px + 3, PG.b2 - 6); x.moveTo(px - 3, PG.b2 - 6); x.lineTo(px + 3, PG.b2 - 14); x.stroke(); continue; }
+        if (gt === 'hold') { if (k === 0) { x.fillStyle = c; x.fillRect(cx + 3, PG.b2 - 14, cw - 6, 6); } continue; }
+        ln(x, px, PG.b2 - 4, px, PG.b2 - 16, (gt === 'single' ? k === 0 : true) ? c : '#d4dae1', 2);
+      }
+      txt(x, gt + '·' + P, cx + cw / 2, PG.b2 + 12, hl ? tr.col : '#9aa3ad', 8, 'center');
+    }
+    if (ph >= 0) playhead(x, L0 + (ph + 0.5) * cw, PG.t1, PG.b2, tr.col);
+  },
+  curvecloud(x, tr, ph) {
+    const W = x.W, L0 = 14, R0 = W - 14, n = tr.steps, cw = (R0 - L0) / n;
+    x.clearRect(0, 0, W, x.H); label(x, 'stages → curve density · φ(u;c) · drag density · ↔ curvature · square=rest');
+    for (let i = 0; i < n; i++) {
+      const cx = L0 + i * cw, hl = i === ph, D = tr.density[i], c = tr.curv[i], on = tr.gates[i];
+      x.strokeStyle = '#eef2f7'; x.lineWidth = 1; x.strokeRect(cx, PG.t1, cw, PG.b1 - PG.t1);   // value fader
+      const vh = (tr.values[i] / DEG_MAX) * (PG.b1 - PG.t1);
+      x.fillStyle = hl ? tr.col : (on ? '#d4dae1' : '#eef2f7'); x.fillRect(cx + 2, PG.b1 - vh, cw - 4, vh);
+      txt(x, stageNote(tr, i), cx + cw / 2, PG.t1 - 4, hl ? tr.col : '#9aa3ad', 8.5, 'center');
+      x.strokeStyle = '#eef2f7'; x.strokeRect(cx, PG.t2, cw, PG.b2 - PG.t2);                     // trigger box
+      x.strokeStyle = (hl ? tr.col : '#9aa3ad') + '66'; x.lineWidth = 1.2; x.beginPath();        // curve overlay
+      for (let u = 0; u <= 1.001; u += 0.04) { const px = cx + 2 + curveWarp(u, c) * (cw - 4), py = PG.b2 - u * (PG.b2 - PG.t2); u ? x.lineTo(px, py) : x.moveTo(px, py); }
+      x.stroke();
+      const trigCol = !on ? '#e5e9ee' : (hl ? tr.col : '#cbd5e1');                                // rested stage = dim triggers
+      for (let k = 1; k <= D; k++) { const px = cx + 2 + curveWarp(k / D, c) * (cw - 4); ln(x, px, PG.b2 - 3, px, PG.b2 - 12, trigCol, 1.4); }   // density triggers
+      gateSquare(x, cx + cw / 2, tr.col, on, PG.b2);                                              // per-stage rest toggle
+      txt(x, 'd' + D + ' c' + (c > 0 ? '+' : '') + c.toFixed(1), cx + cw / 2, PG.b2 + 26, hl ? tr.col : '#9aa3ad', 8, 'center');
+    }
+    if (ph >= 0) playhead(x, L0 + (ph + 0.5) * cw, PG.t1, PG.b2, tr.col);
+  },
+  gridwalk(x, tr) {
+    const g = gridGeom(tr), cell = currentCell(tr);
+    x.clearRect(0, 0, x.W, x.H);
+    label(x, g.nx + '×' + g.ny + ' grid · two clocks step X·Y → cell · drag=pitch · square=mute');
+    if (cell) {                                          // X column + Y row tints
+      x.save(); x.globalAlpha = 0.10; x.fillStyle = tr.col;
+      x.fillRect(g.L0 + cell[0] * g.cw, g.top, g.cw, g.base - g.top);
+      x.fillRect(g.L0, g.top + cell[1] * g.ch, g.R0 - g.L0, g.ch); x.restore();
+    }
+    drawGridCells(x, tr, g, cell);
+  },
+  vectorscan(x, tr) {
+    const g = gridGeom(tr), cell = currentCell(tr);
+    x.clearRect(0, 0, x.W, x.H);
+    label(x, g.nx + '×' + g.ny + ' grid · two continuous cursors → cell · drag=pitch · square=mute');
+    drawGridCells(x, tr, g, cell);
+    const cycX = cycleDur(tr.axes[0]), cycY = cycleDur(tr.axes[1]);   // ramp-trajectory path over the combined period
+    x.strokeStyle = tr.col + '55'; x.lineWidth = 1.3; x.beginPath();
+    const N = 240, span = cycX * tr.axes[1].steps; let lift = true;
+    for (let i = 0; i <= N; i++) {
+      const t = i / N * span, px = (t / cycX) % 1, py = (t / cycY) % 1;
+      const X = g.L0 + px * (g.R0 - g.L0), Y = g.top + py * (g.base - g.top);
+      if (lift) { x.moveTo(X, Y); lift = false; } else x.lineTo(X, Y);
+      if (((i + 1) / N * span / cycX) % 1 < (t / cycX) % 1 || ((i + 1) / N * span / cycY) % 1 < (t / cycY) % 1) lift = true;
+    }
+    x.stroke();
+    const phx = axPhase(tr, 0), phy = axPhase(tr, 1);    // live continuous cursor
+    if (phx >= 0) {
+      const X = g.L0 + phx * (g.R0 - g.L0), Y = g.top + phy * (g.base - g.top);
+      x.fillStyle = tr.col; x.beginPath(); x.arc(X, Y, 4, 0, 7); x.fill();
+    }
+  },
+};
+
+/* ============================================================
+   Accumulator staircase (live) + per-engine math glyph.
+   ============================================================ */
+function txt(x, s, px, py, col, sz, al) { x.fillStyle = col; x.font = Math.max(12, sz || 12) + 'px ui-monospace,Menlo,monospace'; x.textAlign = al || 'left'; x.fillText(s, px, py); }
+// Vertical label (bottom-to-top) at 12px — for per-column note names when the lane is too narrow for horizontal.
+function vtxt(x, s, px, py, col, sz) { x.save(); x.translate(px, py); x.rotate(-Math.PI / 2); x.fillStyle = col; x.font = Math.max(12, sz || 12) + 'px ui-monospace,Menlo,monospace'; x.textAlign = 'center'; x.fillText(s, 0, 0); x.restore(); }
+// Per-column note name: horizontal when wide enough (≤20 stages), else vertical — always ≥12px, never overlapping.
+function colNote(x, tr, s, cx, baseY, col) { if (tr.steps <= 20) txt(x, s, cx, baseY, col, 12, 'center'); else vtxt(x, s, cx, baseY + 6, col, 12); }
+function ln(x, a, b, c, d, col, w) { x.strokeStyle = col; x.lineWidth = w || 1; x.beginPath(); x.moveTo(a, b); x.lineTo(c, d); x.stroke(); }
+function drawAccum(x, tr) {
+  const W = x.W, H = x.H, L0 = 8, R0 = W - 8, top = 14, base = H - 12;
+  x.clearRect(0, 0, W, H);
+  txt(x, 'running transpose', L0, 8, '#9aa3ad', 8.5);
+  const step = tr.acc.step;
+  if (!step) { ln(x, L0, base, R0, base, '#eef2f7', 1); txt(x, 'no transpose', W / 2, (top + base) / 2, '#cbd5e1', 9.5, 'center'); return; }
+  const ticks = tr.steps, dx = (R0 - L0) / ticks, lim = tr.acc.limit || Math.abs(step) * 8;
+  const ord = tr.acc.order || 'wrap', pend = ord === 'pendulum';
+  const zeroY = pend ? (top + base) / 2 : (step >= 0 ? base : top);   // pendulum centres so ±limit fits; wrap baselines at edge
+  const yfor = v => zeroY - (v / lim) * ((base - top) * (pend ? 0.5 : 1));
+  ln(x, L0, zeroY, R0, zeroY, '#eef2f7', 1);          // zero line
+  const ext = yfor(step >= 0 ? lim : -lim);
+  x.save(); x.setLineDash([2, 3]); ln(x, L0, ext, R0, ext, tr.col + '66', 1); x.restore();
+  txt(x, tdeg(step >= 0 ? lim : -lim), R0, ext + (step >= 0 ? -2 : 8), tr.col, 8, 'right');
+  let acc = 0, dir = 1; const pts = [[L0, 0]];
+  for (let t = 1; t <= ticks; t++) {
+    if (t % tr.acc.every === 0) { acc += step * dir; if (lim && Math.abs(acc) >= lim) { if (pend) { acc = Math.sign(acc) * lim; dir = -dir; } else acc = 0; } }
+    pts.push([L0 + t * dx, acc]);
+  }
+  x.strokeStyle = tr.col; x.lineWidth = 1.7; x.beginPath();
+  pts.forEach((p, i) => { const X = p[0], Y = yfor(p[1]); if (!i) x.moveTo(X, Y); else { x.lineTo(X, yfor(pts[i - 1][1])); x.lineTo(X, Y); } });
+  x.stroke();
+}
+// Global clock: a gentle sweep over one bar, wrapping each bar.
+let clockCtx = null;
+function drawClock(x) {
+  const W = x.W, H = x.H, y = Math.round(H / 2) + 0.5;
+  x.clearRect(0, 0, W, H);
+  ln(x, 0, y, W, y, '#e7eaee', 1);
+  for (let b = 0; b <= 4; b++) { const bx = Math.min(W - 0.5, Math.round(b / 4 * W) + 0.5); ln(x, bx, y - 3, bx, y + 3, '#dde3ea', 1); }
+  if (!playing || !ctx || tracks[0].startTime == null) return;
+  const phase = (((ctx.currentTime - tracks[0].startTime) / (16 * sixteenthDur())) % 1 + 1) % 1;
+  const px = phase * W;
+  x.save(); x.globalAlpha = 0.4; ln(x, 0, y, px, y, '#2563eb', 2); x.restore();
+  x.fillStyle = '#2563eb'; x.beginPath(); x.arc(px, y, 3, 0, 7); x.fill();
+}
+function gcd(a, b) { return b ? gcd(b, a % b) : a; }
+const MATH = {
+  evengrid(x, tr) {
+    const n = tr ? tr.steps : 16, x0 = 14, x1 = x.W - 8, y0 = x.H - 22, y1 = 36, dx = (x1 - x0) / n, dy = (y0 - y1) / n;
+    txt(x, 'n=(n+1)%' + n, 12, 15, '#b6bec7', 9.5);
+    x.strokeStyle = '#cbd5e1'; x.lineWidth = 1.4; x.beginPath(); x.moveTo(x0, y0);
+    for (let i = 0; i < n; i++) { const xa = x0 + i * dx, ya = y0 - i * dy; x.lineTo(xa + dx, ya); x.lineTo(xa + dx, ya - dy); } x.stroke();
+    const s = playing && tr ? currentStep(tr) : -1;
+    if (s >= 0) { x.fillStyle = tr.col; x.beginPath(); x.arc(x0 + (s + 1) * dx, y0 - (s + 1) * dy, 3, 0, 7); x.fill(); }
+  },
+  weighted(x, tr) {
+    const x0 = 14, x1 = x.W - 8, y = 70;
+    txt(x, 'τ=Σwᵢ/W', 12, 15, '#b6bec7', 9.5);
+    ln(x, x0, y, x1, y, '#cbd5e1', 1.4);
+    const ws = tr ? tr.weights : [2, 1, 3, 1, 2, 1.5], W2 = ws.reduce((a, b) => a + b, 0);
+    let cum = 0; ws.forEach(w => { cum += w; const px = x0 + (x1 - x0) * cum / W2; ln(x, px, y - 7, px, y + 7, '#9aa3ad', 1.4); });
+    const s = playing && tr ? currentStep(tr) : -1;
+    if (s >= 0 && tr.cumStart) { const px = x0 + (x1 - x0) * tr.cumStart[s]; ln(x, px, y - 10, px, y + 10, tr.col, 1.4); x.fillStyle = tr.col; x.beginPath(); x.arc(px, y, 3.5, 0, 7); x.fill(); }
+    txt(x, 'uneven', x0, 92, '#b6bec7', 9);
+  },
+  rampmap(x, tr) {
+    const x0 = 14, x1 = x.W - 8, y0 = x.H - 22, y1 = 30;
+    txt(x, 'Φ=t/T · ' + (tr ? tr.steps : 0) + ' bands', 12, 15, '#b6bec7', 9.5);
+    if (tr && tr.cumStart) for (let i = 1; i < tr.cumStart.length; i++) {  // real band boundaries
+      const ty = y0 - tr.cumStart[i] * (y0 - y1); ln(x, x0, ty, x1, ty, '#eef2f7', 1);
+    }
+    ln(x, x0, y0, x1, y1, '#cbd5e1', 1.6);                                 // the ramp: phase vs time
+    const ph = playing && tr ? cursorPhase(tr) : -1;
+    if (ph >= 0) { x.fillStyle = tr.col; x.beginPath(); x.arc(x0 + ph * (x1 - x0), y0 - ph * (y0 - y1), 3.5, 0, 7); x.fill(); }
+  },
+  pulsegrid(x, tr) {
+    const n = tr ? tr.steps : 4, x0 = 14, x1 = x.W - 8, y = 68;
+    txt(x, 'Φ=Σp / ΣP', 12, 15, '#b6bec7', 9.5);
+    const sw = (x1 - x0) / n, s = playing && tr ? currentStep(tr) : -1;
+    for (let i = 0; i < n; i++) {
+      const sx = x0 + i * sw, P = tr ? tr.pulses[i] : 2, on = i === s, c = on ? tr.col : '#9aa3ad';
+      ln(x, sx, y - 9, sx, y + 9, c, 1.4);
+      for (let k = 0; k < P; k++) { const px = sx + (k + 0.5) * sw / P; ln(x, px, y - 4, px, y + 4, on ? tr.col : '#cbd5e1', 1.2); }
+    }
+    ln(x, x1, y - 9, x1, y + 9, '#9aa3ad', 1.4);
+    txt(x, 'stage·pulse', x0, 92, '#b6bec7', 9);
+  },
+  curvecloud(x, tr) {
+    const x0 = 14, x1 = x.W - 8, y0 = x.H - 22, y1 = 32, col = tr ? tr.col : '#db2777';
+    txt(x, 'φ(u;c)', 12, 15, '#b6bec7', 9.5);
+    const s = playing && tr ? currentStep(tr) : -1, c = tr ? tr.curv[s >= 0 ? s : 0] : 6;
+    ln(x, x0, y0, x1, y1, '#eef2f7', 1);
+    x.strokeStyle = col + '99'; x.lineWidth = 1.6; x.beginPath();
+    for (let u = 0; u <= 1.001; u += 0.03) { const px = x0 + curveWarp(u, c) * (x1 - x0), py = y0 - u * (y0 - y1); u ? x.lineTo(px, py) : x.moveTo(px, py); }
+    x.stroke();
+    txt(x, 'c=' + (c > 0 ? '+' : '') + c.toFixed(1), x0, 92, '#b6bec7', 9);
+  },
+  gridwalk(x, tr) {
+    const nx = tr ? tr.axes[0].steps : 4, ny = tr ? tr.axes[1].steps : 3, col = tr ? tr.col : '#16a34a';
+    txt(x, 'lcm(' + nx + ',' + ny + ')=' + (nx * ny / gcd(nx, ny)), 12, 15, '#b6bec7', 9.5);
+    const cell = playing && tr ? currentCell(tr) : null;
+    txt(x, 'nx 0..' + (nx - 1), 14, 52, '#b6bec7', 9); txt(x, 'ny 0..' + (ny - 1), 14, 76, '#b6bec7', 9);
+    const x0 = 70, x1 = x.W - 8, sx = Math.min(12, (x1 - x0) / Math.max(1, nx - 1)), sy = Math.min(12, (x1 - x0) / Math.max(1, ny - 1));
+    for (let i = 0; i < nx; i++) { const on = cell && cell[0] === i; x.fillStyle = on ? col : '#cbd5e1'; x.beginPath(); x.arc(x0 + i * sx, 52, on ? 3 : 2, 0, 7); x.fill(); }
+    for (let i = 0; i < ny; i++) { const on = cell && cell[1] === i; x.fillStyle = on ? col : '#cbd5e1'; x.beginPath(); x.arc(x0 + i * sy, 76, on ? 3 : 2, 0, 7); x.fill(); }
+  },
+  vectorscan(x, tr) {
+    const col = tr ? tr.col : '#ca8a04', bx = 14, by = 28, bw = x.W - 22, bh = x.H - 44;
+    const rx = tr ? +tr.axes[0].rateMul.toFixed(2) : 1, ry = tr ? +tr.axes[1].rateMul.toFixed(2) : 1.5;
+    txt(x, 'Φx:Φy = ' + rx + ':' + ry, 12, 15, '#b6bec7', 9.5);
+    x.strokeStyle = '#eef2f7'; x.lineWidth = 1; x.strokeRect(bx, by, bw, bh);
+    if (tr) {
+      const cycX = cycleDur(tr.axes[0]), cycY = cycleDur(tr.axes[1]), N = 200, span = cycX * tr.axes[1].steps;
+      x.strokeStyle = col + '88'; x.lineWidth = 1.3; x.beginPath(); let lift = true;   // real linear (Φx,Φy) path
+      for (let i = 0; i <= N; i++) {
+        const t = i / N * span, px = (t / cycX) % 1, py = (t / cycY) % 1, X = bx + px * bw, Y = by + py * bh;
+        if (lift) { x.moveTo(X, Y); lift = false; } else x.lineTo(X, Y);
+        if (((i + 1) / N * span / cycX) % 1 < px || ((i + 1) / N * span / cycY) % 1 < py) lift = true;
+      }
+      x.stroke();
+      const phx = playing ? axPhase(tr, 0) : -1;
+      if (phx >= 0) { x.fillStyle = col; x.beginPath(); x.arc(bx + phx * bw, by + axPhase(tr, 1) * bh, 4, 0, 7); x.fill(); }
+    }
+  },
+};
+
+/* ============================================================
+   Editing: paint a stage's degree by clicking/dragging in the
+   lane (x -> stage via cumStart fractions, y -> degree). cumStart
+   is uniform for Even Grid, free for Weighted Hold — same hit-test.
+   ============================================================ */
+const VIZ_W = 632, VIZ_TOP = 26, VIZ_BASE = 98, GATE_SQ = 10;
+let painting = null;
+function stageAtX(tr, mx) {
+  const L0 = 14, span = VIZ_W - 14 - L0, frac = (mx - L0) / span;
+  if (frac < 0 || frac > 1) return -1;
+  let s = 0;
+  for (let i = 0; i < tr.cumStart.length; i++) { if (frac >= tr.cumStart[i]) s = i; else break; }
+  return s;
+}
+function paintDegree(tr, mx, my) {
+  const s = stageAtX(tr, mx);
+  if (s < 0) return;
+  tr.values[s] = Math.max(0, Math.min(DEG_MAX, Math.round((VIZ_BASE - my) / (VIZ_BASE - VIZ_TOP) * DEG_MAX)));
+}
+// Flat per-stage gate cycles off → on → tie (tie = held into the next stage, no re-attack).
+function toggleGate(tr, mx) { const s = stageAtX(tr, mx); if (s < 0) return; const g = tr.gates[s]; tr.gates[s] = g === false ? true : g === true ? 'tie' : false; }
+// k=2 drag in the bar region sets the cell's degree (gate strip is toggled on mousedown, not drag).
+function paintCell(tr, mx, my) { const h = cellHit(tr, mx, my); if (h && !h.onGate) tr.grid[h.c][h.r] = h.deg; }
+function gateSquare(x, cx, col, on, baseY) {
+  const g = GATE_SQ, gx = cx - g / 2, gy = (baseY == null ? VIZ_BASE : baseY) + 5;
+  if (on === 'tie') {                                        // filled square + tail = held into the next stage
+    x.fillStyle = col; x.fillRect(gx, gy, g, g);
+    x.strokeStyle = col; x.lineWidth = 2; x.beginPath(); x.moveTo(gx + g, gy + g / 2); x.lineTo(gx + g + 7, gy + g / 2); x.stroke();
+  } else if (on) { x.fillStyle = col; x.fillRect(gx, gy, g, g); }
+  else { x.strokeStyle = '#cbd5e1'; x.lineWidth = 1.2; x.strokeRect(gx + 0.5, gy + 0.5, g - 1, g - 1); }
+}
+// Ramp Map (DM) two-row layout: f(X) value faders over X width faders. Taller track.
+const RM = { t1: 30, b1: 82, t2: 98, b2: 146, h: 196 };
+let rampDrag = null;
+function stageAtCol(tr, mx) { const cw = (VIZ_W - 28) / tr.steps, i = Math.floor((mx - 14) / cw); return i < 0 || i >= tr.steps ? -1 : i; }
+function paintRampValue(tr, mx, my) { const s = stageAtCol(tr, mx); if (s >= 0) tr.values[s] = Math.max(0, Math.min(DEG_MAX, Math.round((RM.b1 - my) / (RM.b1 - RM.t1) * DEG_MAX))); }
+function setRampWeight(tr, mx, my) {
+  const s = stageAtCol(tr, mx); if (s < 0) return;
+  const f = Math.max(0, Math.min(1, (RM.b2 - my) / (RM.b2 - RM.t2)));
+  if (tr.widthMode === 'len') {                          // relative: this weight, others redistribute
+    tr.weights[s] = +(Math.max(0.05, f) * 4).toFixed(2);
+    rebuildPlacement(tr);
+  } else {                                               // absolute: independent free position; play order re-sorts
+    tr.pos[s] = Math.max(0, Math.min(0.999, f));
+    rebuildAbs(tr);
+  }
+}
+// Per-stage marker cycles off -> both(square) -> up(▲) -> down(▼) -> off.
+function cycleRampGate(tr, s) {
+  if (!tr.gates[s]) { tr.gates[s] = true; tr.dirs[s] = 'both'; }
+  else if (tr.dirs[s] === 'both') tr.dirs[s] = 'up';
+  else if (tr.dirs[s] === 'up') tr.dirs[s] = 'down';
+  else tr.gates[s] = false;
+}
+function markerRamp(x, cx, baseY, col, gate, dir) {
+  const g = GATE_SQ, gy = baseY + 5;
+  if (!gate) { x.strokeStyle = '#cbd5e1'; x.lineWidth = 1.2; x.strokeRect(cx - g / 2 + 0.5, gy + 0.5, g - 1, g - 1); return; }
+  x.fillStyle = col; x.beginPath();
+  if (dir === 'up') { x.moveTo(cx, gy); x.lineTo(cx + g / 2, gy + g); x.lineTo(cx - g / 2, gy + g); x.closePath(); x.fill(); }
+  else if (dir === 'down') { x.moveTo(cx, gy + g); x.lineTo(cx + g / 2, gy); x.lineTo(cx - g / 2, gy); x.closePath(); x.fill(); }
+  else x.fillRect(cx - g / 2, gy, g, g);
+}
+function rampMouseDown(tr, e) {
+  const my = e.offsetY;
+  if (my <= RM.b1 + 4) { rampDrag = { tr, mode: 'value' }; paintRampValue(tr, e.offsetX, my); }
+  else if (my <= RM.b2 + 4) { rampDrag = { tr, mode: 'weight' }; setRampWeight(tr, e.offsetX, my); }
+  else { const s = stageAtCol(tr, e.offsetX); if (s >= 0) cycleRampGate(tr, s); }
+}
+// Pulse Grid (depth-2) two-row editing: value faders over pulse-count faders; gate type cycles below.
+const PG = { t1: 28, b1: 74, t2: 90, b2: 132, h: 166 };
+const PGATES = ['single', 'multi', 'hold', 'rest'];
+let pgDrag = null;
+function paintPGvalue(tr, mx, my) { const s = stageAtCol(tr, mx); if (s >= 0) tr.values[s] = Math.max(0, Math.min(DEG_MAX, Math.round((PG.b1 - my) / (PG.b1 - PG.t1) * DEG_MAX))); }
+function setPGpulses(tr, mx, my) { const s = stageAtCol(tr, mx); if (s >= 0) tr.pulses[s] = Math.max(1, Math.min(8, Math.round((PG.b2 - my) / (PG.b2 - PG.t2) * 8))); }
+function cyclePGgate(tr, s) { tr.pgate[s] = PGATES[(PGATES.indexOf(tr.pgate[s]) + 1) % PGATES.length]; }
+function pgMouseDown(tr, e) {
+  const my = e.offsetY;
+  if (my <= PG.b1 + 4) { pgDrag = { tr, mode: 'value' }; paintPGvalue(tr, e.offsetX, my); }
+  else if (my <= PG.b2 + 4) { pgDrag = { tr, mode: 'pulses' }; setPGpulses(tr, e.offsetX, my); }
+  else { const s = stageAtCol(tr, e.offsetX); if (s >= 0) cyclePGgate(tr, s); }
+}
+// Curve Cloud: value fader (row 1) · trigger box (row 2): drag vertical = density, horizontal = curvature.
+let ccDrag = null;
+function setCCdensity(tr, s, my) { tr.density[s] = Math.max(1, Math.min(16, Math.round((PG.b2 - my) / (PG.b2 - PG.t2) * 16))); }
+function ccMouseDown(tr, e) {
+  const my = e.offsetY;
+  if (my <= PG.b1 + 4) { ccDrag = { tr, mode: 'value' }; paintPGvalue(tr, e.offsetX, my); }
+  else if (my <= PG.b2 + 4) { const s = stageAtCol(tr, e.offsetX); if (s >= 0) { ccDrag = { tr, mode: 'trig', stage: s, startX: e.offsetX, startCurv: tr.curv[s] }; setCCdensity(tr, s, my); } }
+  else { const s = stageAtCol(tr, e.offsetX); if (s >= 0) tr.gates[s] = !tr.gates[s]; }   // square row = per-stage rest
+}
+function ccMove(tr, mx, my) {
+  if (!ccDrag || ccDrag.tr !== tr) return;
+  if (ccDrag.mode === 'value') { paintPGvalue(tr, mx, my); return; }
+  const s = ccDrag.stage; setCCdensity(tr, s, my);
+  tr.curv[s] = Math.max(-8, Math.min(8, ccDrag.startCurv + (mx - ccDrag.startX) / 16));
+}
+// Stage-width editing: drag a stage boundary to repartition the two adjacent weights
+// (their sum stays fixed, so other stages are untouched). Free-placement engines only.
+let _wdrag = null;
+const VIZ_SPAN = VIZ_W - 28;
+function boundaryAtX(tr, mx) {
+  for (let i = 1; i < tr.steps; i++) { if (Math.abs(mx - (14 + tr.cumStart[i] * VIZ_SPAN)) < 5) return i; }
+  return -1;
+}
+function startWeightDrag(tr, bi) {
+  const R = bi + 1 <= tr.steps - 1 ? tr.cumStart[bi + 1] : 1;
+  _wdrag = { tr, bi, L: tr.cumStart[bi - 1], R, combo: tr.weights[bi - 1] + tr.weights[bi] };
+}
+function weightDragMove(mx) {
+  const w = _wdrag, min = 0.04;
+  let f = Math.min(w.R - min, Math.max(w.L + min, (mx - 14) / VIZ_SPAN));
+  const ratio = (f - w.L) / (w.R - w.L);
+  w.tr.weights[w.bi - 1] = w.combo * ratio;
+  w.tr.weights[w.bi] = w.combo * (1 - ratio);
+  rebuildPlacement(w.tr);
+}
+
+/* ============================================================
+   Build + transport. Track = tuning · viz · accumulator · math,
+   plus a footer chip strip (mover/wrap params).
+   ============================================================ */
+const RATES = [{ m: 0.25, l: '÷4' }, { m: 1 / 3, l: '÷3' }, { m: 0.5, l: '÷2' }, { m: 1, l: '×1' }, { m: 2, l: '×2' }, { m: 3, l: '×3' }, { m: 4, l: '×4' }];
+const ORDERS = [{ v: 'fwd', l: '→' }, { v: 'rev', l: '←' }, { v: 'ping', l: '↺' }];
+const LIMITS = [0, 4, 7, 12, 24];
+const RESETS = [0, 1, 2, 3, 4, 8];
+const tdeg = n => (n >= 0 ? '+' : '') + n + '°';
+const rateLab = m => (RATES.find(o => Math.abs(o.m - m) < 1e-6) || RATES[3]).l;
+const orderLab = v => (ORDERS.find(o => o.v === v) || ORDERS[0]).l;
+// Unified vertical drag-scrub: press + drag up = more, down = less; release commits;
+// a click without drag nudges to the next value. One mechanism for every value control.
+let _scrub = null;
+function scrubMove(e) {
+  if (!_scrub) return;
+  const s = _scrub, sp = s.spec, dy = s.startY - e.clientY;
+  if (Math.abs(dy) > 2) s.moved = true;
+  const n = Math.round(dy / (sp.px || 6));
+  if (sp.opts) { const i0 = Math.max(0, sp.opts.indexOf(s.startVal)); sp.set(sp.opts[Math.min(sp.opts.length - 1, Math.max(0, i0 + n))]); }
+  else sp.set(Math.min(sp.max, Math.max(sp.min, s.startVal + n * sp.step)));
+  sp.render();
+}
+function scrubEnd() {
+  if (_scrub && !_scrub.moved) {
+    const sp = _scrub.spec;
+    if (sp.opts) { const i = (Math.max(0, sp.opts.indexOf(sp.get())) + 1) % sp.opts.length; sp.set(sp.opts[i]); }
+    else sp.set(sp.get() + sp.step > sp.max ? sp.min : sp.get() + sp.step);
+    sp.render();
+  }
+  _scrub = null;
+}
+function makeScrub(el, sp) {
+  sp.fvEl = el.querySelector('.fv') || el;
+  sp.render = () => { sp.fvEl.textContent = sp.fmt(sp.get()); };
+  sp.render(); el.classList.add('scrub');
+  el.addEventListener('mousedown', e => { e.preventDefault(); _scrub = { spec: sp, startY: e.clientY, startVal: sp.get(), moved: false }; });
+}
+function refreshTrackControls(tr) { if (tr._specs) for (const k in tr._specs) tr._specs[k].render && tr._specs[k].render(); }
+function controlSpecs(tr) {
+  const s = {
+    stages: { get: () => tr.steps, set: v => { setStageCount(tr, v); refreshTrackControls(tr); }, min: 1, max: 32, step: 1, fmt: v => '' + v },
+    gate: { get: () => Math.round(tr.gate * 100), set: v => tr.gate = v / 100, min: 5, max: 100, step: 1, px: 2, fmt: v => v + '%' },
+    transpose: { get: () => tr.transpose, set: v => tr.transpose = v, min: -7, max: 14, step: 1, px: 5, fmt: tdeg },
+    rate: tr.mover === 'continuous'
+      ? { get: () => tr.rateMul, set: v => tr.rateMul = v, min: 0.25, max: 4, step: 0.05, px: 4, fmt: v => '×' + v.toFixed(2) }
+      : { get: () => tr.rateMul, set: v => tr.rateMul = v, opts: RATES.map(o => o.m), fmt: rateLab },
+    order: { get: () => tr.order, set: v => { tr.order = v; tr.dir = 1; }, opts: ['fwd', 'rev', 'ping'], fmt: orderLab },
+    first: { get: () => tr.first, set: v => { tr.first = Math.min(v, tr.last); }, min: 0, max: 31, step: 1, fmt: v => '' + (v + 1) },
+    last: { get: () => tr.last, set: v => { tr.last = Math.max(Math.min(v, tr.steps - 1), tr.first); }, min: 0, max: 31, step: 1, fmt: v => '' + (v + 1) },
+    reset: { get: () => tr.reset, set: v => tr.reset = v, opts: RESETS, fmt: v => v === 0 ? 'off' : v + (v === 1 ? ' bar' : ' bars') },
+    slide: { get: () => tr.slide, set: v => tr.slide = v, opts: [false, true], fmt: v => v ? 'on' : 'off' },
+    voiceOn: { get: () => tr.vmod.on, set: v => tr.vmod.on = v, opts: [false, true], fmt: v => v ? 'on' : 'off' },
+    voiceCut: { get: () => tr.vmod.cut, set: v => tr.vmod.cut = v, min: -1, max: 1, step: 0.05, px: 4, fmt: v => (v > 0 ? '+' : '') + v.toFixed(2) },
+    voiceAmp: { get: () => tr.vmod.amp, set: v => tr.vmod.amp = v, min: -1, max: 1, step: 0.05, px: 4, fmt: v => (v > 0 ? '+' : '') + v.toFixed(2) },
+    voiceTarget: { get: () => tr.vmod.target == null ? tracks.indexOf(tr) : tr.vmod.target, set: v => tr.vmod.target = v, opts: tracks.map((_, i) => i), fmt: v => 'tk' + (v + 1) },
+    step: { get: () => tr.acc.step, set: v => tr.acc.step = v, min: -7, max: 7, step: 1, fmt: tdeg },
+    advance: { get: () => tr.acc.advanceAt || 'stage', set: v => tr.acc.advanceAt = v, opts: ['stage', 'pulse'], fmt: v => v === 'pulse' ? 'Pulse' : 'Stage' },
+    every: { get: () => tr.acc.every, set: v => tr.acc.every = v, min: 1, max: 8, step: 1, fmt: v => '' + v },
+    limit: { get: () => tr.acc.limit, set: v => tr.acc.limit = v, opts: LIMITS, fmt: v => v ? v + '°' : 'off' },
+    accOrder: { get: () => tr.acc.order || 'wrap', set: v => tr.acc.order = v, opts: ['wrap', 'pendulum'], fmt: v => v === 'pendulum' ? 'Pend' : 'Wrap' },
+  };
+  if (tr.custom) {                                       // Custom exposes the dimensions the presets pin
+    s.k = { get: () => tr.k || 1, set: v => morphCustom(tr, 'k', v), opts: [1, 2], fmt: v => 'k=' + v };
+    s.mover = { get: () => tr.mover, set: v => morphCustom(tr, 'mover', v), opts: ['stepped', 'continuous'], fmt: v => v === 'continuous' ? 'cont' : 'step' };
+    if ((tr.k || 1) === 1) {                              // nesting is a k=1 capability here (no k=2 nested engine)
+      s.depth = { get: () => tr.depth || 1, set: v => morphCustom(tr, 'depth', v), opts: [1, 2], fmt: v => '' + v };
+      if ((tr.depth || 1) === 2) s.child = { get: () => tr.childMode || 'pulse', set: v => morphCustom(tr, 'child', v), opts: ['pulse', 'curve'], fmt: v => v };
+    }
+  }
+  if (tr.viz === 'rampmap') s.xmode = {
+    get: () => tr.widthMode,
+    set: v => {
+      if (v === 'abs') { tr.pos = tr.cumStart.slice(); tr.widthMode = 'abs'; rebuildAbs(tr); }
+      else { if (tr.seq && tr.gap) { const w = tr.weights.slice(); tr.seq.forEach((st, r) => w[st] = tr.gap[r] * tr.steps); tr.weights = w; } tr.widthMode = 'len'; rebuildPlacement(tr); }
+    },
+    opts: ['abs', 'len'], fmt: v => v === 'abs' ? 'absolute' : 'length'
+  };
+  if (tr.k === 2) {                                      // each axis its own rate (stepped = ÷n/×n divisions, continuous = fine ratio)
+    const rspec = ai => tr.axes[ai].mover === 'continuous'   // get/set look up the axis live (resize replaces the object)
+      ? { get: () => tr.axes[ai].rateMul, set: v => tr.axes[ai].rateMul = v, min: 0.25, max: 4, step: 0.05, px: 4, fmt: v => '×' + v.toFixed(2) }
+      : { get: () => tr.axes[ai].rateMul, set: v => tr.axes[ai].rateMul = v, opts: RATES.map(o => o.m), fmt: rateLab };
+    s.rateX = rspec(0); s.rateY = rspec(1);
+    s.lenX = { get: () => tr.axes[0].steps, set: v => { setGridDim(tr, 0, v); refreshTrackControls(tr); }, min: 2, max: 8, step: 1, fmt: v => '' + v };
+    s.lenY = { get: () => tr.axes[1].steps, set: v => { setGridDim(tr, 1, v); refreshTrackControls(tr); }, min: 2, max: 8, step: 1, fmt: v => '' + v };
+    s.order = { get: () => tr.order, set: v => { tr.order = v; for (const ax of tr.axes) { ax.order = v; ax.dir = 1; } }, opts: ['fwd', 'rev', 'ping'], fmt: orderLab };
+    s.gateSource = { get: () => tr.gateSource, set: v => tr.gateSource = v, opts: ['x', 'y', 'cell'], fmt: v => v === 'cell' ? 'cell' : v.toUpperCase() };
+  }
+  return s;
+}
+function lcm(a, b) { return a * b / gcd(a, b); }
+// A track's pattern length in stages: k=2 cell trajectory = lcm of the two axis lengths.
+function trackLen(tr) { return tr.k === 2 ? lcm(tr.axes[0].steps, tr.axes[1].steps) : tr.steps; }
+// Master cycle = lcm of every track's length — the stages before the whole frame repeats.
+function masterCycle() { return tracks.reduce((m, tr) => lcm(m, trackLen(tr)), 1); }
+// Build one track's row and wire its controls; returns the node. reloadTrack swaps it in
+// place, so any slot can host any preset (the slot index stays; name/colour/viz come from the preset).
+function buildTrack(tr, i) {
+    const d = document.createElement('div'); d.className = 'track'; d.style.borderLeftColor = tr.col;
+    const accRow = (k, lab) => '<div class="cr"><span class="cl">' + lab + '</span><span class="cv" data-k="' + k + '"></span></div>';
+    const reloadSel = '<select class="reload" title="reload this slot from a preset">' + PRESET_ORDER.map(id =>
+      '<option value="' + id + '"' + (id === tr.presetId ? ' selected' : '') + '>' + PRESET_NAMES[id] + '</option>').join('') + '</select>';
+    d.innerHTML =
+      '<div class="thead"><span class="idx" style="background:' + tr.col + '">' + (i + 1) +
+      '</span>' + reloadSel + '<span class="tag">' + tr.tag + '</span><span class="solo">SOLO</span><span class="on">ON</span></div>' +
+      '<div class="tbody">' +
+        '<div class="eparams">' +
+          (tr.custom
+            ? '<div class="seg"><div class="elab">k axes</div><div class="cr"><span class="cv" data-k="k"></span></div></div>' +
+              '<div class="seg"><div class="elab">mover</div><div class="cr"><span class="cv" data-k="mover"></span></div></div>' +
+              ((tr.k || 1) === 1 ? '<div class="seg"><div class="elab">depth</div><div class="cr"><span class="cv" data-k="depth"></span></div></div>' : '') +
+              ((tr.k || 1) === 1 && (tr.depth || 1) === 2 ? '<div class="seg"><div class="elab">child</div><div class="cr"><span class="cv" data-k="child"></span></div></div>' : '')
+            : '') +
+          (tr.k === 2
+            ? '<div class="seg"><div class="elab">cols</div><div class="cr"><span class="cv" data-k="lenX"></span></div></div>' +
+              '<div class="seg"><div class="elab">rows</div><div class="cr"><span class="cv" data-k="lenY"></span></div></div>'
+            : '<div class="seg"><div class="elab">stages</div><div class="cr"><span class="cv" data-k="stages">' + tr.steps + '</span></div></div>') +
+          '<div class="seg"><div class="elab">gate</div><div class="cr"><span class="cv" data-k="gate"></span></div></div>' +
+          '<div class="seg"><div class="elab">transpose</div><div class="cr"><span class="cv" data-k="transpose"></span></div></div>' +
+        '</div>' +
+        '<div class="vizwrap"><canvas class="viz"></canvas></div>' +
+        '<div class="accwrap">' +
+          '<div class="acchead"><span class="elab">note accumulator</span><span class="accoff" style="color:' + tr.col + '">+0°</span></div>' +
+          '<canvas class="acc"></canvas>' +
+          '<div class="accgrid">' + accRow('step', 'Step') + accRow('advance', 'Advance') + accRow('every', 'Every') + accRow('limit', 'Limit') + accRow('accOrder', 'Order') + '</div>' +
+        '</div>' +
+        '<div class="mathwrap"><canvas class="math"></canvas></div>' +
+        '<div class="vmodwrap">' +
+          '<div class="elab">voice mod</div>' +
+          '<div class="seg"><div class="cr"><span class="cl">drive</span><span class="cv" data-k="voiceOn"></span></div></div>' +
+          '<div class="seg"><div class="cr"><span class="cl">cutoff</span><span class="cv" data-k="voiceCut"></span></div></div>' +
+          '<div class="seg"><div class="cr"><span class="cl">amp</span><span class="cv" data-k="voiceAmp"></span></div></div>' +
+          '<div class="seg"><div class="cr"><span class="cl">voice</span><span class="cv" data-k="voiceTarget"></span></div></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="tfoot">' +
+        (tr.k === 2
+          ? '<span class="fchip" data-k="rateX"><span class="fk">Rate X</span><span class="fv"></span></span>' +
+            '<span class="fchip" data-k="rateY"><span class="fk">Rate Y</span><span class="fv"></span></span>'
+          : '<span class="fchip" data-k="rate"><span class="fk">Rate</span><span class="fv"></span></span>') +
+        '<span class="fchip" data-k="order"><span class="fk">Order</span><span class="fv"></span></span>' +
+        (tr.k === 2
+          ? '<span class="fchip" data-k="gateSource"><span class="fk">Gate</span><span class="fv"></span></span>'
+          : '<span class="fchip" data-k="first"><span class="fk">First</span><span class="fv"></span></span>' +
+            '<span class="fchip" data-k="last"><span class="fk">Last</span><span class="fv"></span></span>') +
+        '<span class="fchip" data-k="reset"><span class="fk">Reset</span><span class="fv"></span></span>' +
+        '<span class="fchip" data-k="slide"><span class="fk">Slide</span><span class="fv"></span></span>' +
+        (tr.viz === 'rampmap' ? '<span class="fchip" data-k="xmode"><span class="fk">X-mode</span><span class="fv"></span></span>' : '') +
+        '<span class="fsep"></span>' +
+        '<span class="fchip"><span class="fk">Scale</span><span class="fv scaleInh">' + SCALE_NAMES[masterScaleIdx] + '</span></span>' +
+      '</div>';
+    tr.el = d;
+    tr.vizEl = d.querySelector('.viz');
+    tr.vizCtx = fit(tr.vizEl, VIZ_W, tr.viz === 'rampmap' ? RM.h : tr.viz === 'pulsegrid' || tr.viz === 'curvecloud' ? PG.h : tr.k === 2 ? gridH(tr) : 150);
+    tr.accCtx = fit(d.querySelector('.acc'), 238, 78);
+    tr.mathCtx = fit(d.querySelector('.math'), 150, 120);
+    tr.accoffEl = d.querySelector('.accoff');
+    tr.scaleInhEl = d.querySelector('.scaleInh');
+
+    const badge = d.querySelector('.on');
+    const syncOn = () => { badge.textContent = tr.on ? 'ON' : 'OFF'; badge.classList.toggle('off', !tr.on); d.classList.toggle('off', !tr.on); };
+    syncOn();                                            // reflect the muted-by-default state
+    badge.addEventListener('click', () => { tr.on = !tr.on; syncOn(); });
+    const soloBadge = d.querySelector('.solo');
+    soloBadge.classList.toggle('act', tr.solo);
+    soloBadge.addEventListener('click', () => {
+      tr.solo = !tr.solo; soloBadge.classList.toggle('act', tr.solo);
+      if (tr.solo) { tr.on = true; syncOn(); }            // soloing un-mutes the track
+    });
+    // every value control = one drag-scrub mechanism
+    const specs = controlSpecs(tr); tr._specs = specs;
+    for (const k in specs) { const el = d.querySelector('[data-k="' + k + '"]'); if (el) makeScrub(el, specs[k]); }
+    const cv = d.querySelector('.viz');
+    cv.addEventListener('mousedown', e => {
+      if (tr.k === 2) { const h = cellHit(tr, e.offsetX, e.offsetY); if (h) { if (h.onGate) tr.gateGrid[h.c][h.r] = !tr.gateGrid[h.c][h.r]; else { painting = tr; tr.grid[h.c][h.r] = h.deg; } } return; }
+      if (tr.viz === 'rampmap') { rampMouseDown(tr, e); return; }
+      if (tr.viz === 'pulsegrid') { pgMouseDown(tr, e); return; }
+      if (tr.viz === 'curvecloud') { ccMouseDown(tr, e); return; }
+      if (tr.viz === 'weighted') { const bi = boundaryAtX(tr, e.offsetX); if (bi >= 0) { startWeightDrag(tr, bi); return; } }
+      if (e.offsetY > VIZ_BASE + 2) { toggleGate(tr, e.offsetX); }
+      else { painting = tr; paintDegree(tr, e.offsetX, e.offsetY); }
+    });
+    cv.addEventListener('mousemove', e => {
+      if (tr.k === 2) { if (painting === tr) paintCell(tr, e.offsetX, e.offsetY); return; }
+      if (tr.viz === 'rampmap') { if (rampDrag && rampDrag.tr === tr) { rampDrag.mode === 'value' ? paintRampValue(tr, e.offsetX, e.offsetY) : setRampWeight(tr, e.offsetX, e.offsetY); } return; }
+      if (tr.viz === 'pulsegrid') { if (pgDrag && pgDrag.tr === tr) { pgDrag.mode === 'value' ? paintPGvalue(tr, e.offsetX, e.offsetY) : setPGpulses(tr, e.offsetX, e.offsetY); } return; }
+      if (tr.viz === 'curvecloud') { ccMove(tr, e.offsetX, e.offsetY); return; }
+      if (_wdrag && _wdrag.tr === tr) { weightDragMove(e.offsetX); return; }
+      if (painting === tr) { paintDegree(tr, e.offsetX, e.offsetY); return; }
+      if (tr.viz === 'weighted') cv.style.cursor = boundaryAtX(tr, e.offsetX) >= 0 ? 'ew-resize' : 'crosshair';
+    });
+    d.querySelector('.reload').addEventListener('change', e => reloadTrack(i, e.target.value));
+    return d;
+}
+// Custom is an unconstrained config; its viz pane shows whichever engine renderer matches the
+// current (k, mover, depth, child) — the spec's "every engine is one config" made editable.
+function customViz(tr) {
+  if (tr.k === 2) return tr.mover === 'continuous' ? 'vectorscan' : 'gridwalk';
+  if (tr.depth === 2) return tr.childMode === 'curve' ? 'curvecloud' : 'pulsegrid';
+  return tr.mover === 'continuous' ? 'rampmap' : 'weighted';
+}
+// Re-init one already-built track on the running clock (shared by morph + reload).
+function spliceLive(tr) {
+  if (!playing) return;
+  const t0 = ctx.currentTime + 0.05;
+  tr.startTime = tr.nextTime = tr.barStart = t0; tr.idx = firstIdx(tr); tr.accVal = 0; tr.accCount = 0; tr.accDir = 1; tr.dir = 1; tr.prevFreq = 0; tr.sched = [];
+  if (tr.k === 2) for (const ax of tr.axes) { ax.nextTime = t0; ax.idx = ax.first; ax.dir = 1; ax.stage = (ax.widthMode === 'abs' && ax.seq) ? ax.seq[ax.idx] : ax.idx; }
+}
+// Change one structural dimension of the Custom slot, re-derive its renderer, rebuild it in place.
+function morphCustom(tr, field, val) {
+  if (field === 'k') {
+    tr.k = val;
+    if (val === 2) tr.axisDefs = [{ steps: 4, rateMul: 1, mover: tr.mover }, { steps: 3, rateMul: tr.mover === 'continuous' ? 1.5 : 1 / 3, mover: tr.mover }];
+    else { delete tr.axes; delete tr.grid; delete tr.gateGrid; tr.steps = tr.weights.length; }
+  } else if (field === 'mover') {
+    tr.mover = val;
+    if (tr.k === 2 && tr.axisDefs) tr.axisDefs.forEach(a => a.mover = val);
+    else tr.widthMode = val === 'continuous' ? 'abs' : 'len';
+  } else if (field === 'depth') { tr.depth = val; if (val === 2 && !tr.childMode) tr.childMode = 'pulse'; }
+  else if (field === 'child') tr.childMode = val;
+  tr.viz = customViz(tr);
+  const i = tracks.indexOf(tr);
+  buildPlacement(tr); spliceLive(tr);
+  tr.el.replaceWith(buildTrack(tr, i));
+}
+// Reload slot i from a preset: fresh config, placement built, loaded silent, DOM swapped in place.
+function reloadTrack(i, id) {
+  const tr = PRESETS[id](); tr.presetId = id;
+  buildPlacement(tr); loadSilent(tr); spliceLive(tr);
+  const old = tracks[i]; tracks[i] = tr;
+  old.el.replaceWith(buildTrack(tr, i));
+}
+function build() {
+  const host = document.getElementById('tracks');
+  tracks.forEach((tr, i) => host.appendChild(buildTrack(tr, i)));
+  window.addEventListener('mouseup', () => { painting = null; _wdrag = null; rampDrag = null; pgDrag = null; ccDrag = null; });
+  window.addEventListener('mousemove', scrubMove);
+  window.addEventListener('mouseup', scrubEnd);
+  const ms = document.getElementById('masterScale');
+  ms.innerHTML = SCALE_NAMES.map((nm, si) =>
+    '<option value="' + si + '"' + (si === masterScaleIdx ? ' selected' : '') + '>' + nm + '</option>').join('');
+  ms.addEventListener('change', e => {
+    masterScaleIdx = +e.target.value;
+    tracks.forEach(t => { t.scaleInhEl.textContent = SCALE_NAMES[masterScaleIdx]; });
+  });
+  makeScrub(document.getElementById('bpm'), { get: () => BPM, set: v => BPM = v, min: 20, max: 300, step: 1, px: 2, fmt: v => '' + v });
+  clockCtx = fit(document.getElementById('clockviz'), document.getElementById('clockwrap').clientWidth, 14);
+}
+function frame() {
+  if (clockCtx) drawClock(clockCtx);
+  document.getElementById('cycle').textContent = masterCycle();
+  for (const tr of tracks) {
+    VIZ[tr.viz](tr.vizCtx, tr, currentStep(tr));
+    drawAccum(tr.accCtx, tr);
+    tr.mathCtx.clearRect(0, 0, tr.mathCtx.W, tr.mathCtx.H);   // live dots move -> clear each frame
+    MATH[tr.viz](tr.mathCtx, tr);
+    tr.accoffEl.textContent = tdeg(tr.accVal || 0);
+  }
+  requestAnimationFrame(frame);
+}
+document.getElementById('play').addEventListener('click', () => { playing ? stop() : start(); });
+build();
+frame();
+
+// Verification handle (window.* per instr2html — top-level const isn't on window).
+window.SEQUOA = {
+  get ctx() { return ctx; }, get analyser() { return analyser; }, get playing() { return playing; },
+  tracks, currentStep, currentCell, start, stop, readout, degToFreq, SCALES, cycleDur, stageDur,
+  buildPlacement, cellValue, reloadTrack, masterCycle, morphCustom, customViz, PRESET_ORDER, _tap: null,
+  get masterScale() { return masterScaleIdx; },
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XFORMER vs Sequoa: Substrate Matrix</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #ffffff; color: #333; line-height: 1.6; padding: 20px; max-width: 1400px; margin: 0 auto; }
+        h1, h2, h3 { color: #111; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; vertical-align: top; }
+        th { background-color: #f8f9fa; font-weight: 600; }
+        code { background-color: #f1f3f5; padding: 2px 4px; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; color: #d63384; }
+        .evidence { display: block; font-size: 11px; color: #666; margin-top: 4px; }
+        .verdict { background: #e9f2ff; border-left: 4px solid #0056b3; padding: 15px; margin: 20px 0; border-radius: 0 4px 4px 0; }
+        .warning { background: #fff5f5; border-left: 4px solid #dc3545; padding: 15px; margin: 20px 0; }
+        .success { background: #f0fdf4; border-left: 4px solid #198754; padding: 15px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+    <h1>XFORMER vs Sequoa: Shared Sequencer Substrate Research</h1>
+
+    <div class="verdict">
+        <h3>Executive Verdict</h3>
+        <p>A Sequoa-style <code>StageCrosser</code> (unified fraction/weight time core) is <strong>fundamentally incompatible</strong> with XFORMER's current architecture without severe RAM bloat and semantic breakage. XFORMER utilizes four distinct time-progression primitives: Grid/Tick (Note/Curve), Duration-Sum (Indexed/Stochastic), Voltage-Threshold (DiscreteMap), and Cumulative-Fraction (PhaseFlux). Attempting to unify these into one time engine would force polymorphism or massive union states in the 1kHz loop.</p>
+        <p>However, the <strong>Value/Scale Projection</strong> math is highly duplicated and represents the safest, most immediate extraction candidate. The identical scale projection math is copy-pasted across 5 engine files. <strong>Gate Event Queuing</strong> is a shared structural pattern, but since payload semantics differ per track, it remains a deferred extraction.</p>
+    </div>
+
+    <h2>Decomposition Matrix</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Track Mode</th>
+                <th>Phase/Event Source & Timing Units</th>
+                <th>Partition/Placement & Traversal</th>
+                <th>Gate Scheduling/Policy & Parent Dwell</th>
+                <th>Scale/Degree/Voltage Projection</th>
+                <th>Accumulator & Mutation</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Note</strong></td>
+                <td><code>tick % divisor</code> (Aligned) or `clock().tickPosition()` (Free).<br><span class="evidence">NoteTrackEngine.cpp (~line 166)</span></td>
+                <td><code>SequenceState.step()</code> via <code>advanceAligned()</code>.<br><span class="evidence">NoteTrackEngine.cpp (~line 180)</span></td>
+                <td>Absolute tick queuing (<code>_gateQueue.pushReplace</code>) overlapping ratchets/bursts.<br><span class="evidence">NoteTrackEngine.cpp (~line 484)</span></td>
+                <td><code>scale.noteToVolts(note + evalTransposition()) + rootNote/12</code>. Follower override.<br><span class="evidence">NoteTrackEngine.cpp (~line 79)</span></td>
+                <td><code>Accumulator</code> object. Tick per pulse/stage/burst.<br><span class="evidence">NoteTrackEngine.cpp (~line 322)</span></td>
+            </tr>
+            <tr>
+                <td><strong>Curve</strong></td>
+                <td>Phase accumulator <code>_freePhase</code> or <code>relativeTick % divisor</code>.<br><span class="evidence">CurveTrackEngine.cpp (~line 115)</span></td>
+                <td><code>SequenceState</code> + <code>globalPhase</code> offset shift.<br><span class="evidence">CurveTrackEngine.cpp (~line 259)</span></td>
+                <td>No queues. Slope/zero-crossing detection. <code>_gateTimer</code> countdown.<br><span class="evidence">CurveTrackEngine.cpp (~line 333)</span></td>
+                <td><code>range.denormalize(shapeValue)</code> (Voltage space only).<br><span class="evidence">CurveTrackEngine.cpp (~line 49)</span></td>
+                <td>None. Uses continuous <code>_chaosPhase</code> / <code>_latoocarfian</code>.<br><span class="evidence">CurveTrackEngine.cpp (~line 211)</span></td>
+            </tr>
+            <tr>
+                <td><strong>Indexed</strong></td>
+                <td>Wallclock tick duration sum: <code>_stepTimer += scaledDelta</code>.<br><span class="evidence">IndexedTrackEngine.cpp (~line 151)</span></td>
+                <td><code>while</code> loop skipping 0-duration steps. Array modulo.<br><span class="evidence">IndexedTrackEngine.cpp (~line 218)</span></td>
+                <td>Single gate per step via <code>_gateTimer</code> countdown.<br><span class="evidence">IndexedTrackEngine.cpp (~line 295)</span></td>
+                <td><code>scale.noteToVolts(noteIndex + shift) + rootNote/12</code>.<br><span class="evidence">IndexedTrackEngine.cpp (~line 322)</span></td>
+                <td>None. Uses RouteModulation (A/B combining).<br><span class="evidence">IndexedTrackEngine.cpp (~line 66)</span></td>
+            </tr>
+            <tr>
+                <td><strong>DiscreteMap</strong></td>
+                <td>Internal triangle <code>_rampPhase</code> or <code>getRoutedInput()</code> (External CV).<br><span class="evidence">DiscreteMapTrackEngine.cpp (~line 115)</span></td>
+                <td>Voltage threshold crossings (Rise/Fall/Both).<br><span class="evidence">DiscreteMapTrackEngine.cpp (~line 456)</span></td>
+                <td>Gate triggered on crossing. Fixed length or 1-tick. Pluck env generated.<br><span class="evidence">DiscreteMapTrackEngine.cpp (~line 189)</span></td>
+                <td><code>scale.noteToVolts(noteIndex + shift)</code>. Sampled on gate.<br><span class="evidence">DiscreteMapTrackEngine.cpp (~line 494)</span></td>
+                <td>None.</td>
+            </tr>
+            <tr>
+                <td><strong>PhaseFlux</strong></td>
+                <td><code>relativeTick % _cycleTicks</code>.<br><span class="evidence">PhaseFluxTrackEngine.cpp (~line 419)</span></td>
+                <td>Linear scan over <code>_cumulativeTicks</code> array. Fixed order.<br><span class="evidence">PhaseFluxTrackEngine.cpp (~line 446)</span></td>
+                <td>Pre-calculated <code>_schedule</code> array of offsets inside a fractional window.<br><span class="evidence">PhaseFluxTrackEngine.cpp (~line 329)</span></td>
+                <td>Orthogonal Tonality Filters. <code>scale.noteToVolts(degree)</code>.<br><span class="evidence">PhaseFluxTrackEngine.cpp (~line 290)</span></td>
+                <td>RTZ/Hold/Pendulum arrays. Tick on stage/pulse.<br><span class="evidence">PhaseFluxTrackEngine.cpp (~line 78)</span></td>
+            </tr>
+            <tr>
+                <td><strong>Stochastic</strong></td>
+                <td>Duration countdown: <code>_eventElapsed >= _eventDuration</code>.<br><span class="evidence">StochasticTrackEngine.cpp (~line 165)</span></td>
+                <td>Window rotation <code>first</code> to <code>last</code>.<br><span class="evidence">StochasticTrackEngine.cpp (~line 220)</span></td>
+                <td>Absolute tick queuing (<code>_gateQueue.push</code>) for bursts/ratchets.<br><span class="evidence">StochasticTrackEngine.cpp (~line 375)</span></td>
+                <td><code>scale.noteToVolts(note) + rootNote/12</code>.<br><span class="evidence">StochasticTrackEngine.cpp (~line 302)</span></td>
+                <td><code>_jumpRegister</code> (octave drift mutates at cycle end).<br><span class="evidence">StochasticTrackEngine.cpp (~line 457)</span></td>
+            </tr>
+            <tr>
+                <td><strong>Tuesday</strong></td>
+                <td><code>relativeTick % divisor</code>.<br><span class="evidence">TuesdayTrackEngine.cpp (~line 1066)</span></td>
+                <td>Algorithm-specific state machines (<code>_stepIndex</code>, Markov).<br><span class="evidence">TuesdayTrackEngine.cpp (~line 665)</span></td>
+                <td>FX Layer Post-process. <code>_microGateQueue</code> for trills.<br><span class="evidence">TuesdayTrackEngine.cpp (~line 1115)</span></td>
+                <td><code>scale.noteToVolts(totalDegree) + rootNote/12</code>.<br><span class="evidence">TuesdayTrackEngine.cpp (~line 979)</span></td>
+                <td>Algorithm internal memory (e.g., Markov history matrices).<br><span class="evidence">TuesdayTrackEngine.cpp (~line 73)</span></td>
+            </tr>
+            <tr>
+                <td><strong>Teletype</strong></td>
+                <td>Clock accumulation <code>_clockRemainder</code> or 1ms <code>_tickRemainderMs</code>.<br><span class="evidence">TeletypeTrackEngine.cpp (~line 525)</span></td>
+                <td>N/A (VM Scripts execution).<br><span class="evidence">TeletypeTrackEngine.cpp (~line 777)</span></td>
+                <td><code>_teletypePulseRemainingMs</code> timers and <code>_envState</code> generators.<br><span class="evidence">TeletypeTrackEngine.cpp (~line 616)</span></td>
+                <td><code>applyCvQuantize()</code> (noteFromVolts -> noteToVolts).<br><span class="evidence">TeletypeTrackEngine.cpp (~line 750)</span></td>
+                <td>VM Variables (X, Y, Z, T).<br><span class="evidence">TeletypeTrackEngine.cpp (~line 468)</span></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="success">
+        <h3>1. Proven Common Primitives</h3>
+        <ul>
+            <li><strong>Degree-to-Voltage Readout:</strong> The block <code>scale.noteToVolts(note + shift) + (scale.isChromatic() ? rootNote / 12.f : 0.f)</code> is strictly duplicated in Note, Indexed, PhaseFlux, Stochastic, and Tuesday.</li>
+            <li><strong>Slew Application:</strong> <code>Slide::applySlide()</code> is universally used for time-based exponential smoothing across Note, Curve, Indexed, and Teletype.</li>
+        </ul>
+    </div>
+
+    <div class="warning">
+        <h3>2. False Commonalities</h3>
+        <ul>
+            <li><strong>"Stage" and "Tick Position":</strong> A stage in NoteTrack is a linear grid cell. A stage in DiscreteMap is a voltage window. A stage in Indexed is a duration sum. A stage in PhaseFlux is a fractional slice of a cumulative measure. They share the word "stage" but share zero mathematical placement logic.</li>
+            <li><strong>Accumulators:</strong> NoteTrack's <code>Accumulator</code> object (global/local UI) is entirely different from PhaseFlux's array of <code>AccumulatorOps</code> (Wrap/Pendulum bounds logic) and Stochastic's simple cycle-end <code>_jumpRegister</code>.</li>
+        </ul>
+    </div>
+
+    <h2>3. Missing Substrate Concepts (Sequoa vs XFORMER)</h2>
+    <ul>
+        <li><strong>Generalized <code>Crosser</code>:</strong> Sequoa abstracts all time into a unified fraction 0.0-1.0 over weights. XFORMER has no central time abstraction; each engine builds its own tick/phase loops.</li>
+        <li><strong>Unified Readout Pipeline:</strong> Sequoa pushes everything through one projection layer. XFORMER engines do their own pitch math.</li>
+    </ul>
+
+    <h2>4. XFORMER Features Sequoa Cannot Express</h2>
+    <ul>
+        <li><strong>Overlapping Absolute Child Events:</strong> Event queues outlive their parent steps. Sequoa's <code>advanceAt</code> relies on stage dwell, breaking if ratchets span stage boundaries.</li>
+        <li><strong>Voltage-Domain Triggers:</strong> DiscreteMap's rising/falling CV threshold partitioning.</li>
+        <li><strong>Generative VMs:</strong> Teletype script environments and Tuesday's C-struct gesture machines.</li>
+    </ul>
+
+    <h2>5. Recommended First Extraction</h2>
+    <p><strong><code>PitchReadout</code> (Scale/Degree Voltage Helper):</strong> Extract strictly the <code>degree + octave/transpose -> scale.noteToVolts(...) + chromatic root offset</code> math into a stateless helper namespace. This prevents accumulator/slew/order creep, affects 5 files, and poses zero risk of breaking 1kHz timing or RAM limits.</p>
+
+    <h2>6. Rejected / Deferred Extractions</h2>
+    <ul>
+        <li><strong>StageCrosser / Time Substrate:</strong> <em>Rejected.</em> Attempting to merge Indexed's while-loop, Note's tick-modulo, and PhaseFlux's linear cumulative scan would require a massive <code>TrackEngine</code> union size increase (violating RAM constraints) and would obliterate clean, localized logic.</li>
+        <li><strong>Gate Queues (<code>SortedQueue</code>):</strong> <em>Deferred.</em> While Note, Stochastic, Tuesday, and Curve share the <code>SortedQueue</code> shape, their payloads and semantics differ (e.g., Note carries accumulator/CV metadata, Tuesday carries CV per micro-gate). This is a shared structural pattern, not a universal shared primitive yet.</li>
+    </ul>
+
+    <h2>7. Verification Strategy</h2>
+    <ul>
+        <li><strong>Focused Parity Tests:</strong> For the first tiny extraction (<code>PitchReadout</code>), skip the full golden-output trace harness. Instead, add focused parity unit tests around each caller to prove exact math equivalence.</li>
+        <li><strong>Deferred Golden Traces:</strong> Reserve the heavy "golden output trace" harness for future extractions that touch timing, <code>SortedQueue</code> operations, accumulators, or scheduler order.</li>
+    </ul>
+
+</body>
+</html>

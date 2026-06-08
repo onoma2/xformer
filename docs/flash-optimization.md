@@ -389,3 +389,77 @@ Current custom-function triage targets:
 - `DiscreteMapSequencePage::clusterContextAction(...)`
 - `StochasticSequenceEditPage` draw/context methods
 - `IndexedSequenceEditPage` draw/encoder methods
+
+## General UI Optimization Strategy (Edit Pages)
+
+Based on a scan of the 16 `EditPage` and 12 `SequencePage` source and header files, there is a recurring architectural pattern causing flash bloat: **control-flow duplication across different UI lifecycle methods (`draw`, `encoder`, `keyPress`, `contextAction`)**. 
+
+To move away from monolithic `switch` statements and heavy lambda captures toward data-driven tables and shared inline helpers, the following general strategies are proposed:
+
+### 1. Eradicate `std::function` Multi-Select Lambdas
+Many edit pages have a feature where turning an encoder edits either the single highlighted cell or *all* cells currently held down (multi-selection).
+- **The Problem:** In `PhaseFluxEditPage`, this is implemented using `std::function` inside a lambda (`forEachCell`), generating a huge amount of boilerplate code for every single knob turn definition.
+- **The Fix:** Replace these with targeted `enum` dispatchers or a single lightweight template helper that uses standard function pointers or stateless lambdas.
+
+### 2. Data-Driven Slot Definitions
+- **The Problem:** Pages like `StochasticSequenceEditPage` hardcode the layout of their 16 "Live" screen slots. The mapping of "Slot 0 is Duration", "Slot 1 is Variation" is repeated separately in `drawLivePage`, `editLiveStep`, and `contextAction`.
+- **The Fix:** Introduce a static `SlotDescriptor` table defining Label, Min/Max bounds, Init value, and Randomization logic in *one* place. The UI lifecycle methods simply loop over or index into this table.
+
+### 3. Decouple Algorithms from Context Menus
+- **The Problem:** Massive functions like `DiscreteMapSequencePage::clusterContextAction` (~5.3KB) inline complex procedural generation algorithms directly inside the UI switch statement.
+- **The Fix:** Move sequence generation, randomization, and clustering algorithms into the `Model` layer (e.g., `DiscreteMapSequence::generateCluster(...)`) or a stateless utility class. The UI should only handle passing the current `selectionMask` to the algorithm.
+
+### Proposed Helper Headers (`src/apps/sequencer/ui/pages/helpers/`)
+
+To execute this, we could introduce a small suite of helper headers:
+
+**1. `SelectionHelpers.h`**
+A central place for the "apply to selection or cursor" logic, avoiding `std::function` overhead.
+```cpp
+template <typename Container, typename Func>
+inline void applyToSelection(Container& seq, const StepSelection<16>& selection, int cursor, Func fn) {
+    if (selection.any()) {
+        for (int i = 0; i < 16; ++i) {
+            if (selection[i]) fn(seq.step(i));
+        }
+    } else {
+        fn(seq.step(cursor));
+    }
+}
+```
+
+**2. `SlotDescriptor.h`**
+For the data-driven UI layouts (primarily for Stochastic, Curve, and Note pages).
+```cpp
+struct SlotDescriptor {
+    const char* label;
+    int16_t minVal;
+    int16_t maxVal;
+    int16_t defaultVal;
+    uint8_t editId; 
+};
+```
+
+**3. `DrawHelpers.h`**
+Pages like `TuesdayEditPage` and `PhaseFluxEditPage` have custom `drawBar`, `drawGridCell`, and `drawScope` methods. Extracting these into a shared static UI toolkit reduces duplication where identical visual primitives are needed across different sequencer modes.
+
+## Graphify & Grep Research Validation
+
+Using the `graphify` knowledge graph tool and `grep` across the `ui/pages` community validated the optimization strategy and highlighted these concrete targets:
+
+### 1. The `std::function` Lambda Trap
+The most urgent extraction opportunity is moving away from `std::function` inside UI loops. 
+- `PhaseFluxEditPage.cpp` uses `std::function` for its `forEachCell` multi-cell edit logic.
+- `GeneratorPage.cpp` also imports `std::function`.
+
+**Action:** Extract a lightweight templated iteration helper (e.g., `SelectionHelpers.h`) that takes a simple function pointer or a non-capturing lambda. This removes the heavy branch/dispatch code the compiler generates for `std::function` objects.
+
+### 2. Context Action Procedural Generation
+The `DiscreteMapSequencePage::clusterContextAction` function inlines procedural generation logic (e.g., Random clustering logic) directly into the UI layer.
+
+**Action:** Extract these algorithms from the `ui/pages` community and move them to `model/` (e.g. `DiscreteMapSequence::generateCluster()`). The `contextAction` should only gather the current UI selection mask and dispatch the call.
+
+### 3. Slot Descriptors and Label Arrays
+Across `StochasticSequenceEditPage`, `CurveSequenceEditPage`, and `NoteSequenceEditPage`, the layout and metadata of 16-step grid slots are hardcoded multiple times across `draw`, `edit`, and `init` functions.
+
+**Action:** Extract `SlotDescriptor` tables. Instead of duplicating a massive `switch (step)` in `draw` to get the string label and then again in `encoder` to call the right setter, a static struct array can hold `[Label, Min, Max, EnumId]`.
