@@ -7,6 +7,7 @@
 #include "model/RouteFork.h"
 #include "model/ParamTableGlobal.h"
 #include "model/ParamTableNote.h"
+#include "engine/RouteMidiLearn.h"
 
 #include "ui/model/ListModel.h"
 
@@ -969,9 +970,22 @@ void RoutingPage::drawMidi(Canvas &canvas) {
         canvas.fillRect(CONFIG_LCD_WIDTH - 3, thumbY, 2, thumbH);
     }
 
+    bool learning = _engine.midiLearn().isActive();
+    if (learning) {                          // armed: capture popup over the page
+        const int bw = 120, bh = 16;
+        int bx = (CONFIG_LCD_WIDTH - bw) / 2;
+        int by = (CONFIG_LCD_HEIGHT - 11 - bh) / 2;
+        canvas.setColor(Color::None);
+        canvas.fillRect(bx, by, bw, bh);
+        canvas.setColor(Color::Bright);
+        canvas.drawRect(bx, by, bw, bh);
+        const char *m = "waiting for MIDI...";
+        canvas.drawText(bx + (bw - canvas.textWidth(m)) / 2, by + 11, m);
+    }
+
     bool canCommit = editing && RouteDraft::canCommit(_matrixDraft);
-    const char *fn[] = { "VIEW", "EDIT", nullptr, editing ? "CANCEL" : nullptr, canCommit ? "COMMIT" : nullptr };
-    WindowPainter::drawFooter(canvas, fn, pageKeyState(), editing ? int(Function::Edit) : -1);
+    const char *fn[] = { "VIEW", "EDIT", editing ? "LEARN" : nullptr, editing ? "CANCEL" : nullptr, canCommit ? "COMMIT" : nullptr };
+    WindowPainter::drawFooter(canvas, fn, pageKeyState(), learning ? int(Function::Combine) : (editing ? int(Function::Edit) : -1));
 }
 
 // Begin editing the focused MIDI route: copy the live route into the draft (the route
@@ -991,6 +1005,7 @@ void RoutingPage::handleMidiKey(KeyPressEvent &event) {
     const auto &key = event.key();
 
     if (key.isLeft() || key.isRight()) {     // tab cycle: discard draft, leave the MIDI tab
+        _engine.midiLearn().stop();
         if (_matrixEditActive) {
             matrixExitEdit(false);
         }
@@ -1010,7 +1025,20 @@ void RoutingPage::handleMidiKey(KeyPressEvent &event) {
                 _midiCol = (_midiCol + 1) % cols;
             }
             break;
+        case Function::Combine: // F3: arm/disarm LEARN, capturing into the draft
+            if (_matrixEditActive) {
+                if (_engine.midiLearn().isActive()) {
+                    _engine.midiLearn().stop();
+                } else {
+                    _engine.midiLearn().start([this] (const MidiLearn::Result &result) {
+                        assignMidiLearn(result, _matrixDraft.route.midiSource());
+                        _engine.midiLearn().stop();
+                    });
+                }
+            }
+            break;
         case Function::Edit: // F2: nav <-> edit on the focused route
+            _engine.midiLearn().stop();
             if (_matrixEditActive) {
                 matrixExitEdit(false);
             } else {
@@ -1018,6 +1046,7 @@ void RoutingPage::handleMidiKey(KeyPressEvent &event) {
             }
             break;
         case Function::Cancel: // F4: Shift = REMOVE the route; plain = discard draft
+            _engine.midiLearn().stop();
             if (key.shiftModifier()) {
                 if (_matrixEditActive) {
                     matrixExitEdit(false);
@@ -1032,6 +1061,7 @@ void RoutingPage::handleMidiKey(KeyPressEvent &event) {
             }
             break;
         case Function::Commit: // F5: write the draft live (gated on canCommit)
+            _engine.midiLearn().stop();
             if (_matrixEditActive && RouteDraft::canCommit(_matrixDraft)) {
                 matrixExitEdit(true);
             }
