@@ -1,7 +1,9 @@
 #pragma once
 
 #include "BasePage.h"
-#include "engine/WaveformGenerator.h"
+#include "ui/painters/ScopePainter.h"
+
+#include <cstdint>
 
 class ModulatorPage : public BasePage {
 public:
@@ -49,7 +51,6 @@ private:
     void setSelectedModulator(int index);
     void setSelectedFunction(Function function);
     void setSelectedRoutingFunction(RoutingFunction function);
-    void updateWaveformCache();
     void contextShow(bool doubleClick = false) override;
     void contextAction(int index);
     void loadRoutingFromMidiOutput();
@@ -70,14 +71,9 @@ private:
     bool _routingEventIsCC = true;   // false = Note, true = CC (MIDI only)
     int _routingCCNum = 0;           // CC number 0-127 (MIDI CC only)
 
-    // Waveform cache
-    static constexpr int WaveformCacheSize = 112;
-    int8_t _waveformCache[WaveformCacheSize];
-    bool _waveformCacheValid = false;
-    Modulator::Shape _lastShape = Modulator::Shape::Sine;
-    int _lastDepth = 0;
-    int _lastOffset = 0;
-    int _lastPhase = 0;
-    int _lastAttack = 0;
-    int _lastDecay = 0;
+    // Rolling scope history of the modulator output (int8, +/-127 = full swing),
+    // sampled once per draw. Replaces the static waveform-shape cache.
+    static constexpr int ScopeWidth = 116;
+    int8_t _scope[ScopeWidth] = {};
+    int _scopeWrite = 0;
 };

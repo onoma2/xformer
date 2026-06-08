@@ -23,7 +23,6 @@ ModulatorPage::ModulatorPage(PageManager &manager, PageContext &context) :
 
 void ModulatorPage::enter() {
     _selectedModulator = _project.selectedModulatorIndex();
-    _waveformCacheValid = false;
     _currentPage = 0;
 }
 
@@ -180,168 +179,24 @@ void ModulatorPage::draw(Canvas &canvas) {
         }
     }
 
-    // --- Left half: waveform or ADSR envelope ---
-    const int waveformX = 4;
-    const int waveformY = 15;
-    const int waveformW = 116;
-    const int waveformH = 34;
+    // --- Left half: real-time scope of the modulator output (rolling trace, no level bar) ---
+    {
+        const int boxX = 1, boxY = 12, boxW = 119, boxH = 40;
+        // Sample the live output (0..127, centered 64) into the rolling history, scaled to
+        // +/-127 so the full swing fills the box. Same trace draw as the Monitor scope.
+        int v = _engine.modulatorEngine().currentValue(_selectedModulator);
+        _scope[_scopeWrite] = clamp((v - 64) * 2, -127, 127);
+        _scopeWrite = (_scopeWrite + 1) % ScopeWidth;
 
-    if (isChaos) {
-        // Chaos: live output visualization (like Random — updates every frame)
-        canvas.setColor(Color::Bright);
-        canvas.drawRect(waveformX, waveformY, waveformW, waveformH);
-
-        const int scopeX = waveformX + 2;
-        const int scopeY = waveformY + (waveformH / 2);
-        const int scopeWidth = waveformW - 4;
-        const int scopeHeight = waveformH - 4;
-
+        canvas.setBlendMode(BlendMode::Set);
+        canvas.setColor(Color::Medium);
+        canvas.drawRect(boxX, boxY, boxW, boxH);
+        const int centerY = boxY + boxH / 2;
+        const int halfH = boxH / 2 - 3;
         canvas.setColor(Color::Low);
-        canvas.hline(scopeX, scopeY, scopeWidth);
-
+        canvas.hline(boxX + 2, centerY, boxW - 4);
         canvas.setColor(Color::Bright);
-        int currentValue = _engine.modulatorEngine().currentValue(_selectedModulator);
-        int y = scopeY - ((currentValue - 64) * scopeHeight / 2) / 127;
-        canvas.hline(scopeX, y, scopeWidth);
-
-        // Level bar (same as all other shapes)
-        const int barX = waveformX + waveformW + 2;
-        const int barWidth = 4;
-        canvas.setColor(Color::Medium);
-        canvas.drawRect(barX, waveformY, barWidth, waveformH);
-        canvas.setColor(Color::Bright);
-        int levelY = waveformY + waveformH - 2 - ((currentValue * (waveformH - 4)) / 127);
-        canvas.hline(barX + 1, levelY, barWidth - 2);
-        canvas.hline(barX + 1, levelY + 1, barWidth - 2);
-    } else if (isADSR) {
-        // ADSR envelope visualization
-        int attackMs = modulator.attack();
-        int decayMs = modulator.decay();
-        int sustainLevel = modulator.sustain();
-        int releaseMs = modulator.release();
-        int amplitude = modulator.amplitude();
-
-        int totalTime = attackMs + decayMs + 500 + releaseMs;
-        if (totalTime == 0) totalTime = 1;
-        int attackWidth = (attackMs * waveformW) / totalTime;
-        int decayWidth = (decayMs * waveformW) / totalTime;
-        int sustainWidth = (500 * waveformW) / totalTime;
-        int releaseWidth = (releaseMs * waveformW) / totalTime;
-
-        int x = waveformX;
-        int bottomY = waveformY + waveformH - 2;
-        int peakY = waveformY + 2;
-
-        // Scale by amplitude
-        int scaledPeakY = bottomY - ((bottomY - peakY) * amplitude) / 127;
-        int scaledSustainY = bottomY - ((bottomY - peakY) * sustainLevel * amplitude) / (127 * 127);
-
-        canvas.setColor(Color::Bright);
-        // Attack
-        canvas.line(x, bottomY, x + attackWidth, scaledPeakY);
-        x += attackWidth;
-        // Decay
-        canvas.line(x, scaledPeakY, x + decayWidth, scaledSustainY);
-        x += decayWidth;
-        // Sustain
-        if (sustainWidth > 0) {
-            canvas.hline(x, scaledSustainY, sustainWidth);
-        }
-        x += sustainWidth;
-        // Release
-        canvas.line(x, scaledSustainY, x + releaseWidth, bottomY);
-
-        // Draw playhead
-        auto state = _engine.modulatorEngine().adsrState(_selectedModulator);
-        uint32_t timer = _engine.modulatorEngine().adsrTimer(_selectedModulator);
-        int playheadX = waveformX;
-
-        switch (state) {
-        case ModulatorEngine::ADSRState::Idle:
-            playheadX = waveformX;
-            break;
-        case ModulatorEngine::ADSRState::Attack: {
-            int attackTicks = (attackMs * CONFIG_PPQN) / 2500;
-            if (attackTicks == 0) attackTicks = 1;
-            int progress = clamp(static_cast<int>((timer * attackWidth) / attackTicks), 0, attackWidth);
-            playheadX = waveformX + progress;
-            break;
-        }
-        case ModulatorEngine::ADSRState::Decay: {
-            int decayTicks = (decayMs * CONFIG_PPQN) / 2500;
-            if (decayTicks == 0) decayTicks = 1;
-            int progress = clamp(static_cast<int>((timer * decayWidth) / decayTicks), 0, decayWidth);
-            playheadX = waveformX + attackWidth + progress;
-            break;
-        }
-        case ModulatorEngine::ADSRState::Sustain:
-            playheadX = waveformX + attackWidth + decayWidth;
-            break;
-        case ModulatorEngine::ADSRState::Release: {
-            int releaseTicks = (releaseMs * CONFIG_PPQN) / 2500;
-            if (releaseTicks == 0) releaseTicks = 1;
-            int progress = clamp(static_cast<int>((timer * releaseWidth) / releaseTicks), 0, releaseWidth);
-            playheadX = waveformX + attackWidth + decayWidth + sustainWidth + progress;
-            break;
-        }
-        }
-
-        canvas.setColor(Color::Medium);
-        canvas.vline(playheadX, waveformY + 1, waveformH - 2);
-    } else {
-        // Waveform visualization
-        canvas.setColor(Color::Bright);
-        canvas.drawRect(waveformX, waveformY, waveformW, waveformH);
-
-        const int scopeX = waveformX + 2;
-        const int scopeY = waveformY + (waveformH / 2);
-        const int scopeWidth = waveformW - 4;
-        const int scopeHeight = waveformH - 4;
-
-        canvas.setColor(Color::Low);
-        canvas.hline(scopeX, scopeY, scopeWidth);
-
-        canvas.setColor(Color::Bright);
-
-        if (isRandom) {
-            int currentValue = _engine.modulatorEngine().currentValue(_selectedModulator);
-            int y = scopeY - ((currentValue - 64) * scopeHeight / 2) / 127;
-            canvas.hline(scopeX, y, scopeWidth);
-        } else {
-            if (!_waveformCacheValid ||
-                modulator.shape() != _lastShape ||
-                modulator.depth() != _lastDepth ||
-                modulator.offset() != _lastOffset ||
-                modulator.phase() != _lastPhase ||
-                modulator.attack() != _lastAttack ||
-                modulator.decay() != _lastDecay) {
-                updateWaveformCache();
-            }
-
-            for (int x = 0; x < WaveformCacheSize - 1; ++x) {
-                int y1 = scopeY - (_waveformCache[x] * scopeHeight / 2) / 127;
-                int y2 = scopeY - (_waveformCache[x + 1] * scopeHeight / 2) / 127;
-                canvas.line(scopeX + x, y1, scopeX + x + 1, y2);
-            }
-
-            uint16_t currentPhase = _engine.modulatorEngine().currentPhase(_selectedModulator);
-            int playheadX = (currentPhase * scopeWidth) / 65536;
-            canvas.setColor(Color::Medium);
-            canvas.vline(scopeX + playheadX, waveformY + 1, waveformH - 2);
-        }
-
-        // Level bar
-        int currentValue = _engine.modulatorEngine().currentValue(_selectedModulator);
-        const int barX = waveformX + waveformW + 2;
-        const int barWidth = 4;
-
-        canvas.setColor(Color::Medium);
-        canvas.drawRect(barX, waveformY, barWidth, waveformH);
-
-        canvas.setColor(Color::Bright);
-        int levelY = waveformY + waveformH - 2 - ((currentValue * (waveformH - 4)) / 127);
-        canvas.hline(barX + 1, levelY, barWidth - 2);
-        canvas.hline(barX + 1, levelY + 1, barWidth - 2);
+        ScopePainter::drawTrace(canvas, boxX + 1, centerY, halfH, _scope, ScopeWidth, _scopeWrite);
     }
 
     // --- Right half: parameter display ---
@@ -648,8 +503,6 @@ void ModulatorPage::encoder(EncoderEvent &event) {
             }
             break;
         }
-
-        _waveformCacheValid = false;
     }
 
     event.consume();
@@ -658,7 +511,6 @@ void ModulatorPage::encoder(EncoderEvent &event) {
 void ModulatorPage::setSelectedModulator(int index) {
     _selectedModulator = clamp(index, 0, CONFIG_MODULATOR_COUNT - 1);
     _project.setSelectedModulatorIndex(_selectedModulator);
-    _waveformCacheValid = false;
     _currentPage = 0;
     if (_showRoutingOverlay) {
         loadRoutingFromMidiOutput();
@@ -671,72 +523,6 @@ void ModulatorPage::setSelectedFunction(Function function) {
 
 void ModulatorPage::setSelectedRoutingFunction(RoutingFunction function) {
     _selectedRoutingFunction = function;
-}
-
-void ModulatorPage::updateWaveformCache() {
-    auto &modulator = _project.modulator(_selectedModulator);
-
-    _lastShape = modulator.shape();
-    _lastDepth = modulator.depth();
-    _lastOffset = modulator.offset();
-    _lastPhase = modulator.phase();
-    _lastAttack = modulator.attack();
-    _lastDecay = modulator.decay();
-
-    if (Modulator::isChaosShape(modulator.shape())) {
-        if (modulator.shape() == Modulator::Shape::ChaosLorenz) {
-            Lorenz lorenz;
-            lorenz.reset();
-            float p1n = modulator.attack() / 2000.f;
-            float p2n = modulator.decay() / 2000.f;
-            float p1c = p1n * (2.0f - p1n);
-            float p2c = p2n * (2.0f - p2n);
-            float rho  = 10.0f + p1c * 40.0f;
-            float beta = 0.5f + p2c * 3.5f;
-            for (int i = 0; i < 100; ++i) {
-                lorenz.next(0.001f, rho, beta);
-            }
-            for (int x = 0; x < WaveformCacheSize; ++x) {
-                float raw = lorenz.next(0.001f, rho, beta);
-                int value = static_cast<int>(raw * 127.f);
-                value = (value * modulator.depth()) / 127;
-                value += modulator.offset();
-                _waveformCache[x] = static_cast<int8_t>(clamp(value, -127, 127));
-            }
-        } else {
-            Latoocarfian latoo;
-            latoo.reset();
-            float p1n = modulator.attack() / 2000.f;
-            float p2n = modulator.decay() / 2000.f;
-            float p1c = p1n * (2.0f - p1n);
-            float p2c = p2n * (2.0f - p2n);
-            float ab = 0.5f + p1c * 2.5f;
-            float cd = 0.5f + p2c * 2.5f;
-            for (int x = 0; x < WaveformCacheSize; ++x) {
-                float raw = latoo.next(ab, ab, cd, cd);
-                int value = static_cast<int>(raw * 127.f);
-                value = (value * modulator.depth()) / 127;
-                value += modulator.offset();
-                _waveformCache[x] = static_cast<int8_t>(clamp(value, -127, 127));
-            }
-        }
-        _waveformCacheValid = true;
-        return;
-    }
-
-    for (int x = 0; x < WaveformCacheSize; ++x) {
-        uint32_t phase = ((uint32_t)x * 65536) / WaveformCacheSize;
-        phase = (phase + ((uint32_t)modulator.phase() * 65536 / 360)) & 0xFFFF;
-
-        int value = WaveformGenerator::generate(modulator.shape(), (uint16_t)phase);
-        value = (value * modulator.depth()) / 127;
-        value += modulator.offset();
-        value = clamp(value, -127, 127);
-
-        _waveformCache[x] = value;
-    }
-
-    _waveformCacheValid = true;
 }
 
 void ModulatorPage::contextShow(bool doubleClick) {

@@ -2,11 +2,14 @@
 
 #include "BasePage.h"
 
+#include "ui/painters/ScopePainter.h"
+
 #include "engine/MidiPort.h"
 
 #include "core/midi/MidiMessage.h"
 
 #include <array>
+#include <cstdint>
 
 class MonitorPage : public BasePage {
 public:
@@ -56,9 +59,10 @@ private:
 
     static constexpr int ScopeWidth = Width;
     static constexpr int ScopeHeight = Height;
-    std::array<float, ScopeWidth> _scopeCv{};
+    std::array<int8_t, ScopeWidth> _scopeCv{};            // normalized +/-127 (= +/-6V)
     std::array<uint8_t, ScopeWidth> _scopeGate{};
-    std::array<float, ScopeWidth> _scopeCvSecondary{};
+    std::array<int8_t, ScopeWidth> _scopeCvSecondary{};
+    float _scopeLastCv = 0.f;                              // last raw primary CV, for the readout
     int _scopeWriteIndex = 0;
     int8_t _scopeChannel = 0;
     int8_t _scopeSecondaryChannel = -1;

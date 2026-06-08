@@ -323,21 +323,27 @@ void MonitorPage::drawVersion(Canvas &canvas) {
 }
 
 void MonitorPage::sampleScope() {
-    _scopeCv[_scopeWriteIndex] = _engine.cvOutput().channel(_scopeChannel);
+    // Store normalized int8 (+/-127 = +/-6V) for the shared scope trace; keep the raw
+    // primary CV for the numeric readout.
+    float cv = _engine.cvOutput().channel(_scopeChannel);
+    _scopeLastCv = cv;
+    _scopeCv[_scopeWriteIndex] = int8_t(clamp(int(cv / 6.f * 127.f), -127, 127));
     _scopeGate[_scopeWriteIndex] = (_engine.gateOutput() >> _scopeChannel) & 1;
 
     if (_scopeSecondaryChannel >= 0) {
-        _scopeCvSecondary[_scopeWriteIndex] = _engine.cvOutput().channel(_scopeSecondaryChannel);
+        float cvSec = _engine.cvOutput().channel(_scopeSecondaryChannel);
+        _scopeCvSecondary[_scopeWriteIndex] = int8_t(clamp(int(cvSec / 6.f * 127.f), -127, 127));
     } else {
-        _scopeCvSecondary[_scopeWriteIndex] = 0.f;
+        _scopeCvSecondary[_scopeWriteIndex] = 0;
     }
     _scopeWriteIndex = (_scopeWriteIndex + 1) % ScopeWidth;
 }
 
 void MonitorPage::resetScope() {
-    _scopeCv.fill(0.f);
+    _scopeCv.fill(0);
     _scopeGate.fill(0);
-    _scopeCvSecondary.fill(0.f);
+    _scopeCvSecondary.fill(0);
+    _scopeLastCv = 0.f;
     _scopeWriteIndex = 0;
 }
 
@@ -430,47 +436,17 @@ void MonitorPage::drawScope(Canvas &canvas) {
     const int gateHeight = 3;
     const int gateTop = ScopeHeight - 3 - (gateHeight - 1);
     const int cvBottom = gateTop - 1;
-    const float cvCenter = cvBottom * 0.5f;
-    const float cvScale = cvBottom / (2.f * 6.f);
+    const int cvCenter = cvBottom / 2;   // +/-127 sample maps to +/-cvCenter (= +/-6V)
 
     canvas.setBlendMode(BlendMode::Set);
 
     if (_scopeSecondaryChannel >= 0) {
         canvas.setColor(Color::Low);
-        int lastSecondaryY = 0;
-        {
-            int idx = _scopeWriteIndex % ScopeWidth;
-            float cv = _scopeCvSecondary[idx];
-            lastSecondaryY = clamp(int(cvCenter - cv * cvScale), 0, cvBottom);
-        }
-        for (int x = 1; x < ScopeWidth; ++x) {
-            int idx = (_scopeWriteIndex + x) % ScopeWidth;
-            float cv = _scopeCvSecondary[idx];
-            int y = clamp(int(cvCenter - cv * cvScale), 0, cvBottom);
-            int y0 = std::min(lastSecondaryY, y);
-            int y1 = std::max(lastSecondaryY, y);
-            canvas.vline(x, y0, y1 - y0 + 1);
-            lastSecondaryY = y;
-        }
+        ScopePainter::drawTrace(canvas, 0, cvCenter, cvCenter, _scopeCvSecondary.data(), ScopeWidth, _scopeWriteIndex);
     }
 
     canvas.setColor(Color::MediumBright);
-    int lastY = 0;
-    {
-        int idx = _scopeWriteIndex % ScopeWidth;
-        float cv = _scopeCv[idx];
-        lastY = clamp(int(cvCenter - cv * cvScale), 0, cvBottom);
-    }
-
-    for (int x = 1; x < ScopeWidth; ++x) {
-        int idx = (_scopeWriteIndex + x) % ScopeWidth;
-        float cv = _scopeCv[idx];
-        int y = clamp(int(cvCenter - cv * cvScale), 0, cvBottom);
-        int y0 = std::min(lastY, y);
-        int y1 = std::max(lastY, y);
-        canvas.vline(x, y0, y1 - y0 + 1);
-        lastY = y;
-    }
+    ScopePainter::drawTrace(canvas, 0, cvCenter, cvCenter, _scopeCv.data(), ScopeWidth, _scopeWriteIndex);
 
     canvas.setColor(Color::Medium);
     int runStart = -1;
@@ -490,9 +466,7 @@ void MonitorPage::drawScope(Canvas &canvas) {
         canvas.fillRect(runStart, gateTop, ScopeWidth - runStart, gateHeight);
     }
 
-    int lastIndex = (_scopeWriteIndex + ScopeWidth - 1) % ScopeWidth;
-    float lastCv = _scopeCv[lastIndex];
-    FixedStringBuilder<8> cvStr("%+5.2f", lastCv);
+    FixedStringBuilder<8> cvStr("%+5.2f", _scopeLastCv);
     canvas.setFont(Font::Tiny);
     canvas.setColor(Color::Low);
     int x = Width - 2 - canvas.textWidth(cvStr);
