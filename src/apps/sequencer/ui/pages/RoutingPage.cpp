@@ -70,6 +70,8 @@ void RoutingPage::exit() {
 void RoutingPage::draw(Canvas &canvas) {
     if (tabIsBus(_tabEditorTab)) {
         drawBus(canvas);
+    } else if (tabIsMidi(_tabEditorTab)) {
+        drawMidi(canvas);
     } else {
         drawTabEditor(canvas);
     }
@@ -83,6 +85,8 @@ void RoutingPage::keyPress(KeyPressEvent &event) {
     }
     if (tabIsBus(_tabEditorTab)) {
         handleBusKey(event);
+    } else if (tabIsMidi(_tabEditorTab)) {
+        handleMidiKey(event);
     } else {
         handleTabEditorKey(event);
     }
@@ -99,6 +103,27 @@ void RoutingPage::encoder(EncoderEvent &event) {
             }
         } else {                        // nav: move the lane cursor 0..3
             _busLane = clamp(_busLane + event.value(), 0, Engine::BusCvCount - 1);
+        }
+        event.consume();
+        return;
+    }
+    if (tabIsMidi(_tabEditorTab)) {          // MIDI tab
+        bool shift = event.pressed() || globalKeyState()[Key::Shift];
+        if (_matrixEditActive) {             // editing a route: dial the focused field
+            auto &midi = _matrixDraft.route.midiSource();
+            switch (_midiCol) {
+            case 0: midi.source().editPort(event.value(), shift); break;
+            case 1: midi.source().editChannel(event.value(), shift); break;
+            case 2: midi.editEvent(event.value(), shift); break;
+            default:
+                if (midi.isControlEvent()) midi.editControlNumber(event.value(), shift);
+                else midi.editNote(event.value(), shift);
+                break;
+            }
+        } else {                             // nav: move the row cursor over learned routes
+            uint8_t rows[CONFIG_ROUTE_COUNT];
+            int n = RouteBrowse::midiRouteList(_project.routing(), rows, CONFIG_ROUTE_COUNT);
+            _midiRow = clamp(_midiRow + event.value(), 0, n > 0 ? n - 1 : 0);
         }
         event.consume();
         return;
@@ -181,7 +206,7 @@ int RoutingPage::tabParams(int t, uint8_t *keys, int maxKeys) const {
     if (tabIsEngine(t)) {
         return RouteBrowse::enginePageParams(tabEngineMode(t), keys, maxKeys);
     }
-    if (tabIsBus(t)) {
+    if (tabIsBus(t) || tabIsMidi(t)) {
         return 0;
     }
     return RouteBrowse::bandParams(RouteBrowse::Band(t), keys, maxKeys);
@@ -191,7 +216,7 @@ const char *RoutingPage::tabName(int t) const {
     static const char *names[kTabCount] = {
         "PITCH", "CLOCK", "GLOB",
         "NOTE", "PHASEFLUX", "CURVE", "TUESDAY", "DISCMAP", "INDEXED", "STOCH",
-        "BUS",
+        "BUS", "MIDI",
     };
     return names[clamp(t, 0, kTabCount - 1)];
 }
@@ -339,6 +364,8 @@ void RoutingPage::enterTabEditor() {
     _tabCol = clamp(_project.selectedTrackIndex(), 0, CONFIG_TRACK_COUNT - 1);
     _matrixEditActive = false;
     _matrixEditRow = -1;
+    _midiRow = 0;
+    _midiCol = 0;
     _matrixDraft = RouteDraft::Draft();
     tabRefocus();
 }
@@ -812,6 +839,193 @@ void RoutingPage::handleBusKey(KeyPressEvent &event) {
                 int idx = RouteDraft::findRouteForTarget(_project.routing(), target);
                 if (idx >= 0) {
                     _project.routing().route(idx).clear();
+                }
+            } else if (_matrixEditActive) {
+                matrixExitEdit(false);
+            }
+            break;
+        case Function::Commit: // F5: write the draft live (gated on canCommit)
+            if (_matrixEditActive && RouteDraft::canCommit(_matrixDraft)) {
+                matrixExitEdit(true);
+            }
+            break;
+        default:
+            break;
+        }
+        event.consume();
+        return;
+    }
+    event.consume(); // modal: swallow other keys so they don't reach TopPage
+}
+
+// Compact event token for the narrow EVENT column (full eventName() won't fit).
+static const char *midiEventAbbrev(Routing::MidiSource::Event e) {
+    using Event = Routing::MidiSource::Event;
+    switch (e) {
+    case Event::ControlAbsolute: return "CCa";
+    case Event::ControlRelative: return "CCr";
+    case Event::PitchBend:       return "PB";
+    case Event::NoteMomentary:   return "NtM";
+    case Event::NoteToggle:      return "NtT";
+    case Event::NoteVelocity:    return "NtV";
+    case Event::NoteRange:       return "NtR";
+    default:                     return "?";
+    }
+}
+
+// MIDI tab: every route whose source is MIDI, one row each (legacy detail fields:
+// target it drives | Port | Channel | Event | CC/Note). EDIT opens the focused route's
+// draft; VIEW walks the columns; encoder dials the focused field; COMMIT persists.
+void RoutingPage::drawMidi(Canvas &canvas) {
+    const int DIV = 76, TGT_X = 4, PORT_X = 82, CH_X = 110, EVT_X = 132, NUM_X = 170;
+    auto &routing = _project.routing();
+    uint8_t rows[CONFIG_ROUTE_COUNT];
+    int n = RouteBrowse::midiRouteList(routing, rows, CONFIG_ROUTE_COUNT);
+    bool editing = _matrixEditActive;
+    _midiRow = clamp(_midiRow, 0, n > 0 ? n - 1 : 0);
+
+    WindowPainter::clear(canvas);
+    canvas.setFont(Font::Tiny);
+
+    // header: title + column labels, or the active column tag while editing
+    canvas.setColor(Color::Bright);
+    canvas.drawText(3, 7, "MIDI");
+    if (editing) {
+        static const char *colTag[4] = { "PORT", "CHANNEL", "EVENT", "CC/NOTE" };
+        canvas.setColor(Color::Medium);
+        canvas.drawText(PORT_X, 7, colTag[clamp(_midiCol, 0, 3)]);
+    } else {
+        canvas.setColor(Color::Low);
+        canvas.drawText(PORT_X, 7, "PORT");
+        canvas.drawText(CH_X, 7, "CH");
+        canvas.drawText(EVT_X, 7, "EVENT");
+        canvas.drawText(NUM_X, 7, "CC/NOTE");
+    }
+    canvas.setColor(Color::Low);
+    canvas.hline(0, 10, CONFIG_LCD_WIDTH);
+    canvas.vline(DIV, 11, CONFIG_LCD_HEIGHT - 22);
+
+    if (n == 0) {
+        canvas.setColor(Color::Low);
+        const char *msg = "no MIDI assignments - learn from the matrix";
+        canvas.drawText((CONFIG_LCD_WIDTH - canvas.textWidth(msg)) / 2, 34, msg);
+    }
+
+    const int top = 14, rowH = 10, visible = 4;
+    int firstRow = (n > visible) ? clamp(_midiRow - visible + 1, 0, n - visible) : 0;
+    for (int vi = 0; vi < visible; ++vi) {
+        int ri = firstRow + vi;
+        if (ri >= n) break;
+        int y = top + vi * rowH;
+        bool editThis = editing && ri == _matrixEditRow;
+        bool focus = editThis || (!editing && ri == _midiRow);
+        const Routing::Route &route = routing.route(rows[ri]);
+        const Routing::MidiSource &ms = editThis ? _matrixDraft.route.midiSource() : route.midiSource();
+        Routing::Target tgt = editThis ? _matrixDraft.route.target() : route.target();
+        uint8_t tracks = editThis ? _matrixDraft.route.tracks() : route.tracks();
+
+        if (focus) {
+            canvas.setColor(Color::Bright);
+            canvas.fillRect(0, y - 1, 2, rowH - 1);
+        }
+        // target it drives: name + first track for per-track targets, clipped to gutter
+        FixedStringBuilder<20> tlabel("%s", Routing::targetName(tgt));
+        if (Routing::isPerTrackTarget(tgt)) {
+            for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
+                if (tracks & (1 << t)) { tlabel(" %d", t + 1); break; }
+            }
+        }
+        canvas.setColor(focus ? Color::Bright : Color::Medium);
+        drawClippedName(canvas, TGT_X, y + 4, DIV - TGT_X - 2, tlabel);
+
+        FixedStringBuilder<8> portTxt; ms.source().printPort(portTxt);
+        FixedStringBuilder<8> chTxt; ms.source().printChannel(chTxt);
+        const char *evtTxt = midiEventAbbrev(ms.event());
+        FixedStringBuilder<8> numTxt;
+        bool hasNum = ms.event() != Routing::MidiSource::Event::PitchBend;
+        if (hasNum) {
+            if (ms.isControlEvent()) ms.printControlNumber(numTxt); else ms.printNote(numTxt);
+        }
+        auto fieldColor = [&](int col) {
+            return (editThis && col == _midiCol) ? Color::Bright : Color::Medium;
+        };
+        canvas.setColor(fieldColor(0)); canvas.drawText(PORT_X, y + 4, portTxt);
+        canvas.setColor(fieldColor(1)); canvas.drawText(CH_X, y + 4, chTxt);
+        canvas.setColor(fieldColor(2)); canvas.drawText(EVT_X, y + 4, evtTxt);
+        if (hasNum) {
+            canvas.setColor(fieldColor(3)); canvas.drawText(NUM_X, y + 4, numTxt);
+        } else {
+            canvas.setColor(Color::Low); canvas.drawText(NUM_X, y + 4, "-");
+        }
+    }
+
+    if (n > visible) {                       // right-edge scrollbar
+        int trackH = CONFIG_LCD_HEIGHT - 22;
+        int thumbH = std::max(4, trackH * visible / n);
+        int thumbY = 11 + (trackH - thumbH) * firstRow / std::max(1, n - visible);
+        canvas.setColor(Color::Low);
+        canvas.vline(CONFIG_LCD_WIDTH - 2, 11, trackH);
+        canvas.setColor(Color::Medium);
+        canvas.fillRect(CONFIG_LCD_WIDTH - 3, thumbY, 2, thumbH);
+    }
+
+    bool canCommit = editing && RouteDraft::canCommit(_matrixDraft);
+    const char *fn[] = { "VIEW", "EDIT", nullptr, editing ? "CANCEL" : nullptr, canCommit ? "COMMIT" : nullptr };
+    WindowPainter::drawFooter(canvas, fn, pageKeyState(), editing ? int(Function::Edit) : -1);
+}
+
+// Begin editing the focused MIDI route: copy the live route into the draft (the route
+// already exists — created in the grid with source MIDI). Live route untouched until COMMIT.
+void RoutingPage::midiEnterEdit() {
+    uint8_t rows[CONFIG_ROUTE_COUNT];
+    int n = RouteBrowse::midiRouteList(_project.routing(), rows, CONFIG_ROUTE_COUNT);
+    if (n == 0) return;
+    int ri = clamp(_midiRow, 0, n - 1);
+    _matrixDraft = RouteDraft::begin(_project.routing(), rows[ri]);
+    _matrixEditActive = true;
+    _matrixEditRow = ri;
+    _midiCol = 0;
+}
+
+void RoutingPage::handleMidiKey(KeyPressEvent &event) {
+    const auto &key = event.key();
+
+    if (key.isLeft() || key.isRight()) {     // tab cycle: discard draft, leave the MIDI tab
+        if (_matrixEditActive) {
+            matrixExitEdit(false);
+        }
+        _tabEditorTab = (_tabEditorTab + (key.isLeft() ? kTabCount - 1 : 1)) % kTabCount;
+        _tabScroll = 0;
+        _tabEditorRow = 0;
+        tabRefocus();
+        event.consume();
+        return;
+    }
+
+    if (key.isFunction()) {
+        switch (Function(key.function())) {
+        case Function::View: // F1: advance the edited column (PitchBend skips CC/Note)
+            if (_matrixEditActive) {
+                int cols = _matrixDraft.route.midiSource().event() == Routing::MidiSource::Event::PitchBend ? 3 : 4;
+                _midiCol = (_midiCol + 1) % cols;
+            }
+            break;
+        case Function::Edit: // F2: nav <-> edit on the focused route
+            if (_matrixEditActive) {
+                matrixExitEdit(false);
+            } else {
+                midiEnterEdit();
+            }
+            break;
+        case Function::Cancel: // F4: Shift = REMOVE the route; plain = discard draft
+            if (key.shiftModifier()) {
+                if (_matrixEditActive) {
+                    matrixExitEdit(false);
+                }
+                uint8_t rows[CONFIG_ROUTE_COUNT];
+                int n = RouteBrowse::midiRouteList(_project.routing(), rows, CONFIG_ROUTE_COUNT);
+                if (n > 0) {
+                    _project.routing().route(rows[clamp(_midiRow, 0, n - 1)]).clear();
                 }
             } else if (_matrixEditActive) {
                 matrixExitEdit(false);
