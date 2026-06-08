@@ -1,7 +1,7 @@
 #include "RoutingEngine.h"
 
 #include "model/RouteParam.h"
-#include "model/RouteFork.h"
+#include "model/RouteResolve.h"
 
 #include "RouteShellTrigger.h"
 #include "GateRotation.h"
@@ -458,7 +458,7 @@ void RoutingEngine::updateSinks() {
 
             if (Routing::isBusTarget(target)) {
                 // Unified base-0 model: signed depthPct + combine, no min/max window.
-                float volts = RouteFork::busDelta(_sourceValues[routeIndex], route.shaper(0),
+                float volts = RouteResolve::busDelta(_sourceValues[routeIndex], route.shaper(0),
                                                   route.depthPct(0), route.combine());
                 int busIndex = int(target) - int(Routing::Target::BusCv1);
                 _engine.setBusCv(busIndex, volts, Engine::BusWriterRouting);
@@ -482,12 +482,12 @@ void RoutingEngine::updateSinks() {
                 float routeSpan = route.max() - route.min();
                 for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
                     if (tracks & (1 << trackIndex)) {
-                        // Apply fork: migrated Note/PhaseFlux per-track params take the
-                        // bias-free override path; old writeTarget is skipped for them.
+                        // Per-track override params take the bias-free override path; the
+                        // legacy writeTarget fallthrough is skipped for them.
                         uint8_t paramKey;
                         RouteParam::Range pRange;
-                        if (RouteFork::migrated(_project.track(trackIndex).trackMode(), target, paramKey, pRange)) {
-                            float delta = RouteFork::computeDelta(_sourceValues[routeIndex],
+                        if (RouteResolve::overrideParam(_project.track(trackIndex).trackMode(), target, paramKey, pRange)) {
+                            float delta = RouteResolve::computeDelta(_sourceValues[routeIndex],
                                                                  route.shaper(trackIndex), route.depthPct(trackIndex), pRange,
                                                                  route.combine());
                             Routing::writeRouteOverride(paramKey, trackIndex, delta);
@@ -562,8 +562,8 @@ void RoutingEngine::updateSinks() {
                 // skipping old absolute writeTarget. No track dimension -> slot 0
                 // carries the route's shaper/depth.
                 uint8_t gKey; RouteParam::Range gRange;
-                if (RouteFork::migratedGlobal(target, gKey, gRange)) {
-                    float delta = RouteFork::computeDelta(_sourceValues[routeIndex],
+                if (RouteResolve::overrideParamGlobal(target, gKey, gRange)) {
+                    float delta = RouteResolve::computeDelta(_sourceValues[routeIndex],
                                                           route.shaper(0), route.depthPct(0), gRange,
                                                           route.combine());
                     Routing::writeRouteOverride(gKey, Routing::GlobalTrack, delta);

@@ -7,7 +7,7 @@
 #include "core/math/Math.h"
 
 #include "model/Track.h"
-#include "model/RouteFork.h"
+#include "model/RouteResolve.h"
 #include "model/RouteDraft.h"
 
 namespace {
@@ -367,8 +367,8 @@ bool ListPage::modulatedRow(int row, int &routeIndex) const {
     const auto &track = _project.selectedTrack();
     uint8_t key = 0;
     RouteParam::Range range;
-    bool isMigrated = RouteFork::migrated(track.trackMode(), target, key, range) ||
-                      RouteFork::migratedGlobal(target, key, range);
+    bool isMigrated = RouteResolve::overrideParam(track.trackMode(), target, key, range) ||
+                      RouteResolve::overrideParamGlobal(target, key, range);
     if (!isMigrated) {
         return false;
     }
@@ -491,7 +491,7 @@ bool ListPage::trackEligible(int trackIndex) const {
     }
     uint8_t key = 0;
     RouteParam::Range range;
-    return RouteFork::migrated(_project.track(trackIndex).trackMode(), target, key, range);
+    return RouteResolve::overrideParam(_project.track(trackIndex).trackMode(), target, key, range);
 }
 
 int ListPage::firstEligibleTrack() const {

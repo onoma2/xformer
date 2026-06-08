@@ -2,7 +2,7 @@
 
 #include "Routing.h"
 #include "RouteParamKey.h"
-#include "RouteFork.h"
+#include "RouteResolve.h"
 
 // Param-aggregation read model for the tab editor (lens UI). A tab band maps to a
 // fixed list of ParamKeys (the registry bands); matches() resolves whether a route
@@ -39,7 +39,7 @@ namespace RouteBrowse {
     // table rows minus the keys the fixed Pitch/Clock/SlideTime bands already own
     // (Global keys never appear in engine tables). Preserves table order. Returns count.
     inline int enginePageParams(Track::TrackMode mode, uint8_t *keys, int maxKeys) {
-        const RouteParam::Table *table = RouteFork::tableForMode(mode);
+        const RouteParam::Table *table = RouteResolve::tableForMode(mode);
         if (!table) {
             return 0;
         }
@@ -85,7 +85,7 @@ namespace RouteBrowse {
         }
     }
 
-    // Reverse of RouteFork::targetToParamKey: the Routing::Target a new route should
+    // Reverse of RouteResolve::targetToParamKey: the Routing::Target a new route should
     // carry to back paramKey. Inverts the forward map by scan so every band AND engine
     // key resolves (the engine pages route the full per-type tables). None for unknown.
     inline Routing::Target paramKeyToTarget(uint8_t key) {
@@ -94,7 +94,7 @@ namespace RouteBrowse {
         }
         for (int t = 0; t < int(Routing::Target::Last); ++t) {
             auto target = Routing::Target(t);
-            if (RouteFork::targetToParamKey(target) == key) {
+            if (RouteResolve::targetToParamKey(target) == key) {
                 return target;
             }
         }
@@ -137,7 +137,7 @@ namespace RouteBrowse {
         if (!route.active()) {
             return false;
         }
-        if (RouteFork::targetToParamKey(route.target()) != paramKey) {
+        if (RouteResolve::targetToParamKey(route.target()) != paramKey) {
             return false;
         }
         bool perTrack = Routing::isPerTrackTarget(route.target());

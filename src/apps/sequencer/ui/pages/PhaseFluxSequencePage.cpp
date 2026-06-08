@@ -7,7 +7,7 @@
 #include "core/utils/StringBuilder.h"
 
 #include "model/RouteDraft.h"
-#include "model/RouteFork.h"
+#include "model/RouteResolve.h"
 #include "model/RouteParam.h"
 
 enum class ContextAction {
@@ -99,8 +99,8 @@ bool PhaseFluxSequencePage::contextActionEnabled(int index) const {
         auto target = _listModel.routingTarget(selectedRow());
         if (target == Routing::Target::None) return false;
         uint8_t key; RouteParam::Range range;
-        return RouteFork::migrated(_project.track(_project.selectedTrackIndex()).trackMode(), target, key, range)
-            || RouteFork::migratedGlobal(target, key, range);
+        return RouteResolve::overrideParam(_project.track(_project.selectedTrackIndex()).trackMode(), target, key, range)
+            || RouteResolve::overrideParamGlobal(target, key, range);
     }
     default:
         return true;

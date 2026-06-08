@@ -226,12 +226,8 @@ void Routing::writeTarget(Target target, uint8_t tracks, float normalized) {
             if (tracks & (1<<trackIndex)) {
                 auto &track = _project.track(trackIndex);
 
-                // CvOutputRotate + GateOutputRotate are handled at route level in
-                // RoutingEngine (group rotation, spec 018/019) — no per-track write here.
-                if (target == Target::Run) {
-                    track.setRunGate(floatValue > 0.55f, true);
-                    continue;
-                }
+                // Run/Reset and CvOutput/GateOutputRotate are handled on the clean path in
+                // RoutingEngine (specs 017/018/019) — no per-track write here.
                 // DiscreteMapSync: live non-migrated inlet (external reset/sync sink);
                 // retired from the override model but still routed via writeTarget.
                 if (target == Target::DiscreteMapSync) {

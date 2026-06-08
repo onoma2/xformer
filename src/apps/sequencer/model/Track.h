@@ -138,24 +138,8 @@ public:
     str(trackModeName(trackMode()));
   }
 
-  // cvOutputRotate
-
-  int cvOutputRotate() const { return _cvOutputRotate.get(Routing::isRouted(Routing::Target::CvOutputRotate, _trackIndex)); }
-  void setCvOutputRotate(int rotate, bool routed = false) {
-      _cvOutputRotate.set(clamp(rotate, -8, 8), routed);
-  }
-  void editCvOutputRotate(int value, bool shift) {
-      if (!Routing::isRouted(Routing::Target::CvOutputRotate, _trackIndex)) {
-          setCvOutputRotate(cvOutputRotate() + value);
-      }
-  }
-  void printCvOutputRotate(StringBuilder &str) const {
-      Routing::printRouted(str, Routing::Target::CvOutputRotate, _trackIndex);
-      str("%+d", cvOutputRotate());
-  }
-  bool isCvOutputRotated() const {
-      return _cvOutputRotate.base != 0 || Routing::isRouted(Routing::Target::CvOutputRotate, _trackIndex);
-  }
+  // _cvOutputRotate is vestigial (base always 0, never user-set): CV output rotation is a
+  // route-level group rotation in RoutingEngine now (spec 019). Field kept for format compat.
 
   // runGate
 
@@ -174,24 +158,8 @@ public:
        str(runGate() ? "On" : "Off");
   }
 
-  // gateOutputRotate
-
-  int gateOutputRotate() const { return _gateOutputRotate.get(Routing::isRouted(Routing::Target::GateOutputRotate, _trackIndex)); }
-  void setGateOutputRotate(int rotate, bool routed = false) {
-      _gateOutputRotate.set(clamp(rotate, -8, 8), routed);
-  }
-  void editGateOutputRotate(int value, bool shift) {
-      if (!Routing::isRouted(Routing::Target::GateOutputRotate, _trackIndex)) {
-          setGateOutputRotate(gateOutputRotate() + value);
-      }
-  }
-  void printGateOutputRotate(StringBuilder &str) const {
-      Routing::printRouted(str, Routing::Target::GateOutputRotate, _trackIndex);
-      str("%+d", gateOutputRotate());
-  }
-  bool isGateOutputRotated() const {
-      return _gateOutputRotate.base != 0 || Routing::isRouted(Routing::Target::GateOutputRotate, _trackIndex);
-  }
+  // _gateOutputRotate is vestigial (base always 0, never user-set): gate output rotation is a
+  // route-level group rotation in RoutingEngine now (spec 018). Field kept for format compat.
 
   // noteTrack
 

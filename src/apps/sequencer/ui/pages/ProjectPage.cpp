@@ -6,7 +6,7 @@
 
 #include "model/FileManager.h"
 #include "model/RouteDraft.h"
-#include "model/RouteFork.h"
+#include "model/RouteResolve.h"
 #include "model/RouteParam.h"
 
 #include "core/utils/StringBuilder.h"
@@ -160,7 +160,7 @@ bool ProjectPage::contextActionEnabled(int index) const {
         auto target = _listModel.routingTarget(selectedRow());
         if (target == Routing::Target::None) return false;
         uint8_t key; RouteParam::Range range;
-        return RouteFork::migratedGlobal(target, key, range);
+        return RouteResolve::overrideParamGlobal(target, key, range);
     }
     default:
         return true;

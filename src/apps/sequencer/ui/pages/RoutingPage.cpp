@@ -4,7 +4,7 @@
 
 #include "model/RouteBrowse.h"
 #include "model/RouteDraft.h"
-#include "model/RouteFork.h"
+#include "model/RouteResolve.h"
 #include "model/ParamTableGlobal.h"
 #include "model/ParamTableNote.h"
 #include "engine/RouteMidiLearn.h"
@@ -236,7 +236,7 @@ const char *RoutingPage::tabName(int t) const {
 const char *RoutingPage::tabParamName(int t, uint8_t key) const {
     const RouteParam::Table *tbl = nullptr;
     if (tabIsEngine(t)) {
-        tbl = RouteFork::tableForMode(tabEngineMode(t));
+        tbl = RouteResolve::tableForMode(tabEngineMode(t));
     } else if (RouteBrowse::Band(t) == RouteBrowse::Band::Global) {
         tbl = &GlobalParamTable::table();
     } else {
@@ -388,16 +388,16 @@ static bool tabCellEligible(const Track &track, uint8_t paramKey) {
     Routing::Target target = RouteBrowse::paramKeyToTarget(paramKey);
     if (target == Routing::Target::None) return false;
     // Output/transport shell targets apply to any track regardless of engine mode — they
-    // aren't migrated param-table params, so the migrated() gate would wrongly reject them.
+    // aren't migrated param-table params, so the overrideParam() gate would wrongly reject them.
     if (target == Routing::Target::Run || target == Routing::Target::Reset ||
         target == Routing::Target::CvOutputRotate || target == Routing::Target::GateOutputRotate) {
         return true;
     }
     uint8_t key; RouteParam::Range range;
     if (Routing::isProjectTarget(target)) {
-        return RouteFork::migratedGlobal(target, key, range);
+        return RouteResolve::overrideParamGlobal(target, key, range);
     }
-    return RouteFork::migrated(track.trackMode(), target, key, range);
+    return RouteResolve::overrideParam(track.trackMode(), target, key, range);
 }
 
 void RoutingPage::drawTabEditor(Canvas &canvas) {

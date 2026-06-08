@@ -838,8 +838,8 @@ public:
               CvSource &cvSource()       { return _cvSource; }
         const MidiSource &midiSource() const { return _midiSource; }
               MidiSource &midiSource()       { return _midiSource; }
-        bool cvRotateInterpolate() const { return _cvRotateInterpolate; }
-        void setCvRotateInterpolate(bool enabled) { _cvRotateInterpolate = enabled; }
+        // _cvRotateInterpolate is vestigial (never set; the CV-rotate interp path was deleted,
+        // its morph returns as CvOutputCrossfade). Field kept serialized for format compat.
         Route();
         void clear();
         bool active() const { return _target != Target::None; }

@@ -1,7 +1,7 @@
 #include "UnitTest.h"
 
 #include "apps/sequencer/model/RouteBrowse.h"
-#include "apps/sequencer/model/RouteFork.h"
+#include "apps/sequencer/model/RouteResolve.h"
 #include "apps/sequencer/model/RouteParamKey.h"
 #include "apps/sequencer/model/Project.h"
 
@@ -96,7 +96,7 @@ CASE("paramKeyToTarget: round-trips every band param key") {
         for (int i = 0; i < n; ++i) {
             Routing::Target t = RouteBrowse::paramKeyToTarget(keys[i]);
             expectTrue(int(t) != int(Routing::Target::None), "band key maps to a real target");
-            expectEqual(int(RouteFork::targetToParamKey(t)), int(keys[i]), "round-trips key");
+            expectEqual(int(RouteResolve::targetToParamKey(t)), int(keys[i]), "round-trips key");
         }
     }
 }

@@ -31,7 +31,7 @@
 //
 // See docs/plans/2026-06-03-005-sliced-cutover-plan.md.
 
-namespace RouteFork {
+namespace RouteResolve {
 
     // Bridge the route's legacy Routing::Target to a shared ParamKey number.
     // Covers every target that backs a Note or PhaseFlux table row; None otherwise
@@ -157,10 +157,10 @@ namespace RouteFork {
         }
     }
 
-    // True when (trackMode, target) is a migrated per-track param; fills paramKey
-    // and the param's real range. Migrated: Note, PhaseFlux, Curve, Tuesday,
-    // Stochastic, DiscreteMap, Indexed, MidiCv (all engines).
-    inline bool migrated(Track::TrackMode mode, Routing::Target target,
+    // True when (trackMode, target) is a per-track override param; fills paramKey
+    // and the param's real range. The override path covers every engine's sequence
+    // params (Note/PhaseFlux/Curve/Tuesday/Stochastic/DiscreteMap/Indexed/MidiCv).
+    inline bool overrideParam(Track::TrackMode mode, Routing::Target target,
                          uint8_t &paramKey, RouteParam::Range &range) {
         const RouteParam::Table *table = tableForMode(mode);
         if (!table) {
@@ -178,8 +178,8 @@ namespace RouteFork {
 
     // Global (project) variant: Tempo/Swing/CVR have no track dimension. Gates on
     // the project-target range + the global param table, filling key + range the
-    // same way migrated() does — the engine writes the override at GlobalTrack.
-    inline bool migratedGlobal(Routing::Target target, uint8_t &paramKey, RouteParam::Range &range) {
+    // same way overrideParam() does — the engine writes the override at GlobalTrack.
+    inline bool overrideParamGlobal(Routing::Target target, uint8_t &paramKey, RouteParam::Range &range) {
         if (!Routing::isProjectTarget(target)) {
             return false;
         }
@@ -193,4 +193,4 @@ namespace RouteFork {
         return true;
     }
 
-} // namespace RouteFork
+} // namespace RouteResolve
