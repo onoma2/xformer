@@ -102,6 +102,9 @@ from pages_modulator import (
     render_modulator_proposed_chaos,
     render_modulator_proposed_adsr_page2,
     render_modulator_proposed_chaos_page2,
+    render_modulator_rate_free_proposed,
+    render_modulator_rate_tempo_proposed,
+    render_modulator_gatemodes_proposed,
 )
 from tracks import (
     DiscreteMapSequence, DiscreteMapTrackEngine,
@@ -366,6 +369,12 @@ def render_page(page: str, scale: int = 4):
         render_modulator_proposed_adsr_page2(canvas)
     elif page == "modulator-proposed-chaos-page2":
         render_modulator_proposed_chaos_page2(canvas)
+    elif page == "modulator-rate-free-proposed":
+        render_modulator_rate_free_proposed(canvas)
+    elif page == "modulator-rate-tempo-proposed":
+        render_modulator_rate_tempo_proposed(canvas)
+    elif page == "modulator-gatemodes-proposed":
+        render_modulator_gatemodes_proposed(canvas)
     elif page == "stochastic-loop-proposed":
         render_stochastic_loop_proposed(canvas)
     elif page == "stochastic-loop-proposed-held":
@@ -572,6 +581,7 @@ def main():
                                  'modulator-proposed-sine', 'modulator-proposed-adsr',
                                  'modulator-proposed-random', 'modulator-proposed-chaos',
                                  'modulator-proposed-adsr-page2', 'modulator-proposed-chaos-page2',
+                                 'modulator-rate-free-proposed', 'modulator-rate-tempo-proposed', 'modulator-gatemodes-proposed',
                                  'stochastic-loop-proposed', 'stochastic-loop-proposed-held',
                                  'stochastic-live-proposed', 'stochastic-live-proposed-held',
                                  'stochastic-live-proposed-burst', 'stochastic-live-proposed-spread',

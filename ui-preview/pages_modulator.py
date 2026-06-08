@@ -623,6 +623,68 @@ def render_modulator_current_chaos(canvas):
     render_modulator_page_current(canvas, mod, eng, selected_function=3, current_page=0)
 
 
+# --- PROPOSED: wall-clock rate domain + gate-mode rename ---
+
+_GATE_MODE_NAMES = {0: "Run", 1: "Trig", 2: "Gate"}
+
+
+def _format_free_rate(centi_hz):
+    return f"{centi_hz / 100.0:.2f}Hz"
+
+
+def _render_modulator_rate_domain(canvas, domain):
+    # Main page, Chaos shape, RATE selected. Free shows centi-Hz (default 0.05Hz);
+    # Tempo shows a clock division. Domain flips with press; a dim tag shows which.
+    mod = MockModulator(shape=ModulatorShape.ChaosLorenz, depth=80)
+    eng = MockModulatorEngine(current_value=80)
+    WindowPainter.clear(canvas)
+    WindowPainter.draw_header(canvas, track=0, mode="MOD 1 - MODULATOR")
+    WindowPainter.draw_active_function(canvas, "")
+    WindowPainter.draw_footer(canvas, ["SHAPE", "RATE", "P1", "P2", "DEPTH"], highlight=1)
+    param_x = 132            # clear of the level bar (x=124..128)
+    canvas.set_font(Font.Tiny)
+    canvas.set_blend_mode(BlendMode.Set)
+    canvas.set_color(Color.Medium)
+    canvas.draw_text(param_x, 18, "RATE")
+    canvas.set_font(Font.Small)
+    canvas.set_color(Color.Bright)
+    value = _format_free_rate(5) if domain == 'free' else "1/4"
+    canvas.draw_text(param_x, 30, value)
+    canvas.set_font(Font.Tiny)
+    canvas.set_color(Color.Low)
+    canvas.draw_text(param_x, 44, "FREE" if domain == 'free' else "TEMPO")
+    _draw_waveform(canvas, mod, eng, 0)
+
+
+def render_modulator_rate_free_proposed(canvas):
+    _render_modulator_rate_domain(canvas, 'free')
+
+
+def render_modulator_rate_tempo_proposed(canvas):
+    _render_modulator_rate_domain(canvas, 'tempo')
+
+
+def render_modulator_gatemodes_proposed(canvas):
+    # Routing overlay, MODE selected. Gate behavior renamed/reduced to Run/Trig/Gate.
+    mod = MockModulator(shape=ModulatorShape.Sine, mode=1)
+    eng = MockModulatorEngine(current_value=64)
+    WindowPainter.clear(canvas)
+    WindowPainter.draw_header(canvas, track=0, mode="MOD 1 - ROUTING")
+    WindowPainter.draw_footer(canvas, ["MODE", "GATE", "TARGET", "EVENT", "CC NUM"], highlight=0)
+    param_x = 132            # clear of the level bar (x=124..128)
+    canvas.set_font(Font.Tiny)
+    canvas.set_blend_mode(BlendMode.Set)
+    canvas.set_color(Color.Medium)
+    canvas.draw_text(param_x, 18, "MODE")
+    canvas.set_font(Font.Small)
+    canvas.set_color(Color.Bright)
+    canvas.draw_text(param_x, 30, _GATE_MODE_NAMES[1])
+    canvas.set_font(Font.Tiny)
+    canvas.set_color(Color.Low)
+    canvas.draw_text(param_x, 44, "Run / Trig / Gate")
+    _draw_waveform(canvas, mod, eng, 0)
+
+
 # --- PROPOSED v2 ---
 
 def render_modulator_proposed_sine(canvas):
