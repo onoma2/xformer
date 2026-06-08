@@ -4,6 +4,7 @@
 #include "model/RouteFork.h"
 
 #include "RouteShellTrigger.h"
+#include "GateRotation.h"
 #include "Engine.h"
 #include "MidiUtils.h"
 #include "core/math/Math.h"
@@ -427,6 +428,8 @@ void RoutingEngine::updateSources() {
 void RoutingEngine::updateSinks() {
     _cvRotateValues.fill(0.f);
     _cvRotateInterp.fill(false);
+    _gateRotateMask = 0;
+    _gateRotateAmount = 0;
     Routing::clearRouteOverrides();
 
     for (int routeIndex = 0; routeIndex < CONFIG_ROUTE_COUNT; ++routeIndex) {
@@ -475,6 +478,13 @@ void RoutingEngine::updateSinks() {
                                                   route.depthPct(0), route.combine());
                 int busIndex = int(target) - int(Routing::Target::BusCv1);
                 _engine.setBusCv(busIndex, volts, Engine::BusWriterRouting);
+            } else if (target == Routing::Target::GateOutputRotate) {
+                // Group rotation (spec 018): route-level, not per-track. The track mask is
+                // the group; one amount rotates it. Single group — lowest-index route wins.
+                if (_gateRotateMask == 0) {
+                    _gateRotateMask = route.tracks();
+                    _gateRotateAmount = gateRotationFromSource(_sourceValues[routeIndex], route.depthPct(0), route.combine());
+                }
             } else if (Routing::isPerTrackTarget(target)) {
                 uint8_t tracks = route.tracks();
 

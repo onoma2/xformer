@@ -2,6 +2,7 @@
 
 #include "Config.h"
 #include "MidiUtils.h"
+#include "GateRotation.h"
 
 #include "core/Debug.h"
 #include "core/midi/MidiMessage.h"
@@ -596,11 +597,13 @@ void Engine::updateTrackOutputs() {
     int gatePool[CONFIG_CHANNEL_COUNT];
     int gatePoolSize = 0;
 
-    // Identify Gate Pool
+    // Identify Gate Pool: jacks whose track is in the rotation group (spec 018 — the
+    // GateOutputRotate route's mask), not the legacy per-track isGateOutputRotated().
+    uint8_t gateRotateMask = _routingEngine.gateRotateMask();
     for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
         int trackIndex = gateOutputTracks[i];
         if (trackIndex < CONFIG_TRACK_COUNT &&
-            _project.track(trackIndex).isGateOutputRotated()) {
+            (gateRotateMask & (1 << trackIndex))) {
             gatePool[gatePoolSize++] = i;
         }
     }
@@ -638,15 +641,8 @@ void Engine::updateTrackOutputs() {
         for (int k = 0; k < gatePoolSize; ++k) { if (gatePool[k] == i) { gatePoolIndex = k; break; } }
 
         if (gatePoolIndex != -1) {
-            // It's rotating!
-            int originalTrack = gateOutputTracks[i];
-            int rotation = _project.track(originalTrack).gateOutputRotate();
-
-            // Wrap rotation within pool size
-            // Note: standard % operator can return negative values, handle carefully
-            int rotatedIndex = (gatePoolIndex - rotation) % gatePoolSize;
-            if (rotatedIndex < 0) rotatedIndex += gatePoolSize;
-
+            // One group amount rotates the whole pool (legacy (p - N) mod K cycle).
+            int rotatedIndex = rotatedGroupMember(gatePoolIndex, _routingEngine.gateRotateAmount(), gatePoolSize);
             gateSourceOutputIndex = gatePool[rotatedIndex];
         }
 

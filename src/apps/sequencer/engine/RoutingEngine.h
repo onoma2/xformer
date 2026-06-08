@@ -27,6 +27,11 @@ public:
     bool cvRotateInterpolated(int trackIndex) const;
     float cvRotateValue(int trackIndex) const;
 
+    // Gate-output group rotation (spec 018): one mask + amount per frame, applied to the
+    // masked group's jacks in the engine output loop. Mask 0 = no rotation this frame.
+    uint8_t gateRotateMask() const { return _gateRotateMask; }
+    int gateRotateAmount() const { return _gateRotateAmount; }
+
     struct RouteState {
         Routing::Target target = Routing::Target::None;
         uint8_t tracks = 0;
@@ -110,4 +115,6 @@ private:
     std::array<RouteState, CONFIG_ROUTE_COUNT> _routeStates;
     std::array<float, CONFIG_TRACK_COUNT> _cvRotateValues{};
     std::array<bool, CONFIG_TRACK_COUNT> _cvRotateInterp{};
+    uint8_t _gateRotateMask = 0;
+    int _gateRotateAmount = 0;
 };

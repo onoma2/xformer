@@ -231,10 +231,8 @@ void Routing::writeTarget(Target target, uint8_t tracks, float normalized) {
                     track.setCvOutputRotate(intValue, true);
                     continue;
                 }
-                if (target == Target::GateOutputRotate) {
-                    track.setGateOutputRotate(intValue, true);
-                    continue;
-                }
+                // GateOutputRotate is handled at route level in RoutingEngine (group
+                // rotation, spec 018) — no per-track write here.
                 if (target == Target::Run) {
                     track.setRunGate(floatValue > 0.55f, true);
                     continue;
