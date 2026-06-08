@@ -217,15 +217,23 @@ per-track targets the override fork doesn't claim. Removing it target-by-target.
 - [ ] **CvOutputCrossfade** (spec 019 slice 2, DEFERRED) — new appended Target, float group
       position, crossfade adjacent members' CVs. Note: the CV-router `scan` already crossfades
       CvIn/Bus/Mod lanes; this only adds direct track-CV morph across the group.
-- [ ] **Legacy branch now a no-op fallthrough.** All four shell targets are off it; it only
-      catches mismatched (target, mode) pairs (a no-op `writeTarget`). Candidate for deletion once
-      confirmed nothing legitimately rides it — bundled with the shaper deletion (separate).
-- [ ] **Dead-code + rename cleanup (NEXT).** Delete dead accessors (`isGateOutputRotated`/
-      `isCvOutputRotated`, the rotate get/set/edit/print clusters, `cvRotateInterpolate` get/set,
-      the Run `writeTarget` case); keep the serialized base/flag fields (no version bump). Rename
-      `migrated`/`migratedGlobal`/`RouteFork` → override-centric names (the phase-6 migration is
-      done; the word is now history). Leave `draft`/`RouteDraft` — it's the live edit→COMMIT model,
-      not legacy. Shapers stay a separate discussion.
+- [x] **Dead-code + rename cleanup** (2026-06-08, `93592c4d`). Deleted dead accessors
+      (`isGateOutputRotated`/`isCvOutputRotated`, the rotate get/set/edit/print clusters,
+      `cvRotateInterpolate` get/set, the Run `writeTarget` case); serialized base/flag fields kept.
+      Renamed `migrated`/`migratedGlobal`/`RouteFork` → `overrideParam`/`overrideParamGlobal`/
+      `RouteResolve`. `draft`/`RouteDraft` left (live edit→COMMIT model, not legacy).
+- [x] **Legacy shaper branch DELETED + stateful shapers parked** (2026-06-08, `b1ecf3de`/
+      `74640e28`/`d9806d03`). **Crease ported** into `RouteShaper` (was identity; only its legacy
+      `applyCreaseSource` existed). **Off-center fold variants** added as the bias replacement:
+      `TriangleFold30/70` + `Crease10/90` (fixed centers; appended enum ordinals, re-tunable
+      constants, no version bump) — SHAPER dial None/FLD/F30/F70/CRS/C10/C90. **Deleted the whole
+      legacy apply branch** (`applyBiasDepthToSource` + bias + min/max window + 9-shaper switch) +
+      the per-route shaper-state machinery (`RouteState` shaper[8]/state structs/TrackStateUnion/
+      shaperState[8]; resetState/effectiveShaper/resetRouteShaperState/resetShaperState). The 5
+      **stateful** shapers' math + tuning **parked, not compiled**, in
+      `.tasks/modulator-enhancements/parked-stateful-shapers.cpp` for the modulator migration.
+      Mismatched (target,mode) routes are now clean no-ops. ~3.1 KB flash + shaperState .bss freed.
+      Routing shaper lane = the stateless folds only; None/Fold/Crease(+offset) live via RouteShaper.
 
 ## Deferred / out of scope (spec §13)
 - `scaleSource` cross-source resolution (stored + math exist; `computeDelta` hardcodes the
