@@ -31,11 +31,22 @@ namespace RouteShaper {
         return clamp(0.5f + 0.5f * folded, 0.f, 1.f);
     }
 
-    // Shaper stage dispatch: None/TriangleFold ported; others identity this slice.
+    // Bias-free discontinuous fold: a fixed ±0.5 wrap at center (threshold locked at 0.5;
+    // bias is gone). Crease's harsh, aliasing cousin to TriangleFold.
+    inline float crease(float h) {
+        constexpr float creaseAmount = 0.5f;
+        float creased = h + (h <= 0.5f ? creaseAmount : -creaseAmount);
+        return clamp(creased, 0.f, 1.f);
+    }
+
+    // Shaper stage dispatch: the stateless folds (None/TriangleFold/Crease) live on the
+    // routing lane; the stateful shapers are identity here (they move to modulators).
     inline float shape(Routing::Shaper shaper, float h) {
         switch (shaper) {
         case Routing::Shaper::TriangleFold:
             return triangleFold(h);
+        case Routing::Shaper::Crease:
+            return crease(h);
         default:
             return h;
         }

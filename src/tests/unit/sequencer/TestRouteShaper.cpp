@@ -49,8 +49,16 @@ CASE("TriangleFold output stays in [0,1]") {
     }
 }
 
-CASE("unported shapers fall through to identity this slice") {
-    for (auto shaper : { Routing::Shaper::Crease, Routing::Shaper::Location,
+CASE("Crease is a bias-free discontinuous fold at center (+-0.5 wrap)") {
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::Crease, 0.0f), 0.5f),  "0 -> 0.5");
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::Crease, 0.5f), 1.0f),  "0.5 -> 1.0 (<= threshold)");
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::Crease, 1.0f), 0.5f),  "1 -> 0.5");
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::Crease, 0.25f), 0.75f), "0.25 -> 0.75");
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::Crease, 0.75f), 0.25f), "0.75 -> 0.25");
+}
+
+CASE("the remaining (stateful) shapers fall through to identity — they move to modulators") {
+    for (auto shaper : { Routing::Shaper::Location,
                          Routing::Shaper::Envelope, Routing::Shaper::FrequencyFollower,
                          Routing::Shaper::Activity, Routing::Shaper::ProgressiveDivider,
                          Routing::Shaper::VcaNext }) {

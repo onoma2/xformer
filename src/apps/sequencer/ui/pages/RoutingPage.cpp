@@ -136,11 +136,16 @@ void RoutingPage::encoder(EncoderEvent &event) {
             return;
         }
         if (_matrixView == MatrixView::Shaper) {    // SHAPER view: dial the row's shaper
-            int idx = _matrixDraft.route.shaper(0) == Routing::Shaper::TriangleFold ? 1 : 0;
-            idx = clamp(idx + (event.value() > 0 ? 1 : -1), 0, 1);
-            Routing::Shaper s = idx ? Routing::Shaper::TriangleFold : Routing::Shaper::None;
+            // only the stateless folds live on the routing lane (None/Fold/Crease)
+            static const Routing::Shaper live[] = { Routing::Shaper::None,
+                Routing::Shaper::TriangleFold, Routing::Shaper::Crease };
+            int idx = 0;
+            for (int i = 0; i < 3; ++i) {
+                if (_matrixDraft.route.shaper(0) == live[i]) { idx = i; break; }
+            }
+            idx = clamp(idx + (event.value() > 0 ? 1 : -1), 0, 2);
             for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
-                _matrixDraft.route.setShaper(t, s);
+                _matrixDraft.route.setShaper(t, live[idx]);
             }
             event.consume();
             return;
@@ -524,7 +529,8 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
             if (_matrixView == MatrixView::Shaper) {   // row's shaper on every eligible cell
                 FixedStringBuilder<6> txt;
                 if (rowHasRoute) {
-                    txt(rowShaper == Routing::Shaper::TriangleFold ? "FLD" : "-");
+                    txt(rowShaper == Routing::Shaper::TriangleFold ? "FLD"
+                        : rowShaper == Routing::Shaper::Crease ? "CRS" : "-");
                 } else {
                     txt(".");
                 }
