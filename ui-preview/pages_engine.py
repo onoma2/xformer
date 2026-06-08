@@ -52,7 +52,7 @@ def _engine_page(canvas, tab, engines, eligible_letter, rows, cursor_row, cursor
     canvas.set_color(Color.Bright)
     canvas.draw_text(2, 7, tab)
     canvas.set_color(Color.Medium)
-    vtag = "SOURCE" if view == "source" else "DEPTH"
+    vtag = {"source": "SOURCE", "depth": "DEPTH", "shaper": "SHAPER"}.get(view, "DEPTH")
     canvas.draw_text((PW - canvas.text_width(vtag)) // 2, 7, vtag)
     canvas.draw_text(bar_x - canvas.text_width(combine) - 2, 7, combine)
     canvas.hline(0, 10, PW)
@@ -75,7 +75,8 @@ def _engine_page(canvas, tab, engines, eligible_letter, rows, cursor_row, cursor
         r = scroll + vi
         if r >= len(rows):
             break
-        name, source, depths = rows[r]
+        name, source, depths = rows[r][:3]
+        shaper = rows[r][3] if len(rows[r]) > 3 else "-"   # per-row shaper abbrev
         y = top + vi * rh
         canvas.set_color(Color.Bright if r == cursor_row else Color.Medium)
         canvas.draw_text(2, y + 6, _clip(canvas, name, name_w - 2))
@@ -89,7 +90,12 @@ def _engine_page(canvas, tab, engines, eligible_letter, rows, cursor_row, cursor
                 continue
             d = depths.get(t) if depths else None
             if d is not None:
-                txt = source if view == "source" else f"{d:+d}"
+                if view == "source":
+                    txt = source
+                elif view == "shaper":
+                    txt = shaper
+                else:
+                    txt = f"{d:+d}"
                 canvas.set_color(Color.Bright if is_cursor else Color.Medium)
             else:
                 txt = "."
@@ -112,15 +118,15 @@ def _engine_page(canvas, tab, engines, eligible_letter, rows, cursor_row, cursor
 # tracks 1,2,5 = Curve; rest other engines
 _CURVE_ENGINES = ["C", "C", "N", "A", "C", "D", "P", "I"]
 _CURVE_ROWS = [
-    ("Offset", "CV1", {0: 20, 1: -10, 4: 30}),
-    ("Shp Bias", "B2", {0: 15, 4: 15}),
+    ("Offset", "CV1", {0: 20, 1: -10, 4: 30}, "FLD"),
+    ("Shp Bias", "B2", {0: 15, 4: 15}, "-"),
     ("Gate Bias", None, None),
-    ("C.Rate", "LFO1", {1: 40}),
+    ("C.Rate", "LFO1", {1: 40}, "-"),
     ("Phase", None, None),
     ("Run Mode", None, None),
     ("First St", None, None),
     ("Last St", None, None),
-    ("Fold", "CV3", {0: 50, 4: 50}),
+    ("Fold", "CV3", {0: 50, 4: 50}, "FLD"),
     ("Gain", None, None),
     ("DJ Filter", None, None),
     ("Chaos Amt", "B1", {1: 25}),
@@ -144,6 +150,11 @@ _NOTE_ROWS = [
 def render_engine_curve(canvas):
     _engine_page(canvas, "CURVE", _CURVE_ENGINES, "C", _CURVE_ROWS,
                  cursor_row=6, cursor_col=4)
+
+
+def render_engine_curve_shaper(canvas):
+    _engine_page(canvas, "CURVE", _CURVE_ENGINES, "C", _CURVE_ROWS,
+                 cursor_row=0, cursor_col=4, view="shaper")
 
 
 def render_engine_note(canvas):

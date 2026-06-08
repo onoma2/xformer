@@ -487,6 +487,9 @@ def render_page(page: str, scale: int = 4):
     elif page == "engine-note-proposed":
         from pages_engine import render_engine_note
         render_engine_note(canvas)
+    elif page == "engine-curve-shaper-proposed":
+        from pages_engine import render_engine_curve_shaper
+        render_engine_curve_shaper(canvas)
     elif page == "bus-nav-proposed":
         from pages_bus import render_bus_nav_proposed
         render_bus_nav_proposed(canvas)
@@ -546,6 +549,7 @@ def main():
                                  'mod-param-row', 'mod-param-depth', 'mod-spread', 'mod-source', 'mod-matrix', 'mod-matrix-bytype', 'mod-matrix-src',
                                  'bus', 'engine-curve-proposed', 'engine-note-proposed', 'bus-grid-proposed', 'bus-nav-proposed', 'bus-edit-source-proposed', 'bus-edit-depth-proposed',
                                  'midi-proposed', 'midi-empty-proposed', 'midi-edit-proposed', 'midi-learn-proposed',
+                                 'engine-curve-shaper-proposed',
                                  # Pure reference screens
                                  'ref-prob-melod', 'ref-shredder', 'ref-euclid',
                                  'ref-delinquencer', 'ref-skylines', 'ref-prob-div',

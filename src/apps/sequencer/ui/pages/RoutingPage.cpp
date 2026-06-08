@@ -135,6 +135,16 @@ void RoutingPage::encoder(EncoderEvent &event) {
             event.consume();
             return;
         }
+        if (_matrixView == MatrixView::Shaper) {    // SHAPER view: dial the row's shaper
+            int idx = _matrixDraft.route.shaper(0) == Routing::Shaper::TriangleFold ? 1 : 0;
+            idx = clamp(idx + (event.value() > 0 ? 1 : -1), 0, 1);
+            Routing::Shaper s = idx ? Routing::Shaper::TriangleFold : Routing::Shaper::None;
+            for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
+                _matrixDraft.route.setShaper(t, s);
+            }
+            event.consume();
+            return;
+        }
         // DEPTH view: dial the cursor cell's draft depth
         const Track &track = _project.track(_tabCol);
         uint8_t paramKey = 0;
@@ -268,6 +278,7 @@ void RoutingPage::matrixEnterEdit() {
     }
     _matrixEditActive = true;
     _matrixEditRow = _tabEditorRow;
+    _matrixView = MatrixView::Source;        // edit opens on SOURCE, not DEPTH
 }
 
 // Group index of a source for Shift+encoder jumps: 0 None, 1 CvIn, 2 CvOut, 3 BusCv,
@@ -398,7 +409,8 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     canvas.setColor(Color::Bright);
     canvas.drawText(2, 7, tabName(_tabEditorTab));
     canvas.setColor(Color::Medium);
-    const char *viewTag = _matrixView == MatrixView::Source ? "SOURCE" : "DEPTH";
+    const char *viewTag = _matrixView == MatrixView::Source ? "SOURCE"
+                        : _matrixView == MatrixView::Shaper ? "SHAPER" : "DEPTH";
     canvas.drawText((CONFIG_LCD_WIDTH - canvas.textWidth(viewTag)) / 2, 7, viewTag);
     // occupied-slot counter (always) far-right; combine indicator sits to its left
     int activeRoutes = 0;
@@ -466,10 +478,12 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
         // whether a track is actually applied is shown by DEPTH view. Resolve the row source once.
         Routing::Source rowSource = Routing::Source::None;
         RouteApply::Combine rowCombine = RouteApply::Combine::Modulate;
+        Routing::Shaper rowShaper = Routing::Shaper::None;
         bool rowHasRoute = false;
         if (draftRow) {
             rowSource = _matrixDraft.route.source();
             rowCombine = _matrixDraft.route.combine();
+            rowShaper = _matrixDraft.route.shaper(0);
             rowHasRoute = true;
         } else {
             int rowRouteIdx = routeForBandParam(key, globalKey ? 0 : 0xFF);
@@ -477,6 +491,7 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
                 const auto &rr = _project.routing().route(rowRouteIdx);
                 rowSource = rr.source();
                 rowCombine = rr.combine();
+                rowShaper = rr.shaper(0);
                 rowHasRoute = true;
             }
         }
@@ -493,6 +508,17 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
                 FixedStringBuilder<6> txt;
                 if (rowHasRoute) {
                     Routing::printSourceAbbrev(rowSource, txt);
+                } else {
+                    txt(".");
+                }
+                canvas.setColor(isCursor ? Color::Bright : (rowHasRoute ? Color::Medium : Color::MediumLow));
+                canvas.drawText(cx - canvas.textWidth(txt) / 2, y + 6, txt);
+                continue;
+            }
+            if (_matrixView == MatrixView::Shaper) {   // row's shaper on every eligible cell
+                FixedStringBuilder<6> txt;
+                if (rowHasRoute) {
+                    txt(rowShaper == Routing::Shaper::TriangleFold ? "FLD" : "-");
                 } else {
                     txt(".");
                 }
@@ -617,8 +643,10 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
                 matrixEnterEdit();
             }
             break;
-        case Function::View: // cycle the cell view: depth <-> source
-            _matrixView = _matrixView == MatrixView::Depth ? MatrixView::Source : MatrixView::Depth;
+        case Function::View: // cycle the cell view: source -> depth -> shaper
+            _matrixView = _matrixView == MatrixView::Source ? MatrixView::Depth
+                        : _matrixView == MatrixView::Depth ? MatrixView::Shaper
+                        : MatrixView::Source;
             break;
         case Function::Combine: // toggle Modulate <-> Absolute on the draft
             if (_matrixEditActive) {

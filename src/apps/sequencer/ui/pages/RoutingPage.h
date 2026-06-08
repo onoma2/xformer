@@ -55,7 +55,7 @@ private:
     const char *tabName(int t) const;                // header label for tab t
     const char *tabParamName(int t, uint8_t key) const;      // row label (short pref)
 
-    enum class MatrixView { Depth, Source };
+    enum class MatrixView { Depth, Source, Shaper };
     MatrixView _matrixView = MatrixView::Depth;
 
     int _tabEditorTab = 0;
