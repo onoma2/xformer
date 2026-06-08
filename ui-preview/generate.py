@@ -496,6 +496,18 @@ def render_page(page: str, scale: int = 4):
     elif page == "bus-edit-depth-proposed":
         from pages_bus import render_bus_edit_depth_proposed
         render_bus_edit_depth_proposed(canvas)
+    elif page == "midi-proposed":
+        from pages_midi import render_midi
+        render_midi(canvas)
+    elif page == "midi-empty-proposed":
+        from pages_midi import render_midi_empty
+        render_midi_empty(canvas)
+    elif page == "midi-edit-proposed":
+        from pages_midi import render_midi_edit
+        render_midi_edit(canvas)
+    elif page == "midi-learn-proposed":
+        from pages_midi import render_midi_learn
+        render_midi_learn(canvas)
     else:
         raise ValueError(f"Unknown page: {page}")
 
@@ -533,6 +545,7 @@ def main():
                                  'routing-hero', 'routing-hero-step', 'routing-scope', 'routing-scope-global', 'routing-unified', 'routing-unified-clock', 'routing-spread', 'routing-target', 'routing-scope-bytype', 'routing-unified-idx', 'routing-unified-idx1', 'routing-source', 'routing-source-gate', 'routing-tabscope', 'routing-tabscope-bytype', 'routing-depth', 'routing-depth-abs', 'routing-tablane', 'routing-rowbar',
                                  'mod-param-row', 'mod-param-depth', 'mod-spread', 'mod-source', 'mod-matrix', 'mod-matrix-bytype', 'mod-matrix-src',
                                  'bus', 'engine-curve-proposed', 'engine-note-proposed', 'bus-grid-proposed', 'bus-nav-proposed', 'bus-edit-source-proposed', 'bus-edit-depth-proposed',
+                                 'midi-proposed', 'midi-empty-proposed', 'midi-edit-proposed', 'midi-learn-proposed',
                                  # Pure reference screens
                                  'ref-prob-melod', 'ref-shredder', 'ref-euclid',
                                  'ref-delinquencer', 'ref-skylines', 'ref-prob-div',
