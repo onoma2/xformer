@@ -440,7 +440,8 @@ def render_modulator_page_current(canvas, modulator, engine,
 
 def render_modulator_page_proposed_v2(canvas, modulator, engine,
                                       selected_modulator=0, current_page=0,
-                                      selected_function=0, show_routing=False):
+                                      selected_function=0, show_routing=False,
+                                      scope_mode=False):
     is_random = (modulator.shape() == ModulatorShape.Random)
     is_triggered = is_random and (modulator.random_mode() == ModulatorRandomMode.Triggered)
     is_adsr = (modulator.shape() == ModulatorShape.ADSR)
@@ -489,8 +490,11 @@ def render_modulator_page_proposed_v2(canvas, modulator, engine,
             page_str = f"Pg {current_page + 1}/{total_pages}"
             canvas.draw_text(56, 12, page_str)
 
-    # Waveform (left half — UNCHANGED)
-    _draw_waveform(canvas, modulator, engine, selected_modulator)
+    # Waveform (left half): proposed scope-style rolling trace, or the current static shape.
+    if scope_mode:
+        _draw_modulator_scope(canvas)
+    else:
+        _draw_waveform(canvas, modulator, engine, selected_modulator)
 
     # ------------------------------------------------------------------
     # PROPOSED RIGHT PANEL: 2-row layout, Small font, no labels
@@ -631,6 +635,34 @@ def render_modulator_current_chaos(canvas):
                         attack=800, decay=600)
     eng = MockModulatorEngine(current_value=55)
     render_modulator_page_current(canvas, mod, eng, selected_function=3, current_page=0)
+
+
+def _draw_modulator_scope(canvas, samples_cycles=2.2):
+    # Proposed: real-time rolling trace of the modulator output (reuses the monitor
+    # scope's trace draw), NO level bar. Box enlarged left/up/down (the freed bar +
+    # safe-area room): x=1, y=12, bottom=52.
+    x, y, w, h = 1, 12, 119, 40
+    canvas.set_color(Color.Medium)
+    canvas.draw_rect(x, y, w, h)
+    cx, cy = x + 2, y + h // 2
+    sw, sh = w - 4, h - 4
+    canvas.set_color(Color.Low)
+    canvas.hline(cx, cy, sw)                      # center line
+    canvas.set_color(Color.Bright)
+    prev = None
+    for i in range(sw):                           # representative rolling trace
+        v = math.sin(2 * math.pi * samples_cycles * i / sw)
+        py = cy - int(v * (sh // 2))
+        if prev is not None:
+            canvas.line(cx + i - 1, prev, cx + i, py)
+        prev = py
+
+
+def render_modulator_scope_proposed(canvas):
+    # Scope-style modulator display: rolling output trace, no level bar; RATE selected.
+    mod = MockModulator(shape=ModulatorShape.Sine, rate=5, rate_domain='free', depth=50)
+    eng = MockModulatorEngine(current_value=64)
+    render_modulator_page_proposed_v2(canvas, mod, eng, selected_function=1, scope_mode=True)
 
 
 # --- PROPOSED: wall-clock rate domain + gate-mode rename (on the real dashboard layout) ---
