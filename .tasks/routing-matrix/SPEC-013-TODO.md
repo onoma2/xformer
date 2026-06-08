@@ -200,12 +200,32 @@ The `applyBiasDepthToSource` + bias + min/max window + 9-shaper switch branch on
 per-track targets the override fork doesn't claim. Removing it target-by-target.
 - [x] **Run + Reset** — DONE (2026-06-08, spec 017). Base-less toggle/trigger → clean raw-
       source consumer (Reset=`gateRisingEdge`, Run=`routeRunGate` threshold). Off the branch.
-- [ ] **CvOutputRotate / GateOutputRotate** — have a real −8..8 user base → migrate to the
-      override path (`routedValueInt(base,−8,8)`). CvOutRot also feeds a float interp array
-      (`_cvRotateValues`) — int-override-vs-float-interp call pending. Last targets on the branch.
-- [ ] Once the rotates move: delete the legacy branch + the 7 stale shapers (Crease/Location/
-      Envelope/FrequencyFollower/Activity/ProgressiveDivider/VcaNext) + their RouteState
-      shaper-state structs. None/TriangleFold survive via `RouteShaper` on the override/bus paths.
+- [x] **GateOutputRotate** — DONE (2026-06-08, spec 018, `dcda36ef`). Reimagined as a coherent
+      **group rotation**: the route's track mask = group, one amount cycles the group's jacks
+      (`(p−N) mod K`). Route-level `(mask, amount)` off the branch; per-track `_gateOutputRotate`
+      vestigial. The "−8..8 base" was never settable (no UI) — base is Layout, the route is a
+      pure rotation offset. Helpers `gateRotationFromSource`/`rotatedGroupMember`/`firstMaskedSlot`.
+- [x] **CvOutputRotate** — DONE (2026-06-08, spec 019 slice 1, `0c0566a9`). Discrete group
+      rotation, mirror of gate. The float interpolation path was **dead** (`_cvRotateInterpolate`
+      had no setter) → deleted. Its smooth-morph returns later as the **CvOutputCrossfade** target
+      (spec 019 slice 2, DEFERRED).
+- [x] **Surfaced in the matrix** (2026-06-08, `8ec8a126`). Run/Reset/CvOutRot/GateOutRot had no
+      ParamKey/`targetToParamKey`/eligibility, so they were unreachable (legacy `RouteListModel`
+      deleted in phase 9). Added ParamKeys 26-29 + bridges; folded by scope (Run/Reset→Clock,
+      CvOutRot/GateOutRot→Global; scope resolves per-row not per-band); `tabCellEligible` always-
+      eligible for the four. ui-preview band renderer rebuilt (`f09e9f35`).
+- [ ] **CvOutputCrossfade** (spec 019 slice 2, DEFERRED) — new appended Target, float group
+      position, crossfade adjacent members' CVs. Note: the CV-router `scan` already crossfades
+      CvIn/Bus/Mod lanes; this only adds direct track-CV morph across the group.
+- [ ] **Legacy branch now a no-op fallthrough.** All four shell targets are off it; it only
+      catches mismatched (target, mode) pairs (a no-op `writeTarget`). Candidate for deletion once
+      confirmed nothing legitimately rides it — bundled with the shaper deletion (separate).
+- [ ] **Dead-code + rename cleanup (NEXT).** Delete dead accessors (`isGateOutputRotated`/
+      `isCvOutputRotated`, the rotate get/set/edit/print clusters, `cvRotateInterpolate` get/set,
+      the Run `writeTarget` case); keep the serialized base/flag fields (no version bump). Rename
+      `migrated`/`migratedGlobal`/`RouteFork` → override-centric names (the phase-6 migration is
+      done; the word is now history). Leave `draft`/`RouteDraft` — it's the live edit→COMMIT model,
+      not legacy. Shapers stay a separate discussion.
 
 ## Deferred / out of scope (spec §13)
 - `scaleSource` cross-source resolution (stored + math exist; `computeDelta` hardcodes the
