@@ -45,6 +45,11 @@ private:
     void updateSources();
     void updateSinks();
 
+    // Resolve a Source to a normalized [0,1] value, reading live engine I/O. CV-domain
+    // sources normalize through the route's own cvSource range (scaleSource has no own
+    // config). MIDI is excluded (set asynchronously in receiveMidi) -> returns 0.
+    float resolveSourceValue(const Routing::Route &route, Routing::Source source) const;
+
     void writeEngineTarget(Routing::Target target, float normalized, RouteState &routeState);
 
     Engine &_engine;

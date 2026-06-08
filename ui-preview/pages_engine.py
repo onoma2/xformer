@@ -52,7 +52,7 @@ def _engine_page(canvas, tab, engines, eligible_letter, rows, cursor_row, cursor
     canvas.set_color(Color.Bright)
     canvas.draw_text(2, 7, tab)
     canvas.set_color(Color.Medium)
-    vtag = {"source": "SOURCE", "depth": "DEPTH", "shaper": "SHAPER"}.get(view, "DEPTH")
+    vtag = {"source": "SOURCE", "depth": "DEPTH", "scale": "SCALE", "shaper": "SHAPER"}.get(view, "DEPTH")
     canvas.draw_text((PW - canvas.text_width(vtag)) // 2, 7, vtag)
     canvas.draw_text(bar_x - canvas.text_width(combine) - 2, 7, combine)
     canvas.hline(0, 10, PW)
@@ -77,6 +77,7 @@ def _engine_page(canvas, tab, engines, eligible_letter, rows, cursor_row, cursor
             break
         name, source, depths = rows[r][:3]
         shaper = rows[r][3] if len(rows[r]) > 3 else "-"   # per-row shaper abbrev
+        scale = rows[r][4] if len(rows[r]) > 4 else None    # per-row scaleSource abbrev (None = no scale)
         y = top + vi * rh
         canvas.set_color(Color.Bright if r == cursor_row else Color.Medium)
         canvas.draw_text(2, y + 6, _clip(canvas, name, name_w - 2))
@@ -94,6 +95,8 @@ def _engine_page(canvas, tab, engines, eligible_letter, rows, cursor_row, cursor
                     txt = source
                 elif view == "shaper":
                     txt = shaper
+                elif view == "scale":
+                    txt = scale if scale else "."   # None scaleSource = no gain
                 else:
                     txt = f"{d:+d}"
                 canvas.set_color(Color.Bright if is_cursor else Color.Medium)
@@ -118,7 +121,7 @@ def _engine_page(canvas, tab, engines, eligible_letter, rows, cursor_row, cursor
 # tracks 1,2,5 = Curve; rest other engines
 _CURVE_ENGINES = ["C", "C", "N", "A", "C", "D", "P", "I"]
 _CURVE_ROWS = [
-    ("Offset", "CV1", {0: 20, 1: -10, 4: 30}, "FLD"),
+    ("Offset", "CV1", {0: 20, 1: -10, 4: 30}, "FLD", "LFO1"),
     ("Shp Bias", "B2", {0: 15, 4: 15}, "-"),
     ("Gate Bias", None, None),
     ("C.Rate", "LFO1", {1: 40}, "-"),
@@ -126,7 +129,7 @@ _CURVE_ROWS = [
     ("Run Mode", None, None),
     ("First St", None, None),
     ("Last St", None, None),
-    ("Fold", "CV3", {0: 50, 4: 50}, "FLD"),
+    ("Fold", "CV3", {0: 50, 4: 50}, "FLD", "CV2"),
     ("Gain", None, None),
     ("DJ Filter", None, None),
     ("Chaos Amt", "B1", {1: 25}),
@@ -155,6 +158,11 @@ def render_engine_curve(canvas):
 def render_engine_curve_shaper(canvas):
     _engine_page(canvas, "CURVE", _CURVE_ENGINES, "C", _CURVE_ROWS,
                  cursor_row=0, cursor_col=4, view="shaper")
+
+
+def render_engine_curve_scale(canvas):
+    _engine_page(canvas, "CURVE", _CURVE_ENGINES, "C", _CURVE_ROWS,
+                 cursor_row=0, cursor_col=4, view="scale")
 
 
 def render_engine_note(canvas):

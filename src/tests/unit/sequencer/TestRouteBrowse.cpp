@@ -136,6 +136,39 @@ CASE("sourceList: excludes the self-route bus for a bus target") {
     expectTrue(hasBus3, "BusCv3 kept");
 }
 
+CASE("scaleSourceList: drops MIDI + the route's own primary source, keeps None") {
+    Routing::Source out[40];
+    int n = RouteBrowse::scaleSourceList(Routing::Target::Transpose, Routing::Source::CvIn1, out, 40);
+    expectEqual(n, 32, "34 minus MIDI minus CvIn1 primary");
+    expectEqual(int(out[0]), int(Routing::Source::None), "None kept first (= no scale, 1.0)");
+    bool hasMidi = false, hasPrimary = false;
+    for (int i = 0; i < n; ++i) {
+        if (out[i] == Routing::Source::Midi) hasMidi = true;
+        if (out[i] == Routing::Source::CvIn1) hasPrimary = true;
+    }
+    expectFalse(hasMidi, "MIDI excluded (no second config slot)");
+    expectFalse(hasPrimary, "own primary source excluded (no self-scale)");
+}
+
+CASE("scaleSourceList: primary None excludes only MIDI, None stays selectable") {
+    Routing::Source out[40];
+    int n = RouteBrowse::scaleSourceList(Routing::Target::Transpose, Routing::Source::None, out, 40);
+    expectEqual(n, 33, "34 minus MIDI; None not double-dropped");
+    expectEqual(int(out[0]), int(Routing::Source::None), "None present");
+    expectEqual(int(out[n - 1]), int(Routing::Source::Mod8), "Mod8 last");
+}
+
+CASE("scaleSourceList: also excludes the self-route bus for a bus target") {
+    Routing::Source out[40];
+    int n = RouteBrowse::scaleSourceList(Routing::Target::BusCv2, Routing::Source::CvIn1, out, 40);
+    expectEqual(n, 31, "33 (bus self already gone) minus MIDI minus CvIn1");
+    bool hasBus2 = false;
+    for (int i = 0; i < n; ++i) {
+        if (out[i] == Routing::Source::BusCv2) hasBus2 = true;
+    }
+    expectFalse(hasBus2, "BusCv2 self-route excluded");
+}
+
 CASE("sourceList: honors maxOut") {
     Routing::Source out[5];
     int n = RouteBrowse::sourceList(Routing::Target::Transpose, out, 5);

@@ -124,21 +124,24 @@ namespace RouteResolve {
 
     // The per-track value composition updateSinks() runs for a migrated target:
     // bias-free shape of the normalized source, then the Modulate delta over the
-    // param's inferred range (depthPct = the per-track d gain, scaleSource = None).
+    // param's inferred range (depthPct = the per-track d gain). scaleValue is the
+    // resolved scaleSource gain on depth; 1.0 = no scale source (identity).
     inline float computeDelta(float sourceValue, Routing::Shaper shaper, int depthPct,
                               const RouteParam::Range &range,
-                              RouteApply::Combine combine = RouteApply::Combine::Modulate) {
+                              RouteApply::Combine combine = RouteApply::Combine::Modulate,
+                              float scaleValue = 1.f) {
         float h = RouteShaper::shape(shaper, sourceValue);
-        return RouteApply::delta(h, 1.f, combine, depthPct, inferRange(range));
+        return RouteApply::delta(h, scaleValue, combine, depthPct, inferRange(range));
     }
 
     // Bus lanes are base-0 sinks on the unified model: one signed depthPct + combine,
     // no min/max window. Returns volts to sum onto the lane (read clamps to +/-5V).
     // Modulate = bipolar around 0V, Absolute = sweep from 0V; depth 100 = full rail.
+    // scaleValue = resolved scaleSource gain (1.0 = no scale source).
     inline float busDelta(float sourceValue, Routing::Shaper shaper, int depthPct,
-                          RouteApply::Combine combine) {
+                          RouteApply::Combine combine, float scaleValue = 1.f) {
         float h = RouteShaper::shape(shaper, sourceValue);
-        return RouteApply::delta(h, 1.f, combine, depthPct, 5.f);
+        return RouteApply::delta(h, scaleValue, combine, depthPct, 5.f);
     }
 
     // The per-type param table for a track mode, or nullptr for modes with no

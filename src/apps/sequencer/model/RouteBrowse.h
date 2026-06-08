@@ -117,6 +117,26 @@ namespace RouteBrowse {
         return n;
     }
 
+    // Fill out[] with the sources offered for a route's scaleSource (dynamic depth gain):
+    // like sourceList but drops MIDI (no second config slot), the route's own primary
+    // source (forbids self-scale squaring), and any self-route bus. None stays (= no
+    // scale, 1.0 identity). Returns the count (<= maxOut).
+    inline int scaleSourceList(Routing::Target target, Routing::Source primarySource,
+                               Routing::Source *out, int maxOut) {
+        int n = 0;
+        for (int s = 0; s < int(Routing::Source::Last) && n < maxOut; ++s) {
+            auto source = Routing::Source(s);
+            if (Routing::isBusSelfRoute(source, target) || Routing::isMidiSource(source)) {
+                continue;
+            }
+            if (source != Routing::Source::None && source == primarySource) {
+                continue;
+            }
+            out[n++] = source;
+        }
+        return n;
+    }
+
     // Fill out[] with the indices of every active route whose source is MIDI, in
     // ascending order — the row set for the MIDI page. Returns the count (<= maxOut).
     inline int midiRouteList(const Routing &routing, uint8_t *out, int maxOut) {

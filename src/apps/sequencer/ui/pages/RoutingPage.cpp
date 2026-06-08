@@ -135,6 +135,11 @@ void RoutingPage::encoder(EncoderEvent &event) {
             event.consume();
             return;
         }
+        if (_matrixView == MatrixView::Scale) {     // SCALE view: dial the row's scaleSource
+            matrixEditScale(event.value(), event.pressed() || globalKeyState()[Key::Shift]);
+            event.consume();
+            return;
+        }
         if (_matrixView == MatrixView::Shaper) {    // SHAPER view: dial the row's shaper
             // only the stateless folds live on the routing lane (None/Fold/Crease + off-center)
             static const Routing::Shaper live[] = { Routing::Shaper::None,
@@ -335,6 +340,41 @@ void RoutingPage::matrixEditSource(int delta, bool group) {
     _matrixDraft.route.setSource(list[next]);
 }
 
+// SCALE view: step the draft's scaleSource through scaleSourceList() order (drops MIDI,
+// the primary source, self-bus; None stays = no scale). Mirrors matrixEditSource; group
+// jumps to the adjacent source family.
+void RoutingPage::matrixEditScale(int delta, bool group) {
+    if (delta == 0) return;
+    Routing::Source list[int(Routing::Source::Last)];
+    Routing::Target target = _matrixDraft.route.target();
+    int n = RouteBrowse::scaleSourceList(target, _matrixDraft.route.source(), list, int(Routing::Source::Last));
+    if (n == 0) return;
+    Routing::Source cur = _matrixDraft.route.scaleSource();
+    int idx = 0;
+    for (int i = 0; i < n; ++i) {
+        if (list[i] == cur) { idx = i; break; }
+    }
+    int next = idx;
+    if (group) {
+        int curGroup = sourceGroup(list[idx]);
+        if (delta > 0) {
+            for (int i = idx + 1; i < n; ++i) {
+                if (sourceGroup(list[i]) != curGroup) { next = i; break; }
+            }
+        } else {
+            int prevGroup = -1;
+            for (int i = idx - 1; i >= 0; --i) {
+                int g = sourceGroup(list[i]);
+                if (g != curGroup) { prevGroup = g; }
+                if (prevGroup >= 0 && (i == 0 || sourceGroup(list[i - 1]) != prevGroup)) { next = i; break; }
+            }
+        }
+    } else {
+        next = clamp(idx + (delta > 0 ? 1 : -1), 0, n - 1);
+    }
+    _matrixDraft.route.setScaleSource(list[next]);
+}
+
 // Leave edit. commit=true writes the draft live (caller gates on canCommit); false
 // reverts (frees a freshly-allocated slot). Either way return to nav and clear state.
 void RoutingPage::matrixExitEdit(bool commit) {
@@ -436,6 +476,7 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     canvas.drawText(2, 7, tabName(_tabEditorTab));
     canvas.setColor(Color::Medium);
     const char *viewTag = _matrixView == MatrixView::Source ? "SOURCE"
+                        : _matrixView == MatrixView::Scale ? "SCALE"
                         : _matrixView == MatrixView::Shaper ? "SHAPER" : "DEPTH";
     canvas.drawText((CONFIG_LCD_WIDTH - canvas.textWidth(viewTag)) / 2, 7, viewTag);
     // occupied-slot counter (always) far-right; combine indicator sits to its left
@@ -505,11 +546,13 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
         Routing::Source rowSource = Routing::Source::None;
         RouteApply::Combine rowCombine = RouteApply::Combine::Modulate;
         Routing::Shaper rowShaper = Routing::Shaper::None;
+        Routing::Source rowScale = Routing::Source::None;
         bool rowHasRoute = false;
         if (draftRow) {
             rowSource = _matrixDraft.route.source();
             rowCombine = _matrixDraft.route.combine();
             rowShaper = _matrixDraft.route.shaper(0);
+            rowScale = _matrixDraft.route.scaleSource();
             rowHasRoute = true;
         } else {
             int rowRouteIdx = routeForBandParam(key, globalKey ? 0 : 0xFF);
@@ -518,6 +561,7 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
                 rowSource = rr.source();
                 rowCombine = rr.combine();
                 rowShaper = rr.shaper(0);
+                rowScale = rr.scaleSource();
                 rowHasRoute = true;
             }
         }
@@ -536,6 +580,17 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
                     Routing::printSourceAbbrev(rowSource, txt);
                 } else {
                     txt(".");
+                }
+                canvas.setColor(isCursor ? Color::Bright : (rowHasRoute ? Color::Medium : Color::MediumLow));
+                canvas.drawText(cx - canvas.textWidth(txt) / 2, y + 6, txt);
+                continue;
+            }
+            if (_matrixView == MatrixView::Scale) {   // row's scaleSource on every eligible cell
+                FixedStringBuilder<6> txt;
+                if (rowHasRoute && rowScale != Routing::Source::None) {
+                    Routing::printSourceAbbrev(rowScale, txt);
+                } else {
+                    txt(".");   // None scaleSource = no depth gain
                 }
                 canvas.setColor(isCursor ? Color::Bright : (rowHasRoute ? Color::Medium : Color::MediumLow));
                 canvas.drawText(cx - canvas.textWidth(txt) / 2, y + 6, txt);
@@ -669,9 +724,10 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
                 matrixEnterEdit();
             }
             break;
-        case Function::View: // cycle the cell view: source -> depth -> shaper
+        case Function::View: // cycle the cell view: source -> depth -> scale -> shaper
             _matrixView = _matrixView == MatrixView::Source ? MatrixView::Depth
-                        : _matrixView == MatrixView::Depth ? MatrixView::Shaper
+                        : _matrixView == MatrixView::Depth ? MatrixView::Scale
+                        : _matrixView == MatrixView::Scale ? MatrixView::Shaper
                         : MatrixView::Source;
             break;
         case Function::Combine: // toggle Modulate <-> Absolute on the draft

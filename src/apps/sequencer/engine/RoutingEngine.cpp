@@ -101,76 +101,75 @@ bool RoutingEngine::receiveMidi(MidiPort port, const MidiMessage &message) {
     return consumed;
 }
 
+float RoutingEngine::resolveSourceValue(const Routing::Route &route, Routing::Source source) const {
+    switch (source) {
+    case Routing::Source::None:
+        return 0.f;
+    case Routing::Source::CvIn1:
+    case Routing::Source::CvIn2:
+    case Routing::Source::CvIn3:
+    case Routing::Source::CvIn4: {
+        const auto &range = Types::voltageRangeInfo(route.cvSource().range());
+        int index = int(source) - int(Routing::Source::CvIn1);
+        return range.normalize(_engine.cvInput().channel(index));
+    }
+    case Routing::Source::CvOut1:
+    case Routing::Source::CvOut2:
+    case Routing::Source::CvOut3:
+    case Routing::Source::CvOut4:
+    case Routing::Source::CvOut5:
+    case Routing::Source::CvOut6:
+    case Routing::Source::CvOut7:
+    case Routing::Source::CvOut8: {
+        const auto &range = Types::voltageRangeInfo(route.cvSource().range());
+        int index = int(source) - int(Routing::Source::CvOut1);
+        return range.normalize(_engine.cvOutput().channel(index));
+    }
+    case Routing::Source::BusCv1:
+    case Routing::Source::BusCv2:
+    case Routing::Source::BusCv3:
+    case Routing::Source::BusCv4: {
+        const auto &range = Types::voltageRangeInfo(route.cvSource().range());
+        int index = int(source) - int(Routing::Source::BusCv1);
+        return range.normalize(_engine.busCv(index));
+    }
+    case Routing::Source::GateOut1:
+    case Routing::Source::GateOut2:
+    case Routing::Source::GateOut3:
+    case Routing::Source::GateOut4:
+    case Routing::Source::GateOut5:
+    case Routing::Source::GateOut6:
+    case Routing::Source::GateOut7:
+    case Routing::Source::GateOut8: {
+        int index = int(source) - int(Routing::Source::GateOut1);
+        return (_engine.gateOutput() & (1 << index)) ? 1.f : 0.f;
+    }
+    case Routing::Source::Midi:
+        // set asynchronously in receiveMidi; not resolvable synchronously here
+        return 0.f;
+    case Routing::Source::Mod1:
+    case Routing::Source::Mod2:
+    case Routing::Source::Mod3:
+    case Routing::Source::Mod4:
+    case Routing::Source::Mod5:
+    case Routing::Source::Mod6:
+    case Routing::Source::Mod7:
+    case Routing::Source::Mod8: {
+        int index = int(source) - int(Routing::Source::Mod1);
+        return _engine.modulatorEngine().currentValue(index) / 127.f;
+    }
+    case Routing::Source::Last:
+        return 0.f;
+    }
+    return 0.f;
+}
+
 void RoutingEngine::updateSources() {
     for (int routeIndex = 0; routeIndex < CONFIG_ROUTE_COUNT; ++routeIndex) {
         const auto &route = _routing.route(routeIndex);
-        if (route.active()) {
-            auto &sourceValue = _sourceValues[routeIndex];
-            switch (route.source()) {
-            case Routing::Source::None:
-                sourceValue = 0.f;
-                break;
-            case Routing::Source::CvIn1:
-            case Routing::Source::CvIn2:
-            case Routing::Source::CvIn3:
-            case Routing::Source::CvIn4: {
-                const auto &range = Types::voltageRangeInfo(route.cvSource().range());
-                int index = int(route.source()) - int(Routing::Source::CvIn1);
-                sourceValue = range.normalize(_engine.cvInput().channel(index));
-                break;
-            }
-            case Routing::Source::CvOut1:
-            case Routing::Source::CvOut2:
-            case Routing::Source::CvOut3:
-            case Routing::Source::CvOut4:
-            case Routing::Source::CvOut5:
-            case Routing::Source::CvOut6:
-            case Routing::Source::CvOut7:
-            case Routing::Source::CvOut8: {
-                const auto &range = Types::voltageRangeInfo(route.cvSource().range());
-                int index = int(route.source()) - int(Routing::Source::CvOut1);
-                sourceValue = range.normalize(_engine.cvOutput().channel(index));
-                break;
-            }
-            case Routing::Source::BusCv1:
-            case Routing::Source::BusCv2:
-            case Routing::Source::BusCv3:
-            case Routing::Source::BusCv4: {
-                const auto &range = Types::voltageRangeInfo(route.cvSource().range());
-                int index = int(route.source()) - int(Routing::Source::BusCv1);
-                sourceValue = range.normalize(_engine.busCv(index));
-                break;
-            }
-            case Routing::Source::GateOut1:
-            case Routing::Source::GateOut2:
-            case Routing::Source::GateOut3:
-            case Routing::Source::GateOut4:
-            case Routing::Source::GateOut5:
-            case Routing::Source::GateOut6:
-            case Routing::Source::GateOut7:
-            case Routing::Source::GateOut8: {
-                int index = int(route.source()) - int(Routing::Source::GateOut1);
-                sourceValue = (_engine.gateOutput() & (1 << index)) ? 1.f : 0.f;
-                break;
-            }
-            case Routing::Source::Midi:
-                // handled in receiveMidi
-                break;
-            case Routing::Source::Mod1:
-            case Routing::Source::Mod2:
-            case Routing::Source::Mod3:
-            case Routing::Source::Mod4:
-            case Routing::Source::Mod5:
-            case Routing::Source::Mod6:
-            case Routing::Source::Mod7:
-            case Routing::Source::Mod8: {
-                int index = int(route.source()) - int(Routing::Source::Mod1);
-                sourceValue = _engine.modulatorEngine().currentValue(index) / 127.f;
-                break;
-            }
-            case Routing::Source::Last:
-                break;
-            }
+        if (route.active() && route.source() != Routing::Source::Midi) {
+            // MIDI is left as set in receiveMidi; everything else resolves from live I/O.
+            _sourceValues[routeIndex] = resolveSourceValue(route, route.source());
         }
     }
 }
@@ -205,10 +204,19 @@ void RoutingEngine::updateSinks() {
 
             auto target = route.target();
 
+            // scaleSource is a dynamic gain on the route's modulation depth (None -> 1.0
+            // identity). Resolved like any source; bypass to 1.0 if it would self-reference
+            // the route's own bus (the only within-frame feedback path).
+            float scaleValue = 1.f;
+            auto scaleSrc = route.scaleSource();
+            if (scaleSrc != Routing::Source::None && !Routing::isBusSelfRoute(scaleSrc, target)) {
+                scaleValue = clamp(resolveSourceValue(route, scaleSrc), 0.f, 1.f);
+            }
+
             if (Routing::isBusTarget(target)) {
                 // Unified base-0 model: signed depthPct + combine, no min/max window.
                 float volts = RouteResolve::busDelta(_sourceValues[routeIndex], route.shaper(0),
-                                                  route.depthPct(0), route.combine());
+                                                  route.depthPct(0), route.combine(), scaleValue);
                 int busIndex = int(target) - int(Routing::Target::BusCv1);
                 _engine.setBusCv(busIndex, volts, Engine::BusWriterRouting);
             } else if (target == Routing::Target::GateOutputRotate) {
@@ -236,7 +244,7 @@ void RoutingEngine::updateSinks() {
                         if (RouteResolve::overrideParam(_project.track(trackIndex).trackMode(), target, paramKey, pRange)) {
                             float delta = RouteResolve::computeDelta(_sourceValues[routeIndex],
                                                                  route.shaper(trackIndex), route.depthPct(trackIndex), pRange,
-                                                                 route.combine());
+                                                                 route.combine(), scaleValue);
                             Routing::writeRouteOverride(paramKey, trackIndex, delta);
                             continue;
                         }
@@ -268,7 +276,7 @@ void RoutingEngine::updateSinks() {
                 if (RouteResolve::overrideParamGlobal(target, gKey, gRange)) {
                     float delta = RouteResolve::computeDelta(_sourceValues[routeIndex],
                                                           route.shaper(0), route.depthPct(0), gRange,
-                                                          route.combine());
+                                                          route.combine(), scaleValue);
                     Routing::writeRouteOverride(gKey, Routing::GlobalTrack, delta);
                 }
             } else {

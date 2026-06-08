@@ -37,6 +37,7 @@ private:
     void matrixEnterEdit();     // encoder-press in nav: begin/create the per-row draft
     void matrixExitEdit(bool commit); // commit or cancel the draft, return to nav
     void matrixEditSource(int delta, bool group); // SOURCE view: cycle the draft source
+    void matrixEditScale(int delta, bool group);  // SCALE view: cycle the draft scaleSource
     int routeForBandParam(uint8_t paramKey, uint8_t trackMask) const;
     int tabBandParamCount() const;
 
@@ -55,7 +56,7 @@ private:
     const char *tabName(int t) const;                // header label for tab t
     const char *tabParamName(int t, uint8_t key) const;      // row label (short pref)
 
-    enum class MatrixView { Depth, Source, Shaper };
+    enum class MatrixView { Depth, Source, Scale, Shaper };
     MatrixView _matrixView = MatrixView::Depth;
 
     int _tabEditorTab = 0;

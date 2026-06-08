@@ -155,6 +155,27 @@ CASE("computeDelta: combine Absolute sweeps from base (raw source), Modulate cen
     expectTrue(near(RouteResolve::computeDelta(0.5f, Routing::Shaper::None, 100, transpose), 0.f), "default = Modulate");
 }
 
+CASE("computeDelta: scaleValue is a unipolar gain on depth (None->1.0 identity)") {
+    RouteParam::Range transpose{ -60.f, 60.f };   // inferRange -> 60
+    // scaleValue 1.0 = identity (no scale source), default arg matches
+    expectTrue(near(RouteResolve::computeDelta(1.0f, Routing::Shaper::None, 100, transpose, Combine::Modulate, 1.0f), 60.f), "scale 1.0 -> full");
+    expectTrue(near(RouteResolve::computeDelta(1.0f, Routing::Shaper::None, 100, transpose), 60.f), "default scale = 1.0");
+    // scaleValue 0.5 = half deviation -> half delta
+    expectTrue(near(RouteResolve::computeDelta(1.0f, Routing::Shaper::None, 100, transpose, Combine::Modulate, 0.5f), 30.f), "scale 0.5 -> half");
+    // scaleValue 0 = collapse to center -> no modulation
+    expectTrue(near(RouteResolve::computeDelta(1.0f, Routing::Shaper::None, 100, transpose, Combine::Modulate, 0.0f), 0.f), "scale 0 -> none");
+    // center stays neutral for any scaleValue
+    expectTrue(near(RouteResolve::computeDelta(0.5f, Routing::Shaper::None, 100, transpose, Combine::Modulate, 0.5f), 0.f), "center neutral under scale");
+}
+
+CASE("busDelta: scaleValue gains the lane delta (None->1.0 identity)") {
+    auto none = Routing::Shaper::None;
+    expectTrue(near(RouteResolve::busDelta(1.0f, none, 100, Combine::Modulate, 1.0f), 5.f), "scale 1.0 -> +5V");
+    expectTrue(near(RouteResolve::busDelta(1.0f, none, 100, Combine::Modulate), 5.f), "default scale = 1.0");
+    expectTrue(near(RouteResolve::busDelta(1.0f, none, 100, Combine::Modulate, 0.5f), 2.5f), "scale 0.5 -> +2.5V");
+    expectTrue(near(RouteResolve::busDelta(1.0f, none, 100, Combine::Modulate, 0.0f), 0.f), "scale 0 -> 0V");
+}
+
 CASE("computeDelta: range comes from the migrated row") {
     uint8_t key; RouteParam::Range range;
     RouteResolve::overrideParam(Mode::Note, Routing::Target::Transpose, key, range);
