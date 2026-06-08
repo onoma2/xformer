@@ -12,13 +12,13 @@ void Modulator::editPhase(int value, bool shift) {
 }
 
 void Modulator::editRate(int value, bool shift) {
-    if (isChaosShape(shape())) {
-        // Chaos: rate is Hz * 10, stored in _rate
-        int step = shift ? 1 : 5;  // 0.1 Hz or 0.5 Hz increment
-        _rate = clamp(_rate + value * step, 1, 1000);  // 0.1 Hz to 100.0 Hz
+    if (_rateDomain == RateDomain::Free) {
+        // Free: wall-Hz in centi-Hz steps (0.01 fine / 0.05 coarse)
+        int step = shift ? 1 : 5;
+        setRate(_rate + value * step);
         return;
     }
-    // LFO: musical divisions
+    // Tempo: musical divisions
     static const int divisions[] = {
         6,    // 1/64
         8,    // 1/64T
@@ -60,20 +60,13 @@ void Modulator::editRate(int value, bool shift) {
 }
 
 void Modulator::printRate(StringBuilder &str) const {
-    if (isChaosShape(shape())) {
-        int hzTenths = rate();
-        int whole = hzTenths / 10;
-        int frac = hzTenths % 10;
-        if (hzTenths < 10) {
-            str("0.%dHz", frac);
-        } else if (hzTenths < 1000) {
-            str("%d.%dHz", whole, frac);
-        } else {
-            str("%dHz", whole);
-        }
+    if (_rateDomain == RateDomain::Free) {
+        // Free: wall-Hz from centi-Hz (e.g. 5 -> "0.05Hz", 1600 -> "16.00Hz")
+        int centi = rate();
+        str("%d.%02dHz", centi / 100, centi % 100);
         return;
     }
-    // LFO: musical divisions
+    // Tempo: musical divisions
     int r = rate();
 
     if (r == 8) str("1/64T");

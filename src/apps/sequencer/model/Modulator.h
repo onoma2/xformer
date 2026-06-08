@@ -64,6 +64,23 @@ public:
         return nullptr;
     }
 
+    // Rate domain: Free = wall-time Hz (tempo-independent, runs when stopped);
+    // Tempo = clock division (tempo-locked, freezes with the transport).
+    enum class RateDomain : uint8_t {
+        Free,
+        Tempo,
+        Last
+    };
+
+    static const char *rateDomainName(RateDomain domain) {
+        switch (domain) {
+        case RateDomain::Free:  return "FREE";
+        case RateDomain::Tempo: return "TEMPO";
+        case RateDomain::Last:  break;
+        }
+        return nullptr;
+    }
+
     enum class RandomMode : uint8_t {
         Clocked,
         Triggered,
@@ -101,16 +118,27 @@ public:
         str(shapeName(shape()));
     }
 
-    // rate (in ticks: 6..6144, musical divisions of PPQN)
+    // rate — domain-keyed: Free = centi-Hz (1..1600 = 0.01..16Hz), Tempo = PPQN ticks (6..6144).
 
     int rate() const { return _rate; }
     void setRate(int rate) {
-        _rate = clamp(rate, 6, 6144);
+        _rate = (_rateDomain == RateDomain::Free) ? clamp(rate, 1, 1600) : clamp(rate, 6, 6144);
     }
+    float rateHz() const { return _rate / 100.f; }   // Free-domain reading
 
     void editRate(int value, bool shift);
-
     void printRate(StringBuilder &str) const;
+
+    // rateDomain — Free (wall-Hz) vs Tempo (clock division). cycle = re-press RATE.
+    RateDomain rateDomain() const { return _rateDomain; }
+    void setRateDomain(RateDomain domain) {
+        _rateDomain = ModelUtils::clampedEnum(domain);
+        setRate(_rate);   // re-clamp the raw value into the new domain's range
+    }
+    void cycleRateDomain() {
+        setRateDomain(_rateDomain == RateDomain::Free ? RateDomain::Tempo : RateDomain::Free);
+    }
+    void printRateDomain(StringBuilder &str) const { str(rateDomainName(_rateDomain)); }
 
     // depth (0-127)
 
@@ -304,7 +332,8 @@ public:
 
     void clear() {
         setShape(Shape::Sine);
-        setRate(96);    // 1/4 note for LFO
+        setRateDomain(RateDomain::Free);
+        setRate(5);     // 0.05 Hz (wall-time, all start Free)
         setDepth(25);  // ~±1V default
         setOffset(0);
         setPhase(0);
@@ -334,6 +363,7 @@ public:
         writer.write(_sustain);
         writer.write(_release);
         writer.write(_amplitude);
+        writer.write(_rateDomain);
     }
 
     void read(VersionedSerializedReader &reader) {
@@ -351,14 +381,15 @@ public:
         reader.read(_sustain);
         reader.read(_release);
         reader.read(_amplitude);
+        reader.read(_rateDomain);
 
-        // Sanitize raw-read fields against bad/old file data: rate is used as a
-        // divisor, and out-of-range enums would fall through engine switches.
-        if (_rate < 6) _rate = 6;
-        if (_rate > 6144) _rate = 6144;
+        // Sanitize raw-read fields against bad/old file data: out-of-range enums
+        // would fall through engine switches; rate is clamped to its domain range.
         _shape = ModelUtils::clampedEnum(_shape);
         _randomMode = ModelUtils::clampedEnum(_randomMode);
         _mode = ModelUtils::clampedEnum(_mode);
+        _rateDomain = ModelUtils::clampedEnum(_rateDomain);
+        setRate(_rate);
     }
 
 private:
@@ -371,6 +402,7 @@ private:
     uint8_t _gateTrack = 0;
     RandomMode _randomMode = RandomMode::Clocked;
     Mode _mode = Mode::Free;
+    RateDomain _rateDomain = RateDomain::Free;
     uint16_t _attack = 100;
     uint16_t _decay = 100;
     uint8_t _sustain = 100;

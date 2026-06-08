@@ -19,7 +19,7 @@ CASE("sub_tick_attack_completes") {
     m.setAttack(1); // 1ms -> 0 ticks pre-fix; attack should still complete
     ModulatorEngine engine;
     engine.reset();
-    engine.tick(0, m, 0, true); // gate rising -> Attack
+    engine.tick(0, 0.001f, m, 0, true); // gate rising -> Attack
     // pre-fix: level stuck at 0; fixed: attack completes to full
     expectEqual(engine.currentValue(0), 127, "sub-tick attack reaches full level");
 }
@@ -33,8 +33,8 @@ CASE("sub_tick_decay_reaches_sustain") {
     m.setSustain(0);
     ModulatorEngine engine;
     engine.reset();
-    engine.tick(0, m, 0, true); // Attack(0) -> Decay
-    engine.tick(1, m, 0, true); // Decay
+    engine.tick(0, 0.001f, m, 0, true); // Attack(0) -> Decay
+    engine.tick(1, 0.001f, m, 0, true); // Decay
     // pre-fix: stuck at 127; fixed: decays to sustain (0)
     expectEqual(engine.currentValue(0), 0, "sub-tick decay reaches sustain");
 }
@@ -49,10 +49,10 @@ CASE("sub_tick_release_reaches_idle") {
     m.setRelease(1); // 0 ticks pre-fix; release should still reach idle
     ModulatorEngine engine;
     engine.reset();
-    engine.tick(0, m, 0, true);  // Attack(0) -> Decay
-    engine.tick(1, m, 0, true);  // Decay(0) -> Sustain
-    engine.tick(2, m, 0, true);  // Sustain (level 64)
-    engine.tick(3, m, 0, false); // gate falling -> Release
+    engine.tick(0, 0.001f, m, 0, true);  // Attack(0) -> Decay
+    engine.tick(1, 0.001f, m, 0, true);  // Decay(0) -> Sustain
+    engine.tick(2, 0.001f, m, 0, true);  // Sustain (level 64)
+    engine.tick(3, 0.001f, m, 0, false); // gate falling -> Release
     // pre-fix: stuck at 64; fixed: releases to 0
     expectEqual(engine.currentValue(0), 0, "sub-tick release reaches idle");
 }

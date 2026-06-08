@@ -1,0 +1,98 @@
+#include "UnitTest.h"
+
+#include "apps/sequencer/model/Modulator.h"
+#include "apps/sequencer/engine/ModulatorEngine.h"
+
+#include "core/utils/StringBuilder.h"
+
+#include <cmath>
+#include <cstring>
+
+// Rate-model rethink (modulator-enhancements slice 1): rate has an explicit
+// Free(wall-Hz) / Tempo(clock-division) domain, applied to all shapes. Free reuses
+// _rate as centi-Hz (1..1600 = 0.01..16Hz, default 5 = 0.05Hz); Tempo as ticks
+// (6..6144). printRate/editRate/setRate are domain-keyed, not shape-keyed.
+
+namespace {
+using Domain = Modulator::RateDomain;
+bool eq(const StringBuilder &b, const char *s) { return std::strcmp((const char *)b, s) == 0; }
+}
+
+UNIT_TEST("Modulator") {
+
+CASE("clear() defaults to Free domain @ 0.05Hz") {
+    Modulator m; m.clear();
+    expectEqual(int(m.rateDomain()), int(Domain::Free), "Free domain by default");
+    expectEqual(m.rate(), 5, "rate centi-Hz 5 = 0.05Hz");
+}
+
+CASE("Free rate clamps to centi-Hz 1..1600") {
+    Modulator m; m.clear();
+    m.setRate(0);    expectEqual(m.rate(), 1, "clamp lo to 1 (0.01Hz)");
+    m.setRate(9999); expectEqual(m.rate(), 1600, "clamp hi to 1600 (16Hz)");
+}
+
+CASE("rateHz reads the centi-Hz value") {
+    Modulator m; m.clear();
+    m.setRate(105);
+    expectTrue(std::fabs(m.rateHz() - 1.05f) < 1e-4f, "105 centi-Hz -> 1.05Hz");
+}
+
+CASE("Tempo rate clamps to ticks 6..6144") {
+    Modulator m; m.clear();
+    m.setRateDomain(Domain::Tempo);
+    m.setRate(0);     expectEqual(m.rate(), 6, "clamp lo to 6 ticks");
+    m.setRate(99999); expectEqual(m.rate(), 6144, "clamp hi to 6144 ticks");
+}
+
+CASE("printRate: Free shows Hz, Tempo shows clock division") {
+    Modulator m; m.clear();
+    FixedStringBuilder<16> a; m.setRate(5);    m.printRate(a); expectTrue(eq(a, "0.05Hz"), (const char *)a);
+    FixedStringBuilder<16> b; m.setRate(105);  m.printRate(b); expectTrue(eq(b, "1.05Hz"), (const char *)b);
+    FixedStringBuilder<16> c; m.setRate(1600); m.printRate(c); expectTrue(eq(c, "16.00Hz"), (const char *)c);
+    m.setRateDomain(Domain::Tempo); m.setRate(96);
+    FixedStringBuilder<16> d; m.printRate(d); expectTrue(eq(d, "1/4"), (const char *)d);
+}
+
+CASE("editRate: Free steps centi-Hz (coarse/fine)") {
+    Modulator m; m.clear();
+    m.setRate(100);
+    m.editRate(1, false);  expectEqual(m.rate(), 105, "coarse +5 centi-Hz");
+    m.editRate(-1, true);  expectEqual(m.rate(), 104, "fine -1 centi-Hz");
+    m.setRate(1);
+    m.editRate(-1, false); expectEqual(m.rate(), 1, "clamps at lo");
+}
+
+CASE("editRate: Tempo steps the division table") {
+    Modulator m; m.clear();
+    m.setRateDomain(Domain::Tempo);
+    m.setRate(96);                 // 1/4
+    m.editRate(-1, false);         // next slower division
+    expectTrue(m.rate() > 96, "moved to a slower (larger-tick) division");
+}
+
+CASE("freePhaseIncrement carries the fractional remainder (no drift at slow rates)") {
+    float rem = 0.f;
+    uint32_t total = 0;
+    for (int i = 0; i < 1000; ++i) {            // 1 s at a 1 kHz update rate
+        total += ModulatorEngine::freePhaseIncrement(0.001f, 0.05f, rem);
+    }
+    // 0.05 Hz over 1 s = 0.05 cycle = 0.05 * 65536 = 3276.8 phase units
+    expectTrue(total >= 3275 && total <= 3278, "~3277 units/s; remainder prevents truncation drift");
+}
+
+CASE("freePhaseIncrement: zero Hz does not advance") {
+    float rem = 0.f;
+    expectEqual(int(ModulatorEngine::freePhaseIncrement(0.001f, 0.f, rem)), 0, "0 Hz -> 0 step");
+}
+
+CASE("cycleRateDomain toggles and re-clamps into the new range") {
+    Modulator m; m.clear();        // Free, rate 5
+    m.cycleRateDomain();
+    expectEqual(int(m.rateDomain()), int(Domain::Tempo), "-> Tempo");
+    expectEqual(m.rate(), 6, "centi-Hz 5 re-clamped into ticks (>=6)");
+    m.cycleRateDomain();
+    expectEqual(int(m.rateDomain()), int(Domain::Free), "-> Free");
+}
+
+}

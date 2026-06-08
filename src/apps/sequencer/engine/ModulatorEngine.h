@@ -22,6 +22,16 @@ public:
 
     ModulatorEngine() = default;
 
+    // Free-domain phase step in 16-bit phase units for one engine update of `dt`
+    // seconds at `rateHz`. Carries the fractional remainder so slow rates don't
+    // drift (truncating dt*Hz*65536 each update would lose phase at low Hz).
+    static uint32_t freePhaseIncrement(float dt, float rateHz, float &remainder) {
+        float inc = dt * rateHz * 65536.f + remainder;
+        uint32_t step = (inc > 0.f) ? uint32_t(inc) : 0u;
+        remainder = inc - float(step);
+        return step;
+    }
+
     void reset() {
         for (int i = 0; i < CONFIG_MODULATOR_COUNT; ++i) {
             _phaseAccumulator[i] = 0;
@@ -36,10 +46,11 @@ public:
             _adsrTimer[i] = 0;
             _lorenz[i].reset();
             _latoocarfian[i].reset();
+            _freeRemainder[i] = 0.f;
         }
     }
 
-    void tick(uint32_t tick, const Modulator &modulator, int index, bool gate) {
+    void tick(uint32_t tick, float dt, const Modulator &modulator, int index, bool gate) {
         if (index < 0 || index >= CONFIG_MODULATOR_COUNT) {
             return;
         }
@@ -171,9 +182,10 @@ public:
                 _lastGate[index] = gate;
             }
 
-            // Rate is Hz * 10
-            float hz = modulator.rate() / 10.f;
-            float dt = 0.001f;  // 1ms per sub-tick tick assumption
+            // Phase advance this update: Free = real dt*Hz (drift-free), Tempo = PPQN division.
+            uint32_t inc = (modulator.rateDomain() == Modulator::RateDomain::Free)
+                ? freePhaseIncrement(dt, modulator.rateHz(), _freeRemainder[index])
+                : 65536 / (modulator.rate() * 2);
             bool shouldAdvance = (modulator.mode() == Modulator::Mode::Free) ||
                                 (modulator.mode() == Modulator::Mode::Sync) ||
                                 (modulator.mode() == Modulator::Mode::Retrigger) ||
@@ -191,16 +203,19 @@ public:
                 float p2curve = p2n * (2.0f - p2n);
 
                 if (modulator.shape() == Modulator::Shape::ChaosLorenz) {
-                    // Sub-tick iterations to maintain stable dt
-                    int subTicks = std::max(1, static_cast<int>(hz));
                     float rho  = 10.0f + p1curve * 40.0f;     // P1: 10..50
                     float beta = 0.5f + p2curve * 3.5f;        // P2: 0.5..4.0
-                    for (int i = 0; i < subTicks; ++i) {
-                        rawValue = _lorenz[index].next(dt, rho, beta);
+                    // attractor-time = inc/65536 cycles (1.0 unit/cycle); substep keeps each
+                    // Lorenz integration step small enough to stay stable at higher rates.
+                    float adv = inc / 65536.f;
+                    int sub = clamp(static_cast<int>(adv / 0.001f) + 1, 1, 64);
+                    float st = adv / sub;
+                    for (int i = 0; i < sub; ++i) {
+                        rawValue = _lorenz[index].next(st, rho, beta);
                     }
                 } else {
-                    // Latoocarfian: phase-based stepping
-                    _phaseAccumulator[index] += static_cast<uint32_t>(hz * 655.36f);
+                    // Latoocarfian: phase-stepped, steps the map on phase wrap
+                    _phaseAccumulator[index] += inc;
                     if ((_phaseAccumulator[index] & 0xFFFF) < _lastPhase[index]) {
                         float ab = 0.5f + p1curve * 2.5f;      // P1: 0.5..3.0
                         float cd = 0.5f + p2curve * 2.5f;      // P2: 0.5..3.0
@@ -227,9 +242,10 @@ public:
 
         // Clocked Random mode
         if (modulator.shape() == Modulator::Shape::Random) {
-            // Rate is in PPQN=96 ticks in reference; convert to our PPQN=192
-            uint32_t rate = modulator.rate() * 2;
-            uint32_t phaseIncrement = 65536 / rate;
+            // Free advances by real dt*Hz; Tempo by the PPQN division.
+            uint32_t phaseIncrement = (modulator.rateDomain() == Modulator::RateDomain::Free)
+                ? freePhaseIncrement(dt, modulator.rateHz(), _freeRemainder[index])
+                : 65536 / (modulator.rate() * 2);
             _phaseAccumulator[index] += phaseIncrement;
 
             uint32_t phase = _phaseAccumulator[index] + (static_cast<uint32_t>(modulator.phase()) * 65536 / 360);
@@ -257,8 +273,6 @@ public:
         }
 
         // Standard LFO modes (Sine, Triangle, Saw, Square)
-        // Rate is in PPQN=96 ticks in reference; convert to our PPQN=192
-        uint32_t rate = modulator.rate() * 2;
 
         // Sync/Retrigger/Hold modes
         if (modulator.mode() == Modulator::Mode::Sync) {
@@ -281,8 +295,10 @@ public:
             _lastGate[index] = gate;
         }
 
-        // Increment phase
-        uint32_t phaseIncrement = 65536 / rate;
+        // Increment phase: Free advances by real dt*Hz (drift-free), Tempo by the PPQN division.
+        uint32_t phaseIncrement = (modulator.rateDomain() == Modulator::RateDomain::Free)
+            ? freePhaseIncrement(dt, modulator.rateHz(), _freeRemainder[index])
+            : 65536 / (modulator.rate() * 2);
 
         if (modulator.mode() == Modulator::Mode::Hold) {
             // Hold: only advance phase while gate is high
@@ -360,6 +376,7 @@ private:
     uint16_t _lastPhase[CONFIG_MODULATOR_COUNT] = {};
     bool _lastGate[CONFIG_MODULATOR_COUNT] = {};
     int _targetValue[CONFIG_MODULATOR_COUNT] = {};
+    float _freeRemainder[CONFIG_MODULATOR_COUNT] = {};   // Free-domain phase fractional carry
     Random _rng[CONFIG_MODULATOR_COUNT];
 
     // ADSR envelope state

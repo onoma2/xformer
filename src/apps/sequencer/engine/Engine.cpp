@@ -192,7 +192,7 @@ void Engine::update() {
             int gateTrack = modulator.gateTrack();
             bool gate = (gateTrack >= 0 && gateTrack < CONFIG_TRACK_COUNT) ?
                 _trackEngines[gateTrack]->gateOutput(0) : false;
-            _modulatorEngine.tick(tick, modulator, modulatorIndex, gate);
+            _modulatorEngine.tick(tick, dt, modulator, modulatorIndex, gate);
             _midiOutputEngine.sendModulator(modulatorIndex, _modulatorEngine.currentValue(modulatorIndex));
         }
 
