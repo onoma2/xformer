@@ -323,7 +323,6 @@ void Engine::clockContinue() {
 
 void Engine::clockReset() {
     _clock.masterReset();
-    _routingEngine.resetShaperState();
 }
 
 bool Engine::clockRunning() const {

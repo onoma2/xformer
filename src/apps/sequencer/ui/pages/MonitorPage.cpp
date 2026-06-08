@@ -383,15 +383,8 @@ void MonitorPage::drawSizes(Canvas &canvas) {
     case 2: // RoutingEngine
         drawRow(0, "RoutingEngine", sizeof(RoutingEngine));
         drawRow(1, "RouteState", sizeof(RoutingEngine::RouteState));
-        drawRow(2, "TSUnion", sizeof(RoutingEngine::RouteState::TrackStateUnion));
-        drawRow(3, "Shaper", sizeof(Routing::Shaper));
-        drawRow2(4, "RouteStates[]", sizeof(RoutingEngine::RouteState) * CONFIG_ROUTE_COUNT, CONFIG_ROUTE_COUNT);
-        drawRow2(5, "TSUnions[]", sizeof(RoutingEngine::RouteState::TrackStateUnion) * CONFIG_ROUTE_COUNT * CONFIG_TRACK_COUNT, CONFIG_ROUTE_COUNT * CONFIG_TRACK_COUNT);
-        drawRow(6, "LocationState", sizeof(RoutingEngine::RouteState::LocationState));
-        drawRow(7, "EnvelopeState", sizeof(RoutingEngine::RouteState::EnvelopeState));
-        drawRow(8, "FreqFollowState", sizeof(RoutingEngine::RouteState::FreqFollowState));
-        drawRow(9, "ActivityState", sizeof(RoutingEngine::RouteState::ActivityState));
-        drawRow(10, "ProgDivState", sizeof(RoutingEngine::RouteState::ProgDivState));
+        drawRow(2, "Shaper", sizeof(Routing::Shaper));
+        drawRow2(3, "RouteStates[]", sizeof(RoutingEngine::RouteState) * CONFIG_ROUTE_COUNT, CONFIG_ROUTE_COUNT);
         break;
     case 3: // TrackEngine container sizes
         drawRow(0, "NoteTrackEngine", sizeof(NoteTrackEngine));
