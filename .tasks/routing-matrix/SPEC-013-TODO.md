@@ -175,12 +175,11 @@ Read-side migration (slice-4 pattern) per engine: `RouteFork::migrated` case + g
 ### Phase 6 review follow-ups (non-blocking — from the adversarial slice review, 2026-06-07)
 Each engine was already Codex-gated BLOCK→ALLOW during implementation; these are test-coverage
 gaps the apply-hook strip surfaced, not behavior bugs:
-- [ ] Wavefolder Fold/Gain/DjFilter: migrated getter uses `routedValueInt` (rounds) where the old
-      dead apply-hook truncated centi. Confirm round-to-nearest is acceptable (±1 centi on 0..200),
-      then add override-delta tests for Fold/Gain (only integer DjFilter is currently covered).
-- [ ] DiscreteMap snapshot fan-out lost its direct test assertion when `TestParamTableDiscreteMap`
-      was reduced in the strip (`7029bf0e`). Structurally still holds (sequences share track index);
-      re-add a snapshot-fanout assertion to TestRouteGetterMigration or a focused test.
+- [x] Wavefolder Fold/Gain/DjFilter (2026-06-08, `627a6701`): confirmed the fields are already
+      `int16_t` centi (no float storage), so `routedValueInt` rounds-to-nearest — acceptable at CV
+      rate. Added Fold + Gain override-delta tests (rounding + clamp) to TestRouteGetterMigration.
+- [x] DiscreteMap snapshot fan-out (2026-06-08, `627a6701`): re-added the assertion — a routed param
+      keyed by (paramKey, trackIndex) reaches both a pattern slot and the snapshot slot (shared index).
 - Gate `516b12f9` (sourceless routes inert) — Codex ALLOW. Slice 1 (strip) — needs-attention (the two
   items above). Slices 2 (Curve/Tuesday/Stochastic getters) + 3 (inlets) not re-reviewed at slice
   altitude (rescue runtime kept hanging) — but each is already per-engine ALLOW'd.
@@ -257,6 +256,16 @@ them). F2 SRC now focuses the source for inline encoder cycling (Shift = source-
 F2 returns to depth; MODULATE on an empty param auto-enters source focus (first turn picks). Source
 token renders bright while focused. Mirrors the matrix's inline source edit. STM32 950144 green.
 
+## Wire format (U7/§8) — RESOLVED (2026-06-08)
+- paramKey width: **no-op.** ParamKey is never serialized — only `Routing::Target` goes to the wire
+  (via `targetSerialize`), resolved to paramKey at read time by `targetToParamKey`. The enum is
+  already `: uint8_t`, runtime-only. Nothing to finalize.
+- Indexed external-sync (`Target::DiscreteMapSync`): **RETIRED** (2026-06-08, `4f282b37`) — was
+  shared with DiscreteMap, gated by each engine's `SyncMode::External`, did a rising-edge reset =
+  redundant with a Reset route, and UI-unreachable. Removed the inlet field/accessors/consumer +
+  the engines' External handling; dropped External from the Sync picker. Kept `SyncMode::External`
+  (ord 2) + `Target::DiscreteMapSync` (serialize 49) inert for file compat (External → behaves as Off).
+
 ## Deferred / out of scope (spec §13)
-- Flat "every modulation" audit list; serialized-format cleanup (U7/§8 wire format); deleting
-  `RouteListModel`/legacy RoutingPage editor (phase 9, mostly done).
+- Flat "every modulation" audit list; deleting `RouteListModel`/legacy RoutingPage editor
+  (phase 9, mostly done).
