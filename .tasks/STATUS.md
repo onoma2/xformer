@@ -44,6 +44,26 @@ _Prior 2026-05-29 (PhaseFlux polish round landed: mask+tilt orthogonal union rep
 **Branch:** refactor/routing-matrix
 **Reference:** `.tasks/routing-matrix/TASK.md` (decision log). `.scratch/param-groups.html` (grouped triage canvas). `.scratch/param-census.html` (full per-type surface). `.tasks/core-architecture-optimization/routing-five-sources-map.md` (the smear this replaces).
 
+---
+
+## ⚪ modulator-enhancements — free wallclock Hz mode + post-depth shaper selector
+**Status:** ready — captured 2026-06-08 from the routing/shaper discussion, no code started.
+**Where I stopped:** Two independent items spec'd in `.tasks/modulator-enhancements.md`. (1) A
+completely free **wallclock Hz mode** — today even `Mode::Free` sets rate in ticks
+(`Modulator::rate()` 6..6144, clock-relative); the new mode advances phase from real wall-time
+at a Hz rate (depends on the `wallclock-time-architecture` WallClock substrate). (2) Put the
+routing **shaper selector** (None/Fold/Crease + off-center) into the modulator chain **after
+depth** (model+engine+ui) so a modulator can fold its own output. Both ui-preview-render first.
+**Next action:** Settle the item-1 open questions (Hz range/resolution, separate-field-vs-
+reinterpret, clock-stopped behavior), then build item 2 first (no dependency) if item 1's
+wallclock substrate isn't ready.
+**Depends on:** item 1 → `wallclock-time-architecture`; item 2 → nothing (reuses `RouteShaper`).
+**Branch:** TBD
+**Reference:** `.tasks/modulator-enhancements.md`. Related: the 5 stateful shapers (Location/
+Envelope/FreqFollower/Activity/ProgDiv) are slated to leave the routing lane and become
+**input-reading modulators** (needs a modulator input-source concept — separate prerequisite);
+VcaNext → scaleSource, ProgDiv → clock-util/drop.
+
 ## 🟢 generator-preview-apply — Generator A/B preview, step selection, 64-step context, Tuesday AlgoGenerator
 **Status:** done — Phases A-F complete and hardware verified.
 **Where I stopped:** All phases committed. SequenceBuilder 3-copy state machine, RandomGenerator enhancements, GeneratorPage A/B workflow, 64-step bank visualization, context menu expansion, and Tuesday AlgoGenerator (15 algorithms via TuesdayAlgoCore). RAM: `.data + .bss = 118,884` (92.9%).
