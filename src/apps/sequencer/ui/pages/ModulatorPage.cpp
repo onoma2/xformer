@@ -486,7 +486,16 @@ void ModulatorPage::keyPress(KeyPressEvent &event) {
         } else {
             int func = key.function();
             if (func >= 0 && func < 5) {
-                setSelectedFunction(Function(func));
+                // Re-pressing RATE (when it's already the selected function and the shape
+                // actually shows RATE on F2) toggles the rate domain Free <-> Tempo.
+                auto &modulator = _project.modulator(_selectedModulator);
+                bool rateOnF2 = modulator.shape() != Modulator::Shape::Random &&
+                                modulator.shape() != Modulator::Shape::ADSR;
+                if (Function(func) == Function::Rate && _selectedFunction == Function::Rate && rateOnF2) {
+                    modulator.cycleRateDomain();
+                } else {
+                    setSelectedFunction(Function(func));
+                }
             }
         }
         event.consume();
