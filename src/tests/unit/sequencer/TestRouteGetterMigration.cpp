@@ -222,6 +222,45 @@ CASE("Curve sequence djFilter: signed centi-domain override read + clamp (bipola
     expect(std::fabs(seq.djFilter() - 0.2f) < 1e-4f, "stale clear -> base restored");
 }
 
+CASE("Curve sequence wavefolderFold: centi-domain override read + round + clamp (0..100)") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Curve);
+    auto &seq = p.track(0).curveTrack().sequence(0);
+    seq.setWavefolderFold(0.30f);                   // base centi 30
+    expect(std::fabs(seq.wavefolderFold() - 0.30f) < 1e-4f, "no override -> base");
+
+    Routing::writeRouteOverride(ParamKey::WavefolderFold, 0, 25.f);  // centi delta 25 -> 55
+    expect(std::fabs(seq.wavefolderFold() - 0.55f) < 1e-4f, "override -> (base + delta) / 100");
+
+    Routing::writeRouteOverride(ParamKey::WavefolderFold, 0, 0.4f);  // 30 + 0.4 rounds to 30
+    expect(std::fabs(seq.wavefolderFold() - 0.30f) < 1e-4f, "sub-centi delta rounds to nearest");
+
+    Routing::writeRouteOverride(ParamKey::WavefolderFold, 0, 999.f);
+    expect(std::fabs(seq.wavefolderFold() - 1.0f) < 1e-4f, "clamps hi to 1.0 (centi 100)");
+
+    Routing::clearRouteOverrides();
+    expect(std::fabs(seq.wavefolderFold() - 0.30f) < 1e-4f, "stale clear -> base restored");
+}
+
+CASE("Curve sequence wavefolderGain: centi-domain override read + clamp (0..200)") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Curve);
+    auto &seq = p.track(0).curveTrack().sequence(0);
+    seq.setWavefolderGain(1.0f);                    // base centi 100
+    expect(std::fabs(seq.wavefolderGain() - 1.0f) < 1e-4f, "no override -> base");
+
+    Routing::writeRouteOverride(ParamKey::WavefolderGain, 0, 50.f);  // centi delta 50 -> 150
+    expect(std::fabs(seq.wavefolderGain() - 1.5f) < 1e-4f, "override -> (base + delta) / 100");
+
+    Routing::writeRouteOverride(ParamKey::WavefolderGain, 0, 999.f);
+    expect(std::fabs(seq.wavefolderGain() - 2.0f) < 1e-4f, "clamps hi to 2.0 (centi 200)");
+
+    Routing::clearRouteOverrides();
+    expect(std::fabs(seq.wavefolderGain() - 1.0f) < 1e-4f, "stale clear -> base restored");
+}
+
 CASE("Curve sequence chaosAmount: base-anchored read + clamp (unipolar 0..100)") {
     Routing::clearRouteOverrides();
     Project p;
@@ -594,6 +633,30 @@ CASE("Stochastic Bias/Spread/BurstCount/BurstRate: base-anchored routed reads") 
     Routing::clearRouteOverrides();
     expectEqual(seq.marblesBias(), 20, "Bias clear -> base");
     expectEqual(seq.burstRate(), 80, "BurstRate clear -> base");
+}
+
+// The override table is keyed by (paramKey, trackIndex), and every sequence under a
+// DiscreteMap track shares that track index — so one routed param fans out to all the
+// track's pattern slots AND the snapshot slot. Pins the fan-out that lost its direct
+// assertion when the apply-hooks were stripped (7029bf0e).
+CASE("DiscreteMap: a routed param fans out to both a pattern and the snapshot slot") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::DiscreteMap);
+    auto &track = p.track(0).discreteMapTrack();
+    auto &pat = track.sequence(0);                         // pattern slot
+    auto &snap = track.sequence(CONFIG_PATTERN_COUNT);     // snapshot slot
+    pat.setDivisor(48);
+    snap.setDivisor(48);
+    expectEqual(pat.divisor(), 48, "pattern base");
+    expectEqual(snap.divisor(), 48, "snapshot base");
+
+    Routing::writeRouteOverride(ParamKey::Divisor, 0, 12.f);
+    expectEqual(pat.divisor(), 60, "override fans out to the pattern");
+    expectEqual(snap.divisor(), 60, "override fans out to the snapshot too (shared track index)");
+
+    Routing::clearRouteOverrides();
+    expectEqual(snap.divisor(), 48, "stale clear -> snapshot base restored");
 }
 
 } // UNIT_TEST
