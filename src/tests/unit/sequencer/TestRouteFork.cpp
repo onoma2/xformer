@@ -39,15 +39,17 @@ CASE("inferRange: bipolar uses half-span, unipolar uses full span") {
     expectTrue(near(RouteFork::inferRange({ -64.f, 64.f }), 64.f), "nudge +/-64 -> 64");
 }
 
-CASE("targetToParamKey bridges migrated targets, None for the rest") {
+CASE("targetToParamKey bridges migrated targets + the folded output/shell targets") {
     expectEqual(int(RouteFork::targetToParamKey(Routing::Target::Scale)), int(ParamKey::Scale), "Scale");
     expectEqual(int(RouteFork::targetToParamKey(Routing::Target::Transpose)), int(ParamKey::Transpose), "Transpose");
     expectEqual(int(RouteFork::targetToParamKey(Routing::Target::ClockMult)), int(ParamKey::ClockMultiplier), "ClockMult");
     expectEqual(int(RouteFork::targetToParamKey(Routing::Target::FirstStep)), int(ParamKey::FirstStep), "FirstStep");
     expectEqual(int(RouteFork::targetToParamKey(Routing::Target::Tempo)), int(ParamKey::Tempo), "Tempo (global) mapped");
-    expectEqual(int(RouteFork::targetToParamKey(Routing::Target::CvOutputRotate)), int(ParamKey::None), "CvOutputRotate unmapped");
-    expectEqual(int(RouteFork::targetToParamKey(Routing::Target::Reset)), int(ParamKey::None), "Reset unmapped");
-    expectEqual(int(RouteFork::targetToParamKey(Routing::Target::Run)), int(ParamKey::None), "Run unmapped");
+    // Output/shell targets now bridge so the matrix can surface them (Clock/Global bands).
+    expectEqual(int(RouteFork::targetToParamKey(Routing::Target::CvOutputRotate)), int(ParamKey::CvOutputRotate), "CvOutputRotate mapped");
+    expectEqual(int(RouteFork::targetToParamKey(Routing::Target::GateOutputRotate)), int(ParamKey::GateOutputRotate), "GateOutputRotate mapped");
+    expectEqual(int(RouteFork::targetToParamKey(Routing::Target::Reset)), int(ParamKey::Reset), "Reset mapped");
+    expectEqual(int(RouteFork::targetToParamKey(Routing::Target::Run)), int(ParamKey::Run), "Run mapped");
 }
 
 CASE("Note migrates all 15 of its per-track params") {

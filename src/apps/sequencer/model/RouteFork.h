@@ -52,6 +52,10 @@ namespace RouteFork {
         case Routing::Target::RootNote:                  return ParamKey::RootNote;
         case Routing::Target::Divisor:                   return ParamKey::Divisor;
         case Routing::Target::ClockMult:                 return ParamKey::ClockMultiplier;
+        case Routing::Target::Run:                       return ParamKey::Run;
+        case Routing::Target::Reset:                     return ParamKey::Reset;
+        case Routing::Target::CvOutputRotate:            return ParamKey::CvOutputRotate;
+        case Routing::Target::GateOutputRotate:          return ParamKey::GateOutputRotate;
         case Routing::Target::RunMode:                   return ParamKey::RunMode;
         case Routing::Target::FirstStep:                 return ParamKey::FirstStep;
         case Routing::Target::LastStep:                  return ParamKey::LastStep;

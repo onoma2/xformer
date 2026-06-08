@@ -387,6 +387,12 @@ void RoutingPage::enterTabEditor() {
 static bool tabCellEligible(const Track &track, uint8_t paramKey) {
     Routing::Target target = RouteBrowse::paramKeyToTarget(paramKey);
     if (target == Routing::Target::None) return false;
+    // Output/transport shell targets apply to any track regardless of engine mode — they
+    // aren't migrated param-table params, so the migrated() gate would wrongly reject them.
+    if (target == Routing::Target::Run || target == Routing::Target::Reset ||
+        target == Routing::Target::CvOutputRotate || target == Routing::Target::GateOutputRotate) {
+        return true;
+    }
     uint8_t key; RouteParam::Range range;
     if (Routing::isProjectTarget(target)) {
         return RouteFork::migratedGlobal(target, key, range);

@@ -22,6 +22,13 @@ CASE("gateRotateAmount: Absolute sweeps 0..8 from the source") {
     expectEqual(gateRotationFromSource(1.0f, 100, Combine::Absolute), 8, "top = +8");
 }
 
+CASE("firstMaskedSlot: lowest set track in the group mask") {
+    expectEqual(firstMaskedSlot(0b00000001), 0, "track 1");
+    expectEqual(firstMaskedSlot(0b00001100), 2, "tracks 3,4 -> first is 3 (slot 2)");
+    expectEqual(firstMaskedSlot(0b10000000), 7, "track 8");
+    expectEqual(firstMaskedSlot(0), 0, "empty mask -> 0");
+}
+
 CASE("rotatedGroupMember: identity, swap, wrap, negative-safe") {
     expectEqual(rotatedGroupMember(0, 0, 3), 0, "N=0 identity p0");
     expectEqual(rotatedGroupMember(2, 0, 3), 2, "N=0 identity p2");

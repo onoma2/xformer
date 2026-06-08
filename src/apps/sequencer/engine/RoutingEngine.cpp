@@ -464,16 +464,17 @@ void RoutingEngine::updateSinks() {
                 _engine.setBusCv(busIndex, volts, Engine::BusWriterRouting);
             } else if (target == Routing::Target::GateOutputRotate) {
                 // Group rotation (spec 018): route-level, not per-track. The track mask is
-                // the group; one amount rotates it. Single group — lowest-index route wins.
+                // the group; one amount (from the first masked track's depth) rotates it.
+                // Single group — lowest-index route wins.
                 if (_gateRotateMask == 0) {
                     _gateRotateMask = route.tracks();
-                    _gateRotateAmount = gateRotationFromSource(_sourceValues[routeIndex], route.depthPct(0), route.combine());
+                    _gateRotateAmount = gateRotationFromSource(_sourceValues[routeIndex], route.depthPct(firstMaskedSlot(route.tracks())), route.combine());
                 }
             } else if (target == Routing::Target::CvOutputRotate) {
                 // Discrete CV group rotation (spec 019), mirror of gate.
                 if (_cvRotateMask == 0) {
                     _cvRotateMask = route.tracks();
-                    _cvRotateAmount = gateRotationFromSource(_sourceValues[routeIndex], route.depthPct(0), route.combine());
+                    _cvRotateAmount = gateRotationFromSource(_sourceValues[routeIndex], route.depthPct(firstMaskedSlot(route.tracks())), route.combine());
                 }
             } else if (Routing::isPerTrackTarget(target)) {
                 uint8_t tracks = route.tracks();

@@ -37,7 +37,12 @@ struct ParamKey {
         // --- Tier 1: universal per-track (20..39) ---
         Divisor         = 20,
         ClockMultiplier = 21,
-        // reserve 22..39: Mute/Fill/FillAmount/Pattern/Run/Reset/CvOutputRotate/GateOutputRotate
+        // reserve 22..25: Mute/Fill/FillAmount/Pattern
+        Run              = 26,
+        Reset            = 27,
+        CvOutputRotate   = 28,
+        GateOutputRotate = 29,
+        // reserve 30..39
 
         // --- Tier 2: pitched / structural shared (40..59) ---
         Scale     = 40,

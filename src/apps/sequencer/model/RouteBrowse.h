@@ -19,13 +19,15 @@ namespace RouteBrowse {
     inline int bandParams(Band band, uint8_t *keys, int maxKeys) {
         static const uint8_t pitch[]  = { ParamKey::Scale, ParamKey::RootNote, ParamKey::Transpose,
                                           ParamKey::Octave, ParamKey::SlideTime, ParamKey::Rotate };
-        static const uint8_t clock[]  = { ParamKey::Divisor, ParamKey::ClockMultiplier };
-        static const uint8_t global[] = { ParamKey::Tempo, ParamKey::Swing, ParamKey::CvRouteScan, ParamKey::CvRouteRoute };
+        static const uint8_t clock[]  = { ParamKey::Divisor, ParamKey::ClockMultiplier,
+                                          ParamKey::Run, ParamKey::Reset };
+        static const uint8_t global[] = { ParamKey::Tempo, ParamKey::Swing, ParamKey::CvRouteScan,
+                                          ParamKey::CvRouteRoute, ParamKey::CvOutputRotate, ParamKey::GateOutputRotate };
         const uint8_t *src; int n;
         switch (band) {
         case Band::Pitch:     src = pitch;  n = 6; break;
-        case Band::Clock:     src = clock;  n = 2; break;
-        case Band::Global:    src = global; n = 4; break;
+        case Band::Clock:     src = clock;  n = 4; break;
+        case Band::Global:    src = global; n = 6; break;
         default:              return 0;
         }
         if (n > maxKeys) n = maxKeys;
@@ -75,6 +77,10 @@ namespace RouteBrowse {
         case ParamKey::StepTrill:                return "Stp Trill";
         case ParamKey::GateLength:               return "Gate Len";
         case ParamKey::GateOffset:               return "Gate Ofs";
+        case ParamKey::Run:                      return "Run";
+        case ParamKey::Reset:                    return "Reset";
+        case ParamKey::CvOutputRotate:           return "CV Rot";
+        case ParamKey::GateOutputRotate:         return "Gate Rot";
         default:                                 return nullptr;
         }
     }

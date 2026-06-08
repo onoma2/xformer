@@ -40,12 +40,28 @@ CASE("bandParams: PITCH lists pitch keys plus folded SlideTime + Rotate") {
     expectEqual(int(keys[5]), int(ParamKey::Rotate), "Rotate folded in");
 }
 
-CASE("bandParams: CLOCK / GLOBAL counts") {
+CASE("bandParams: CLOCK folds in Run + Reset") {
     uint8_t keys[8];
-    expectEqual(RouteBrowse::bandParams(Band::Clock, keys, 8), 2, "Divisor, ClockMult");
+    int n = RouteBrowse::bandParams(Band::Clock, keys, 8);
+    expectEqual(n, 4, "Divisor, ClockMult, Run, Reset");
+    expectTrue(hasKey(keys, n, ParamKey::Run), "Run folded into Clock");
+    expectTrue(hasKey(keys, n, ParamKey::Reset), "Reset folded into Clock");
+}
+
+CASE("bandParams: GLOBAL folds in CV/Gate output rotate") {
+    uint8_t keys[8];
     int g = RouteBrowse::bandParams(Band::Global, keys, 8);
-    expectEqual(g, 4, "Tempo/Swing/CVRscan/CVRroute");
+    expectEqual(g, 6, "Tempo/Swing/CVRscan/CVRroute + CvOutRot/GateOutRot");
     expectEqual(int(keys[0]), int(ParamKey::Tempo), "Tempo first");
+    expectTrue(hasKey(keys, g, ParamKey::CvOutputRotate), "CvOutputRotate folded into Global");
+    expectTrue(hasKey(keys, g, ParamKey::GateOutputRotate), "GateOutputRotate folded into Global");
+}
+
+CASE("paramKeyToTarget: the folded shell keys map to their targets") {
+    expectEqual(int(RouteBrowse::paramKeyToTarget(ParamKey::Run)), int(Routing::Target::Run), "Run");
+    expectEqual(int(RouteBrowse::paramKeyToTarget(ParamKey::Reset)), int(Routing::Target::Reset), "Reset");
+    expectEqual(int(RouteBrowse::paramKeyToTarget(ParamKey::CvOutputRotate)), int(Routing::Target::CvOutputRotate), "CvOutRot");
+    expectEqual(int(RouteBrowse::paramKeyToTarget(ParamKey::GateOutputRotate)), int(Routing::Target::GateOutputRotate), "GateOutRot");
 }
 
 CASE("matches: per-track route matches its paramKey when scope overlaps") {
