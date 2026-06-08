@@ -186,10 +186,29 @@ gaps the apply-hook strip surfaced, not behavior bugs:
   altitude (rescue runtime kept hanging) — but each is already per-engine ALLOW'd.
 
 ## Phase 7 — MIDI source + shaper (spec §7, §13)
-- [ ] MIDI source via **F4 LEARN** (MidiLearn → source=Midi + midiSource on the live route).
-- [ ] Shaper UI (engine-gated; only None/TriangleFold live today), surfaced in spread.
+- [x] MIDI source — DONE (2026-06-08). Capture decoupled from source-selection: grid picks
+      MIDI as a plain source value; a 12th **MIDI tab** (after BUS) lists routes where
+      `source==Midi` and hosts **F3 LEARN** (`midiLearn()` → `assignMidiLearn` → draft's
+      MidiSource) + field editing (Port/Channel/Event/CC via VIEW columns). Design
+      `docs/plans/2026-06-08-016-midi-routing-source-design.md`.
+- [x] Shaper UI — DONE (2026-06-08). SHAPER as a third grid view (VIEW cycles
+      SOURCE→DEPTH→SHAPER), per-row, dial None↔TriangleFold only (the 7 unported shapers
+      excluded from the dial — identity in the override path).
+
+## Legacy apply-branch removal (RoutingEngine.cpp:495+)
+The `applyBiasDepthToSource` + bias + min/max window + 9-shaper switch branch only serves the
+per-track targets the override fork doesn't claim. Removing it target-by-target.
+- [x] **Run + Reset** — DONE (2026-06-08, spec 017). Base-less toggle/trigger → clean raw-
+      source consumer (Reset=`gateRisingEdge`, Run=`routeRunGate` threshold). Off the branch.
+- [ ] **CvOutputRotate / GateOutputRotate** — have a real −8..8 user base → migrate to the
+      override path (`routedValueInt(base,−8,8)`). CvOutRot also feeds a float interp array
+      (`_cvRotateValues`) — int-override-vs-float-interp call pending. Last targets on the branch.
+- [ ] Once the rotates move: delete the legacy branch + the 7 stale shapers (Crease/Location/
+      Envelope/FrequencyFollower/Activity/ProgressiveDivider/VcaNext) + their RouteState
+      shaper-state structs. None/TriangleFold survive via `RouteShaper` on the override/bus paths.
 
 ## Deferred / out of scope (spec §13)
-- `scaleSource` cross-source resolution; flat "every modulation" audit list; serialized-format
-  cleanup (U7/§8 wire format); deleting old `writeTarget`/`Routable` routed half (phase 9);
-  deleting `RouteListModel`/legacy RoutingPage editor (phase 9).
+- `scaleSource` cross-source resolution (stored + math exist; `computeDelta` hardcodes the
+  scale value to 1.0, no UI — fully inert today). Flat "every modulation" audit list;
+  serialized-format cleanup (U7/§8 wire format); deleting `RouteListModel`/legacy RoutingPage
+  editor (phase 9, mostly done).
