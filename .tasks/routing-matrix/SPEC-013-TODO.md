@@ -236,7 +236,25 @@ per-track targets the override fork doesn't claim. Removing it target-by-target.
       Routing shaper lane = the stateless folds only; None/Fold/Crease(+offset) live via RouteShaper.
 
 ## Deferred / out of scope (spec §13)
-- `scaleSource` cross-source resolution (stored + math exist; `computeDelta` hardcodes the
-  scale value to 1.0, no UI — fully inert today). Flat "every modulation" audit list;
-  serialized-format cleanup (U7/§8 wire format); deleting `RouteListModel`/legacy RoutingPage
-  editor (phase 9, mostly done).
+- **`scaleSource` wiring** (per-route VCA on the route's own modulation — the explicit VcaNext
+  replacement, R6). Fully inert today: `Route::scaleSource()` stored + serialized + `operator==`,
+  `RouteApply::scaled(h,v)=0.5+(h-0.5)·v` math exists, but `computeDelta`/`busDelta` hardcode the
+  scale value to **1.0**, nothing resolves the chosen source, no UI. **Scope:** one `Source` per
+  route (not per-track). **Meaning:** a dynamic/voltage-controlled **Depth** — in Modulate mode
+  `delta = base·depth·scaleValue·range`, so depth (static per-track knob) and scaleSource (live,
+  source-driven) are commutative gains on the route's modulation. To wire: (a) `computeDelta`
+  gains a `scaleValue` arg, engine resolves `_sourceValues[scaleSource]` (or the MIDI eval) and
+  passes it — **`None` → 1.0 bypass, NOT 0** (else unset routes collapse to neutral); (b) per-route
+  picker in the matrix (4th view or a field), reusing `RouteBrowse::sourceList`.
+  **CONSTRAINT (owner, no feedback on ARM):** forbid self-reference in the picker —
+  exclude (1) the route's own **bus target** (reuse `isBusSelfRoute(scaleSource, target)`, the
+  same guard the primary source already has — this is the only real feedback path: bus output →
+  scale → output within a frame; per-track param targets aren't sources so they can't feed back)
+  and (2) the route's own **primary source** (the squaring "scale myself" quirk). Plus an engine
+  guard: scaleSource resolving to the route's own bus → bypass (1.0). Note: this closes *direct*
+  self-reference only; arbitrary multi-route bus cycles aren't caught by a self-ref check (graph
+  cycle detection — already possible with primary sources today, and bounded by the ±5V per-frame
+  bus clamp), but scaleSource then adds **no new feedback surface** beyond the within-route case
+  we forbid.
+- Flat "every modulation" audit list; serialized-format cleanup (U7/§8 wire format); deleting
+  `RouteListModel`/legacy RoutingPage editor (phase 9, mostly done).
