@@ -3,6 +3,7 @@
 #include "apps/sequencer/model/RouteBrowse.h"
 #include "apps/sequencer/model/RouteFork.h"
 #include "apps/sequencer/model/RouteParamKey.h"
+#include "apps/sequencer/model/Project.h"
 
 // Param-aggregation read model for the tab editor (lens UI). A tab band maps to a
 // fixed list of ParamKeys; matches() resolves whether a given route targets a band
@@ -160,6 +161,44 @@ CASE("enginePageParams: MidiCv has no engine-page params (both are shared)") {
     uint8_t keys[32];
     int n = RouteBrowse::enginePageParams(Track::TrackMode::MidiCv, keys, 32);
     expectEqual(n, 0, "MidiCv: SlideTime + Transpose are both shared -> empty page");
+}
+
+CASE("midiRouteList: empty routing yields no rows") {
+    Project project;
+    auto &routing = project.routing();
+    uint8_t idx[CONFIG_ROUTE_COUNT];
+    expectEqual(RouteBrowse::midiRouteList(routing, idx, CONFIG_ROUTE_COUNT), 0, "no MIDI routes");
+}
+
+CASE("midiRouteList: collects only active MIDI-sourced routes, ascending") {
+    Project project;
+    auto &routing = project.routing();
+    routing.route(2).setTarget(Routing::Target::Transpose);
+    routing.route(2).setSource(Routing::Source::Midi);
+    routing.route(3).setTarget(Routing::Target::Octave);
+    routing.route(3).setSource(Routing::Source::CvIn1);     // not MIDI
+    routing.route(5).setTarget(Routing::Target::Tempo);
+    routing.route(5).setSource(Routing::Source::Midi);
+    // a route with MIDI source but no target stays inactive -> excluded
+    routing.route(7).setSource(Routing::Source::Midi);
+
+    uint8_t idx[CONFIG_ROUTE_COUNT];
+    int n = RouteBrowse::midiRouteList(routing, idx, CONFIG_ROUTE_COUNT);
+    expectEqual(n, 2, "two active MIDI routes");
+    expectEqual(int(idx[0]), 2, "route 2 first");
+    expectEqual(int(idx[1]), 5, "route 5 second");
+}
+
+CASE("midiRouteList: honors maxOut") {
+    Project project;
+    auto &routing = project.routing();
+    routing.route(0).setTarget(Routing::Target::Transpose);
+    routing.route(0).setSource(Routing::Source::Midi);
+    routing.route(1).setTarget(Routing::Target::Tempo);
+    routing.route(1).setSource(Routing::Source::Midi);
+    uint8_t idx[1];
+    expectEqual(RouteBrowse::midiRouteList(routing, idx, 1), 1, "clamped to maxOut");
+    expectEqual(int(idx[0]), 0, "first MIDI route");
 }
 
 } // UNIT_TEST

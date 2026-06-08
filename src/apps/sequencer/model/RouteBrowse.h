@@ -113,6 +113,19 @@ namespace RouteBrowse {
         return n;
     }
 
+    // Fill out[] with the indices of every active route whose source is MIDI, in
+    // ascending order — the row set for the MIDI page. Returns the count (<= maxOut).
+    inline int midiRouteList(const Routing &routing, uint8_t *out, int maxOut) {
+        int n = 0;
+        for (int i = 0; i < CONFIG_ROUTE_COUNT && n < maxOut; ++i) {
+            const Routing::Route &route = routing.route(i);
+            if (route.active() && route.source() == Routing::Source::Midi) {
+                out[n++] = uint8_t(i);
+            }
+        }
+        return n;
+    }
+
     // True when route is active, its target maps to paramKey, and its scope overlaps
     // trackMask. trackMask 0 = global scope (matches a project/global route only); a
     // non-zero mask = per-track scope (matches a per-track route whose tracks overlap).
