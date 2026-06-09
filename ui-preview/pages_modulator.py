@@ -782,26 +782,29 @@ def render_modulator_destinations_grid_proposed(canvas):
     eng = MockModulatorEngine(current_value=64)
     WindowPainter.clear(canvas)
     WindowPainter.draw_header(canvas, track=2, mode="MOD 3 - ROUTING")
-    WindowPainter.draw_footer(canvas, ["MODE", "GATE", "CLEAR", "EVENT", "CC NUM"], highlight=-1)
+    WindowPainter.draw_footer(canvas, ["RUN", "GATE", "CLEAR", "EVENT", "CC NUM"], highlight=-1)
 
     _draw_dest_membership_grid(canvas, 1, 12, 119, 40,
                                cv_members={1, 3}, midi_members={3, 10},
                                cursor_kind='midi', cursor_index=3)
 
-    # Right panel: single-value fields + cursored MIDI destination's event/CC.
+    # Right panel: cursored destination + its event/CC up top (F4/F5 edit focus),
+    # modulator-wide MODE/GATE compact along the bottom.
     canvas.set_blend_mode(BlendMode.Set)
     canvas.set_font(Font.Small)
     canvas.set_color(Color.Medium)
-    canvas.draw_text(128, 22, "MODE")
-    canvas.draw_text(128, 34, "GATE")
+    canvas.draw_text(128, 22, "MIDI 3")
     canvas.set_color(Color.Bright)
-    canvas.draw_text(168, 22, "Trig")
-    canvas.draw_text(168, 34, "T2")
+    canvas.draw_text(128, 34, "CC 74")
 
     canvas.set_color(Color.Low)
     canvas.hline(128, 39, 124)
     canvas.set_font(Font.Tiny)
     canvas.set_color(Color.Medium)
-    canvas.draw_text(128, 50, "> MIDI 3")
+    canvas.draw_text(128, 50, "RUN")
     canvas.set_color(Color.Bright)
-    canvas.draw_text(190, 50, "CC 74")
+    canvas.draw_text(150, 50, "TRIG")
+    canvas.set_color(Color.Medium)
+    canvas.draw_text(192, 50, "GATE")
+    canvas.set_color(Color.Bright)
+    canvas.draw_text(222, 50, "T2")

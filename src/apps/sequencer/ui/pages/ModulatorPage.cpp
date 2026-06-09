@@ -13,9 +13,11 @@
 #include "core/utils/StringBuilder.h"
 
 static const ContextMenuModel::Item contextMenuItems[] = {
-    { "Commit" },
-    { "Cancel" },
-    { "Route" },
+    { nullptr },
+    { nullptr },
+    { nullptr },
+    { "CANCEL" },
+    { "COMMIT" },
 };
 
 ModulatorPage::ModulatorPage(PageManager &manager, PageContext &context) :
@@ -57,7 +59,7 @@ void ModulatorPage::draw(Canvas &canvas) {
 
     // Footer
     if (_showRoutingOverlay) {
-        const char *routingNames[5] = { "MODE", "GATE", "CLEAR", "EVENT", "CC NUM" };
+        const char *routingNames[5] = { "RUN", "GATE", "CLEAR", "EVENT", "CC NUM" };
         int hl = -1;
         switch (_selectedRoutingFunction) {
         case RoutingFunction::Mode: hl = 0; break;
@@ -502,10 +504,8 @@ void ModulatorPage::contextShow(bool doubleClick) {
         int(ContextAction::Last),
         [this] (int index) { contextAction(index); },
         [this] (int index) {
-            if (index == int(ContextAction::Commit) || index == int(ContextAction::Cancel)) {
-                return _showRoutingOverlay;
-            }
-            return true;
+            return _showRoutingOverlay &&
+                   (index == int(ContextAction::Cancel) || index == int(ContextAction::Commit));
         },
         doubleClick
     ));
@@ -520,25 +520,6 @@ void ModulatorPage::contextAction(int index) {
         loadRoutingFromMidiOutput();
         showMessage(FixedStringBuilder<32>("Mod %d routing reverted", _selectedModulator + 1), 2000);
         break;
-    case ContextAction::Route: {
-        for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
-            if (_project.cvOutputModulator(i) == _selectedModulator + 1) {
-                _project.setCvOutputModulator(i, 0);
-                showMessage(FixedStringBuilder<32>("Mod %d -> CV %d removed", _selectedModulator + 1, i + 1));
-                return;
-            }
-        }
-        for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
-            if (_project.cvOutputModulator(i) == 0) {
-                _project.setCvOutputModulator(i, _selectedModulator + 1);
-                showMessage(FixedStringBuilder<32>("Mod %d -> CV %d", _selectedModulator + 1, i + 1));
-                return;
-            }
-        }
-        _project.setCvOutputModulator(0, _selectedModulator + 1);
-        showMessage(FixedStringBuilder<32>("Mod %d -> CV 1", _selectedModulator + 1));
-        break;
-    }
     case ContextAction::Last:
         break;
     }
@@ -619,30 +600,19 @@ void ModulatorPage::applyRoutingToMidiOutput() {
 void ModulatorPage::drawDestinationsBody(Canvas &canvas, Modulator &modulator) {
     drawMembershipGrid(canvas);
 
-    const int colL = 128, colV = 172;
+    const int colL = 128;
     canvas.setBlendMode(BlendMode::Set);
+
+    // Top: cursored destination + its event/CC (the F4/F5 edit focus).
     canvas.setFont(Font::Small);
-
-    FixedStringBuilder<16> modeStr; modulator.printMode(modeStr);
-    FixedStringBuilder<16> gateStr; modulator.printGateTrack(gateStr);
-    canvas.setColor(_selectedRoutingFunction == RoutingFunction::Mode ? Color::Bright : Color::Medium);
-    canvas.drawText(colL, 22, "MODE");
-    canvas.drawText(colV, 22, modeStr);
-    canvas.setColor(_selectedRoutingFunction == RoutingFunction::Gate ? Color::Bright : Color::Medium);
-    canvas.drawText(colL, 34, "GATE");
-    canvas.drawText(colV, 34, gateStr);
-
-    canvas.setColor(Color::Low);
-    canvas.hline(colL, 39, 124);
-    canvas.setFont(Font::Tiny);
     FixedStringBuilder<16> dest;
     if (cursorIsCv()) {
-        dest("> CV %d", cursorCvIndex() + 1);
+        dest("CV %d", cursorCvIndex() + 1);
     } else {
-        dest("> MIDI %d", cursorMidiIndex() + 1);
+        dest("MIDI %d", cursorMidiIndex() + 1);
     }
     canvas.setColor(Color::Medium);
-    canvas.drawText(colL, 50, dest);
+    canvas.drawText(colL, 22, dest);
     if (!cursorIsCv()) {
         int idx = cursorMidiIndex();
         FixedStringBuilder<16> ev;
@@ -651,11 +621,25 @@ void ModulatorPage::drawDestinationsBody(Canvas &canvas, Modulator &modulator) {
         case ContEvent::Pressure: ev("AT"); break;
         default:                  ev("CC %d", _midiCCNum[idx]); break;
         }
-        bool evFocus = _selectedRoutingFunction == RoutingFunction::Event ||
-                       _selectedRoutingFunction == RoutingFunction::CCNumber;
-        canvas.setColor(evFocus ? Color::Bright : Color::Medium);
-        canvas.drawText(colL + 62, 50, ev);
+        canvas.setColor(Color::Bright);
+        canvas.drawText(colL, 34, ev);
     }
+
+    canvas.setColor(Color::Low);
+    canvas.hline(colL, 39, 124);
+
+    // Bottom: modulator-wide RUN mode + GATE track, compact.
+    canvas.setFont(Font::Tiny);
+    FixedStringBuilder<16> modeStr; modulator.printMode(modeStr);
+    FixedStringBuilder<16> gateStr; modulator.printGateTrack(gateStr);
+    canvas.setColor(_selectedRoutingFunction == RoutingFunction::Mode ? Color::Bright : Color::Medium);
+    canvas.drawText(colL, 50, "RUN");
+    canvas.setColor(Color::Bright);
+    canvas.drawText(colL + 22, 50, modeStr);
+    canvas.setColor(_selectedRoutingFunction == RoutingFunction::Gate ? Color::Bright : Color::Medium);
+    canvas.drawText(colL + 64, 50, "GATE");
+    canvas.setColor(Color::Bright);
+    canvas.drawText(colL + 94, 50, gateStr);
 }
 
 void ModulatorPage::drawMembershipGrid(Canvas &canvas) {

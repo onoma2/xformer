@@ -50,11 +50,12 @@ private:
         Last,
     };
 
+    // Positioned so the menu binds CANCEL to F4 and COMMIT to F5, matching the
+    // routing matrix footer (slots 0-2 are empty/inert).
     enum class ContextAction : uint8_t {
-        Commit = 0,
-        Cancel = 1,
-        Route = 2,
-        Last
+        Cancel = 3,
+        Commit = 4,
+        Last = 5,
     };
 
     void setSelectedModulator(int index);

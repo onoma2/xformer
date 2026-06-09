@@ -57,9 +57,9 @@ public:
 
     static const char *modeName(Mode mode) {
         switch (mode) {
-        case Mode::Run:   return "Run";
-        case Mode::Trig:  return "Trig";
-        case Mode::Gate:  return "Gate";
+        case Mode::Run:   return "FREE";
+        case Mode::Trig:  return "TRIG";
+        case Mode::Gate:  return "HOLD";
         case Mode::Last:  break;
         }
         return nullptr;
