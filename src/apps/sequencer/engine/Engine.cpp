@@ -187,6 +187,9 @@ void Engine::update() {
 
         // tick modulators before the global recompute so a modulator used as a
         // routing/CV source reflects the current tick
+        const bool justf = _modulatorEngine.justfActive();
+        const float justfMasterHz = justf ? _project.modulator(0).rateHz() : 0.f;
+        const float justfIntone = _modulatorEngine.intone();
         for (int modulatorIndex = 0; modulatorIndex < CONFIG_MODULATOR_COUNT; ++modulatorIndex) {
             const auto &modulator = _project.modulator(modulatorIndex);
             Routing::Source gs = modulator.gateSource();
@@ -196,7 +199,12 @@ void Engine::update() {
                 ? 0.f : _routingEngine.resolveSourceLevel(gs);
             bool gate = ModulatorEngine::gateFromLevel(level, _modulatorGateState[modulatorIndex]);
             _modulatorGateState[modulatorIndex] = gate;
-            _modulatorEngine.tick(tick, dt, modulator, modulatorIndex, gate);
+            // JustF: Free-domain modulators run at M1 x INTONE-ratio (B-clamped); others as-is.
+            float rateOverride = -1.f;
+            if (justf && modulator.rateDomain() == Modulator::RateDomain::Free) {
+                rateOverride = ModulatorEngine::justfEffectiveHz(justfMasterHz, justfIntone, modulatorIndex + 1);
+            }
+            _modulatorEngine.tick(tick, dt, modulator, modulatorIndex, gate, rateOverride);
             _midiOutputEngine.sendModulator(modulatorIndex, _modulatorEngine.currentValue(modulatorIndex));
         }
 

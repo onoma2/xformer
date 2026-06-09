@@ -38,6 +38,34 @@ public:
         return prevGate ? (value >= 0.45f) : (value >= 0.55f);
     }
 
+    // --- JustF (Just Friends / ochd) rate link: M1 master + INTONE spread ---
+    // index is 1-based; M1 (index 1) is the identity. INTONE -1..+1: noon = unison,
+    // CW = harmonic (M_k = k x M1), CCW = subharmonic (M_k = M1 / k).
+    static float intoneRatio(float intone, int index) {
+        if (index <= 1) return 1.f;
+        float n = float(index - 1);
+        return intone >= 0.f ? (1.f + intone * n) : (1.f / (1.f - intone * n));
+    }
+    // B-clamp: cap the master so the fastest follower stays <= 16 Hz (the Free
+    // ceiling). Top clamp only on the harmonic side; subharmonic keeps full range.
+    static float justfMasterHz(float m1Hz, float intone) {
+        float maxN = float(CONFIG_MODULATOR_COUNT - 1);
+        float maxRatio = 1.f + maxN * (intone > 0.f ? intone : 0.f);
+        float cap = 16.f / maxRatio;
+        return m1Hz < cap ? m1Hz : cap;
+    }
+    static float justfEffectiveHz(float m1Hz, float intone, int index) {
+        float hz = justfMasterHz(m1Hz, intone) * intoneRatio(intone, index);
+        if (hz > 16.f) hz = 16.f;
+        if (hz < 0.0001f) hz = 0.0001f;
+        return hz;
+    }
+
+    bool justfActive() const { return _justfActive; }
+    void setJustfActive(bool active) { _justfActive = active; }
+    float intone() const { return _intone; }
+    void setIntone(float v) { _intone = clamp(v, -1.f, 1.f); }
+
     void reset() {
         for (int i = 0; i < CONFIG_MODULATOR_COUNT; ++i) {
             _phaseAccumulator[i] = 0;
@@ -54,12 +82,17 @@ public:
             _latoocarfian[i].reset();
             _freeRemainder[i] = 0.f;
         }
+        _justfActive = false;
+        _intone = 0.f;
     }
 
-    void tick(uint32_t tick, float dt, const Modulator &modulator, int index, bool gate) {
+    void tick(uint32_t tick, float dt, const Modulator &modulator, int index, bool gate,
+              float rateHzOverride = -1.f) {
         if (index < 0 || index >= CONFIG_MODULATOR_COUNT) {
             return;
         }
+        // JustF (Free-domain) substitutes the derived rate for the modulator's own.
+        const float effRateHz = (rateHzOverride >= 0.f) ? rateHzOverride : modulator.rateHz();
 
         // Handle Random shape in Triggered mode
         if (modulator.shape() == Modulator::Shape::Random &&
@@ -186,7 +219,7 @@ public:
 
             // Phase advance this update: Free = real dt*Hz (drift-free), Tempo = PPQN division.
             uint32_t inc = (modulator.rateDomain() == Modulator::RateDomain::Free)
-                ? freePhaseIncrement(dt, modulator.rateHz(), _freeRemainder[index])
+                ? freePhaseIncrement(dt, effRateHz, _freeRemainder[index])
                 : 65536 / (modulator.rate() * 2);
             bool shouldAdvance = (modulator.mode() == Modulator::Mode::Run) ||
                                 (modulator.mode() == Modulator::Mode::Trig) ||
@@ -245,7 +278,7 @@ public:
         if (modulator.shape() == Modulator::Shape::Random) {
             // Free advances by real dt*Hz; Tempo by the PPQN division.
             uint32_t phaseIncrement = (modulator.rateDomain() == Modulator::RateDomain::Free)
-                ? freePhaseIncrement(dt, modulator.rateHz(), _freeRemainder[index])
+                ? freePhaseIncrement(dt, effRateHz, _freeRemainder[index])
                 : 65536 / (modulator.rate() * 2);
             _phaseAccumulator[index] += phaseIncrement;
 
@@ -293,7 +326,7 @@ public:
 
         // Increment phase: Free advances by real dt*Hz (drift-free), Tempo by the PPQN division.
         uint32_t phaseIncrement = (modulator.rateDomain() == Modulator::RateDomain::Free)
-            ? freePhaseIncrement(dt, modulator.rateHz(), _freeRemainder[index])
+            ? freePhaseIncrement(dt, effRateHz, _freeRemainder[index])
             : 65536 / (modulator.rate() * 2);
 
         if (modulator.mode() == Modulator::Mode::Gate) {
@@ -373,6 +406,8 @@ private:
     bool _lastGate[CONFIG_MODULATOR_COUNT] = {};
     int _targetValue[CONFIG_MODULATOR_COUNT] = {};
     float _freeRemainder[CONFIG_MODULATOR_COUNT] = {};   // Free-domain phase fractional carry
+    bool _justfActive = false;                           // JustF rate-link mode (runtime-only)
+    float _intone = 0.f;                                 // JustF spread (-1..+1), runtime-only
     Random _rng[CONFIG_MODULATOR_COUNT];
 
     // ADSR envelope state

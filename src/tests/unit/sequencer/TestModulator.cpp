@@ -128,4 +128,33 @@ CASE("cycleGateSource: steps the curated list and skips self") {
     expectEqual(int(Modulator::cycleGateSource(S::GateOut1, -1, 0)), int(S::Mod8), "wrap back to last");
 }
 
+// --- JustF (ochd / Just Friends) rate-link mode ---
+
+CASE("intoneRatio: index-proportional, M1 identity") {
+    using ME = ModulatorEngine;
+    expectTrue(std::fabs(ME::intoneRatio(0.f, 1) - 1.f) < 1e-5f, "M1 identity at unison");
+    expectTrue(std::fabs(ME::intoneRatio(0.f, 8) - 1.f) < 1e-5f, "unison: all = 1");
+    expectTrue(std::fabs(ME::intoneRatio(1.f, 2) - 2.f) < 1e-5f, "harmonic +1: M2 = 2x");
+    expectTrue(std::fabs(ME::intoneRatio(1.f, 8) - 8.f) < 1e-5f, "harmonic +1: M8 = 8x");
+    expectTrue(std::fabs(ME::intoneRatio(-1.f, 2) - 0.5f) < 1e-5f, "subharm -1: M2 = 1/2");
+    expectTrue(std::fabs(ME::intoneRatio(-1.f, 8) - (1.f / 8.f)) < 1e-5f, "subharm -1: M8 = 1/8");
+    expectTrue(std::fabs(ME::intoneRatio(1.f, 1) - 1.f) < 1e-5f, "M1 always identity");
+}
+
+CASE("justfMasterHz: B-clamp on the harmonic side only") {
+    using ME = ModulatorEngine;
+    expectTrue(std::fabs(ME::justfMasterHz(16.f, 0.f) - 16.f) < 1e-3f, "unison: no clamp");
+    expectTrue(std::fabs(ME::justfMasterHz(16.f, 1.f) - 2.f) < 1e-3f, "+1: master capped 16/8 = 2");
+    expectTrue(std::fabs(ME::justfMasterHz(16.f, -0.5f) - 16.f) < 1e-3f, "subharm side: no top clamp");
+    expectTrue(ME::justfMasterHz(1.f, 1.f) <= 2.f + 1e-3f, "below the cap passes through");
+}
+
+CASE("justfEffectiveHz: fastest follower never exceeds 16Hz") {
+    using ME = ModulatorEngine;
+    expectTrue(ME::justfEffectiveHz(16.f, 1.f, 8) <= 16.f + 1e-3f, "M8 clamped to 16");
+    expectTrue(std::fabs(ME::justfEffectiveHz(16.f, 0.f, 5) - 16.f) < 1e-3f, "unison: follower = master");
+    expectTrue(ME::justfEffectiveHz(16.f, 1.f, 1) <= 2.f + 1e-3f, "M1 = clamped master at +1");
+    expectTrue(ME::justfEffectiveHz(8.f, -1.f, 8) < 8.f, "M8 subharmonic slower than M1");
+}
+
 }
