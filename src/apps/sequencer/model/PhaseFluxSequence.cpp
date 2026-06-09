@@ -71,7 +71,7 @@ void PhaseFluxSequence::Stage::clear() {
     setAccumulatorTrigger(AccumulatorTriggerType::Stage);
     setPulseAccumTrigger(AccumulatorTriggerType::Stage);
     setGateLength(50);
-    setStageDivisor(StageDivisorSlot::Bar);
+    setStageDivisor(StageDivisorSlot::Quarter);
     setSkip(false);
     setStageLen(64);   // 64 = ×1 transparent default; sequence runs unchanged when stageLen is added
     setTemporalRepeat(RepeatType::x1);
@@ -136,7 +136,7 @@ void PhaseFluxSequence::clear() {
     _edited = 0;
     _pitchRate = uint8_t(defaultPitchRateIndex());
     _pitchMode = PitchMode::Cell;
-    _cycleLength = CycleLengthMode::Fixed;
+    _cycleLength = CycleLengthMode::Adaptive;
     _globalPhase = 0.f;
     _warpNudge = 0;
     _responseNudge = 0;
@@ -155,10 +155,14 @@ void PhaseFluxSequence::clear() {
     _pulseAccumConfig.setNegLim(16);
     for (size_t i = 0; i < _stages.size(); ++i) {
         _stages[i].clear();
-        // Fresh sequence: only stage 0 active. Dial pulseCount on stage 0
-        // up to 16 → matches NoteTrack 16-step 1/16 grid (since default
-        // stageDivisor = Bar, seqDivisor = 12).
-        if (i > 0) _stages[i].setSkip(true);
+        // Fresh sequence = a default NoteTrack: 4 active beat-stages (Quarter)
+        // × 4 pulses = 16 sixteenths across the bar. Adaptive cycle drops the
+        // 12 skipped stages, so the cycle is exactly 1 bar at seqDivisor 12.
+        if (i < 4) {
+            _stages[i].setPulseCount(4);
+        } else {
+            _stages[i].setSkip(true);
+        }
     }
 }
 
