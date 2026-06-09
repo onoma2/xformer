@@ -280,6 +280,7 @@ private:
 
     RoutingEngine _routingEngine;
     ModulatorEngine _modulatorEngine;
+    bool _modulatorGateState[CONFIG_MODULATOR_COUNT] = {}; // hysteresis latch per modulator gate
     MidiLearn _midiLearn;
     MidiReceiveHandler _midiReceiveHandler;
     UsbMidiConnectHandler _usbMidiConnectHandler;

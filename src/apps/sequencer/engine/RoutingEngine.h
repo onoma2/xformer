@@ -24,6 +24,10 @@ public:
 
     float routeSource(int index) const;
 
+    // Route-independent normalized [0,1] read, scaled so 0.5 is a gate threshold:
+    // GateOut 0/1, Mod center=64, CvIn/Bus ~1V. Used by the modulator gate source.
+    float resolveSourceLevel(Routing::Source source) const;
+
     // Output group rotation (spec 018/019): one mask + amount per frame, applied to the
     // masked group's jacks in the engine output loop. Mask 0 = no rotation this frame.
     uint8_t gateRotateMask() const { return _gateRotateMask; }

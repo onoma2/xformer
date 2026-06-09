@@ -807,4 +807,4 @@ def render_modulator_destinations_grid_proposed(canvas):
     canvas.set_color(Color.Medium)
     canvas.draw_text(192, 50, "GATE")
     canvas.set_color(Color.Bright)
-    canvas.draw_text(222, 50, "T2")
+    canvas.draw_text(222, 50, "IN2")

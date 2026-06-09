@@ -189,9 +189,13 @@ void Engine::update() {
         // routing/CV source reflects the current tick
         for (int modulatorIndex = 0; modulatorIndex < CONFIG_MODULATOR_COUNT; ++modulatorIndex) {
             const auto &modulator = _project.modulator(modulatorIndex);
-            int gateTrack = modulator.gateTrack();
-            bool gate = (gateTrack >= 0 && gateTrack < CONFIG_TRACK_COUNT) ?
-                _trackEngines[gateTrack]->gateOutput(0) : false;
+            Routing::Source gs = modulator.gateSource();
+            // self-gating is protected: a modulator never gates from its own output
+            float level = (Routing::isModulatorSource(gs) &&
+                           Routing::modulatorSourceIndex(gs) == modulatorIndex)
+                ? 0.f : _routingEngine.resolveSourceLevel(gs);
+            bool gate = ModulatorEngine::gateFromLevel(level, _modulatorGateState[modulatorIndex]);
+            _modulatorGateState[modulatorIndex] = gate;
             _modulatorEngine.tick(tick, dt, modulator, modulatorIndex, gate);
             _midiOutputEngine.sendModulator(modulatorIndex, _modulatorEngine.currentValue(modulatorIndex));
         }

@@ -4,6 +4,7 @@
 #include "Types.h"
 #include "Serialize.h"
 #include "ModelUtils.h"
+#include "Routing.h"
 
 #include "core/math/Math.h"
 #include "core/utils/StringBuilder.h"
@@ -203,19 +204,49 @@ public:
         str("%dms", smooth());
     }
 
-    // gateTrack (0-7, which track's gate triggers sync/retrigger/triggered-random)
+    // gateSource: what gates Trig/Hold and triggered-random. Any track gate,
+    // CV-IN, routing bus, or another modulator (self excluded = protected).
+    Routing::Source gateSource() const { return _gateSource; }
+    void setGateSource(Routing::Source source) { _gateSource = source; }
+    void printGateSource(StringBuilder &str) const { Routing::printSourceAbbrev(_gateSource, str); }
 
-    int gateTrack() const { return _gateTrack; }
-    void setGateTrack(int track) {
-        _gateTrack = clamp(track, 0, CONFIG_TRACK_COUNT - 1);
+    // Curated selectable set, in cycle order; self-modulator filtered at runtime.
+    static const Routing::Source *gateSourceList(int &count) {
+        using S = Routing::Source;
+        static const Routing::Source list[] = {
+            S::GateOut1, S::GateOut2, S::GateOut3, S::GateOut4,
+            S::GateOut5, S::GateOut6, S::GateOut7, S::GateOut8,
+            S::CvIn1, S::CvIn2, S::CvIn3, S::CvIn4,
+            S::BusCv1, S::BusCv2, S::BusCv3, S::BusCv4,
+            S::Mod1, S::Mod2, S::Mod3, S::Mod4, S::Mod5, S::Mod6, S::Mod7, S::Mod8,
+        };
+        count = int(sizeof(list) / sizeof(list[0]));
+        return list;
     }
-
-    void editGateTrack(int value, bool shift) {
-        setGateTrack(gateTrack() + value);
+    static bool gateSourceAllowed(Routing::Source s, int selfModIndex) {
+        int n; auto *list = gateSourceList(n);
+        for (int i = 0; i < n; ++i) {
+            if (list[i] == s) {
+                return !(Routing::isModulatorSource(s) &&
+                         Routing::modulatorSourceIndex(s) == selfModIndex);
+            }
+        }
+        return false;
     }
-
-    void printGateTrack(StringBuilder &str) const {
-        str("T%d", gateTrack() + 1);
+    static Routing::Source cycleGateSource(Routing::Source cur, int dir, int selfModIndex) {
+        int n; auto *list = gateSourceList(n);
+        int idx = 0;
+        for (int i = 0; i < n; ++i) { if (list[i] == cur) { idx = i; break; } }
+        int step = (dir >= 0) ? 1 : -1;
+        for (int k = 0; k < n; ++k) {
+            idx = (idx + step + n) % n;
+            Routing::Source s = list[idx];
+            if (!(Routing::isModulatorSource(s) &&
+                  Routing::modulatorSourceIndex(s) == selfModIndex)) {
+                return s;
+            }
+        }
+        return cur;
     }
 
     // randomMode (Clocked or Triggered)
@@ -339,7 +370,7 @@ public:
         setOffset(0);
         setPhase(0);
         setSmooth(100);
-        setGateTrack(0);
+        setGateSource(Routing::Source::GateOut1);
         setRandomMode(RandomMode::Clocked);
         setMode(Mode::Run);
         setAttack(900);   // P1 = 45 for chaos
@@ -356,7 +387,7 @@ public:
         writer.write(_offset);
         writer.write(_phase);
         writer.write(_smooth);
-        writer.write(_gateTrack);
+        writer.write(_gateSource);
         writer.write(_randomMode);
         writer.write(_mode);
         writer.write(_attack);
@@ -374,7 +405,7 @@ public:
         reader.read(_offset);
         reader.read(_phase);
         reader.read(_smooth);
-        reader.read(_gateTrack);
+        reader.read(_gateSource);
         reader.read(_randomMode);
         reader.read(_mode);
         reader.read(_attack);
@@ -400,7 +431,7 @@ private:
     int8_t _offset = 0;
     uint16_t _phase = 0;
     uint16_t _smooth = 100;
-    uint8_t _gateTrack = 0;
+    Routing::Source _gateSource = Routing::Source::GateOut1;
     RandomMode _randomMode = RandomMode::Clocked;
     Mode _mode = Mode::Run;
     RateDomain _rateDomain = RateDomain::Free;

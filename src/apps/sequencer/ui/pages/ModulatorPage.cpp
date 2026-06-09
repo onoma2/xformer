@@ -105,7 +105,7 @@ void ModulatorPage::draw(Canvas &canvas) {
         } else {
             functionNames[0] = "SHAPE";
             functionNames[1] = isRandom ? "R.MODE" : "RATE";
-            functionNames[2] = isTriggered ? "G.TRACK" : "DEPTH";
+            functionNames[2] = isTriggered ? "G.SRC" : "DEPTH";
             functionNames[3] = "OFFSET";
             functionNames[4] = isRandom ? "SLEW" : "PHASE";
         }
@@ -157,7 +157,7 @@ void ModulatorPage::draw(Canvas &canvas) {
             modulator.printRate(values[1]);
         }
         if (isTriggered) {
-            modulator.printGateTrack(values[2]);
+            modulator.printGateSource(values[2]);
         } else {
             modulator.printDepth(values[2]);
         }
@@ -371,7 +371,7 @@ void ModulatorPage::encoder(EncoderEvent &event) {
             modulator.editMode(event.value(), pressed);
             break;
         case RoutingFunction::Gate:
-            modulator.editGateTrack(event.value(), pressed);
+            modulator.setGateSource(Modulator::cycleGateSource(modulator.gateSource(), event.value(), _selectedModulator));
             break;
         case RoutingFunction::Event:
             if (!cursorIsCv() && event.value() != 0) {
@@ -460,7 +460,7 @@ void ModulatorPage::encoder(EncoderEvent &event) {
             break;
         case Function::Depth:
             if (isTriggered) {
-                modulator.editGateTrack(event.value(), pressed);
+                modulator.setGateSource(Modulator::cycleGateSource(modulator.gateSource(), event.value(), _selectedModulator));
             } else {
                 modulator.editDepth(event.value(), pressed);
             }
@@ -631,7 +631,7 @@ void ModulatorPage::drawDestinationsBody(Canvas &canvas, Modulator &modulator) {
     // Bottom: modulator-wide RUN mode + GATE track, compact.
     canvas.setFont(Font::Tiny);
     FixedStringBuilder<16> modeStr; modulator.printMode(modeStr);
-    FixedStringBuilder<16> gateStr; modulator.printGateTrack(gateStr);
+    FixedStringBuilder<16> gateStr; modulator.printGateSource(gateStr);
     canvas.setColor(_selectedRoutingFunction == RoutingFunction::Mode ? Color::Bright : Color::Medium);
     canvas.drawText(colL, 50, "RUN");
     canvas.setColor(Color::Bright);

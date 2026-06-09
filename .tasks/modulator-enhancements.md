@@ -70,3 +70,46 @@ macro-structure in unpredictable wiggle); Location/ProgDiv work on any shape.
 ## Reference
 Governing scope note: the routing overhaul plan (`002`, R10) walled modulator expansion out of
 scope — so this is net-new, unspecced-until-now work; this file is its spec.
+
+## Gate source expansion (2026-06-09) — TDD + wire
+
+Generalize the modulator gate input from track-only to any of: track gates,
+CV-IN, routing buses, and other modulators (self excluded = "protected"). The
+gate drives TRIG/HOLD phase logic and Random-Triggered S&H.
+
+Most machinery already exists: `Routing::Source` (Routing.h) enumerates CvIn1-4,
+BusCv1-4, GateOut1-8, Mod1-8; `RoutingEngine::resolveSourceValue` already reads
+them all live. The gate is resolved in ONE line today (`Engine.cpp:192-194`).
+
+### Model
+- `_gateTrack` (uint8_t track) -> `_gateSource` (`Routing::Source`). Modulator.h
+  includes Routing.h (no cycle; Routing.h does not include Modulator.h).
+- Curated selectable set + order: GateOut1-8, CvIn1-4, BusCv1-4, Mod1-8 (minus self).
+- Static helpers (pure, TDD): `gateSourceAllowed(Source, selfIdx)`,
+  `cycleGateSource(Source cur, int dir, int selfIdx)`. `printGateSource` via
+  `Routing::sourceName`. Serialize `_gateSource` unconditionally (no version bump).
+- `clear()` default GateOut1 (== old track-1 gate).
+
+### Engine
+- `RoutingEngine::resolveSourceLevel(Source)` — route-independent normalized [0,1]
+  so 0.5 is the gate threshold for every source: GateOut->0/1, Mod->value/127
+  (center 64 = 0.5), CvIn/Bus->clamp(volts/2,0,1) (~1V threshold).
+- `ModulatorEngine::gateFromLevel(value, prevGate)` (static, pure, TDD) — hysteresis
+  hi=0.55 / lo=0.45 around 0.5. Boolean sources cross cleanly; continuous get debounce.
+- `Engine.cpp` gate resolve: self-mod -> level 0 (protected); else resolveSourceLevel
+  -> gateFromLevel(prev) -> bool, latch in `_modulatorGateState[CONFIG_MODULATOR_COUNT]`.
+  Rising-edge detection stays in ModulatorEngine `_lastGate` (unchanged).
+- Mod->mod: index-order tick means a forward ref lags 1 tick (accept, per Engine.cpp:188).
+
+### UI (ModulatorPage)
+- Destinations GATE (F2) cycles the curated source list; panel prints sourceName.
+- Random-Triggered shape: its trigger uses the same `_gateSource`; footer "G.TRACK"
+  -> "G.SRC", value via sourceName (render the random params page).
+
+### Resource (estimate)
+Flash ~0.5-1.5 KB; RAM ~0 (int->enum shrinks, reuse latch); CPU <0.1% (8
+resolveSourceLevel/update, already-hot-path cost). No new tick-rate buffers.
+
+### Gate
+TDD first: `gateFromLevel` + `cycleGateSource` unit cases in TestModulator (red->green).
+Then wire model/engine/UI. sim + STM32 green; ui-preview for label changes. Commit when asked.

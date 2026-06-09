@@ -95,4 +95,37 @@ CASE("cycleRateDomain toggles and re-clamps into the new range") {
     expectEqual(int(m.rateDomain()), int(Domain::Free), "-> Free");
 }
 
+// --- gate source expansion ---
+
+CASE("gateFromLevel: hysteresis around 0.5 (hi 0.55 / lo 0.45)") {
+    using ME = ModulatorEngine;
+    expectTrue(ME::gateFromLevel(0.60f, false), "rises above hi");
+    expectFalse(ME::gateFromLevel(0.50f, false), "0.5 in band stays low from low");
+    expectTrue(ME::gateFromLevel(0.50f, true), "0.5 in band stays high from high");
+    expectFalse(ME::gateFromLevel(0.40f, true), "falls below lo");
+    expectTrue(ME::gateFromLevel(1.0f, false), "boolean high (gate-out)");
+    expectFalse(ME::gateFromLevel(0.0f, true), "boolean low (gate-out)");
+}
+
+CASE("gateSourceAllowed: curated set, self excluded") {
+    using S = Routing::Source;
+    expectTrue(Modulator::gateSourceAllowed(S::GateOut1, 0), "track gate allowed");
+    expectTrue(Modulator::gateSourceAllowed(S::CvIn2, 0), "cv-in allowed");
+    expectTrue(Modulator::gateSourceAllowed(S::BusCv1, 0), "bus allowed");
+    expectTrue(Modulator::gateSourceAllowed(S::Mod4, 0), "other modulator allowed");
+    expectFalse(Modulator::gateSourceAllowed(S::Mod1, 0), "self modulator (idx 0 = Mod1) excluded");
+    expectFalse(Modulator::gateSourceAllowed(S::CvOut1, 0), "cv-out not in the set");
+    expectFalse(Modulator::gateSourceAllowed(S::Midi, 0), "midi not in the set");
+    expectFalse(Modulator::gateSourceAllowed(S::None, 0), "none not in the set");
+}
+
+CASE("cycleGateSource: steps the curated list and skips self") {
+    using S = Routing::Source;
+    expectEqual(int(Modulator::cycleGateSource(S::GateOut1, 1, 0)), int(S::GateOut2), "fwd within tracks");
+    // self = Mod3 (idx 2): stepping onto Mod3 skips it
+    expectEqual(int(Modulator::cycleGateSource(S::Mod2, 1, 2)), int(S::Mod4), "skips self Mod3");
+    // backward from first allowed wraps to last allowed
+    expectEqual(int(Modulator::cycleGateSource(S::GateOut1, -1, 0)), int(S::Mod8), "wrap back to last");
+}
+
 }

@@ -164,6 +164,26 @@ float RoutingEngine::resolveSourceValue(const Routing::Route &route, Routing::So
     return 0.f;
 }
 
+float RoutingEngine::resolveSourceLevel(Routing::Source source) const {
+    if (source >= Routing::Source::CvIn1 && source <= Routing::Source::CvIn4) {
+        int index = int(source) - int(Routing::Source::CvIn1);
+        return clamp(_engine.cvInput().channel(index) * 0.5f, 0.f, 1.f);
+    }
+    if (source >= Routing::Source::BusCv1 && source <= Routing::Source::BusCv4) {
+        int index = int(source) - int(Routing::Source::BusCv1);
+        return clamp(_engine.busCv(index) * 0.5f, 0.f, 1.f);
+    }
+    if (source >= Routing::Source::GateOut1 && source <= Routing::Source::GateOut8) {
+        int index = int(source) - int(Routing::Source::GateOut1);
+        return (_engine.gateOutput() & (1 << index)) ? 1.f : 0.f;
+    }
+    if (Routing::isModulatorSource(source)) {
+        int index = Routing::modulatorSourceIndex(source);
+        return _engine.modulatorEngine().currentValue(index) / 127.f;
+    }
+    return 0.f;
+}
+
 void RoutingEngine::updateSources() {
     for (int routeIndex = 0; routeIndex < CONFIG_ROUTE_COUNT; ++routeIndex) {
         const auto &route = _routing.route(routeIndex);
