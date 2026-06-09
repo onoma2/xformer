@@ -107,6 +107,9 @@ from pages_modulator import (
     render_modulator_gatemodes_proposed,
     render_modulator_scope_proposed,
     render_modulator_destinations_grid_proposed,
+    render_modulator_justf_time,
+    render_modulator_justf_intone,
+    render_modulator_justf_follower,
 )
 from tracks import (
     DiscreteMapSequence, DiscreteMapTrackEngine,
@@ -381,6 +384,12 @@ def render_page(page: str, scale: int = 4):
         render_modulator_scope_proposed(canvas)
     elif page == "modulator-destinations-grid-proposed":
         render_modulator_destinations_grid_proposed(canvas)
+    elif page == "modulator-justf-time":
+        render_modulator_justf_time(canvas)
+    elif page == "modulator-justf-intone":
+        render_modulator_justf_intone(canvas)
+    elif page == "modulator-justf-follower":
+        render_modulator_justf_follower(canvas)
     elif page == "stochastic-loop-proposed":
         render_stochastic_loop_proposed(canvas)
     elif page == "stochastic-loop-proposed-held":
@@ -587,7 +596,7 @@ def main():
                                  'modulator-proposed-sine', 'modulator-proposed-adsr',
                                  'modulator-proposed-random', 'modulator-proposed-chaos',
                                  'modulator-proposed-adsr-page2', 'modulator-proposed-chaos-page2',
-                                 'modulator-rate-free-proposed', 'modulator-rate-tempo-proposed', 'modulator-gatemodes-proposed', 'modulator-scope-proposed', 'modulator-destinations-grid-proposed',
+                                 'modulator-rate-free-proposed', 'modulator-rate-tempo-proposed', 'modulator-gatemodes-proposed', 'modulator-scope-proposed', 'modulator-destinations-grid-proposed', 'modulator-justf-time', 'modulator-justf-intone', 'modulator-justf-follower',
                                  'stochastic-loop-proposed', 'stochastic-loop-proposed-held',
                                  'stochastic-live-proposed', 'stochastic-live-proposed-held',
                                  'stochastic-live-proposed-burst', 'stochastic-live-proposed-spread',

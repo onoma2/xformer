@@ -441,7 +441,8 @@ def render_modulator_page_current(canvas, modulator, engine,
 def render_modulator_page_proposed_v2(canvas, modulator, engine,
                                       selected_modulator=0, current_page=0,
                                       selected_function=0, show_routing=False,
-                                      scope_mode=False):
+                                      scope_mode=False,
+                                      rate_label=None, rate_value=None):
     is_random = (modulator.shape() == ModulatorShape.Random)
     is_triggered = is_random and (modulator.random_mode() == ModulatorRandomMode.Triggered)
     is_adsr = (modulator.shape() == ModulatorShape.ADSR)
@@ -482,6 +483,8 @@ def render_modulator_page_proposed_v2(canvas, modulator, engine,
                 "OFFSET",
                 "SLEW" if is_random else "PHASE",
             ]
+        if rate_label is not None:
+            function_names[1] = rate_label   # JustF: F2 relabels TIME / INTONE / RATE
         WindowPainter.draw_footer(canvas, function_names, highlight=int(selected_function))
 
         if total_pages > 1:
@@ -500,6 +503,8 @@ def render_modulator_page_proposed_v2(canvas, modulator, engine,
     # PROPOSED RIGHT PANEL: 2-row layout, Small font, no labels
     # ------------------------------------------------------------------
     labels, values = _get_param_values(modulator, current_page, show_routing)
+    if rate_value is not None:
+        values[1] = rate_value           # JustF: RATE cell shows TIME / INTONE / derived
 
     # Collect valid (non-empty) values with their original indices
     valid = [(i, v) for i, v in enumerate(values) if v]
@@ -732,6 +737,40 @@ def render_modulator_proposed_chaos_page2(canvas):
                         attack=800, decay=600, smooth=200)
     eng = MockModulatorEngine(current_value=55)
     render_modulator_page_proposed_v2(canvas, mod, eng, selected_function=1, current_page=1)
+
+
+# --- PROPOSED: JustF (Just Friends / ochd) rate-link mode ---
+# Context menu toggles JustF. M1 RATE -> TIME (master), M2 RATE -> INTONE
+# (global spread), M3-M8 RATE -> derived (read-only). F2 relabels by modulator.
+
+def render_modulator_justf_time(canvas):
+    # M1 = master. Just the normal page — RATE stays RATE (it's the master the
+    # others follow; no relabel). Its max is clamped by INTONE (B-rule).
+    mod = MockModulator(shape=ModulatorShape.Sine, rate=200, depth=50, offset=10, phase=45)
+    eng = MockModulatorEngine(current_value=90, current_phase=16384)
+    render_modulator_page_proposed_v2(canvas, mod, eng, selected_modulator=0,
+        selected_function=1, scope_mode=True, rate_value="2.00Hz")
+
+def render_modulator_justf_intone(canvas):
+    # M2 = host of the global INTONE; its RATE cell becomes INTONE.
+    mod = MockModulator(shape=ModulatorShape.Triangle, rate=200, depth=60, offset=-5, phase=0)
+    eng = MockModulatorEngine(current_value=70, current_phase=8192)
+    render_modulator_page_proposed_v2(canvas, mod, eng, selected_modulator=1,
+        selected_function=1, scope_mode=True, rate_label="INTONE", rate_value="+0.50")
+    # M2-only tiny readout under the INTONE value: M2's own derived rate
+    # (its rate cell is taken by INTONE, so surface the actual Hz here).
+    canvas.set_blend_mode(BlendMode.Set)
+    canvas.set_font(Font.Tiny)
+    canvas.set_color(Color.Medium)
+    sub = "3.0Hz"            # M1 2.0Hz x ratio(2) @ +0.50 = x1.5
+    canvas.draw_text(256 - canvas.text_width(sub), 31, sub)
+
+def render_modulator_justf_follower(canvas):
+    # M5 = follower; RATE cell shows the derived rate, read-only.
+    mod = MockModulator(shape=ModulatorShape.SawUp, rate=200, depth=40, offset=0, phase=90)
+    eng = MockModulatorEngine(current_value=55, current_phase=4096)
+    render_modulator_page_proposed_v2(canvas, mod, eng, selected_modulator=4,
+        selected_function=0, scope_mode=True, rate_label="RATE", rate_value="6.0Hz")
 
 
 # --- PROPOSED: multi-destination membership grid on the destinations page ---
