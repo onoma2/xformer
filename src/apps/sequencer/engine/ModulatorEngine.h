@@ -32,6 +32,12 @@ public:
         return step;
     }
 
+    // A source level in [0,1] (0.5 = threshold) gated with hysteresis. Boolean
+    // sources (0/1) cross cleanly; continuous ones get a debounce band.
+    static bool gateFromLevel(float value, bool prevGate) {
+        return prevGate ? (value >= 0.45f) : (value >= 0.55f);
+    }
+
     void reset() {
         for (int i = 0; i < CONFIG_MODULATOR_COUNT; ++i) {
             _phaseAccumulator[i] = 0;
