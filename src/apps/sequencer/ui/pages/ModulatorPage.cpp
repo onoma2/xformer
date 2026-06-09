@@ -32,6 +32,26 @@ void ModulatorPage::enter() {
 }
 
 void ModulatorPage::exit() {
+    bakeJustf();   // leaving the page resolves JustF by baking the derived rates
+}
+
+void ModulatorPage::bakeJustf() {
+    auto &me = _engine.modulatorEngine();
+    if (!me.justfActive()) {
+        return;
+    }
+    float m1Hz = _project.modulator(0).rateHz();
+    float intone = me.intone();
+    for (int i = 0; i < CONFIG_MODULATOR_COUNT; ++i) {
+        auto &m = _project.modulator(i);
+        if (m.rateDomain() != Modulator::RateDomain::Free) {
+            continue;   // Free-domain only; Tempo modulators keep their rate
+        }
+        float hz = ModulatorEngine::justfEffectiveHz(m1Hz, intone, i + 1);
+        m.setRate(int(hz * 100.f + 0.5f));   // -> centi-Hz; setRate clamps to the Free range
+    }
+    me.setJustfActive(false);
+    me.setIntone(0.f);
 }
 
 void ModulatorPage::draw(Canvas &canvas) {
@@ -109,6 +129,11 @@ void ModulatorPage::draw(Canvas &canvas) {
             functionNames[3] = "OFFSET";
             functionNames[4] = isRandom ? "SLEW" : "PHASE";
         }
+        // JustF: M2's RATE key becomes INTONE.
+        if (_engine.modulatorEngine().justfActive() && !isADSR && !isChaos && !isRandom &&
+            _selectedModulator == 1) {
+            functionNames[1] = "INTONE";
+        }
         int highlight = isADSR ? int(_selectedFunction) : int(_selectedFunction);
         WindowPainter::drawFooter(canvas, functionNames, pageKeyState(), highlight);
 
@@ -169,6 +194,21 @@ void ModulatorPage::draw(Canvas &canvas) {
         }
     }
 
+    // JustF: M2's RATE cell hosts INTONE; M3-M8 show their derived rate (read-only).
+    {
+        auto &me = _engine.modulatorEngine();
+        if (me.justfActive() && !isADSR && !isChaos && !isRandom) {
+            if (_selectedModulator == 1) {
+                values[1]("%+.2f", me.intone());
+            } else if (_selectedModulator > 1) {
+                float hz = ModulatorEngine::justfEffectiveHz(
+                    _project.modulator(0).rateHz(), me.intone(), _selectedModulator + 1);
+                values[1]("%.2fHz", hz);
+            }
+            // M1 keeps its own printRate (the master).
+        }
+    }
+
     // --- Left half: real-time scope of the modulator output (rolling trace, no level bar) ---
     {
         const int boxX = 1, boxY = 12, boxW = 119, boxH = 40;
@@ -223,6 +263,18 @@ void ModulatorPage::draw(Canvas &canvas) {
         } else {
             int tw = canvas.textWidth(values[4]);
             canvas.drawText(colR - tw, 42, values[4]);
+        }
+    }
+
+    // JustF: M2's own derived rate, tiny, under the INTONE value.
+    {
+        auto &me = _engine.modulatorEngine();
+        if (me.justfActive() && _selectedModulator == 1 && !isADSR && !isChaos && !isRandom) {
+            float hz = ModulatorEngine::justfEffectiveHz(_project.modulator(0).rateHz(), me.intone(), 2);
+            FixedStringBuilder<16> sub("%.1fHz", hz);
+            canvas.setFont(Font::Tiny);
+            canvas.setColor(Color::Medium);
+            canvas.drawText(colR - canvas.textWidth(sub), 31, sub);
         }
     }
 
@@ -338,6 +390,19 @@ void ModulatorPage::keyPress(KeyPressEvent &event) {
             }
         } else {
             int func = key.function();
+            // Shift+RATE toggles JustF (Free-domain rate link). Toggling off bakes.
+            if (func == int(Function::Rate) && key.shiftModifier()) {
+                auto &me = _engine.modulatorEngine();
+                if (me.justfActive()) {
+                    bakeJustf();
+                } else if (_project.modulator(0).rateDomain() == Modulator::RateDomain::Free) {
+                    me.setIntone(0.f);
+                    me.setJustfActive(true);
+                    setSelectedFunction(Function::Rate);
+                }
+                event.consume();
+                return;
+            }
             if (func >= 0 && func < 5) {
                 // Re-pressing RATE (when it's already the selected function and the shape
                 // actually shows RATE on F2) toggles the rate domain Free <-> Tempo.
@@ -359,6 +424,24 @@ void ModulatorPage::keyPress(KeyPressEvent &event) {
 void ModulatorPage::encoder(EncoderEvent &event) {
     auto &modulator = _project.modulator(_selectedModulator);
     bool pressed = event.pressed();
+
+    // JustF: RATE encoder edits INTONE on M2, is read-only on M3-M8, master on M1.
+    {
+        auto &me = _engine.modulatorEngine();
+        if (me.justfActive() && !_showRoutingOverlay && _selectedFunction == Function::Rate) {
+            if (_selectedModulator == 1) {
+                float step = pressed ? 0.01f : 0.05f;   // finer when the encoder is pressed
+                me.setIntone(me.intone() + event.value() * step);
+                event.consume();
+                return;
+            }
+            if (_selectedModulator >= 2) {
+                event.consume();   // followers are read-only (derived)
+                return;
+            }
+            // M1 (index 0) falls through to normal rate editing — the master.
+        }
+    }
 
     if (_showRoutingOverlay) {
         switch (_selectedRoutingFunction) {
