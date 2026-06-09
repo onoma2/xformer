@@ -63,22 +63,49 @@ Already migrated onto it:
 
 ## Remaining work
 
-### B1 — migrate the last raw-`os::ticks()` behavioral site
-`MidiCvTrackEngine.cpp:113` (`(voice.ticks - os::ticks()) >= delay`) and `:215`
-(`voice.ticks = os::ticks()`). Move onto `WallClock`/`WallTimer` so all musical
-timing shares one wrap-safe source. (Leave non-timing `os::ticks()` uses alone:
-uptime stat `Engine.cpp:504`, RNG seeds in `RandomGenerator.cpp`, `UpdateReducer.h`.)
+### B1 — CLOSED / won't-do (2026-06-09): os::ticks() is the correct clock here
+Investigated `MidiCvTrackEngine` voice scheduling. The retrigger gate pulse is
+**implicitly defined by os-tick (~1 ms) granularity** via wrap arithmetic:
+`gateOutput()` returns `(voice.ticks - os::ticks()) >= delay` with `voice.ticks`
+stamped at allocation (`:215`) and `delay = RetriggerDelay(2)` when retrigger is on.
+`voice.ticks - now` is 0 only while `now` hasn't advanced past the stamp, so the gate
+is held low for ~one os-tick after a re-strike — that IS the retrigger edge. Moving to
+µs would collapse that ~1 ms low window to ~1 µs and the retrigger edge would vanish.
+So os::ticks() is load-bearing, not incidental, at this site. **Not migrated.** The
+"unify all wall-time" goal does not apply to a deliberately tick-quantized gate pulse.
+(The other `os::ticks()` uses — uptime stat, RNG seeds, `UpdateReducer` — were already
+out of scope as non-timing.)
 
 ### B2 — slave-clock outlier guard
 Add the ER-101 0.5×–2× period latch on the external-clock interval so a single
 jittery/garbage clock edge can't yank tempo. This **absorbs** the slave-clock filter
 item parked under `performer-improvements` Phase 0 — this is its proper home.
 
-### A — phase-source unification
-PhaseFlux + Stochastic read `Clock::tickPosition()` (continuous phase float) instead
-of re-deriving from the integer tick. The other six engines already do:
-`NoteTrackEngine`, `CurveTrackEngine`, `TuesdayTrackEngine`, `DiscreteMapTrackEngine`,
-`IndexedTrackEngine`, `TeletypeTrackEngine`. Independent of B; parallelizable.
+### A — phase-source unification — PARKED with cadence data (2026-06-09)
+Original premise: PhaseFlux + Stochastic re-derive phase from the integer tick while
+six engines use `Clock::tickPosition()`; migrate them for sub-tick smoothness.
+
+**Investigation found the premise weak — parked, not scheduled.**
+- The "6 engines use tickPosition" framing is misleading. CurveTrack uses it for its
+  *free-run oscillator* mode (`_freePhase += deltaTicks*speed`, `CurveTrackEngine.cpp:190`)
+  and separately slews CV toward target in `update(dt)`. Not a universal smooth-phase idiom.
+- PhaseFlux's continuous phase (`_stagePhase`) is produced *inside*
+  `PhaseFluxMath::deriveTickPosition()`, the same call that does discrete cell/slot
+  selection — no clean read to redirect; migrating means restructuring that shared helper.
+- **Cadence**: CONFIG_PPQN=192. `tick()` fires per PPQN tick (`Engine.cpp:176`);
+  PhaseFlux computes CV there and **ignores `dt`** in `update()` (`:820`). Result: CV is a
+  zero-order-hold staircase at PPQN resolution — ~2.6 ms/step @120 BPM (~1.3 ms @240,
+  ~5.2 ms @60). For a modulation/pitch control signal that stepping is sub-audible and
+  matches the sequencer's native tick resolution; the existing code already calls it a
+  "smooth envelope" (`:670`).
+- Stochastic is event-triggered (LUT trigger steps at integer-tick boundaries) — no
+  meaningful continuous phase to migrate.
+
+**Conclusion:** the `tickPosition`/`deriveTickPosition` migration buys ~nothing the PPQN
+sampling doesn't already give, for real restructure risk. If smoother PhaseFlux CV is ever
+wanted, the cheap, correct mechanism is inter-tick slew in `update(dt)` (mirroring
+CurveTrack), NOT a phase-source change. Revisit only if PPQN-step staircase proves audible
+in practice. U2/U3 closed pending that evidence.
 
 ---
 
