@@ -121,3 +121,31 @@ resolveSourceLevel/update, already-hot-path cost). No new tick-rate buffers.
 ### Gate
 TDD first: `gateFromLevel` + `cycleGateSource` unit cases in TestModulator (red->green).
 Then wire model/engine/UI. sim + STM32 green; ui-preview for label changes. Commit when asked.
+
+## Follow-on (2026-06-10) — JustF for ADSR/envelope shapes (Just Friends "shape" mode)
+
+JustF (shipped 2026-06-10: U1 325a106a engine, U2 c033033a UI; plan
+docs/plans/2026-06-10-001-feat-modulator-justf-mode-plan.md) currently links only
+the **Free phase rate** (LFO/Random/Chaos). An **ADSR** modulator ignores it — its
+timing is gate + ms params (attack/decay/release -> ticks), never freePhaseIncrement
+-> the INTONE override is a no-op for ADSR today.
+
+Make JustF meaningful for ADSR = Just Friends "shape"/transient mode: spread the
+**envelope durations** (attack/decay/release) by the same TIME x INTONE ratio, so
+one gate fires a **bank of related-speed envelopes** — M1 = base envelope, harmonic
+INTONE = progressively snappier (M8 = 1/8 the time), subharmonic = longer. Cascading
+multi-tap transients from a single trigger.
+
+- Engine hook: in the ADSR branch of `ModulatorEngine::tick`, when justfActive &&
+  Free, scale attackTicks/decayTicks/releaseTicks by `intoneRatio(intone, index)`
+  (or its inverse — faster envelope = shorter time = divide). Reuse the existing
+  `intoneRatio`; **B-clamp flips** to clamp the *shortest* envelope to a sane floor
+  (a few ms) instead of the fastest rate to 16 Hz.
+- Bake on exit: write the scaled attack/decay/release back into each follower's own
+  envelope params (not `_rate`).
+- Open design Q: do followers **inherit M1's envelope shape** and only scale time
+  (true JF bank), or **scale each follower's own** attack/decay/release? JF shares
+  the shape; our modulators have independent envelopes — decide before building.
+- UI: M2's "INTONE" host already exists; the spread readout for ADSR followers would
+  show scaled time, not Hz. Also resolve the Random/ADSR-as-M2 edge noted in the
+  JustF plan (INTONE assumes RATE is on F2).
