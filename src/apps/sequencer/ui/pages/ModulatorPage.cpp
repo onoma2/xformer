@@ -13,6 +13,8 @@
 #include "core/utils/StringBuilder.h"
 
 static const ContextMenuModel::Item contextMenuItems[] = {
+    { "Commit" },
+    { "Cancel" },
     { "Route" },
 };
 
@@ -24,6 +26,7 @@ ModulatorPage::ModulatorPage(PageManager &manager, PageContext &context) :
 void ModulatorPage::enter() {
     _selectedModulator = _project.selectedModulatorIndex();
     _currentPage = 0;
+    _showRoutingOverlay = false;
 }
 
 void ModulatorPage::exit() {
@@ -267,16 +270,14 @@ void ModulatorPage::updateLeds(Leds &leds) {
 void ModulatorPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
 
-    // Shift+Page toggles routing overlay
-    if (key.isPage() && key.shiftModifier()) {
-        _showRoutingOverlay = !_showRoutingOverlay;
-        if (_showRoutingOverlay) {
-            _selectedRoutingFunction = RoutingFunction::Mode;
-            loadRoutingFromMidiOutput();
-        } else {
-            _selectedFunction = Function::Shape;
-            applyRoutingToMidiOutput();
-        }
+    // Context menu (Shift+Page) — must precede the page-modifier guard
+    if (key.isContextMenu()) {
+        contextShow();
+        event.consume();
+        return;
+    }
+    if (key.pageModifier() && event.count() == 2) {
+        contextShow(true);
         event.consume();
         return;
     }
@@ -285,37 +286,29 @@ void ModulatorPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
-    // Pagination for ADSR and chaos (Left/Right without shift)
-    auto &modulator = _project.modulator(_selectedModulator);
-    if ((modulator.shape() == Modulator::Shape::ADSR || Modulator::isChaosShape(modulator.shape()))
-        && _totalPages > 1 && !_showRoutingOverlay) {
-        if (key.is(Key::Left)) {
-            if (_currentPage > 0) {
-                _currentPage--;
-                _selectedFunction = Function::Shape;
-            }
-            event.consume();
-            return;
+    // Left/Right walk the page cursor: param page(s) -> destinations.
+    if (key.is(Key::Left)) {
+        if (_showRoutingOverlay) {
+            _showRoutingOverlay = false;
+            _selectedFunction = Function::Shape;
+        } else if (_currentPage > 0) {
+            _currentPage--;
+            _selectedFunction = Function::Shape;
         }
-        if (key.is(Key::Right)) {
-            if (_currentPage < _totalPages - 1) {
-                _currentPage++;
-                _selectedFunction = Function::Shape;
-            }
-            event.consume();
-            return;
-        }
-    }
-
-    // Context menu
-    if (key.isContextMenu()) {
-        contextShow();
         event.consume();
         return;
     }
-
-    if (key.pageModifier() && event.count() == 2) {
-        contextShow(true);
+    if (key.is(Key::Right)) {
+        if (!_showRoutingOverlay) {
+            if (_currentPage < _totalPages - 1) {
+                _currentPage++;
+                _selectedFunction = Function::Shape;
+            } else {
+                _showRoutingOverlay = true;
+                _selectedRoutingFunction = RoutingFunction::Mode;
+                loadRoutingFromMidiOutput();
+            }
+        }
         event.consume();
         return;
     }
@@ -353,18 +346,6 @@ void ModulatorPage::keyPress(KeyPressEvent &event) {
                 }
             }
         }
-        event.consume();
-        return;
-    }
-
-    // Left/Right change modulator (only when not in ADSR pagination)
-    if (key.isLeft()) {
-        setSelectedModulator(_selectedModulator - 1);
-        event.consume();
-        return;
-    }
-    if (key.isRight()) {
-        setSelectedModulator(_selectedModulator + 1);
         event.consume();
         return;
     }
@@ -530,13 +511,25 @@ void ModulatorPage::contextShow(bool doubleClick) {
         contextMenuItems,
         int(ContextAction::Last),
         [this] (int index) { contextAction(index); },
-        [] (int index) { return true; },
+        [this] (int index) {
+            if (index == int(ContextAction::Commit) || index == int(ContextAction::Cancel)) {
+                return _showRoutingOverlay;
+            }
+            return true;
+        },
         doubleClick
     ));
 }
 
 void ModulatorPage::contextAction(int index) {
     switch (ContextAction(index)) {
+    case ContextAction::Commit:
+        applyRoutingToMidiOutput();
+        break;
+    case ContextAction::Cancel:
+        loadRoutingFromMidiOutput();
+        showMessage(FixedStringBuilder<32>("Mod %d routing reverted", _selectedModulator + 1), 2000);
+        break;
     case ContextAction::Route: {
         for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
             if (_project.cvOutputModulator(i) == _selectedModulator + 1) {

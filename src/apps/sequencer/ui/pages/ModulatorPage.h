@@ -44,7 +44,9 @@ private:
     };
 
     enum class ContextAction : uint8_t {
-        Route = 0,
+        Commit = 0,
+        Cancel = 1,
+        Route = 2,
         Last
     };
 
