@@ -23,6 +23,8 @@ void MidiOutput::Output::write(VersionedSerializedWriter &writer) const {
         writer.write(_data.note.velocitySource);
         break;
     case MidiOutput::Output::Event::ControlChange:
+    case MidiOutput::Output::Event::PitchBend:
+    case MidiOutput::Output::Event::ChannelPressure:
         writer.write(_data.controlChange.controlNumber);
         writer.write(_data.controlChange.controlSource);
         break;
@@ -44,6 +46,8 @@ void MidiOutput::Output::read(VersionedSerializedReader &reader) {
         reader.read(_data.note.velocitySource);
         break;
     case MidiOutput::Output::Event::ControlChange:
+    case MidiOutput::Output::Event::PitchBend:
+    case MidiOutput::Output::Event::ChannelPressure:
         reader.read(_data.controlChange.controlNumber);
         reader.read(_data.controlChange.controlSource);
         break;
@@ -57,7 +61,7 @@ bool MidiOutput::Output::operator==(const Output &other) const {
         _target == other._target &&
         _event == other._event &&
         (_event != MidiOutput::Output::Event::Note || _data.note == other._data.note) &&
-        (_event != MidiOutput::Output::Event::ControlChange || _data.controlChange == other._data.controlChange)
+        (!isContinuousEvent() || _data.controlChange == other._data.controlChange)
     );
 }
 

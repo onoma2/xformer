@@ -31,15 +31,19 @@ public:
             None,
             Note,
             ControlChange,
+            PitchBend,
+            ChannelPressure,
             Last,
         };
 
         static const char *eventName(Event event) {
             switch (event) {
-            case Event::None:           return "None";
-            case Event::Note:           return "Note";
-            case Event::ControlChange:  return "CC";
-            case Event::Last:           break;
+            case Event::None:            return "None";
+            case Event::Note:            return "Note";
+            case Event::ControlChange:   return "CC";
+            case Event::PitchBend:       return "Bend";
+            case Event::ChannelPressure: return "AT";
+            case Event::Last:            break;
             }
             return nullptr;
         }
@@ -93,6 +97,8 @@ public:
                     _data.note.velocitySource = VelocitySource(int(VelocitySource::FirstVelocity) + 100);
                     break;
                 case Event::ControlChange:
+                case Event::PitchBend:
+                case Event::ChannelPressure:
                     break;
                 case Event::Last:
                     break;
@@ -201,6 +207,20 @@ public:
             return event() == MidiOutput::Output::Event::ControlChange;
         }
 
+        bool isPitchBendEvent() const {
+            return event() == MidiOutput::Output::Event::PitchBend;
+        }
+
+        bool isChannelPressureEvent() const {
+            return event() == MidiOutput::Output::Event::ChannelPressure;
+        }
+
+        // CC, PitchBend and ChannelPressure all carry a continuous value driven
+        // by controlSource (controlNumber only used by CC).
+        bool isContinuousEvent() const {
+            return isControlChangeEvent() || isPitchBendEvent() || isChannelPressureEvent();
+        }
+
         bool takesGateFromTrack(int trackIndex) const {
             return isNoteEvent() && int(gateSource()) == trackIndex;
         }
@@ -218,6 +238,10 @@ public:
         }
         bool takesControlFromModulator(int modulatorIndex) const {
             return isControlChangeEvent() &&
+                   int(controlSource()) == int(ControlSource::FirstModulator) + modulatorIndex;
+        }
+        bool takesContinuousFromModulator(int modulatorIndex) const {
+            return isContinuousEvent() &&
                    int(controlSource()) == int(ControlSource::FirstModulator) + modulatorIndex;
         }
 

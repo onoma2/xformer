@@ -39,6 +39,8 @@ private:
             NoteOff         = 1<<1,
             ControlChange   = 1<<2,
             Slide           = 1<<3,
+            PitchBend       = 1<<4,
+            ChannelPressure = 1<<5,
         };
 
         MidiOutput::Output::Event event = MidiOutput::Output::Event::None;

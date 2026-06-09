@@ -98,6 +98,19 @@ void MidiOutputEngine::update(bool forceSendCC) {
             sendMidi(port, MidiMessage::makeControlChange(channel, output.controlNumber(), outputState.control));
             outputState.clearRequest(OutputState::ControlChange);
         }
+
+        // send pitch bend requests (value 0..127 -> 14-bit, modulator center 64 = no bend)
+        if (sendCC && outputState.hasRequest(OutputState::PitchBend)) {
+            int bend = clamp((int(outputState.control) - 64) * 128 + 8192, 0, 16383);
+            sendMidi(port, MidiMessage::makePitchBend(channel, bend));
+            outputState.clearRequest(OutputState::PitchBend);
+        }
+
+        // send channel pressure (aftertouch) requests
+        if (sendCC && outputState.hasRequest(OutputState::ChannelPressure)) {
+            sendMidi(port, MidiMessage::makeChannelPressure(channel, outputState.control));
+            outputState.clearRequest(OutputState::ChannelPressure);
+        }
     }
 }
 
@@ -154,10 +167,20 @@ void MidiOutputEngine::sendModulator(int modulatorIndex, int value) {
     for (int outputIndex = 0; outputIndex < CONFIG_MIDI_OUTPUT_COUNT; ++outputIndex) {
         const auto &output = _midiOutput.output(outputIndex);
         auto &outputState = _outputStates[outputIndex];
-        if (output.takesControlFromModulator(modulatorIndex)) {
+        if (output.takesContinuousFromModulator(modulatorIndex)) {
             if (clamped != outputState.control) {
                 outputState.control = clamped;
-                outputState.setRequest(OutputState::ControlChange);
+                switch (output.event()) {
+                case MidiOutput::Output::Event::PitchBend:
+                    outputState.setRequest(OutputState::PitchBend);
+                    break;
+                case MidiOutput::Output::Event::ChannelPressure:
+                    outputState.setRequest(OutputState::ChannelPressure);
+                    break;
+                default:
+                    outputState.setRequest(OutputState::ControlChange);
+                    break;
+                }
             }
         }
     }

@@ -663,6 +663,11 @@ def render_modulator_scope_proposed(canvas):
     mod = MockModulator(shape=ModulatorShape.Sine, rate=5, rate_domain='free', depth=50)
     eng = MockModulatorEngine(current_value=64)
     render_modulator_page_proposed_v2(canvas, mod, eng, selected_function=1, scope_mode=True)
+    # CV-assignment readout in the scope box top-right corner (was overlapping at y=54).
+    canvas.set_font(Font.Tiny)
+    canvas.set_color(Color.Medium)
+    label = "CV1,CV3"
+    canvas.draw_text(119 - canvas.text_width(label), 18, label)
 
 
 # --- PROPOSED: wall-clock rate domain + gate-mode rename (on the real dashboard layout) ---
@@ -727,3 +732,76 @@ def render_modulator_proposed_chaos_page2(canvas):
                         attack=800, decay=600, smooth=200)
     eng = MockModulatorEngine(current_value=55)
     render_modulator_page_proposed_v2(canvas, mod, eng, selected_function=1, current_page=1)
+
+
+# --- PROPOSED: multi-destination membership grid on the destinations page ---
+
+def _draw_dest_membership_grid(canvas, x0, y0, w, h,
+                               cv_members, midi_members,
+                               cursor_kind, cursor_index):
+    rows = [
+        ("CV",   [('cv', i) for i in range(1, 9)]),
+        ("MIDI", [('midi', i) for i in range(1, 9)]),
+        ("",     [('midi', i) for i in range(9, 17)]),
+    ]
+    cell_w, cell_h = 10, 9
+    lab_x = x0 + 2
+    grid_x0 = x0 + 17
+    pitch = 12
+    row_y = [y0 + 2, y0 + 15, y0 + 28]
+
+    for r, (rlabel, cells) in enumerate(rows):
+        y = row_y[r]
+        if rlabel:
+            canvas.set_blend_mode(BlendMode.Set)
+            canvas.set_color(Color.Medium)
+            canvas.set_font(Font.Tiny)
+            canvas.draw_text(lab_x, y + 7, rlabel)
+        for c, (kind, idx) in enumerate(cells):
+            x = grid_x0 + c * pitch
+            member = (idx in cv_members) if kind == 'cv' else (idx in midi_members)
+            is_cursor = (kind == cursor_kind and idx == cursor_index)
+            canvas.set_blend_mode(BlendMode.Set)
+            canvas.set_font(Font.Tiny)
+            canvas.set_color(Color.Bright if member else Color.Low)
+            canvas.draw_rect(x, y, cell_w, cell_h)
+            if is_cursor:
+                canvas.set_color(Color.Medium)
+                canvas.fill_rect(x + 1, y + 1, cell_w - 2, cell_h - 2)
+                canvas.set_color(Color.None_)
+            else:
+                canvas.set_color(Color.Bright if member else Color.Medium)
+            canvas.draw_text_centered(x, y, cell_w, cell_h, str(idx))
+
+
+def render_modulator_destinations_grid_proposed(canvas):
+    # Destinations page, multi-destination: the freed scope box (x1,y12,119,40)
+    # holds a membership grid (CV 1-8, MIDI 1-16). Filled = assigned.
+    # Cursor on MIDI 3; right panel shows MODE/GATE + cursored dest EVENT/CC.
+    mod = MockModulator(shape=ModulatorShape.Sine, mode=ModulatorMode.Trig, gate_track=2)
+    eng = MockModulatorEngine(current_value=64)
+    WindowPainter.clear(canvas)
+    WindowPainter.draw_header(canvas, track=2, mode="MOD 3 - ROUTING")
+    WindowPainter.draw_footer(canvas, ["MODE", "GATE", "CLEAR", "EVENT", "CC NUM"], highlight=-1)
+
+    _draw_dest_membership_grid(canvas, 1, 12, 119, 40,
+                               cv_members={1, 3}, midi_members={3, 10},
+                               cursor_kind='midi', cursor_index=3)
+
+    # Right panel: single-value fields + cursored MIDI destination's event/CC.
+    canvas.set_blend_mode(BlendMode.Set)
+    canvas.set_font(Font.Small)
+    canvas.set_color(Color.Medium)
+    canvas.draw_text(128, 22, "MODE")
+    canvas.draw_text(128, 34, "GATE")
+    canvas.set_color(Color.Bright)
+    canvas.draw_text(168, 22, "Trig")
+    canvas.draw_text(168, 34, "T2")
+
+    canvas.set_color(Color.Low)
+    canvas.hline(128, 39, 124)
+    canvas.set_font(Font.Tiny)
+    canvas.set_color(Color.Medium)
+    canvas.draw_text(128, 50, "> MIDI 3")
+    canvas.set_color(Color.Bright)
+    canvas.draw_text(190, 50, "CC 74")

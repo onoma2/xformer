@@ -3,7 +3,11 @@
 #include "BasePage.h"
 #include "ui/painters/ScopePainter.h"
 
+#include "Config.h"
+
 #include <cstdint>
+
+class Modulator;
 
 class ModulatorPage : public BasePage {
 public:
@@ -28,19 +32,22 @@ private:
         Phase = 4,
     };
 
-    // Routing overlay functions (Shift+Page to toggle)
+    // Destinations-page focus. Grid is the default (encoder moves the cursor,
+    // push adds, F3 clears); F1/F2/F4/F5 focus the side fields.
     enum class RoutingFunction : uint8_t {
-        Mode = 0,
-        Gate = 1,
-        Target = 2,
-        Event = 3,
-        CCNumber = 4,
+        Grid = 0,
+        Mode,
+        Gate,
+        Event,
+        CCNumber,
     };
 
-    enum class RoutingTargetType : uint8_t {
-        None,
-        Midi,
-        CV,
+    // The continuous MIDI value a modulator can drive on a destination.
+    enum class ContEvent : uint8_t {
+        CC = 0,
+        Bend,
+        Pressure,
+        Last,
     };
 
     enum class ContextAction : uint8_t {
@@ -57,6 +64,12 @@ private:
     void contextAction(int index);
     void loadRoutingFromMidiOutput();
     void applyRoutingToMidiOutput();
+    void drawDestinationsBody(Canvas &canvas, Modulator &modulator);
+    void drawMembershipGrid(Canvas &canvas);
+
+    bool cursorIsCv() const { return _destCursor < CONFIG_CHANNEL_COUNT; }
+    int cursorCvIndex() const { return _destCursor; }
+    int cursorMidiIndex() const { return _destCursor - CONFIG_CHANNEL_COUNT; }
 
     int _selectedModulator = 0;
     Function _selectedFunction = Function::Shape;
@@ -65,13 +78,16 @@ private:
     int _currentPage = 0;  // 0 or 1 for ADSR
     int _totalPages = 1;   // 1 for LFO/Random, 2 for ADSR
 
-    // Routing overlay state
+    // Destinations page (multi). The membership sets stage which CV jacks / MIDI
+    // outs carry this modulator; written to the outputs only on Commit.
+    static constexpr int DestCount = CONFIG_CHANNEL_COUNT + CONFIG_MIDI_OUTPUT_COUNT;
     bool _showRoutingOverlay = false;
-    RoutingFunction _selectedRoutingFunction = RoutingFunction::Mode;
-    RoutingTargetType _routingTargetType = RoutingTargetType::None;
-    int _routingTargetIndex = 0;     // 0-15 = MIDI output, 0-7 = CV output
-    bool _routingEventIsCC = true;   // false = Note, true = CC (MIDI only)
-    int _routingCCNum = 0;           // CC number 0-127 (MIDI CC only)
+    RoutingFunction _selectedRoutingFunction = RoutingFunction::Grid;
+    int _destCursor = 0;                 // 0..CV-1 = CV jacks, then MIDI outs
+    uint8_t _cvSet = 0;                  // CV jack membership bitmask
+    uint16_t _midiSet = 0;              // MIDI output membership bitmask
+    ContEvent _midiEvent[CONFIG_MIDI_OUTPUT_COUNT] = {};   // per-out continuous event
+    uint8_t _midiCCNum[CONFIG_MIDI_OUTPUT_COUNT] = {};      // CC number (CC event only)
 
     // Rolling scope history of the modulator output (int8, +/-127 = full swing),
     // sampled once per draw. Replaces the static waveform-shape cache.
