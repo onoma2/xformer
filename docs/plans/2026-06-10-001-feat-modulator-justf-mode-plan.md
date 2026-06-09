@@ -3,7 +3,7 @@ id: feat-modulator-justf-mode
 schema: plan
 title: "feat: modulator JustF rate-link mode (ochd/Just Friends INTONE spread)"
 type: feat
-status: active
+status: completed
 date: 2026-06-10
 depth: standard
 ---
