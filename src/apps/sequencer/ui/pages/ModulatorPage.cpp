@@ -40,15 +40,24 @@ void ModulatorPage::bakeJustf() {
     if (!me.justfActive()) {
         return;
     }
-    float m1Hz = _project.modulator(0).rateHz();
+    auto &m1 = _project.modulator(0);
+    float m1Hz = m1.rateHz();
     float intone = me.intone();
     for (int i = 0; i < CONFIG_MODULATOR_COUNT; ++i) {
         auto &m = _project.modulator(i);
         if (m.rateDomain() != Modulator::RateDomain::Free) {
             continue;   // Free-domain only; Tempo modulators keep their rate
         }
-        float hz = ModulatorEngine::justfEffectiveHz(m1Hz, intone, i + 1);
-        m.setRate(int(hz * 100.f + 0.5f));   // -> centi-Hz; setRate clamps to the Free range
+        if (m.shape() == Modulator::Shape::ADSR) {
+            // Inherit M1's envelope spread by index; amplitude stays per-follower.
+            m.setAttack(ModulatorEngine::justfEffectiveMs(m1.attack(), intone, i + 1));
+            m.setDecay(ModulatorEngine::justfEffectiveMs(m1.decay(), intone, i + 1));
+            m.setRelease(ModulatorEngine::justfEffectiveMs(m1.release(), intone, i + 1));
+            m.setSustain(m1.sustain());
+        } else {
+            float hz = ModulatorEngine::justfEffectiveHz(m1Hz, intone, i + 1);
+            m.setRate(int(hz * 100.f + 0.5f));   // -> centi-Hz; setRate clamps to the Free range
+        }
     }
     me.setJustfActive(false);
     me.setIntone(0.f);
@@ -130,9 +139,14 @@ void ModulatorPage::draw(Canvas &canvas) {
             functionNames[4] = isRandom ? "SLEW" : "PHASE";
         }
         // JustF: M2's RATE key becomes INTONE.
-        if (_engine.modulatorEngine().justfActive() && !isADSR && !isChaos && !isRandom &&
-            _selectedModulator == 1) {
-            functionNames[1] = "INTONE";
+        if (_engine.modulatorEngine().justfActive() && _selectedModulator == 1) {
+            // INTONE hosts on M2's slot 1: the RATE cell for LFOs, page-2 (beside
+            // AMPLITUDE) for ADSR so attack keeps its page-1 cell.
+            if (isADSR) {
+                if (_currentPage == 1) functionNames[1] = "INTONE";
+            } else if (!isChaos && !isRandom) {
+                functionNames[1] = "INTONE";
+            }
         }
         int highlight = isADSR ? int(_selectedFunction) : int(_selectedFunction);
         WindowPainter::drawFooter(canvas, functionNames, pageKeyState(), highlight);
@@ -197,15 +211,31 @@ void ModulatorPage::draw(Canvas &canvas) {
     // JustF: M2's RATE cell hosts INTONE; M3-M8 show their derived rate (read-only).
     {
         auto &me = _engine.modulatorEngine();
-        if (me.justfActive() && !isADSR && !isChaos && !isRandom) {
-            if (_selectedModulator == 1) {
-                values[1]("%+.2f", me.intone());
-            } else if (_selectedModulator > 1) {
-                float hz = ModulatorEngine::justfEffectiveHz(
-                    _project.modulator(0).rateHz(), me.intone(), _selectedModulator + 1);
-                values[1]("%.2fHz", hz);
+        if (me.justfActive()) {
+            if (isADSR) {
+                float intone = me.intone();
+                auto &m1 = _project.modulator(0);
+                if (_currentPage == 0 && _selectedModulator >= 1) {
+                    // Followers show M1's envelope spread by index (read-only); sustain
+                    // is M1's level. M1 (master) keeps its own raw envelope.
+                    int idx = _selectedModulator + 1;
+                    values[1]("%dms", ModulatorEngine::justfEffectiveMs(m1.attack(), intone, idx));
+                    values[2]("%dms", ModulatorEngine::justfEffectiveMs(m1.decay(), intone, idx));
+                    values[3]("%d", m1.sustain());
+                    values[4]("%dms", ModulatorEngine::justfEffectiveMs(m1.release(), intone, idx));
+                } else if (_currentPage == 1 && _selectedModulator == 1) {
+                    values[1]("%+.2f", intone);   // INTONE on page 2, beside AMPLITUDE
+                }
+            } else if (!isChaos && !isRandom) {
+                if (_selectedModulator == 1) {
+                    values[1]("%+.2f", me.intone());
+                } else if (_selectedModulator > 1) {
+                    float hz = ModulatorEngine::justfEffectiveHz(
+                        _project.modulator(0).rateHz(), me.intone(), _selectedModulator + 1);
+                    values[1]("%.2fHz", hz);
+                }
+                // M1 keeps its own printRate (the master).
             }
-            // M1 keeps its own printRate (the master).
         }
     }
 
@@ -425,21 +455,37 @@ void ModulatorPage::encoder(EncoderEvent &event) {
     auto &modulator = _project.modulator(_selectedModulator);
     bool pressed = event.pressed();
 
-    // JustF: RATE encoder edits INTONE on M2, is read-only on M3-M8, master on M1.
+    // JustF: INTONE edits on M2; followers read-only; M1 is the master.
     {
         auto &me = _engine.modulatorEngine();
-        if (me.justfActive() && !_showRoutingOverlay && _selectedFunction == Function::Rate) {
-            if (_selectedModulator == 1) {
-                float step = pressed ? 0.01f : 0.05f;   // finer when the encoder is pressed
-                me.setIntone(me.intone() + event.value() * step);
-                event.consume();
-                return;
+        if (me.justfActive() && !_showRoutingOverlay) {
+            if (modulator.shape() == Modulator::Shape::ADSR) {
+                // INTONE hosts on page-2 slot 1 (Function::Rate) for M2.
+                if (_currentPage == 1 && _selectedModulator == 1 && _selectedFunction == Function::Rate) {
+                    float step = pressed ? 0.01f : 0.05f;
+                    me.setIntone(me.intone() + event.value() * step);
+                    event.consume();
+                    return;
+                }
+                // Page-1 envelope cells are inherited from M1 on followers (read-only).
+                if (_currentPage == 0 && _selectedModulator >= 1 && _selectedFunction != Function::Shape) {
+                    event.consume();
+                    return;
+                }
+                // M1's page-1 envelope (reshapes the bank) and AMPLITUDE (page 2) edit normally.
+            } else if (_selectedFunction == Function::Rate) {
+                if (_selectedModulator == 1) {
+                    float step = pressed ? 0.01f : 0.05f;   // finer when the encoder is pressed
+                    me.setIntone(me.intone() + event.value() * step);
+                    event.consume();
+                    return;
+                }
+                if (_selectedModulator >= 2) {
+                    event.consume();   // followers are read-only (derived)
+                    return;
+                }
+                // M1 (index 0) falls through to normal rate editing — the master.
             }
-            if (_selectedModulator >= 2) {
-                event.consume();   // followers are read-only (derived)
-                return;
-            }
-            // M1 (index 0) falls through to normal rate editing — the master.
         }
     }
 

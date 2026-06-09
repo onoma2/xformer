@@ -773,6 +773,33 @@ def render_modulator_justf_follower(canvas):
         selected_function=0, scope_mode=True, rate_label="RATE", rate_value="6.0Hz")
 
 
+# --- PROPOSED: JustF envelope spread for ADSR followers (unified rate/time spread) ---
+# An ADSR follower inherits M1's envelope (A300/D400/S80/R600) scaled by its index
+# ratio. INTONE +0.50: M2 ratio 1.5 -> A200/D267/S80/R400; M5 ratio 3.0 -> A100/D133/S80/R200.
+# Sustain is a level, copied from M1 unscaled.
+
+def render_modulator_justf_adsr_follower(canvas):
+    # M5 = ADSR follower; all four envelope cells show inherited+spread values, read-only
+    # (SHAPE selected so nothing in the envelope row reads as editable).
+    mod = MockModulator(shape=ModulatorShape.ADSR, attack=100, decay=133, sustain=80,
+                        release=200, amplitude=100)
+    eng = MockModulatorEngine(current_value=70, adsr_state=2, adsr_timer=50)
+    render_modulator_page_proposed_v2(canvas, mod, eng, selected_modulator=4,
+        selected_function=0, scope_mode=True, current_page=0)
+
+
+def render_modulator_justf_adsr_intone(canvas):
+    # M2 = INTONE host on an ADSR modulator, page 2. ADSR page 2 holds only AMPLITUDE
+    # (slot 0) + empty slots, so INTONE drops into slot 1 with no collision and leaves
+    # attack/decay/sustain/release in their real page-1 cells, read-only spread.
+    mod = MockModulator(shape=ModulatorShape.ADSR, attack=200, decay=267, sustain=80,
+                        release=400, amplitude=100)
+    eng = MockModulatorEngine(current_value=70, adsr_state=2, adsr_timer=40)
+    render_modulator_page_proposed_v2(canvas, mod, eng, selected_modulator=1,
+        selected_function=1, scope_mode=True, current_page=1,
+        rate_label="INTONE", rate_value="+0.50")
+
+
 # --- PROPOSED: multi-destination membership grid on the destinations page ---
 
 def _draw_dest_membership_grid(canvas, x0, y0, w, h,
