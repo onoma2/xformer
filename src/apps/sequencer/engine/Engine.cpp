@@ -201,10 +201,12 @@ void Engine::update() {
             _modulatorGateState[modulatorIndex] = gate;
             // JustF: Free-domain modulators run at M1 x INTONE-ratio (B-clamped); others as-is.
             float rateOverride = -1.f;
+            const Modulator *envBase = nullptr;
             if (justf && modulator.rateDomain() == Modulator::RateDomain::Free) {
                 rateOverride = ModulatorEngine::justfEffectiveHz(justfMasterHz, justfIntone, modulatorIndex + 1);
+                envBase = &_project.modulator(0);   // ADSR inherits M1's envelope, spread by index
             }
-            _modulatorEngine.tick(tick, dt, modulator, modulatorIndex, gate, rateOverride);
+            _modulatorEngine.tick(tick, dt, modulator, modulatorIndex, gate, rateOverride, envBase);
             _midiOutputEngine.sendModulator(modulatorIndex, _modulatorEngine.currentValue(modulatorIndex));
         }
 

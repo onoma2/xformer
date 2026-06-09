@@ -157,4 +157,34 @@ CASE("justfEffectiveHz: fastest follower never exceeds 16Hz") {
     expectTrue(ME::justfEffectiveHz(8.f, -1.f, 8) < 8.f, "M8 subharmonic slower than M1");
 }
 
+CASE("justfEffectiveHz: cap argument generalizes the ceiling (default = 16, rate unchanged)") {
+    using ME = ModulatorEngine;
+    // Default cap keeps the shipped rate behavior byte-identical.
+    expectTrue(ME::justfEffectiveHz(16.f, 1.f, 8) <= 16.f + 1e-3f, "default cap still 16");
+    // A higher cap lets the fastest follower climb past 16 to the new ceiling.
+    expectTrue(std::fabs(ME::justfEffectiveHz(100.f, 1.f, 8, 80.f) - 80.f) < 1e-3f, "M8 clamped to cap 80");
+    expectTrue(std::fabs(ME::justfMasterHz(100.f, 1.f, 80.f) - 10.f) < 1e-3f, "master = cap/maxRatio = 80/8");
+}
+
+CASE("justfEffectiveMs: envelope spread = ms face of the rate helper") {
+    using ME = ModulatorEngine;
+    expectEqual(ME::justfEffectiveMs(100, 1.f, 1), 100, "M1 identity: unscaled");
+    expectEqual(ME::justfEffectiveMs(800, 1.f, 8), 100, "harmonic +1: M8 = 1/8 the time");
+    expectEqual(ME::justfEffectiveMs(100, -1.f, 8), 800, "subharmonic -1: M8 = 8x the time");
+    expectEqual(ME::justfEffectiveMs(50, 0.f, 5), 50, "unison: unchanged");
+}
+
+CASE("justfEffectiveMs: 12ms floor via cap, zero preserved, ratio held") {
+    using ME = ModulatorEngine;
+    expectEqual(ME::justfEffectiveMs(80, 1.f, 8), 12, "would be 10ms, floored to 12 via the cap");
+    expectEqual(ME::justfEffectiveMs(0, 1.f, 8), 0, "zero stage stays instant, no floor");
+    // Master-clamp lengthens M1's own stage so the fastest follower lands at the
+    // 12ms floor with the 1:8 ratio intact (mirror of the rate-side B-clamp).
+    int m1 = ME::justfEffectiveMs(80, 1.f, 1);
+    int m8 = ME::justfEffectiveMs(80, 1.f, 8);
+    expectEqual(m8, 12, "M8 clamped to 12ms");
+    expectEqual(m1, 96, "M1 lengthened to 96ms to preserve the ratio");
+    expectTrue(std::fabs(float(m1) / float(m8) - 8.f) < 0.1f, "ratio preserved at 8:1");
+}
+
 }

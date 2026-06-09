@@ -46,19 +46,27 @@ public:
         float n = float(index - 1);
         return intone >= 0.f ? (1.f + intone * n) : (1.f / (1.f - intone * n));
     }
-    // B-clamp: cap the master so the fastest follower stays <= 16 Hz (the Free
-    // ceiling). Top clamp only on the harmonic side; subharmonic keeps full range.
-    static float justfMasterHz(float m1Hz, float intone) {
+    // B-clamp: cap the master so the fastest follower stays <= `cap` (rate ceiling
+    // 16 Hz by default). Top clamp only on the harmonic side; subharmonic keeps range.
+    static float justfMasterHz(float m1Hz, float intone, float cap = 16.f) {
         float maxN = float(CONFIG_MODULATOR_COUNT - 1);
         float maxRatio = 1.f + maxN * (intone > 0.f ? intone : 0.f);
-        float cap = 16.f / maxRatio;
-        return m1Hz < cap ? m1Hz : cap;
+        float master = cap / maxRatio;
+        return m1Hz < master ? m1Hz : master;
     }
-    static float justfEffectiveHz(float m1Hz, float intone, int index) {
-        float hz = justfMasterHz(m1Hz, intone) * intoneRatio(intone, index);
-        if (hz > 16.f) hz = 16.f;
+    static float justfEffectiveHz(float m1Hz, float intone, int index, float cap = 16.f) {
+        float hz = justfMasterHz(m1Hz, intone, cap) * intoneRatio(intone, index);
+        if (hz > cap) hz = cap;
         if (hz < 0.0001f) hz = 0.0001f;
         return hz;
+    }
+    // ms face of the same spread: an envelope duration is a rate (speed = 1000/ms).
+    // Spreads via justfEffectiveHz with the 12 ms floor expressed as its cap; a 0 ms
+    // stage (instant) is preserved unscaled. No spread logic of its own.
+    static int justfEffectiveMs(int m1Ms, float intone, int index) {
+        if (m1Ms <= 0) return 0;
+        float hz = justfEffectiveHz(1000.f / float(m1Ms), intone, index, 1000.f / 12.f);
+        return int(1000.f / hz + 0.5f);
     }
 
     bool justfActive() const { return _justfActive; }
@@ -87,7 +95,7 @@ public:
     }
 
     void tick(uint32_t tick, float dt, const Modulator &modulator, int index, bool gate,
-              float rateHzOverride = -1.f) {
+              float rateHzOverride = -1.f, const Modulator *justfEnvBase = nullptr) {
         if (index < 0 || index >= CONFIG_MODULATOR_COUNT) {
             return;
         }
@@ -126,6 +134,22 @@ public:
             bool gateFalling = !gate && _lastGate[index];
             _lastGate[index] = gate;
 
+            // JustF: inherit M1's envelope (A/D/R + sustain level) spread by this
+            // follower's index ratio; amplitude stays per-follower. justfEnvBase is M1
+            // when JustF is active, null otherwise (then the follower's own params).
+            int attackMs, decayMs, releaseMs, sustainLevel;
+            if (justfEnvBase) {
+                attackMs = justfEffectiveMs(justfEnvBase->attack(), _intone, index + 1);
+                decayMs = justfEffectiveMs(justfEnvBase->decay(), _intone, index + 1);
+                releaseMs = justfEffectiveMs(justfEnvBase->release(), _intone, index + 1);
+                sustainLevel = justfEnvBase->sustain();
+            } else {
+                attackMs = modulator.attack();
+                decayMs = modulator.decay();
+                releaseMs = modulator.release();
+                sustainLevel = modulator.sustain();
+            }
+
             if (gateRising) {
                 _adsrState[index] = ADSRState::Attack;
                 _adsrTimer[index] = 0;
@@ -140,7 +164,6 @@ public:
                 level = 0;
                 break;
             case ADSRState::Attack: {
-                int attackMs = modulator.attack();
                 if (attackMs == 0) {
                     level = 127;
                     _adsrState[index] = ADSRState::Decay;
@@ -158,8 +181,6 @@ public:
                 break;
             }
             case ADSRState::Decay: {
-                int decayMs = modulator.decay();
-                int sustainLevel = modulator.sustain();
                 if (decayMs == 0 || sustainLevel >= 127) {
                     level = sustainLevel;
                     _adsrState[index] = ADSRState::Sustain;
@@ -177,10 +198,9 @@ public:
                 break;
             }
             case ADSRState::Sustain:
-                level = modulator.sustain();
+                level = sustainLevel;
                 break;
             case ADSRState::Release: {
-                int releaseMs = modulator.release();
                 int startLevel = _adsrLevel[index];
                 if (releaseMs == 0) {
                     level = 0;
