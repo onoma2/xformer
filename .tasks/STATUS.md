@@ -215,12 +215,10 @@ VcaNext → scaleSource, ProgDiv → clock-util/drop.
 
 ---
 
-## 🔵 route-reordering — Rearranging Routing::Target enum into signal-flow ordering
-**Status:** blocked — gated on the routing direction decision. Reordering the `Target` enum now is throwaway work if the five-sources collapse rewrites/replaces it. Spec also stale (62-target snapshot, pre-Stochastic/PhaseFlux).
-**Where I stopped:** Spec written in `reorder-spec.md` (signal-flow order). `targetSerialize()` already decouples serialization from enum values, so reordering is behavior-safe — but premature.
-**Next action:** Wait for the routing direction decision (`core-architecture-optimization` → `routing-five-sources-map.md`). If the collapse happens, fold ordering into it. If "consistency pass only" wins, do this then.
-**Blocked-by:** routing direction decision (core-architecture-optimization routing-five-sources-map)
-**Branch:** TBD
+## 🟢 route-reordering — Rearranging Routing::Target enum into signal-flow ordering
+**Status:** done/obsolete — the name-agnostic scope-addressed matrix made enum order irrelevant to UX, and `targetSerialize()` already decoupled serialization from enum values. No reorder needed; the underlying goal is resolved by the routing-matrix work.
+**Next action:** none — drop after merge.
+**Branch:** n/a
 
 ---
 

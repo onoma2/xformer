@@ -61,6 +61,14 @@ constants must be re-derived against the now-explicit wall-time dt — which is 
 follows slice 2. Musically richest on Chaos/Random/rate-modulated sources (the analyzer finds
 macro-structure in unpredictable wiggle); Location/ProgDiv work on any shape.
 
+### Status: 🟡 someday/maybe. Resource estimate (2026-06-09)
+Flash ~2-3.5 KB: 5 stateful `apply` fns ~1-1.5 KB (parked file is 120 lines of float
+math), stateless folds ~0 if reusing the routing lane helper else ~0.3-0.6 KB, dispatch
+~0.2, model enum+names+serialize ~0.3, the one UI selector ~0.2-0.4. RAM ~0.3-0.5 KB
+(per-modulator state; `ProgDivState` ~28 B is fattest, ×8 + a type byte each). Fits the
+current ~35 KB flash headroom easily. The dt re-derivation prerequisite (the shapers'
+hardcoded "~1 Hz @ 1 kHz" constants vs explicit wall-time dt) is now unblocked — slice 2 shipped.
+
 ## Key files
 - `model/Modulator.h` + `model/Modulator.cpp` (rate/mode/serialize; `editRate`/`printRate`).
 - `engine/ModulatorEngine.h` (tick + phase advance); `engine/Engine.cpp:74,195` (dt + tick call).
