@@ -187,4 +187,48 @@ CASE("justfEffectiveMs: 12ms floor via cap, zero preserved, ratio held") {
     expectTrue(std::fabs(float(m1) / float(m8) - 8.f) < 0.1f, "ratio preserved at 8:1");
 }
 
+// --- Output transform: configurable floor + invert ---
+
+CASE("invert: default off, set/get") {
+    Modulator m; m.clear();
+    expectEqual(int(m.invert()), 0, "invert defaults off");
+    m.setInvert(true);
+    expectEqual(int(m.invert()), 1, "set true");
+    m.setInvert(false);
+    expectEqual(int(m.invert()), 0, "set false");
+}
+
+CASE("floorValue: 64 + offset, clamped 0..127") {
+    Modulator m; m.clear();
+    expectEqual(m.floorValue(), 64, "offset 0 -> floor 64 (0V rest)");
+    m.setOffset(-64);
+    expectEqual(m.floorValue(), 0, "offset -64 -> floor 0 (-5V)");
+    m.setOffset(63);
+    expectEqual(m.floorValue(), 127, "offset +63 -> floor near top");
+}
+
+CASE("unipolarOutput: envelope mapped into [floor,127], invert ducks") {
+    using ME = ModulatorEngine;
+    // floor 64 (0V rest): env 0 -> floor; env=amplitude -> 127 (full amplitude)
+    expectEqual(ME::unipolarOutput(0, 127, 64, false), 64, "rest at floor (0V)");
+    expectEqual(ME::unipolarOutput(127, 127, 64, false), 127, "full amplitude -> +5V");
+    // floor 0 (-5V rest): identity, env -> env
+    expectEqual(ME::unipolarOutput(0, 127, 0, false), 0, "floor 0: rest -5V");
+    expectEqual(ME::unipolarOutput(127, 127, 0, false), 127, "floor 0: peak +5V");
+    // partial amplitude: peak scales with headroom above floor
+    expectEqual(ME::unipolarOutput(64, 64, 64, false), 95, "amp 64 -> half headroom above floor");
+    // invert: rest high (top of window), trigger ducks to floor
+    expectEqual(ME::unipolarOutput(0, 127, 64, true), 127, "inverted rests at window top");
+    expectEqual(ME::unipolarOutput(127, 127, 64, true), 64, "inverted peak ducks to floor");
+}
+
+CASE("bipolarOutput: invert flips around mid-scale") {
+    using ME = ModulatorEngine;
+    expectEqual(ME::bipolarOutput(64, false), 64, "centre unchanged");
+    expectEqual(ME::bipolarOutput(64, true), 63, "invert flips centre ~in place");
+    expectEqual(ME::bipolarOutput(127, true), 0, "top -> bottom");
+    expectEqual(ME::bipolarOutput(0, true), 127, "bottom -> top");
+    expectEqual(ME::bipolarOutput(90, false), 90, "no invert passthrough");
+}
+
 }

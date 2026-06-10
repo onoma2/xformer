@@ -174,6 +174,15 @@ public:
         str("%+d", offset());
     }
 
+    // Output floor (silence/rest level) in 0..127 output units, where 64 = 0V at the
+    // CV stage. Reuses offset as the baseline: default offset 0 -> rest at 0V.
+    int floorValue() const { return clamp(64 + int(_offset), 0, 127); }
+
+    // invert: flip the output around its range (unipolar envelopes duck; bipolar phase-flip)
+
+    bool invert() const { return _invert; }
+    void setInvert(bool invert) { _invert = invert; }
+
     // phase (0-359 degrees)
 
     int phase() const { return _phase; }
@@ -378,6 +387,7 @@ public:
         setSustain(100);
         setRelease(200);
         setAmplitude(127);
+        setInvert(false);
     }
 
     void write(VersionedSerializedWriter &writer) const {
@@ -396,6 +406,7 @@ public:
         writer.write(_release);
         writer.write(_amplitude);
         writer.write(_rateDomain);
+        writer.write(_invert);
     }
 
     void read(VersionedSerializedReader &reader) {
@@ -414,6 +425,7 @@ public:
         reader.read(_release);
         reader.read(_amplitude);
         reader.read(_rateDomain);
+        reader.read(_invert);
 
         // Sanitize raw-read fields against bad/old file data: out-of-range enums
         // would fall through engine switches; rate is clamped to its domain range.
@@ -440,4 +452,5 @@ private:
     uint8_t _sustain = 100;
     uint16_t _release = 200;
     uint8_t _amplitude = 127;
+    bool _invert = false;
 };

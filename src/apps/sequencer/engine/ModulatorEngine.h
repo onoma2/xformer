@@ -69,6 +69,19 @@ public:
         return int(1000.f / hz + 0.5f);
     }
 
+    // --- Output transform: configurable floor + invert ---
+    // Unipolar (ADSR / Geode voice): env in [0,amplitude] (rest 0) lifts into [floor,127];
+    // invert flips within [0,amplitude] so the envelope rests at the window top and ducks.
+    static int unipolarOutput(int env, int amplitude, int floor, bool invert) {
+        if (invert) env = amplitude - env;
+        return clamp(floor + (env * (127 - floor)) / 127, 0, 127);
+    }
+    // Bipolar (LFO / Random / Chaos): offset already biases the value; invert flips around mid.
+    static int bipolarOutput(int value, bool invert) {
+        value = clamp(value, 0, 127);
+        return invert ? (127 - value) : value;
+    }
+
     bool justfActive() const { return _justfActive; }
     void setJustfActive(bool active) { _justfActive = active; }
     float intone() const { return _intone; }
@@ -124,7 +137,7 @@ public:
             int value = current;
             value = (value * modulator.depth()) / 127;
             value += modulator.offset();
-            _currentValue[index] = clamp(value + 64, 0, 127);
+            _currentValue[index] = bipolarOutput(value + 64, modulator.invert());
             return;
         }
 
@@ -220,8 +233,9 @@ public:
             }
 
             _adsrLevel[index] = level;
-            int value = (level * modulator.amplitude()) / 127;
-            _currentValue[index] = clamp(value, 0, 127);
+            int env = (level * modulator.amplitude()) / 127;
+            _currentValue[index] = unipolarOutput(env, modulator.amplitude(),
+                                                  modulator.floorValue(), modulator.invert());
             return;
         }
 
@@ -290,7 +304,7 @@ public:
             // Apply depth and offset
             value = (value * modulator.depth()) / 127;
             value += modulator.offset();
-            _currentValue[index] = clamp(value + 64, 0, 127);
+            _currentValue[index] = bipolarOutput(value + 64, modulator.invert());
             return;
         }
 
@@ -322,7 +336,7 @@ public:
             int value = current;
             value = (value * modulator.depth()) / 127;
             value += modulator.offset();
-            _currentValue[index] = clamp(value + 64, 0, 127);
+            _currentValue[index] = bipolarOutput(value + 64, modulator.invert());
             return;
         }
 

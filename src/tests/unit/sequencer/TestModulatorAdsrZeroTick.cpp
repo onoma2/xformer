@@ -15,6 +15,7 @@ UNIT_TEST("ModulatorAdsrZeroTick") {
 CASE("sub_tick_attack_completes") {
     Modulator m;
     m.setShape(Modulator::Shape::ADSR);
+    m.setOffset(-64); // floor 0 -> identity output, isolates the state machine from the floor transform
     m.setAmplitude(127);
     m.setAttack(1); // 1ms -> 0 ticks pre-fix; attack should still complete
     ModulatorEngine engine;
@@ -27,6 +28,7 @@ CASE("sub_tick_attack_completes") {
 CASE("sub_tick_decay_reaches_sustain") {
     Modulator m;
     m.setShape(Modulator::Shape::ADSR);
+    m.setOffset(-64); // floor 0 -> identity output, isolates the state machine from the floor transform
     m.setAmplitude(127);
     m.setAttack(0);
     m.setDecay(1); // 0 ticks pre-fix; decay should still reach sustain
@@ -42,6 +44,7 @@ CASE("sub_tick_decay_reaches_sustain") {
 CASE("sub_tick_release_reaches_idle") {
     Modulator m;
     m.setShape(Modulator::Shape::ADSR);
+    m.setOffset(-64); // floor 0 -> identity output, isolates the state machine from the floor transform
     m.setAmplitude(127);
     m.setAttack(0);
     m.setDecay(0);
