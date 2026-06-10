@@ -130,28 +130,40 @@ public:
         // JustF (Free-domain) substitutes the derived rate for the modulator's own.
         const float effRateHz = (rateHzOverride >= 0.f) ? rateHzOverride : modulator.rateHz();
 
-        // Handle Random shape in Triggered mode
-        if (modulator.shape() == Modulator::Shape::Random &&
-            modulator.randomMode() == Modulator::RandomMode::Triggered) {
-            // Detect rising edge
-            if (gate && !_lastGate[index]) {
-                _targetValue[index] = _rng[index].nextRange(255) - 127;
-            }
+        // Random shape — driven by the universal Mode (uniform with Chaos):
+        //   Run  = free-running clocked sample-and-hold (gate ignored)
+        //   Trig = sample-and-hold on gate rising edge
+        //   Gate = track-and-hold: resample on the clock while gate high, hold when low
+        if (modulator.shape() == Modulator::Shape::Random) {
+            const Modulator::Mode mode = modulator.mode();
+            const bool gateRising = gate && !_lastGate[index];
             _lastGate[index] = gate;
 
-            // Smooth interpolation
+            if (mode == Modulator::Mode::Trig) {
+                if (gateRising) {
+                    _targetValue[index] = _rng[index].nextRange(255) - 127;
+                }
+            } else if (mode == Modulator::Mode::Run || gate) {
+                // Run advances always; Gate advances only while the gate is high.
+                uint32_t phaseIncrement = (modulator.rateDomain() == Modulator::RateDomain::Free)
+                    ? freePhaseIncrement(dt, effRateHz, _freeRemainder[index])
+                    : 65536 / (modulator.rate() * 2);
+                _phaseAccumulator[index] += phaseIncrement;
+                uint32_t phase = _phaseAccumulator[index] + (static_cast<uint32_t>(modulator.phase()) * 65536 / 360);
+                if ((phase & 0xFFFF) < _lastPhase[index]) {
+                    _targetValue[index] = _rng[index].nextRange(255) - 127;
+                }
+                _lastPhase[index] = phase & 0xFFFF;
+            }
+
+            // Smooth interpolation toward the held target.
             int current = _lastRandomValue[index];
             int target = _targetValue[index];
-            int smoothMs = modulator.smooth();
-            int slewRate = calculateSlewRate(smoothMs, modulator.rate());
-
-            int diff = target - current;
-            current += diff / slewRate;
+            int slewRate = calculateSlewRate(modulator.smooth(), modulator.rate());
+            current += (target - current) / slewRate;
             _lastRandomValue[index] = current;
 
-            int value = current;
-            value = (value * modulator.depth()) / 127;
-            value += modulator.offset();
+            int value = (current * modulator.depth()) / 127 + modulator.offset();
             _currentValue[index] = bipolarOutput(value + 64, modulator.invert());
             return;
         }
@@ -317,38 +329,6 @@ public:
             _lastRandomValue[index] = current;
             int value = current;
             // Apply depth and offset
-            value = (value * modulator.depth()) / 127;
-            value += modulator.offset();
-            _currentValue[index] = bipolarOutput(value + 64, modulator.invert());
-            return;
-        }
-
-        // Clocked Random mode
-        if (modulator.shape() == Modulator::Shape::Random) {
-            // Free advances by real dt*Hz; Tempo by the PPQN division.
-            uint32_t phaseIncrement = (modulator.rateDomain() == Modulator::RateDomain::Free)
-                ? freePhaseIncrement(dt, effRateHz, _freeRemainder[index])
-                : 65536 / (modulator.rate() * 2);
-            _phaseAccumulator[index] += phaseIncrement;
-
-            uint32_t phase = _phaseAccumulator[index] + (static_cast<uint32_t>(modulator.phase()) * 65536 / 360);
-
-            // New random target each cycle (phase wraps)
-            if ((phase & 0xFFFF) < _lastPhase[index]) {
-                _targetValue[index] = _rng[index].nextRange(255) - 127;
-            }
-            _lastPhase[index] = phase & 0xFFFF;
-
-            int current = _lastRandomValue[index];
-            int target = _targetValue[index];
-            int smoothMs = modulator.smooth();
-            int slewRate = calculateSlewRate(smoothMs, modulator.rate());
-
-            int diff = target - current;
-            current += diff / slewRate;
-            _lastRandomValue[index] = current;
-
-            int value = current;
             value = (value * modulator.depth()) / 127;
             value += modulator.offset();
             _currentValue[index] = bipolarOutput(value + 64, modulator.invert());

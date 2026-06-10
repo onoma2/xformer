@@ -616,6 +616,121 @@ def render_modulator_page_proposed_v2(canvas, modulator, engine,
 # Convenience wrappers for generate.py
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# PROPOSED: PhaseFlux-style param list (tiny font, 5 vertical rows, boxed
+# selection). Replaces the single big selected-param readout with the whole
+# param set visible at once on the right pane — modelled on
+# PhaseFluxEditPage's draw_param_list.
+# ---------------------------------------------------------------------------
+
+def _draw_param_list_phaseflux(canvas, labels, values, selected):
+    """Right-pane list: name flush-left, value flush-right, selected row boxed.
+    5 rows of tiny font fit in the safe area (y=12..52)."""
+    PANEL_X, PANEL_Y, PANEL_W = 124, 12, 256 - 124 - 2   # 130 px wide
+    ROW_H = 8
+    canvas.set_blend_mode(BlendMode.Set)
+    canvas.set_font(Font.Tiny)
+    for i in range(5):
+        name = labels[i] if i < len(labels) else None
+        if not name:
+            continue
+        value = values[i] if i < len(values) else ""
+        ry = PANEL_Y + i * ROW_H
+        rh = ROW_H - 1
+        if i == selected:
+            canvas.set_color(Color.Bright)
+            canvas.draw_rect(PANEL_X, ry, PANEL_W, rh)
+            name_color = value_color = Color.Bright
+        else:
+            name_color, value_color = Color.Medium, Color.MediumBright
+        ty = ry + rh - 2
+        canvas.set_color(name_color)
+        canvas.draw_text(PANEL_X + 2, ty, name)
+        vw = canvas.text_width(value)
+        canvas.set_color(value_color)
+        canvas.draw_text(PANEL_X + PANEL_W - 2 - vw, ty, value)
+
+
+def render_modulator_page_listparams(canvas, modulator, engine,
+                                     selected_modulator=0, current_page=0,
+                                     selected_function=0):
+    is_adsr = (modulator.shape() == ModulatorShape.ADSR)
+    is_chaos = MockModulator.is_chaos_shape(modulator.shape())
+    total_pages = 2 if (is_adsr or is_chaos) else 1
+    if current_page >= total_pages:
+        current_page = 0
+
+    WindowPainter.clear(canvas)
+    WindowPainter.draw_header(canvas, track=selected_modulator,
+                              mode=f"MOD {selected_modulator + 1} - MODULATOR")
+    # Pg indicator now lives in the header (active-function slot), not the body.
+    WindowPainter.draw_active_function(
+        canvas, f"Pg {current_page + 1}/{total_pages}" if total_pages > 1 else "")
+
+    labels, values = _get_param_values(modulator, current_page)
+    # footer mirrors the labels (firmware function row)
+    WindowPainter.draw_footer(canvas, [l or None for l in labels],
+                              highlight=int(selected_function))
+
+    # Left: existing scope / waveform. Narrow it slightly so the list pane clears.
+    _draw_waveform(canvas, modulator, engine, selected_modulator)
+    canvas.set_color(Color.Low)
+    canvas.vline(122, 13, 39)   # divider, matches PhaseFlux DividerX2
+
+    _draw_param_list_phaseflux(canvas, labels, values, int(selected_function))
+
+    # CV destination — inside the scope box bottom-left (list owns the right pane).
+    canvas.set_font(Font.Tiny)
+    canvas.set_color(Color.Low)
+    canvas.draw_text(3, 51, "-> CV1,CV3")
+
+
+def render_modulator_list_sine(canvas):
+    mod = MockModulator(shape=ModulatorShape.Sine, rate=96, depth=50, offset=+10, phase=45)
+    eng = MockModulatorEngine(current_value=90, current_phase=16384)
+    render_modulator_page_listparams(canvas, mod, eng, selected_function=1)
+
+
+def render_modulator_list_adsr(canvas):
+    mod = MockModulator(shape=ModulatorShape.ADSR, attack=300, decay=400, sustain=80, release=600, amplitude=100)
+    eng = MockModulatorEngine(current_value=70, adsr_state=2, adsr_timer=50)
+    render_modulator_page_listparams(canvas, mod, eng, selected_function=2, current_page=0)
+
+
+def render_modulator_list_random(canvas):
+    mod = MockModulator(shape=ModulatorShape.Random, random_mode=ModulatorRandomMode.Triggered,
+                        depth=60, offset=-5, smooth=250, gate_track=2)
+    eng = MockModulatorEngine(current_value=110)
+    render_modulator_page_listparams(canvas, mod, eng, selected_function=0)
+
+
+def render_modulator_list_chaos(canvas):
+    mod = MockModulator(shape=ModulatorShape.ChaosLorenz, rate=120, depth=80, offset=+5,
+                        attack=800, decay=600)
+    eng = MockModulatorEngine(current_value=55)
+    render_modulator_page_listparams(canvas, mod, eng, selected_function=3, current_page=0)
+
+
+def render_modulator_list_random_uniform(canvas):
+    # PROPOSED: Random refactored to match Chaos — drops R.MODE, gains RATE
+    # (with Free/Tempo domain), single page: SHAPE/RATE/DEPTH/OFFSET/SLEW.
+    mod = MockModulator(shape=ModulatorShape.Random, depth=60, offset=-5, smooth=250)
+    eng = MockModulatorEngine(current_value=110)
+    WindowPainter.clear(canvas)
+    WindowPainter.draw_header(canvas, track=0, mode="MOD 3 - MODULATOR")
+    WindowPainter.draw_active_function(canvas, "")
+    labels = ["SHAPE", "RATE", "DEPTH", "OFFSET", "SLEW"]
+    values = ["Random", "0.20Hz", "60", "-5", "250ms"]
+    WindowPainter.draw_footer(canvas, labels, highlight=1)
+    _draw_waveform(canvas, mod, eng, 0)
+    canvas.set_color(Color.Low)
+    canvas.vline(122, 13, 39)
+    _draw_param_list_phaseflux(canvas, labels, values, 1)
+    canvas.set_font(Font.Tiny)
+    canvas.set_color(Color.Low)
+    canvas.draw_text(3, 51, "-> CV4")
+
+
 def render_modulator_current_sine(canvas):
     mod = MockModulator(shape=ModulatorShape.Sine, rate=96, depth=50, offset=+10, phase=45)
     eng = MockModulatorEngine(current_value=90, current_phase=16384)

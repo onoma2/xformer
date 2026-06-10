@@ -132,7 +132,6 @@ void ModulatorPage::drawGeodeVoice(Canvas &canvas, int voice) {
 void ModulatorPage::draw(Canvas &canvas) {
     auto &modulator = _project.modulator(_selectedModulator);
     bool isRandom = (modulator.shape() == Modulator::Shape::Random);
-    bool isTriggered = isRandom && (modulator.randomMode() == Modulator::RandomMode::Triggered);
     bool isADSR = (modulator.shape() == Modulator::Shape::ADSR);
     bool isChaos = Modulator::isChaosShape(modulator.shape());
 
@@ -164,6 +163,9 @@ void ModulatorPage::draw(Canvas &canvas) {
     FixedStringBuilder<32> title("MOD %d - %s", _selectedModulator + 1, titleMode);
     WindowPainter::drawHeader(canvas, _model, _engine, title);
 
+    // Function labels — shared by the footer and the right-pane param list.
+    const char *functionNames[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
+
     // Footer
     if (_showRoutingOverlay) {
         const char *routingNames[5] = { "RUN", "GATE", "CLEAR", "EVENT", "CC NUM" };
@@ -179,8 +181,9 @@ void ModulatorPage::draw(Canvas &canvas) {
         drawDestinationsBody(canvas, _project.modulator(_selectedModulator));
         return;
     } else {
-        WindowPainter::drawActiveFunction(canvas, "");
-        const char *functionNames[5];
+        FixedStringBuilder<8> pageLabel;
+        if (_totalPages > 1) pageLabel("Pg %d/%d", _currentPage + 1, _totalPages);
+        WindowPainter::drawActiveFunction(canvas, pageLabel);
         if (isADSR) {
             if (_currentPage == 0) {
                 functionNames[0] = "SHAPE";
@@ -211,8 +214,8 @@ void ModulatorPage::draw(Canvas &canvas) {
             }
         } else {
             functionNames[0] = "SHAPE";
-            functionNames[1] = isRandom ? "R.MODE" : "RATE";
-            functionNames[2] = isTriggered ? "G.SRC" : "DEPTH";
+            functionNames[1] = "RATE";
+            functionNames[2] = "DEPTH";
             functionNames[3] = "OFFSET";
             functionNames[4] = isRandom ? "SLEW" : "PHASE";
         }
@@ -236,14 +239,6 @@ void ModulatorPage::draw(Canvas &canvas) {
         }
         int highlight = isADSR ? int(_selectedFunction) : int(_selectedFunction);
         WindowPainter::drawFooter(canvas, functionNames, pageKeyState(), highlight);
-
-        // Pagination dots for ADSR
-        if (_totalPages > 1) {
-            canvas.setColor(Color::Low);
-            canvas.setFont(Font::Tiny);
-            FixedStringBuilder<8> page("Pg %d/%d", _currentPage + 1, _totalPages);
-            canvas.drawText(56, 12, page);
-        }
     }
 
     canvas.setBlendMode(BlendMode::Set);
@@ -278,16 +273,8 @@ void ModulatorPage::draw(Canvas &canvas) {
         }
     } else {
         values[0](Modulator::shapeName(modulator.shape()));
-        if (isRandom) {
-            values[1](Modulator::randomModeName(modulator.randomMode()));
-        } else {
-            modulator.printRate(values[1]);
-        }
-        if (isTriggered) {
-            modulator.printGateSource(values[2]);
-        } else {
-            modulator.printDepth(values[2]);
-        }
+        modulator.printRate(values[1]);
+        modulator.printDepth(values[2]);
         modulator.printOffset(values[3]);
         if (isRandom) {
             modulator.printSmooth(values[4]);
@@ -365,41 +352,34 @@ void ModulatorPage::draw(Canvas &canvas) {
         ScopePainter::drawTrace(canvas, boxX + 1, centerY, halfH, _scope, ScopeWidth, _scopeWrite);
     }
 
-    // --- Right half: parameter display ---
-    const int colL = 128;
-    const int colM = 190;
-    const int colR = 256;
+    // --- Right half: PhaseFlux-style param list (Tiny font, 5 rows, boxed
+    // selection). Name flush-left, value flush-right; row i maps to F(i+1), so
+    // gaps (null label / empty value) stay aligned with the function keys. ---
+    const int colR = 256;   // right edge, used by the JustF sub-readout below
+    const int panelX = 124, panelY = 12, rowH = 8;
+    const int panelW = 256 - panelX - 2;
 
-    // Unified grid layout: all parameter values visible, no labels
     canvas.setBlendMode(BlendMode::Set);
-    canvas.setFont(Font::Small);
+    canvas.setFont(Font::Tiny);
+    canvas.setColor(Color::Low);
+    canvas.vline(122, 13, 39);   // divider, matches PhaseFlux DividerX2
 
     int selectedIdx = int(_selectedFunction);
-
-    // Row 1 (y=22): param 0 (left) + param 1 (right)
-    for (int i = 0; i < 2; ++i) {
-        if (values[i][0] == '\0') continue;
-        canvas.setColor(i == selectedIdx ? Color::Bright : Color::Medium);
-        if (i == 0) {
-            canvas.drawText(colL, 22, values[0]);
-        } else {
-            int tw = canvas.textWidth(values[1]);
-            canvas.drawText(colR - tw, 22, values[1]);
+    for (int i = 0; i < 5; ++i) {
+        if (!functionNames[i] || values[i][0] == '\0') continue;
+        bool sel = (i == selectedIdx);
+        int ry = panelY + i * rowH;
+        int rh = rowH - 1;
+        if (sel) {
+            canvas.setColor(Color::Bright);
+            canvas.drawRect(panelX, ry, panelW, rh);
         }
-    }
-
-    // Row 2 (y=42): param 2 + param 3 + param 4
-    for (int i = 2; i < 5; ++i) {
-        if (values[i][0] == '\0') continue;
-        canvas.setColor(i == selectedIdx ? Color::Bright : Color::Medium);
-        if (i == 2) {
-            canvas.drawText(colL, 42, values[2]);
-        } else if (i == 3) {
-            canvas.drawText(colM, 42, values[3]);
-        } else {
-            int tw = canvas.textWidth(values[4]);
-            canvas.drawText(colR - tw, 42, values[4]);
-        }
+        int ty = ry + rh - 2;
+        canvas.setColor(sel ? Color::Bright : Color::Medium);
+        canvas.drawText(panelX + 2, ty, functionNames[i]);
+        int vw = canvas.textWidth(values[i]);
+        canvas.setColor(sel ? Color::Bright : Color::MediumBright);
+        canvas.drawText(panelX + panelW - 2 - vw, ty, values[i]);
     }
 
     // JustF: M2's own derived rate, tiny, under the INTONE value.
@@ -428,9 +408,9 @@ void ModulatorPage::draw(Canvas &canvas) {
             }
         }
         if (!first) {
-            FixedStringBuilder<32> label;
-            label("-> %s", (const char *)cvOut);
-            canvas.drawText(colL, 54, label);
+            // Inside the scope box, bottom-left — the 5-row list now owns the
+            // full right pane (matches the scope-page CV-label convention).
+            canvas.drawText(3, 51, FixedStringBuilder<32>("-> %s", (const char *)cvOut));
         }
     }
 }
@@ -549,8 +529,7 @@ void ModulatorPage::keyPress(KeyPressEvent &event) {
                 // Re-pressing RATE (when it's already the selected function and the shape
                 // actually shows RATE on F2) toggles the rate domain Free <-> Tempo.
                 auto &modulator = _project.modulator(_selectedModulator);
-                bool rateOnF2 = modulator.shape() != Modulator::Shape::Random &&
-                                modulator.shape() != Modulator::Shape::ADSR;
+                bool rateOnF2 = modulator.shape() != Modulator::Shape::ADSR;
                 if (Function(func) == Function::Shape && _selectedFunction == Function::Shape) {
                     // Re-pressing SHAPE/F1 fires a one-shot audition pulse for this modulator.
                     _engine.modulatorEngine().triggerManual(_selectedModulator);
@@ -722,26 +701,20 @@ void ModulatorPage::encoder(EncoderEvent &event) {
             }
         }
     } else {
+        // LFO + Random share the layout now (Random's gate behaviour is the
+        // universal Mode in routing, not a separate R.MODE). F5 = SLEW for
+        // Random, PHASE for LFOs.
         bool isRandom = (modulator.shape() == Modulator::Shape::Random);
-        bool isTriggered = isRandom && (modulator.randomMode() == Modulator::RandomMode::Triggered);
 
         switch (_selectedFunction) {
         case Function::Shape:
             modulator.editShape(event.value(), pressed);
             break;
         case Function::Rate:
-            if (isRandom) {
-                modulator.editRandomMode(event.value(), pressed);
-            } else {
-                modulator.editRate(event.value(), pressed);
-            }
+            modulator.editRate(event.value(), pressed);
             break;
         case Function::Depth:
-            if (isTriggered) {
-                modulator.setGateSource(Modulator::cycleGateSource(modulator.gateSource(), event.value(), _selectedModulator));
-            } else {
-                modulator.editDepth(event.value(), pressed);
-            }
+            modulator.editDepth(event.value(), pressed);
             break;
         case Function::Offset:
             modulator.editOffset(event.value(), pressed);

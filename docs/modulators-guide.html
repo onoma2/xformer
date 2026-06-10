@@ -108,7 +108,7 @@ untouched until the modulator moves.</div>
     <tr><td><b>F1&ndash;F5</b></td><td>Select the parameter under that footer label.</td></tr>
     <tr><td><b>Encoder turn</b></td><td>Edit the selected parameter. <b>Push + turn</b> = fine step.</td></tr>
     <tr><td><span class="kbd">&larr;</span> / <span class="kbd">&rarr;</span></td><td>Walk the page cursor: parameter page(s) &rarr; the <b>destinations</b> (routing) page.</td></tr>
-    <tr><td><b>Re-press RATE</b></td><td>Toggle the rate domain <b>FREE &harr; TEMPO</b> (LFO/Chaos shapes).</td></tr>
+    <tr><td><b>Re-press RATE</b></td><td>Toggle the rate domain <b>FREE &harr; TEMPO</b> (LFO / Chaos / Random shapes).</td></tr>
     <tr><td><b>Re-press SHAPE</b></td><td><b>Audition</b> &mdash; fires a one-shot gate pulse into the current modulator (see below).</td></tr>
     <tr><td><span class="kbd">Shift</span>+<span class="kbd">RATE</span></td><td>Toggle <b>JustF</b> (rate-link mode). §9.</td></tr>
     <tr><td><span class="kbd">Shift</span>+<span class="kbd">SHAPE</span></td><td>Toggle <b>Geode</b> (rhythmic engine). §10.</td></tr>
@@ -118,8 +118,8 @@ untouched until the modulator moves.</div>
 <span class="kbd">&rarr;</span> moves between them, then on to the destinations page.</p>
 <div class="note"><b>Audition tap.</b> When <b>SHAPE</b> is already the selected function, tapping <b>F1</b> again fires a
 short (~60&nbsp;ms) gate pulse into that modulator &mdash; the same gate path a real source would use. So it
-plays an <b>ADSR</b> (a quick fire-and-forget hit), grabs a new value on <b>Random&nbsp;Triggered</b>, re-seeds
-a <b>Chaos</b> attractor, or triggers a <b>Geode voice</b>. A free-running LFO ignores it.</div>
+plays an <b>ADSR</b> (a quick fire-and-forget hit), grabs a new value on a <b>Random</b> in TRIG/HOLD, re-seeds
+a <b>Chaos</b> attractor, or triggers a <b>Geode voice</b>. A free-running (RUN) shape ignores it.</div>
 
 <!-- ============================================================ -->
 <h2 id="volt">3 · From value to voltage</h2>
@@ -142,7 +142,7 @@ CV-route Mod sources, so what you see in the scope is what every destination get
     <tr><td><b>Sine / Triangle / Saw&nbsp;Up / Saw&nbsp;Down / Square</b> <span class="tag t-blue">LFO</span></td>
       <td><code>SHAPE · RATE · DEPTH · OFFSET · PHASE</code></td><td>&mdash;</td></tr>
     <tr><td><b>Random</b> <span class="tag t-amber">noise</span></td>
-      <td><code>SHAPE · R.MODE · DEPTH|G.SRC · OFFSET · SLEW</code></td><td>&mdash;</td></tr>
+      <td><code>SHAPE · RATE · DEPTH · OFFSET · SLEW</code></td><td>&mdash;</td></tr>
     <tr><td><b>ADSR</b> <span class="tag t-green">envelope</span></td>
       <td><code>SHAPE · ATTACK · DECAY · SUSTAIN · RELEASE</code></td>
       <td><code>AMPLIT · FLOOR · INVERT</code></td></tr>
@@ -160,12 +160,11 @@ CV-route Mod sources, so what you see in the scope is what every destination get
 <table>
   <thead><tr><th>Param</th><th>Range</th><th>Meaning</th></tr></thead>
   <tbody>
-    <tr><td><b>RATE</b></td><td>0.01&ndash;16&nbsp;Hz (Free) · clock division (Tempo)</td><td>Speed of the LFO/chaos. §5.</td></tr>
+    <tr><td><b>RATE</b></td><td>0.01&ndash;16&nbsp;Hz (Free) · clock division (Tempo)</td><td>Speed of the LFO / Chaos / Random clock. §5.</td></tr>
     <tr><td><b>DEPTH</b></td><td>0&ndash;127</td><td>How far the output swings from centre.</td></tr>
     <tr><td><b>OFFSET</b></td><td>&minus;64&hellip;+63</td><td>Bias / rest level. This <i>is</i> the FLOOR (§7); 0 = 0&nbsp;V.</td></tr>
     <tr><td><b>PHASE</b></td><td>0&ndash;360°</td><td>Starting phase; also the reset point in TRIG mode.</td></tr>
-    <tr><td><b>SLEW</b></td><td>0&ndash;5000&nbsp;ms</td><td>Smoothing (Random / chaos page 2).</td></tr>
-    <tr><td><b>R.MODE</b></td><td>Clocked · Triggered</td><td>Random: free stepping vs gate-triggered S&amp;H.</td></tr>
+    <tr><td><b>SLEW</b></td><td>0&ndash;5000&nbsp;ms</td><td>Smoothing / glide between values (Random &amp; Chaos page 2).</td></tr>
     <tr><td><b>ATTACK / DECAY / RELEASE</b></td><td>0&ndash;2000&nbsp;ms</td><td>ADSR envelope stage times.</td></tr>
     <tr><td><b>SUSTAIN</b></td><td>0&ndash;127</td><td>ADSR held level.</td></tr>
     <tr><td><b>AMPLIT</b></td><td>0&ndash;127</td><td>ADSR peak height (page 2).</td></tr>
@@ -173,10 +172,12 @@ CV-route Mod sources, so what you see in the scope is what every destination get
   </tbody>
 </table>
 
-<div class="note"><b>Random</b> has two flavours: <code>Clocked</code> steps to a new smoothed value on its own
-rate; <code>Triggered</code> is a sample-&amp;-hold that grabs a new value on each gate (the third cell becomes
-<code>G.SRC</code>, the gate source). <b>Chaos</b> (Lorenz / Latoocarfian) are strange attractors &mdash; RATE
-sets how fast you travel the attractor, P1/P2 reshape it.</div>
+<div class="note"><b>Random</b> is sample-and-hold with slew: it rolls a fresh value, glides to it (SLEW), and scales
+by DEPTH/OFFSET. Its three behaviours are the universal <b>gate mode</b> (RUN/TRIG/HOLD on the destinations page),
+exactly like the other shapes &mdash; <b>RUN</b> rolls a new value on every RATE tick, <b>TRIG</b> samples one on each
+gate edge, <b>HOLD</b> rolls on the clock while the gate is high and freezes when it drops (track-and-hold). So RATE
+sets the clock for RUN/HOLD, and the gate drives TRIG/HOLD via the <code>GATE</code> source. <b>Chaos</b> (Lorenz /
+Latoocarfian) are strange attractors &mdash; RATE sets how fast you travel the attractor, P1/P2 reshape it.</div>
 
 <!-- ============================================================ -->
 <h2 id="rate">5 · Rate: Free vs Tempo</h2>
@@ -192,13 +193,14 @@ sets how fast you travel the attractor, P1/P2 reshape it.</div>
 <h2 id="gate">6 · Gate modes &amp; sources</h2>
 <p>A modulator can react to a gate. The <b>gate mode</b> (footer <code>RUN</code> on the destinations page) sets how:</p>
 <table>
-  <thead><tr><th>Mode</th><th>Behaviour</th></tr></thead>
+  <thead><tr><th>Mode</th><th>LFO / Chaos</th><th>Random</th></tr></thead>
   <tbody>
-    <tr><td><b>FREE</b></td><td>Free-running; the gate is ignored.</td></tr>
-    <tr><td><b>TRIG</b></td><td>Reset the phase to its offset on every gate rising edge (hard sync).</td></tr>
-    <tr><td><b>HOLD</b></td><td>Advance only while the gate is high; reset on rising.</td></tr>
+    <tr><td><b>FREE</b> (Run)</td><td>Free-running; the gate is ignored.</td><td>Rolls a new value on every RATE tick (free S&amp;H).</td></tr>
+    <tr><td><b>TRIG</b></td><td>Reset the phase to its offset on every gate rising edge (hard sync); Chaos re-seeds.</td><td>Samples a new value on each gate rising edge (S&amp;H).</td></tr>
+    <tr><td><b>HOLD</b> (Gate)</td><td>Advance only while the gate is high; reset on rising.</td><td>Rolls on the RATE clock while the gate is high, freezes when low (track-and-hold).</td></tr>
   </tbody>
 </table>
+<p>So Random shares the same RUN/TRIG/HOLD control as every other shape &mdash; there is no separate "random mode".</p>
 <p>The <b>gate source</b> (footer <code>GATE</code>) can be any of:</p>
 <ul>
   <li><b>Track gates</b> — <code>GateOut1&ndash;8</code></li>

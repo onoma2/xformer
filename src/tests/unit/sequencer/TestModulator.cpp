@@ -16,6 +16,17 @@
 namespace {
 using Domain = Modulator::RateDomain;
 bool eq(const StringBuilder &b, const char *s) { return std::strcmp((const char *)b, s) == 0; }
+
+Modulator makeClockedRandom(Modulator::Mode mode) {
+    Modulator m; m.clear();
+    m.setShape(Modulator::Shape::Random);
+    m.setRateDomain(Modulator::RateDomain::Tempo);
+    m.setRate(6);          // fastest clock — many wraps inside a short window
+    m.setMode(mode);
+    m.setDepth(127);       // full swing so resamples are visible
+    m.setSmooth(0);        // minimal slew
+    return m;
+}
 }
 
 UNIT_TEST("Modulator") {
@@ -229,6 +240,51 @@ CASE("bipolarOutput: invert flips around mid-scale") {
     expectEqual(ME::bipolarOutput(127, true), 0, "top -> bottom");
     expectEqual(ME::bipolarOutput(0, true), 127, "bottom -> top");
     expectEqual(ME::bipolarOutput(90, false), 90, "no invert passthrough");
+}
+
+// ---- Random shape driven by the universal Mode (Run / Trig / Gate) --------
+// Run  = free-running clocked S&H (gate ignored)
+// Trig = sample-and-hold on gate rising edge
+// Gate = track-and-hold: resample on the clock while gate high, freeze when low
+
+CASE("Random Run free-runs while gate is low") {
+    ModulatorEngine eng; eng.reset();
+    Modulator m = makeClockedRandom(Modulator::Mode::Run);
+    int lo = 1000, hi = -1000;
+    for (uint32_t t = 0; t < 400; ++t) {
+        eng.tick(t, 0.001f, m, 0, /*gate*/ false);
+        int v = eng.currentValue(0);
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+    }
+    expect(lo != hi, "Run keeps resampling without any gate");
+}
+
+CASE("Random Gate holds the value while gate is low") {
+    ModulatorEngine eng; eng.reset();
+    Modulator m = makeClockedRandom(Modulator::Mode::Gate);
+    for (uint32_t t = 0; t < 60; ++t) eng.tick(t, 0.001f, m, 0, false);
+    int v1 = eng.currentValue(0);
+    for (uint32_t t = 60; t < 400; ++t) eng.tick(t, 0.001f, m, 0, false);
+    int v2 = eng.currentValue(0);
+    expectEqual(v1, v2, "Gate freezes the output while the gate is low");
+}
+
+CASE("Random Trig samples only on a gate rising edge") {
+    ModulatorEngine eng; eng.reset();
+    Modulator m = makeClockedRandom(Modulator::Mode::Trig);
+    for (uint32_t t = 0; t < 200; ++t) eng.tick(t, 0.001f, m, 0, false);
+    int held = eng.currentValue(0);
+    for (uint32_t t = 200; t < 400; ++t) eng.tick(t, 0.001f, m, 0, false);
+    expectEqual(eng.currentValue(0), held, "no resample without a gate edge");
+    bool changed = false;
+    uint32_t t = 400;
+    for (int e = 0; e < 8; ++e) {
+        eng.tick(t++, 0.001f, m, 0, true);
+        eng.tick(t++, 0.001f, m, 0, false);
+        if (eng.currentValue(0) != held) changed = true;
+    }
+    expect(changed, "gate rising edges resample");
 }
 
 }

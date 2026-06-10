@@ -115,6 +115,11 @@ from pages_modulator import (
     render_modulator_geode_globals,
     render_modulator_geode_voice,
     render_modulator_adsr_floor,
+    render_modulator_list_sine,
+    render_modulator_list_adsr,
+    render_modulator_list_random,
+    render_modulator_list_chaos,
+    render_modulator_list_random_uniform,
 )
 from tracks import (
     DiscreteMapSequence, DiscreteMapTrackEngine,
@@ -367,6 +372,16 @@ def render_page(page: str, scale: int = 4):
         render_modulator_current_random(canvas)
     elif page == "modulator-current-chaos":
         render_modulator_current_chaos(canvas)
+    elif page == "modulator-list-sine-proposed":
+        render_modulator_list_sine(canvas)
+    elif page == "modulator-list-adsr-proposed":
+        render_modulator_list_adsr(canvas)
+    elif page == "modulator-list-random-proposed":
+        render_modulator_list_random(canvas)
+    elif page == "modulator-list-random-uniform-proposed":
+        render_modulator_list_random_uniform(canvas)
+    elif page == "modulator-list-chaos-proposed":
+        render_modulator_list_chaos(canvas)
     elif page == "modulator-proposed-sine":
         render_modulator_proposed_sine(canvas)
     elif page == "modulator-proposed-adsr":
@@ -621,6 +636,7 @@ def main():
                                  'modulator-proposed-random', 'modulator-proposed-chaos',
                                  'modulator-proposed-adsr-page2', 'modulator-proposed-chaos-page2',
                                  'modulator-rate-free-proposed', 'modulator-rate-tempo-proposed', 'modulator-gatemodes-proposed', 'modulator-scope-proposed', 'modulator-destinations-grid-proposed', 'modulator-justf-time', 'modulator-justf-intone', 'modulator-justf-follower', 'modulator-justf-adsr-follower', 'modulator-justf-adsr-intone', 'modulator-geode-globals', 'modulator-geode-voice', 'modulator-adsr-floor',
+                                 'modulator-list-sine-proposed', 'modulator-list-adsr-proposed', 'modulator-list-random-proposed', 'modulator-list-chaos-proposed', 'modulator-list-random-uniform-proposed',
                                  'stochastic-loop-proposed', 'stochastic-loop-proposed-held',
                                  'stochastic-live-proposed', 'stochastic-live-proposed-held',
                                  'stochastic-live-proposed-burst', 'stochastic-live-proposed-spread',
