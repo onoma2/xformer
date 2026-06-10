@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XFORMER PhaseFlux — full manual</title>
+<style>
+  :root{
+    --blue:#2563eb; --amber:#ca8a04; --green:#16a34a; --red:#dc2626; --purp:#7c3aed;
+    --ink:#1a1a1a; --mut:#5b5b5b; --line:#e5e5e5; --card:#ffffff; --bg:#fafafa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; line-height:1.5;}
+  .wrap{max-width:880px; margin:0 auto; padding:32px 24px 90px}
+  h1{font-size:1.75rem; line-height:1.2; margin:0 0 6px}
+  h2{font-size:1.32rem; line-height:1.25; margin:46px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--blue)}
+  h2.geo{border-color:var(--green)}
+  h2.adv{border-color:var(--purp)}
+  h3{font-size:1.06rem; margin:24px 0 6px}
+  .lede{color:var(--mut); font-size:1.05rem; margin:0 0 8px}
+  p{margin:10px 0}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#f0f0f3; padding:1px 5px; border-radius:4px; font-size:.9em}
+  .kbd{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#1a1a1a; color:#fff; padding:2px 7px; border-radius:5px; font-size:.82em; white-space:nowrap}
+  .tag{display:inline-block; font-size:.7rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:99px; vertical-align:middle}
+  .t-blue{background:#e8effe; color:var(--blue)} .t-amber{background:#fbf1d9; color:var(--amber)}
+  .t-green{background:#e3f5ea; color:var(--green)} .t-purp{background:#efe7fd; color:var(--purp)}
+  .note{border-left:4px solid var(--blue); background:#f3f7ff; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .warn{border-left:4px solid var(--amber); background:#fdf8ec; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .gotcha{border-left:4px solid var(--red); background:#fdeeee; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:.93rem}
+  th,td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top}
+  thead th{background:#e8effe; color:var(--blue)}
+  tbody tr:nth-child(even){background:#fafafa}
+  td code{white-space:nowrap}
+  figure{margin:18px 0; text-align:center}
+  figure svg{max-width:100%; height:auto}
+  figcaption{color:var(--mut); font-size:.85rem; margin-top:6px}
+  .oled{display:block; margin:14px auto 2px; border:1px solid #333; border-radius:4px; background:#000; max-width:560px; width:100%}
+  .shot{display:block; width:100%; max-width:560px; margin:14px auto 2px; image-rendering:pixelated; border:1px solid #333; border-radius:4px; background:#000}
+  .gallery{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0}
+  @media(max-width:620px){.gallery{grid-template-columns:1fr}}
+  .gallery .shot{margin:0}
+  .cap{text-align:center; color:var(--mut); font-size:.84rem; margin:0 0 6px}
+  .steps{counter-reset:step; list-style:none; padding:0; margin:14px 0}
+  .steps>li{counter-increment:step; position:relative; padding:12px 12px 12px 56px; margin:10px 0; background:var(--card); border:1px solid var(--line); border-radius:8px}
+  .steps>li::before{content:counter(step); position:absolute; left:12px; top:12px; width:30px; height:30px; border-radius:50%; background:var(--blue); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:.95rem}
+  .setup{background:var(--card); border:1px solid var(--line); border-left:4px solid var(--green); border-radius:0 8px 8px 0; padding:12px 16px; margin:14px 0}
+  .setup h3{margin-top:0} .setup .recipe{font-size:.9rem; color:var(--mut)}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  @media(max-width:620px){.grid2{grid-template-columns:1fr}}
+  .def{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 14px}
+  .def .k{font-weight:700; color:var(--blue)}
+  .toc{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:16px 0; columns:2; font-size:.93rem}
+  @media(max-width:620px){.toc{columns:1}}
+  .toc a{color:var(--blue); text-decoration:none} .toc a:hover{text-decoration:underline}
+  .footer{margin-top:48px; padding-top:14px; border-top:1px solid var(--line); color:var(--mut); font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>XFORMER PhaseFlux</h1>
+<p class="lede">A pulse-and-curve sequencer on a 4&times;4 grid. Each of the 16 cells is a <b>stage</b> that fires a
+burst of pulses across its slice of time &mdash; you draw <i>where</i> the pulses land with a temporal curve and
+<i>what pitch</i> each one plays with a pitch curve. The playhead walks the grid, the whole pattern loops as one
+<b>cycle</b>, and almost every shape is per-cell. It is a Note track turned inside-out: instead of one note per step,
+you sculpt a density of triggers and a contour of CV per step.</p>
+
+<div class="toc">
+  <a href="#what">1 · What PhaseFlux is</a><br>
+  <a href="#vs-note">2 · How it differs from a Note track</a><br>
+  <a href="#grid">3 · The grid, stages &amp; the walk</a><br>
+  <a href="#cycle">4 · The cycle &amp; timing</a><br>
+  <a href="#pulses">5 · Pulses &amp; the temporal curve</a><br>
+  <a href="#pitch">6 · Pitch &amp; the 0&rarr;1 phase</a><br>
+  <a href="#mask">7 · Mask, phase-shift &amp; windows</a><br>
+  <a href="#accum">8 · Accumulators</a><br>
+  <a href="#macro">9 · Macros &amp; global phase</a><br>
+  <a href="#pages">10 · The edit page</a><br>
+  <a href="#seqpage">11 · Sequence &amp; track pages</a><br>
+  <a href="#params">12 · Parameter reference</a><br>
+  <a href="#expect">13 · What to expect</a><br>
+  <a href="#examples">14 · Worked setups</a>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="what">1 · What PhaseFlux is</h2>
+<p>PhaseFlux is one of the eight track engines. Set a track's mode to <b>PhaseFlux</b> and it stops thinking in
+"steps that hold a note" and starts thinking in <b>cells that emit pulses</b>. The sixteen cells form a 4&times;4 grid.
+A <b>playhead</b> walks the grid in a chosen order; while it sits in a cell, that cell sprays out a programmed number
+of gate pulses, and a per-cell <b>pitch curve</b> decides the CV at every pulse.</p>
+<p>Two independent shapes live in each cell:</p>
+<div class="grid2">
+  <div class="def"><div class="k">Temporal curve</div> Decides <b>where in time</b> the cell's pulses land &mdash; evenly,
+    bunched at the start, bouncing, etc. Drives the <b>gate</b> output.</div>
+  <div class="def"><div class="k">Pitch curve</div> Decides the <b>CV</b> at each pulse &mdash; a ramp, a bell, a triangle,
+    spanning a chosen number of octaves. Drives the <b>CV</b> output.</div>
+</div>
+<div class="note">A cell is not "a note". It is a little machine that, every time the playhead enters, generates up to
+<b>16 pulses</b> with their own timing profile and their own pitch profile. One cell can be a single quarter note, a
+roll of sixteenths, a bouncing flam, or an arpeggiated curve &mdash; all from the same controls.</div>
+
+<!-- ============================================================ -->
+<h2 id="vs-note">2 · How it differs from a Note track</h2>
+<table>
+  <thead><tr><th>Note track</th><th>PhaseFlux</th></tr></thead>
+  <tbody>
+    <tr><td>16/32/64 steps in a row</td><td>16 cells on a 4&times;4 grid, walked in one of 8 orders</td></tr>
+    <tr><td>One step = one gate + one note</td><td>One cell = up to 16 pulses, each with its own CV from a curve</td></tr>
+    <tr><td>Step length is the divisor</td><td>Each cell has its own divisor slot <i>and</i> a length multiplier</td></tr>
+    <tr><td>Pitch is a stored value per step</td><td>Pitch is a <i>curve</i> evaluated over each pulse's phase</td></tr>
+    <tr><td>You place notes</td><td>You sculpt density (temporal) and contour (pitch)</td></tr>
+    <tr><td>Gate probability / retrig fields</td><td>Pulse mask, phase-shift, windows, repeats, dual accumulators</td></tr>
+  </tbody>
+</table>
+<p>It still shares the Performer chassis: a scale, a root note, a clock divisor, a clock multiplier, a reset measure,
+octave / transpose, play-mode, fill-mode &mdash; and it is fully routable like any other track.</p>
+
+<!-- ============================================================ -->
+<h2 id="grid">3 · The grid, stages &amp; the walk</h2>
+<p>The 16 cells are indexed left-to-right, top-to-bottom &mdash; cell 0 is top-left, cell 15 is bottom-right:</p>
+<figure>
+<svg viewBox="0 0 560 200" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,system-ui,sans-serif">
+  <g font-size="11">
+    <text x="90" y="16" text-anchor="middle" font-weight="700" fill="#5b5b5b">Cell indices (grid)</text>
+    <text x="400" y="16" text-anchor="middle" font-weight="700" fill="#5b5b5b">Snake walk order (default)</text>
+  </g>
+  <!-- grid indices -->
+  <g font-size="12" font-weight="700">
+    <!-- row0 -->
+    <g fill="#1a1a1a">
+    <rect x="20" y="30" width="34" height="34" rx="4" fill="#e8effe" stroke="#2563eb"/><text x="37" y="52" text-anchor="middle">0</text>
+    <rect x="58" y="30" width="34" height="34" rx="4" fill="#e8effe" stroke="#2563eb"/><text x="75" y="52" text-anchor="middle">1</text>
+    <rect x="96" y="30" width="34" height="34" rx="4" fill="#e8effe" stroke="#2563eb"/><text x="113" y="52" text-anchor="middle">2</text>
+    <rect x="134" y="30" width="34" height="34" rx="4" fill="#e8effe" stroke="#2563eb"/><text x="151" y="52" text-anchor="middle">3</text>
+    <rect x="20" y="68" width="34" height="34" rx="4" fill="#fff" stroke="#cfcfcf"/><text x="37" y="90" text-anchor="middle">4</text>
+    <rect x="58" y="68" width="34" height="34" rx="4" fill="#fff" stroke="#cfcfcf"/><text x="75" y="90" text-anchor="middle">5</text>
+    <rect x="96" y="68" width="34" height="34" rx="4" fill="#fff" stroke="#cfcfcf"/><text x="113" y="90" text-anchor="middle">6</text>
+    <rect x="134" y="68" width="34" height="34" rx="4" fill="#fff" stroke="#cfcfcf"/><text x="151" y="90" text-anchor="middle">7</text>
+    <rect x="20" y="106" width="34" height="34" rx="4" fill="#fff" stroke="#cfcfcf"/><text x="37" y="128" text-anchor="middle">8</text>
+    <rect x="58" y="106" width="34" height="34" rx="4" fill="#fff" stroke="#cfcfcf"/><text x="75" y="128" text-anchor="middle">9</text>
+    <rect x="96" y="106" width="34" height="34" rx="4" fill="#fff" stroke="#cfcfcf"/><text x="113" y="128" text-anchor="middle">10</text>
+    <rect x="134" y="106" width="34" height="34" rx="4" fill="#fff" stroke="#cfcfcf"/><text x="151" y="128" text-anchor="middle">11</text>
+    <rect x="20" y="144" width="34" height="34" rx="4" fill="#fff" stroke="#cfcfcf"/><text x="37" y="166" text-anchor="middle">12</text>
+    <rect x="58" y="144" width="34" height="34" rx="4" fill="#fff" stroke="#cfcfcf"/><text x="75" y="166" text-anchor="middle">13</text>
+    <rect x="96" y="144" width="34" height="34" rx="4" fill="#fff" stroke="#cfcfcf"/><text x="113" y="166" text-anchor="middle">14</text>
+    <rect x="134" y="144" width="34" height="34" rx="4" fill="#fff" stroke="#cfcfcf"/><text x="151" y="166" text-anchor="middle">15</text>
+    </g>
+  </g>
+  <!-- snake arrows -->
+  <g stroke="#16a34a" stroke-width="2" fill="none" marker-end="url(#ar)">
+    <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#16a34a"/></marker></defs>
+    <line x1="300" y1="47" x2="470" y2="47"/>
+    <line x1="487" y1="60" x2="487" y2="78"/>
+    <line x1="487" y1="85" x2="320" y2="85"/>
+    <line x1="303" y1="98" x2="303" y2="116"/>
+    <line x1="303" y1="123" x2="470" y2="123"/>
+    <line x1="487" y1="136" x2="487" y2="154"/>
+    <line x1="487" y1="161" x2="320" y2="161"/>
+  </g>
+  <g font-size="11" fill="#5b5b5b">
+    <text x="300" y="44">row 0 &rarr;</text>
+    <text x="300" y="138">row 2 &rarr;</text>
+    <text x="320" y="82">&larr; row 1</text>
+    <text x="320" y="176">&larr; row 3</text>
+  </g>
+</svg>
+<figcaption>Cells are numbered by grid position. The walk order is a separate setting &mdash; <b>slot</b> = step in the
+walk, <b>cell</b> = where on the grid that slot points.</figcaption>
+</figure>
+<p>The <b>Traversal</b> setting (sequence page) picks one of 8 walks. Slot <i>n</i> of the walk visits a particular
+cell; the engine plays cells <i>in slot order</i>:</p>
+<table>
+  <thead><tr><th>Traversal</th><th>Walk</th></tr></thead>
+  <tbody>
+    <tr><td><code>Snake</code> <span class="tag t-green">default</span></td><td>Top-down boustrophedon: row 0 L&rarr;R, row 1 R&rarr;L, row 2 L&rarr;R, row 3 R&rarr;L.</td></tr>
+    <tr><td><code>Rows</code></td><td>Bottom-up, every row left&rarr;right (Ren&eacute; mk2 Pattern 1).</td></tr>
+    <tr><td><code>SnakeUp</code></td><td>Snake from the bottom row up (Pattern 2).</td></tr>
+    <tr><td><code>Cols</code></td><td>Columns bottom-up, right column first (Pattern 3).</td></tr>
+    <tr><td><code>ColSnake</code></td><td>Columns, zig-zag down/up alternating (Pattern 4).</td></tr>
+    <tr><td><code>Spiral</code></td><td>Outward spiral from bottom-left (Pattern 5).</td></tr>
+    <tr><td><code>Inward</code></td><td>Inner-to-outer counter-clockwise (Pattern 6).</td></tr>
+    <tr><td><code>Diag</code></td><td>Anti-diagonal scan from bottom-left (Pattern 7).</td></tr>
+  </tbody>
+</table>
+<div class="note">The walk order is borrowed from the Make Noise Ren&eacute; mk2 Access Patterns. Cells keep their
+pitch/temporal content; only the order they're visited changes &mdash; the same grid plays a different melody under
+each pattern.</div>
+
+<!-- ============================================================ -->
+<h2 id="cycle">4 · The cycle &amp; timing</h2>
+<p>One full pass over the grid is a <b>cycle</b>. The cycle's length is the sum of every cell's duration, and each
+cell's duration is built from three things:</p>
+<figure>
+<svg viewBox="0 0 820 150" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,system-ui,sans-serif">
+  <defs><marker id="b" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#5b5b5b"/></marker></defs>
+  <g font-size="11">
+    <rect x="10" y="48" width="150" height="52" rx="8" fill="#e8effe" stroke="#2563eb" stroke-width="1.6"/>
+    <text x="85" y="68" text-anchor="middle" font-weight="700" fill="#2563eb">Stage divisor</text>
+    <text x="85" y="86" text-anchor="middle" font-size="10" fill="#5b5b5b">1/16 … 2&nbsp;bars slot</text>
+    <rect x="210" y="48" width="150" height="52" rx="8" fill="#fff" stroke="#ca8a04" stroke-width="1.6"/>
+    <text x="285" y="68" text-anchor="middle" font-weight="700" fill="#ca8a04">&times; Stage Len</text>
+    <text x="285" y="86" text-anchor="middle" font-size="10" fill="#5b5b5b">0…127, 64 = &times;1</text>
+    <rect x="410" y="48" width="150" height="52" rx="8" fill="#fff" stroke="#7c3aed" stroke-width="1.6"/>
+    <text x="485" y="68" text-anchor="middle" font-weight="700" fill="#7c3aed">&times; Clock mult</text>
+    <text x="485" y="86" text-anchor="middle" font-size="10" fill="#5b5b5b">50…150 %</text>
+    <rect x="640" y="44" width="170" height="60" rx="8" fill="#e3f5ea" stroke="#16a34a" stroke-width="2"/>
+    <text x="725" y="66" text-anchor="middle" font-weight="700" fill="#16a34a">Cell duration</text>
+    <text x="725" y="84" text-anchor="middle" font-size="10" fill="#5b5b5b">ticks in the cycle</text>
+  </g>
+  <g stroke="#5b5b5b" stroke-width="1.6" marker-end="url(#b)" fill="none">
+    <line x1="160" y1="74" x2="206" y2="74"/><line x1="360" y1="74" x2="406" y2="74"/><line x1="560" y1="74" x2="636" y2="74"/>
+  </g>
+  <text x="410" y="128" text-anchor="middle" font-size="11" fill="#5b5b5b">The whole table is rescaled by the
+  sequence <b>Divisor</b> (default 1/16) &mdash; change Divisor and every cell scales together.</text>
+</svg>
+<figcaption>Cell duration = stage-divisor slot &times; stage-length factor &times; clock multiplier, then the whole
+cycle is scaled by the sequence Divisor.</figcaption>
+</figure>
+<p>The <b>stage divisor</b> slot is a musical fraction relative to the 1/16 reference (at the default sequence
+Divisor of 12):</p>
+<table>
+  <thead><tr><th>Slot</th><th>Factor</th><th>Length at default Divisor</th></tr></thead>
+  <tbody>
+    <tr><td><code>Sixteenth</code></td><td>&times;1</td><td>1/16</td></tr>
+    <tr><td><code>EighthT</code></td><td>&times;4/3</td><td>1/8 triplet</td></tr>
+    <tr><td><code>Eighth</code></td><td>&times;2</td><td>1/8</td></tr>
+    <tr><td><code>QuarterT</code></td><td>&times;8/3</td><td>1/4 triplet</td></tr>
+    <tr><td><code>Quarter</code> <span class="tag t-green">cell default</span></td><td>&times;4</td><td>1/4</td></tr>
+    <tr><td><code>Half</code></td><td>&times;8</td><td>1/2</td></tr>
+    <tr><td><code>Bar</code></td><td>&times;16</td><td>1 bar</td></tr>
+    <tr><td><code>TwoBar</code></td><td>&times;32</td><td>2 bars</td></tr>
+  </tbody>
+</table>
+
+<h3>Adaptive vs Fixed cycle</h3>
+<p>A cell can be <b>skipped</b> (double-click its step). <b>Cycle Length</b> decides what a skipped cell does to the
+cycle:</p>
+<ul>
+  <li><b>Adaptive</b> <span class="tag t-green">default</span> &mdash; skipped cells <i>drop out</i>; the cycle
+    shrinks. Four active cells of 1/4 = a one-bar cycle no matter how many cells are skipped.</li>
+  <li><b>Fixed</b> &mdash; skipped cells <i>keep their slot</i> and emit silence; the cycle length is constant
+    regardless of which cells are active (Note-track-like).</li>
+</ul>
+<div class="note">A <b>fresh PhaseFlux sequence is a plain one-bar beat</b>: cells 0&ndash;3 are active Quarter stages
+with 4 pulses each (= 16 sixteenths across the bar), cells 4&ndash;15 are skipped. In Adaptive mode that is exactly
+one bar at the default 1/16 Divisor.</div>
+
+<h3>Reset, restart &amp; idle</h3>
+<p><b>Reset Measure</b> (0&ndash;128, 0 = off) re-anchors the cycle every <i>N</i> bars &mdash; a light reset that
+clears the held gate and pulse memory but <i>preserves</i> accumulator counters. If every cell is skipped the cycle
+length is zero and the track goes <b>idle</b>: the gate holds low, counters freeze, the last CV is held.</p>
+
+<!-- ============================================================ -->
+<h2 id="pulses">5 · Pulses &amp; the temporal curve</h2>
+<p>Inside a cell's slot, <b>Pulse Count</b> (0&ndash;16) sets how many gate pulses fire. <b>0 = a silent cell</b>
+(the slot's duration is still consumed). Where those pulses sit in time is the job of the <b>temporal curve</b>.</p>
+<p>For each pulse the engine takes its even position (pulse <i>i</i> of <i>N</i>), then bends it through a pipeline
+before it becomes a trigger time:</p>
+<figure>
+<svg viewBox="0 0 820 90" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,system-ui,sans-serif">
+  <defs><marker id="c" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#5b5b5b"/></marker></defs>
+  <g font-size="10" text-anchor="middle">
+    <rect x="6"   y="30" width="92" height="34" rx="6" fill="#fff" stroke="#cfcfcf"/><text x="52" y="51">even pos</text>
+    <rect x="118" y="30" width="92" height="34" rx="6" fill="#fff" stroke="#ca8a04"/><text x="164" y="46">Warp</text><text x="164" y="58" font-size="8" fill="#5b5b5b">power-bend</text>
+    <rect x="230" y="30" width="92" height="34" rx="6" fill="#fff" stroke="#2563eb"/><text x="276" y="46">Curve</text><text x="276" y="58" font-size="8" fill="#5b5b5b">Lin/Bell/Bnc</text>
+    <rect x="342" y="30" width="92" height="34" rx="6" fill="#fff" stroke="#cfcfcf"/><text x="388" y="51">FlipV</text>
+    <rect x="454" y="30" width="92" height="34" rx="6" fill="#fff" stroke="#ca8a04"/><text x="500" y="46">Response</text><text x="500" y="58" font-size="8" fill="#5b5b5b">power-bend</text>
+    <rect x="566" y="30" width="100" height="34" rx="6" fill="#fff" stroke="#7c3aed"/><text x="616" y="46">Phase shift</text><text x="616" y="58" font-size="8" fill="#5b5b5b">+ n/8 slot</text>
+    <rect x="686" y="26" width="128" height="42" rx="6" fill="#e3f5ea" stroke="#16a34a"/><text x="750" y="44" font-weight="700" fill="#16a34a">trigger time</text><text x="750" y="58" font-size="8" fill="#5b5b5b">+ gate length</text>
+  </g>
+  <g stroke="#5b5b5b" stroke-width="1.3" marker-end="url(#c)" fill="none">
+    <line x1="98" y1="47" x2="116" y2="47"/><line x1="210" y1="47" x2="228" y2="47"/><line x1="322" y1="47" x2="340" y2="47"/>
+    <line x1="434" y1="47" x2="452" y2="47"/><line x1="546" y1="47" x2="564" y2="47"/><line x1="666" y1="47" x2="684" y2="47"/>
+  </g>
+</svg>
+<figcaption>The temporal pipeline per pulse. Warp and Response are "power-bend" curves (push pulses toward the start or
+end); Curve is the base shape; FlipV mirrors it; Phase-shift slides the whole pattern in eighths of the slot.</figcaption>
+</figure>
+<ul>
+  <li><b>Temporal Curve</b> &mdash; <code>Linear</code> (even), <code>Bell</code> (dense in the middle),
+    <code>Bounce</code> (three cascading exponential drops &mdash; a flam/roll feel).</li>
+  <li><b>Warp</b> / <b>Response</b> (&plusmn;63 each) &mdash; bend the timing before and after the curve. Positive
+    crowds pulses one way, negative the other.</li>
+  <li><b>FlipV</b> &mdash; mirror the curve vertically. <b>FlipH</b> &mdash; mirror the finished schedule in time
+    (the whole burst plays back-to-front, pitches mirror with it).</li>
+  <li><b>Gate Length</b> (0&ndash;100%) &mdash; each pulse's gate as a percentage of the gap to the next pulse.
+    <code>0</code> = that pulse is dropped (silence); very short computed gates are dropped or floored to stay
+    audible.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="pitch">6 · Pitch &amp; the 0&rarr;1 phase</h2>
+<p>Every pulse also gets a CV. PhaseFlux derives it from a <b>pitch curve</b> evaluated at a phase
+<b>&phi; &isin; [0, 1]</b> &mdash; in <b>Cell</b> mode &phi; is the pulse's position in the cell, so the curve
+"plays through" once per cell visit. The curve's height maps to scale degrees over a chosen octave span:</p>
+<figure>
+<svg viewBox="0 0 820 200" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,system-ui,sans-serif">
+  <g font-size="11">
+    <text x="120" y="20" text-anchor="middle" font-weight="700" fill="#2563eb">Ramp</text>
+    <text x="320" y="20" text-anchor="middle" font-weight="700" fill="#2563eb">Bell</text>
+    <text x="520" y="20" text-anchor="middle" font-weight="700" fill="#2563eb">Triangle</text>
+    <text x="720" y="20" text-anchor="middle" font-weight="700" fill="#2563eb">Bounce</text>
+  </g>
+  <g stroke="#e5e5e5"><line x1="40" y1="160" x2="800" y2="160"/></g>
+  <path d="M40,160 L200,40" fill="none" stroke="#16a34a" stroke-width="2.5"/>
+  <path d="M240,160 Q320,20 400,160" fill="none" stroke="#16a34a" stroke-width="2.5"/>
+  <path d="M440,160 L520,40 L600,160" fill="none" stroke="#16a34a" stroke-width="2.5"/>
+  <path d="M640,40 L660,150 L685,70 L705,150 L725,100 L745,150 L765,130 L800,150" fill="none" stroke="#16a34a" stroke-width="2.5"/>
+  <g font-size="9" fill="#5b5b5b">
+    <text x="40" y="178">&phi;=0</text><text x="180" y="178">&phi;=1</text>
+  </g>
+</svg>
+<figcaption>The four pitch base shapes. The curve's vertical value &times; the octave Span &times; the Direction
+becomes a scale-degree offset on top of the cell's base pitch.</figcaption>
+</figure>
+<p>The pitch pipeline mirrors the temporal one, then maps to a note:</p>
+<ul>
+  <li><b>Base Pitch</b> (&plusmn;63 scale degrees) &mdash; the cell's anchor degree.</li>
+  <li><b>Pitch Curve</b> &mdash; <code>Ramp</code> / <code>Bell</code> / <code>Triangle</code> / <code>Bounce</code>.</li>
+  <li><b>Span</b> (Pitch Range) &mdash; how many octaves the curve covers: <code>0.5</code> / <code>1</code> /
+    <code>2</code> / <code>3</code>.</li>
+  <li><b>Direction</b> &mdash; <code>Up</code> (0&rarr;+span), <code>Down</code> (0&rarr;&minus;span),
+    <code>Bipolar</code> (centred, &minus;&frac12;span&hellip;+&frac12;span).</li>
+  <li><b>Warp</b> / <b>Response</b> (&plusmn;63), <b>FlipV</b>, <b>FlipH</b> &mdash; same bends as the temporal axis.</li>
+</ul>
+<p>The degree is then <code>base + accumulator + octave&times;notesPerOctave + transpose</code>, quantised through the
+sequence's scale and root note. So pitch is always in-key.</p>
+
+<h3>Cell mode vs Global mode</h3>
+<p><b>Pitch Mode</b> (sequence page) chooses how &phi; is driven:</p>
+<ul>
+  <li><b>Cell</b> <span class="tag t-green">default</span> &mdash; each cell uses its own pitch curve, &phi; running
+    0&rarr;1 across the cell. Per-cell melodies.</li>
+  <li><b>Global</b> &mdash; one master pitch curve (cell&nbsp;0's) is read by a <i>free-running</i> phase that never
+    resets at cell boundaries. <b>Pitch Rate</b> sets how fast that phase advances as a P:T ratio against the cycle.
+    A non-1:1 rate drifts a little each cycle, so the same grid evolves a long, slowly-rotating melody.</li>
+</ul>
+<table>
+  <thead><tr><th>Pitch Rate</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>1:1</code> <span class="tag t-green">default</span></td><td>Locked &mdash; phase completes exactly once per cell-unit, no drift.</td></tr>
+    <tr><td>e.g. <code>5:7</code>, <code>9:5</code></td><td>17 ratios from <code>1:7</code> up to <code>9:5</code>; each drifts over several cycles before realigning.</td></tr>
+  </tbody>
+</table>
+
+<h3>CV update timing</h3>
+<p>The track's <b>CV Update</b> setting decides when the CV pin moves:</p>
+<ul>
+  <li><b>Gate</b> <span class="tag t-green">default</span> &mdash; CV only changes when a pulse fires (stepped, classic
+    sequencer behaviour).</li>
+  <li><b>Always</b> &mdash; the pitch curve is evaluated every tick from the live cell phase, producing a smooth
+    moving CV envelope between pulses &mdash; the curve becomes an audible contour, not just per-note pitch.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="mask">7 · Mask, phase-shift &amp; windows</h2>
+<h3>Pulse mask</h3>
+<p><b>Mask</b> silences pulses by a fixed pattern &mdash; a built-in Euclid-ish thinner. A set bit mutes that pulse;
+<b>Mask Shift</b> (0&ndash;7) rotates the pattern:</p>
+<table>
+  <thead><tr><th>Mask</th><th>Keeps</th></tr></thead>
+  <tbody>
+    <tr><td><code>Off</code></td><td>every pulse</td></tr>
+    <tr><td><code>1in2</code></td><td>every other pulse</td></tr>
+    <tr><td><code>1in3</code> / <code>1in4</code> / <code>1in8</code></td><td>one pulse out of 3 / 4 / 8</td></tr>
+    <tr><td><code>2in3</code> / <code>2in4</code> / <code>3in4</code></td><td>2 of 3, 2 of 4, 3 of 4</td></tr>
+  </tbody>
+</table>
+
+<h3>Phase shift</h3>
+<p><b>Phase Shift</b> (0&ndash;7) slides the whole burst by eighths of the slot &mdash; nudge a cell's pulses off the
+beat for swing or push/pull without touching its timing curve.</p>
+
+<h3>Window &amp; Repeat <span class="tag t-purp">per axis</span></h3>
+<p>Each axis (temporal and pitch) has its own <b>Window</b> and <b>Repeat</b>:</p>
+<ul>
+  <li><b>Repeat</b> &mdash; <code>x1 / x2 / x3 / x5</code>. Splits the cell into <i>R</i> sub-sections and plays the
+    (windowed) shape once per sub-section &mdash; a built-in ratchet/arp multiplier.</li>
+  <li><b>Window</b> &mdash; <code>Off</code>, <code>Focus70 / Focus50</code> (keep the centre 70%/50% of the curve),
+    <code>Polarize70 / Polarize50</code> (keep the outer band, hide the middle). On the <b>temporal</b> axis a hidden
+    band <i>drops</i> pulses; on the <b>pitch</b> axis it <i>holds</i> at the nearest visible boundary (no notes are
+    lost, the contour just plateaus).</li>
+</ul>
+
+<h3>Melody mask &amp; tilt</h3>
+<p><b>Mask Melody</b> (0&ndash;100, 100 = bypass) and <b>Tilt Melody</b> (0&ndash;100) gate each pulse's note by its
+<b>tonal centrality</b> &mdash; how close the degree is to the root/fifth/thirds. Mask keeps the central (tonal)
+notes; Tilt keeps the outer (anti-tonal) ones; a note passes if <i>either</i> filter accepts it. This is the same
+centrality model the Stochastic track uses for its pitch mask.</p>
+
+<!-- ============================================================ -->
+<h2 id="accum">8 · Accumulators</h2>
+<p>PhaseFlux has <b>two independent accumulators</b> per sequence &mdash; a Cirklon-style drift that nudges values a
+little further each time a cell (or pulse) fires:</p>
+<div class="grid2">
+  <div class="def"><div class="k">Note accumulator (ACCUM.N)</div> Adds scale degrees over time &mdash; the melody
+    transposes/walks as the pattern repeats.</div>
+  <div class="def"><div class="k">Pulse accumulator (ACCUM.P)</div> Adds to each cell's pulse count over time &mdash;
+    rolls thicken or thin as the pattern repeats.</div>
+</div>
+<p>Each accumulator shares the same controls:</p>
+<table>
+  <thead><tr><th>Control</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><b>Step</b> (per cell)</td><td>How much this cell adds when it triggers. Note step UI-clamped to &plusmn;7; pulse step &plusmn;7.</td></tr>
+    <tr><td><b>Trigger</b> (per cell)</td><td><code>Stage</code> = advance once when the cell completes; <code>Pulse</code> = advance on every accepted pulse.</td></tr>
+    <tr><td><b>Order</b></td><td><code>Wrap</code> (roll over at the limit) / <code>Pendulum</code> (bounce) / <code>Hold</code> (clamp) / <code>RTZ</code> (return to zero).</td></tr>
+    <tr><td><b>Polarity</b></td><td><code>Uni</code> (bounds depend on step sign) / <code>Bi</code> (bounds span both limits).</td></tr>
+    <tr><td><b>Reset</b></td><td>Zero the counter every <i>N</i> cycles (0 = never).</td></tr>
+    <tr><td><b>Mode</b></td><td><code>Stage</code> = each cell drifts on its own counter; <code>Sequence</code> = one shared counter (the whole pattern transposes together).</td></tr>
+  </tbody>
+</table>
+<img class="shot" src="../ui-preview/phaseflux-manual/phflx-accum-n.png" alt="ACCUM.N page: 1x16 cell row, per-cell step pancakes, S/P trigger glyphs, order/polarity glyphs">
+<p class="cap">The <b>ACCUM.N</b> page. The grid becomes a single 1&times;16 row; a small bar above each cell is its step
+(pancake), the <code>S</code>/<code>P</code> glyph below is its trigger (Stage / Pulse). Left margin glyphs show Order,
+Polarity and the Reset count. Footer: <code>Ac.St&middot;M:Sta&middot;&mdash;&middot;Order&middot;Next</code>.</p>
+<p>Default span is generous: note limits &plusmn;28 degrees, pulse limits &plusmn;16. Counters survive a reset-measure
+and a restart; they only zero on a real pattern switch or a Reset-every-N hit.</p>
+
+<!-- ============================================================ -->
+<h2 id="macro">9 · Macros &amp; global phase</h2>
+<p>The <b>MACRO</b> topic holds five sequence-wide nudges that offset <i>every</i> cell at once &mdash; a quick way to
+push the whole pattern without editing 16 cells:</p>
+<table>
+  <thead><tr><th>Macro</th><th>Range</th><th>Effect on every cell</th></tr></thead>
+  <tbody>
+    <tr><td><b>Warp Nudge</b></td><td>&plusmn;64</td><td>Added to both axes' Warp.</td></tr>
+    <tr><td><b>Resp Nudge</b></td><td>&plusmn;64</td><td>Added to both axes' Response.</td></tr>
+    <tr><td><b>Pulse Nudge</b></td><td>&plusmn;15</td><td>Added to every cell's pulse count.</td></tr>
+    <tr><td><b>Len Nudge</b></td><td>&plusmn;64</td><td>Added to every cell's stage length (stretches/squashes the cycle).</td></tr>
+    <tr><td><b>Cycle Warp</b> (GWarp)</td><td>&plusmn;64</td><td>Power-bends <i>where</i> in the cycle each cell sits &mdash; same total length, uneven spacing.</td></tr>
+  </tbody>
+</table>
+<p>Two more sit alongside them:</p>
+<ul>
+  <li><b>Global Phase</b> (0.00&ndash;1.00) &mdash; rotates the read position of the whole cycle by a fraction, so the
+    pattern starts mid-way through. Borrowed from the Curve track.</li>
+  <li><b>Snap to grid</b> &mdash; a press-to-fire utility: rounds Global Phase to the nearest 1/16 and every active
+    cell's length to the nearest whole project beat (never to zero). <b>Zero</b> resets the five magnitude macros.</li>
+</ul>
+<img class="shot" src="../ui-preview/phaseflux-manual/phflx-macro-p0.png" alt="MACRO page: full-width scope of every cell's temporal curve, footer WarpN/RespN/PulsN/LenN/Next">
+<p class="cap">The <b>MACRO</b> page drops the grid for a full-width scope &mdash; every active cell's temporal curve laid
+end to end, live feedback as you turn the nudges. Footer: <code>WarpN&middot;RespN&middot;PulsN&middot;LenN&middot;Next</code>
+(page 1 swaps to <code>Phase&middot;GWarp&middot;Snap&middot;Zero</code>).</p>
+
+<!-- ============================================================ -->
+<h2 id="pages">10 · The edit page <span class="tag t-blue">PHFLX</span></h2>
+<p>The main editor opens on header <code>PHFLX</code>. It is organised into five <b>topics</b> cycled with
+<span class="kbd">&larr;</span>/<span class="kbd">&rarr;</span>, each with two or three <b>pages</b> cycled with
+<b>F5&nbsp;Next</b>:</p>
+<img class="shot" src="../ui-preview/phaseflux-manual/phflx-temp-p0.png" alt="PHFLX TEMP page 0: 4x4 grid, temporal scope, param list, paged footer">
+<p class="cap">The <b>TEMP</b> topic, page 0. Left: the 4&times;4 grid (filled = playhead, outlined = cursor with pulse bar,
+crossed = skipped). Centre: the temporal density scope with one ring per pulse. Right: the four editable values.
+Footer: <code>Curve&middot;Warp&middot;Resp&middot;Puls&middot;Next</code> (Warp selected).</p>
+
+<h3>Topics &amp; pages</h3>
+<table>
+  <thead><tr><th>Topic</th><th>Pages (F5 cycles)</th><th>F1 · F2 · F3 · F4</th></tr></thead>
+  <tbody>
+    <tr><td><b>TEMP</b></td><td>P0 / P1 / P2</td><td>P0 <code>Curve·Warp·Resp·Puls</code> · P1 <code>Len·FlipV·FlipH·Mask</code> · P2 <code>Wind·Rep·—·—</code></td></tr>
+    <tr><td><b>PTCH</b> (Cell)</td><td>P0 / P1 / P2</td><td>P0 <code>Curve·Warp·Resp·Note</code> · P1 <code>Span·Dir·FlipV·FlipH</code> · P2 <code>Wind·Rep·Mask·Tilt</code></td></tr>
+    <tr><td><b>PTCH.G</b> (Global)</td><td>P0 / P1</td><td>P0 <code>Curve·Warp·Resp·Rate</code> · P1 <code>Note·Span·FlipV·FlipH</code></td></tr>
+    <tr><td><b>ACCUM.N</b></td><td>P0 / P1</td><td>P0 <code>Ac.St·—·—·Order</code> · P1 <code>Reset·Polar·Trig·—</code></td></tr>
+    <tr><td><b>ACCUM.P</b></td><td>P0 / P1</td><td>same layout for the pulse accumulator</td></tr>
+    <tr><td><b>MACRO</b></td><td>P0 / P1</td><td>P0 <code>WarpN·RespN·PulsN·LenN</code> · P1 <code>Phase·GWarp·Snap·Zero</code></td></tr>
+  </tbody>
+</table>
+<p>When <b>Pitch Mode = Global</b>, the PTCH topic shows as <code>PTCH.G</code> and switches to the two-page Global
+layout (a single master curve + Rate). The header reflects this live.</p>
+
+<h3>Controls</h3>
+<table>
+  <thead><tr><th>Control</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><b>S1&ndash;S16 (step keys)</b></td><td>Move the grid cursor to that cell (drives the scope + param focus).</td></tr>
+    <tr><td><b>Double-click a step</b></td><td>Toggle <b>skip</b> on that cell.</td></tr>
+    <tr><td><span class="kbd">Shift</span>+step / hold steps</td><td>Multi-cell select &mdash; the encoder then edits <i>all</i> selected cells at once.</td></tr>
+    <tr><td><span class="kbd">&larr;</span> / <span class="kbd">&rarr;</span></td><td>Previous / next topic (resets to page 0, F1).</td></tr>
+    <tr><td><b>F1&ndash;F4</b></td><td>Select that field for the encoder &mdash; <i>except</i> the binary FlipV/FlipH/Snap/Zero slots, which fire on press.</td></tr>
+    <tr><td><b>F5 Next</b></td><td>Cycle the topic's pages.</td></tr>
+    <tr><td><b>Encoder</b></td><td>Edit the selected field on the cursor cell (or all selected cells). <span class="kbd">Shift</span> = coarse where supported.</td></tr>
+    <tr><td><span class="kbd">Page</span>+S16 / S15</td><td><b>Shake</b> &mdash; randomize the current page / whole topic (keeps stage length, base pitch, skip).</td></tr>
+    <tr><td><span class="kbd">Page</span>+<span class="kbd">Shift</span></td><td>Context menu: <b>INIT</b> (Stage / Topic / Sequence / Track) · <b>COPY</b> · <b>PASTE</b> · <b>DUP</b>.</td></tr>
+  </tbody>
+</table>
+<div class="warn">On the ACCUM pages F2 reads out the current accumulator <b>Mode</b> as <code>M:Sta</code> /
+<code>M:Seq</code> instead of an editable field &mdash; change the mode from the sequence list page (§11).</div>
+
+<h3>Every page</h3>
+<div class="gallery">
+  <div><img class="shot" src="../ui-preview/phaseflux-manual/phflx-temp-p1.png" alt="TEMP P1"><p class="cap">TEMP P1 &mdash; <code>Len&middot;FlipV&middot;FlipH&middot;Mask</code></p></div>
+  <div><img class="shot" src="../ui-preview/phaseflux-manual/phflx-temp-p2.png" alt="TEMP P2"><p class="cap">TEMP P2 &mdash; <code>Wind&middot;Rep</code></p></div>
+  <div><img class="shot" src="../ui-preview/phaseflux-manual/phflx-ptch-p0.png" alt="PTCH P0"><p class="cap">PTCH P0 &mdash; <code>Curve&middot;Warp&middot;Resp&middot;Note</code></p></div>
+  <div><img class="shot" src="../ui-preview/phaseflux-manual/phflx-ptch-p1.png" alt="PTCH P1"><p class="cap">PTCH P1 &mdash; <code>Span&middot;Dir&middot;FlipV&middot;FlipH</code></p></div>
+  <div><img class="shot" src="../ui-preview/phaseflux-manual/phflx-ptch-p2.png" alt="PTCH P2"><p class="cap">PTCH P2 &mdash; <code>Wind&middot;Rep&middot;Mask&middot;Tilt</code></p></div>
+  <div><img class="shot" src="../ui-preview/phaseflux-manual/phflx-ptchg-p0.png" alt="PTCH.G P0"><p class="cap">PTCH.G P0 &mdash; master curve + <code>Rate</code></p></div>
+</div>
+
+<h3>Grid &amp; LED feedback</h3>
+<p>On the OLED grid, a filled cell is the playhead, an outlined cell with a crossed box is skipped, and a thin bar
+along the bottom of each cell shows its pulse count. A dot top-left flags a non-zero phase shift; a dot top-right
+flags an active mask. On the hardware pads: <b>red</b> = playhead or cursor, <b>green</b> = the cell will fire (not
+skipped and stage length &gt; 0), <b>yellow</b> = both.</p>
+
+<!-- ============================================================ -->
+<h2 id="seqpage">11 · Sequence &amp; track pages</h2>
+<p>The per-cell editor doesn't hold the sequence-wide settings. Those live on two list pages.</p>
+<h3>Sequence page</h3>
+<p>Header <code>SEQUENCE</code> &mdash; a scrolling list. Context menu adds <b>INIT</b> and a <b>MOD+/MOD&minus;</b>
+quick-route on the selected row:</p>
+<table>
+  <thead><tr><th>Row</th><th>Range / values</th></tr></thead>
+  <tbody>
+    <tr><td>Divisor</td><td>clock divisor (default 1/16), routable</td></tr>
+    <tr><td>Clock Mult</td><td>50&ndash;150 % (default 1.00&times;), routable</td></tr>
+    <tr><td>Global Phase</td><td>0.00&ndash;1.00</td></tr>
+    <tr><td>Pitch Mode</td><td><code>Cell</code> / <code>Global</code></td></tr>
+    <tr><td>Pitch Rate</td><td>17 P:T ratios (1:1 default)</td></tr>
+    <tr><td>Traversal</td><td>Snake / Rows / SnakeUp / Cols / ColSnake / Spiral / Inward / Diag</td></tr>
+    <tr><td>Cycle Length</td><td><code>Adaptive</code> / <code>Fixed</code></td></tr>
+    <tr><td>Note / Pulse Accum Mode</td><td><code>Stage</code> / <code>Sequence</code></td></tr>
+    <tr><td>Warp / Resp / Pulse / Len Nudge</td><td>the four magnitude macros</td></tr>
+    <tr><td>Cycle Warp</td><td>&plusmn;64 (GWarp)</td></tr>
+    <tr><td>Scale / Root</td><td>inherit (Default) or override, routable</td></tr>
+    <tr><td>Reset Measure</td><td>0&ndash;128 bars (0 = off)</td></tr>
+  </tbody>
+</table>
+<h3>Track page</h3>
+<p>Track-global settings (one set per track, shared by all its patterns):</p>
+<table>
+  <thead><tr><th>Row</th><th>Range / values</th></tr></thead>
+  <tbody>
+    <tr><td>Play Mode</td><td><code>Aligned</code> / <code>Free</code></td></tr>
+    <tr><td>Fill Mode</td><td><code>None</code> / <code>Gates</code> / <code>Next Pattern</code> / <code>Condition</code></td></tr>
+    <tr><td>CV Update</td><td><code>Gate</code> / <code>Always</code></td></tr>
+    <tr><td>Slide Time</td><td>0&ndash;100, routable &mdash; global glide</td></tr>
+    <tr><td>Octave</td><td>&plusmn;10, routable</td></tr>
+    <tr><td>Transpose</td><td>&plusmn;60 scale degrees, routable</td></tr>
+  </tbody>
+</table>
+<div class="note"><b>Slide Time is a global glide.</b> PhaseFlux has no per-cell slide flag, so any Slide Time &gt; 0
+portamentos every CV change &mdash; the output eases toward each new pitch instead of jumping. Both Gate and Always
+modes step the CV (it's scale-quantised), so slide smooths either. Set Slide Time to 0 for instant pitch.</div>
+
+<!-- ============================================================ -->
+<h2 id="params">12 · Parameter reference</h2>
+<h3>Per-cell (stage) parameters</h3>
+<table>
+  <thead><tr><th>Parameter</th><th>Range</th><th>Default</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>Pulse Count</td><td>0&ndash;16</td><td>4 (cells 0&ndash;3)</td><td>Gate pulses fired in the cell; 0 = silent.</td></tr>
+    <tr><td>Stage Divisor</td><td>8 slots</td><td>Quarter</td><td>The cell's time slot (§4).</td></tr>
+    <tr><td>Stage Len</td><td>0&ndash;127</td><td>64 (&times;1)</td><td>Length multiplier; 0 = silent, 127 &asymp; 2&times;.</td></tr>
+    <tr><td>Skip</td><td>on/off</td><td>off (on for cells 4&ndash;15)</td><td>Drop the cell (Adaptive) or silence its slot (Fixed).</td></tr>
+    <tr><td>Base Pitch</td><td>&plusmn;63 deg</td><td>0</td><td>Cell anchor degree.</td></tr>
+    <tr><td>Pitch Curve</td><td>Ramp/Bell/Triangle/Bounce</td><td>Ramp</td><td>CV base shape.</td></tr>
+    <tr><td>Span (Pitch Range)</td><td>0.5 / 1 / 2 / 3 oct</td><td>1</td><td>Octave height of the curve.</td></tr>
+    <tr><td>Direction</td><td>Up / Down / Bipolar</td><td>Up</td><td>Curve polarity.</td></tr>
+    <tr><td>Pitch Warp / Response</td><td>&plusmn;63</td><td>0</td><td>Power-bend before / after the curve.</td></tr>
+    <tr><td>Pitch FlipV / FlipH</td><td>on/off</td><td>off</td><td>Mirror the curve / mirror in time.</td></tr>
+    <tr><td>Temporal Curve</td><td>Linear / Bell / Bounce</td><td>Linear</td><td>Pulse-timing base shape.</td></tr>
+    <tr><td>Temporal Warp / Response</td><td>&plusmn;63</td><td>0</td><td>Power-bend the timing.</td></tr>
+    <tr><td>Temporal FlipV / FlipH</td><td>on/off</td><td>off</td><td>Mirror timing / play the burst backwards.</td></tr>
+    <tr><td>Gate Length</td><td>0&ndash;100 %</td><td>50</td><td>Each pulse's gate width; 0 = drop.</td></tr>
+    <tr><td>Phase Shift</td><td>0&ndash;7</td><td>0</td><td>Slide the burst by eighths of the slot.</td></tr>
+    <tr><td>Mask / Mask Shift</td><td>8 types / 0&ndash;7</td><td>Off / 0</td><td>Fixed pulse thinning + rotation.</td></tr>
+    <tr><td>Temporal / Pitch Window</td><td>Off / F70 / F50 / P70 / P50</td><td>Off</td><td>Keep centre or outer band of the curve.</td></tr>
+    <tr><td>Temporal / Pitch Repeat</td><td>x1 / x2 / x3 / x5</td><td>x1</td><td>Sub-section ratchet multiplier.</td></tr>
+    <tr><td>Mask Melody / Tilt Melody</td><td>0&ndash;100 / 0&ndash;100</td><td>100 / 0</td><td>Tonal-centrality note filter.</td></tr>
+    <tr><td>Accum Step (note)</td><td>&plusmn;7 (UI)</td><td>0</td><td>Per-cell note-drift amount.</td></tr>
+    <tr><td>Pulse Accum Step</td><td>&plusmn;7</td><td>0</td><td>Per-cell pulse-drift amount.</td></tr>
+    <tr><td>Accum / Pulse Trigger</td><td>Stage / Pulse</td><td>Stage</td><td>Advance per cell or per pulse.</td></tr>
+  </tbody>
+</table>
+<h3>Per-sequence parameters</h3>
+<table>
+  <thead><tr><th>Parameter</th><th>Range</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td>Scale / Root</td><td>inherit or override</td><td>Default (inherit)</td></tr>
+    <tr><td>Divisor</td><td>clamped divisor table</td><td>1/16 (12)</td></tr>
+    <tr><td>Clock Multiplier</td><td>50&ndash;150 %</td><td>100</td></tr>
+    <tr><td>Reset Measure</td><td>0&ndash;128</td><td>0 (off)</td></tr>
+    <tr><td>Global Phase</td><td>0.00&ndash;1.00</td><td>0.00</td></tr>
+    <tr><td>Pitch Mode</td><td>Cell / Global</td><td>Cell</td></tr>
+    <tr><td>Pitch Rate</td><td>17 ratios</td><td>1:1</td></tr>
+    <tr><td>Cycle Length</td><td>Adaptive / Fixed</td><td>Adaptive</td></tr>
+    <tr><td>Traversal</td><td>8 patterns</td><td>Snake</td></tr>
+    <tr><td>Warp / Resp / Len / Cycle Warp Nudge</td><td>&plusmn;64</td><td>0</td></tr>
+    <tr><td>Pulse Nudge</td><td>&plusmn;15</td><td>0</td></tr>
+    <tr><td>Note Accum limits</td><td>&plusmn;28</td><td>&plusmn;28</td></tr>
+    <tr><td>Pulse Accum limits</td><td>&plusmn;16</td><td>&plusmn;16</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="expect">13 · What to expect</h2>
+<ul>
+  <li>A blank PhaseFlux track plays a steady 16-sixteenth bar &mdash; four cells, four pulses each, ramp pitch curves.
+    It sounds like a fast quantised arpeggio out of the box.</li>
+  <li>Drop a cell's pulse count to 1 and it's a single note; raise it to 16 with a Bounce temporal curve and it's a
+    flam/roll.</li>
+  <li>Pitch lands in-key automatically &mdash; the curve only chooses degrees within the scale, so even wild Warp /
+    Bounce shapes stay musical.</li>
+  <li>Accumulators make a static grid <i>evolve</i>: a small note step on one cell turns a loop into a slowly
+    climbing line.</li>
+  <li>Global pitch mode + a non-1:1 rate is the "generative" mode &mdash; the grid stays fixed but the melody drifts
+    for many bars before repeating.</li>
+  <li>Skipped cells in Adaptive mode change the bar length; if you want a fixed bar with rests, switch Cycle Length to
+    Fixed first.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="examples">14 · Worked setups</h2>
+<div class="setup"><h3>1 · Four-on-the-floor with a rolling fill</h3>
+  <p class="recipe">Leave the default 4 active Quarter cells. On cell 3 set <code>Pulse Count 8</code>,
+  <code>Temporal Curve Bounce</code>, <code>Gate Length 30</code> &mdash; three steady beats then a tumbling fill on
+  the fourth.</p></div>
+<div class="setup"><h3>2 · One-cell evolving arpeggio</h3>
+  <p class="recipe">Skip cells 1&ndash;15 (Adaptive). On cell 0: <code>Stage Divisor Bar</code>,
+  <code>Pulse Count 8</code>, <code>Pitch Curve Triangle</code>, <code>Span 2 oct</code>,
+  <code>Pitch Repeat x2</code>. ACCUM.N <code>Step +1</code>, <code>Order Wrap</code> &mdash; an 8-note arp that
+  climbs a degree each bar and wraps.</p></div>
+<div class="setup"><h3>3 · Generative drift line</h3>
+  <p class="recipe">Default grid. Sequence page: <code>Pitch Mode Global</code>, <code>Pitch Rate 5:7</code>. Set the
+  master curve (cell 0) to <code>Bell</code>, <code>Span 3</code>. Track: <code>CV Update Always</code> &mdash; a
+  smooth contour that re-phrases itself over seven cycles.</p></div>
+<div class="setup"><h3>4 · Euclidean-feel hat line</h3>
+  <p class="recipe">One active cell, <code>Stage Divisor Bar</code>, <code>Pulse Count 16</code>,
+  <code>Mask 2in3</code>, <code>Mask Shift 1</code>, <code>Gate Length 20</code> &mdash; a thinned 16-pulse pattern;
+  rotate Mask Shift live for variations.</p></div>
+<div class="setup"><h3>5 · Polyrhythmic columns</h3>
+  <p class="recipe">Traversal <code>Cols</code>. Give each column a different Stage Divisor (1/4, 1/8, 1/4T, 1/2) so
+  walking down each column gives a different rhythmic feel; Cycle Length <code>Fixed</code> keeps the bar steady.</p></div>
+<div class="setup"><h3>6 · Swung off-beat stabs</h3>
+  <p class="recipe">Two active cells, <code>Pulse Count 2</code>, <code>Phase Shift 1</code> on the second cell,
+  <code>Direction Bipolar</code>, <code>Span 1</code> &mdash; pushed off-beat two-note stabs around a centre pitch.</p></div>
+
+<div class="footer">
+  <b>Verified against the firmware.</b> 16-cell 4&times;4 grid; 8 traversal walks (Snake default); per-cell temporal
+  &amp; pitch curves (Linear/Bell/Bounce &middot; Ramp/Bell/Triangle/Bounce) with Warp/Response power-bends, FlipV/FlipH,
+  Windows (Focus/Polarize) and Repeats (x1/x2/x3/x5); Pulse Count 0&ndash;16; fixed pulse Mask + Phase Shift; tonal
+  Mask/Tilt Melody; dual Note/Pulse accumulators (Wrap/Pendulum/Hold/RTZ, Stage/Sequence scope); Cell &amp; Global pitch
+  modes with a 17-entry Pitch Rate table; Adaptive/Fixed cycle; five MACRO nudges + Global Phase + Snap/Zero. Edit page
+  topics TEMP / PTCH(.G) / ACCUM.N / ACCUM.P / MACRO; INIT/COPY/PASTE/DUP context menu; Page+step Shake.
+  <br><br>
+  <b>Notes:</b> Slide Time is a global glide (no per-cell slide flag) &mdash; any value &gt; 0 portamentos every CV
+  change, via the shared <code>Slide::applySlide</code> helper used by Note/Indexed. OLED screens are rendered by
+  <code>ui-preview/pages_phaseflux_manual.py</code> against the current paged <code>draw()</code> layout; the labelled
+  SVGs are concept diagrams.
+</div>
+
+</div>
+</body>
+</html>

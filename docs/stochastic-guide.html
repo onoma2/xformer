@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XFORMER Stochastic — full manual</title>
+<style>
+  :root{
+    --blue:#2563eb; --amber:#ca8a04; --green:#16a34a; --red:#dc2626; --purp:#7c3aed;
+    --ink:#1a1a1a; --mut:#5b5b5b; --line:#e5e5e5; --card:#ffffff; --bg:#fafafa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; line-height:1.5;}
+  .wrap{max-width:880px; margin:0 auto; padding:32px 24px 90px}
+  h1{font-size:1.75rem; line-height:1.2; margin:0 0 6px}
+  h2{font-size:1.32rem; line-height:1.25; margin:46px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--blue)}
+  h2.geo{border-color:var(--green)}
+  h2.adv{border-color:var(--purp)}
+  h3{font-size:1.06rem; margin:24px 0 6px}
+  .lede{color:var(--mut); font-size:1.05rem; margin:0 0 8px}
+  p{margin:10px 0}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#f0f0f3; padding:1px 5px; border-radius:4px; font-size:.9em}
+  .kbd{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#1a1a1a; color:#fff; padding:2px 7px; border-radius:5px; font-size:.82em; white-space:nowrap}
+  .tag{display:inline-block; font-size:.7rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:99px; vertical-align:middle}
+  .t-blue{background:#e8effe; color:var(--blue)} .t-amber{background:#fbf1d9; color:var(--amber)}
+  .t-green{background:#e3f5ea; color:var(--green)} .t-purp{background:#efe7fd; color:var(--purp)}
+  .note{border-left:4px solid var(--blue); background:#f3f7ff; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .warn{border-left:4px solid var(--amber); background:#fdf8ec; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .gotcha{border-left:4px solid var(--red); background:#fdeeee; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:.93rem}
+  th,td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top}
+  thead th{background:#e8effe; color:var(--blue)}
+  tbody tr:nth-child(even){background:#fafafa}
+  td code{white-space:nowrap}
+  figure{margin:18px 0; text-align:center}
+  figure svg{max-width:100%; height:auto}
+  figcaption{color:var(--mut); font-size:.85rem; margin-top:6px}
+  .oled{display:block; margin:14px auto 2px; border:1px solid #333; border-radius:4px; background:#000; max-width:560px; width:100%}
+  .shot{display:block; width:100%; max-width:560px; margin:14px auto 2px; image-rendering:pixelated; border:1px solid #333; border-radius:4px; background:#000}
+  .gallery{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0}
+  @media(max-width:620px){.gallery{grid-template-columns:1fr}}
+  .gallery .shot{margin:0}
+  .cap{text-align:center; color:var(--mut); font-size:.84rem; margin:0 0 6px}
+  .steps{counter-reset:step; list-style:none; padding:0; margin:14px 0}
+  .steps>li{counter-increment:step; position:relative; padding:12px 12px 12px 56px; margin:10px 0; background:var(--card); border:1px solid var(--line); border-radius:8px}
+  .steps>li::before{content:counter(step); position:absolute; left:12px; top:12px; width:30px; height:30px; border-radius:50%; background:var(--blue); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:.95rem}
+  .setup{background:var(--card); border:1px solid var(--line); border-left:4px solid var(--green); border-radius:0 8px 8px 0; padding:12px 16px; margin:14px 0}
+  .setup h3{margin-top:0} .setup .recipe{font-size:.9rem; color:var(--mut)}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  @media(max-width:620px){.grid2{grid-template-columns:1fr}}
+  .def{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 14px}
+  .def .k{font-weight:700; color:var(--blue)}
+  .toc{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:16px 0; columns:2; font-size:.93rem}
+  @media(max-width:620px){.toc{columns:1}}
+  .toc a{color:var(--blue); text-decoration:none} .toc a:hover{text-decoration:underline}
+  .footer{margin-top:48px; padding-top:14px; border-top:1px solid var(--line); color:var(--mut); font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>XFORMER Stochastic</h1>
+<p class="lede">A probability sequencer. Instead of placing notes, you set the <b>odds</b> &mdash; how dense, how long,
+how high, how repetitive &mdash; and the engine rolls a stream of events that obey them. Rhythm and melody are two
+independent machines, each running either as a <b>frozen loop</b> you can mutate, or a <b>live</b> roll that never
+repeats. Pitch and duration are biased by <b>tickets</b>: a lottery where you hand more tickets to the notes and
+lengths you want to hear more often.</p>
+
+<div class="toc">
+  <a href="#what">1 · What Stochastic is</a><br>
+  <a href="#vs-note">2 · How it differs from a Note track</a><br>
+  <a href="#loop-live">3 · Loop vs Live, per domain</a><br>
+  <a href="#event">4 · The event model</a><br>
+  <a href="#tickets">5 · The ticket / probability model</a><br>
+  <a href="#timing">6 · Timing &amp; the duration LUT</a><br>
+  <a href="#rhythm">7 · Rhythm shaping</a><br>
+  <a href="#burst">8 · Bursts &amp; clusters</a><br>
+  <a href="#melody">9 · Melody shaping</a><br>
+  <a href="#loopctl">10 · Loop controls</a><br>
+  <a href="#pages">11 · The edit pages</a><br>
+  <a href="#config">12 · The config page</a><br>
+  <a href="#params">13 · Parameter reference</a><br>
+  <a href="#expect">14 · What to expect</a><br>
+  <a href="#examples">15 · Worked setups</a>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="what">1 · What Stochastic is</h2>
+<p>Stochastic is one of the eight track engines. Set a track's mode to <b>Stochastic</b> and it becomes a generator:
+you don't draw a pattern, you tune the statistics that <i>produce</i> patterns. Two engines run side by side:</p>
+<div class="grid2">
+  <div class="def"><div class="k">Rhythm domain</div> Decides <i>when</i> events fire and how long they last &mdash;
+    density, duration, rests, swing-feel, bursts, gate length.</div>
+  <div class="def"><div class="k">Melody domain</div> Decides <i>which pitch</i> each event plays &mdash; the
+    distribution of scale degrees, octave spread, contour, slides.</div>
+</div>
+<p>Each domain has its own random seed and its own <b>mode</b> (Loop or Live). The output is a single CV + gate stream:
+the rhythm engine times the events, the melody engine colours them.</p>
+
+<!-- ============================================================ -->
+<h2 id="vs-note">2 · How it differs from a Note track</h2>
+<table>
+  <thead><tr><th>Note track</th><th>Stochastic</th></tr></thead>
+  <tbody>
+    <tr><td>You place each note and gate</td><td>You set probabilities; the engine rolls the notes</td></tr>
+    <tr><td>Fixed grid of equal steps</td><td>Event-driven &mdash; each event picks its own duration</td></tr>
+    <tr><td>Pattern is exactly what you drew</td><td>Pattern is a frozen roll (Loop) or never repeats (Live)</td></tr>
+    <tr><td>Per-step probability fields</td><td>Whole-sequence statistics + per-degree tickets</td></tr>
+    <tr><td>Edit = move notes</td><td>Edit = bias the dice, re-roll, mutate, freeze</td></tr>
+  </tbody>
+</table>
+<p>It still rides the Performer chassis: scale, root, clock divisor / multiplier, reset measure, octave, transpose,
+slide, fill-mode &mdash; and every statistic is routable.</p>
+
+<!-- ============================================================ -->
+<h2 id="loop-live">3 · Loop vs Live, per domain</h2>
+<p>Each domain answers one question: <b>do I roll once and remember, or roll fresh every event?</b></p>
+<figure>
+<svg viewBox="0 0 820 200" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,system-ui,sans-serif">
+  <g font-size="12">
+    <rect x="20" y="30" width="360" height="150" rx="10" fill="#e3f5ea" stroke="#16a34a" stroke-width="1.6"/>
+    <text x="200" y="52" text-anchor="middle" font-weight="700" fill="#16a34a">LOOP</text>
+    <text x="200" y="72" text-anchor="middle" font-size="11" fill="#5b5b5b">roll a buffer once, replay it every cycle</text>
+    <g font-size="10" fill="#5b5b5b">
+      <text x="40" y="98">• deterministic from seed × knobs × tickets</text>
+      <text x="40" y="118">• Patience can auto-reroll over time</text>
+      <text x="40" y="138">• Mutate / Jump / Sleep evolve it</text>
+      <text x="40" y="158">• window (First/Size), Rotate, Masks apply</text>
+    </g>
+    <rect x="440" y="30" width="360" height="150" rx="10" fill="#fdf8ec" stroke="#ca8a04" stroke-width="1.6"/>
+    <text x="620" y="52" text-anchor="middle" font-weight="700" fill="#ca8a04">LIVE</text>
+    <text x="620" y="72" text-anchor="middle" font-size="11" fill="#5b5b5b">roll a fresh event every step, never stored</text>
+    <g font-size="10" fill="#5b5b5b">
+      <text x="460" y="98">• never repeats — pure stream</text>
+      <text x="460" y="118">• the knobs ARE the sound, in real time</text>
+      <text x="460" y="138">• NewR/NewM here = capture "what just played"</text>
+      <text x="460" y="158">• masks / window / patience inert</text>
+    </g>
+  </g>
+</svg>
+<figcaption>Loop = a remembered roll you sculpt and evolve; Live = an endless fresh roll. Rhythm and melody choose
+independently, so you can run a fixed groove (Loop rhythm) under an ever-changing melody (Live melody) or vice-versa.</figcaption>
+</figure>
+<ul>
+  <li><b>LoopR / LiveR</b> toggles the rhythm domain; <b>LoopM / LiveM</b> toggles the melody domain. When both match
+    the page header reads <code>Loop</code> or <code>Live</code>; when they differ it reads <code>Split</code>.</li>
+  <li><b>NewR / NewM</b> re-roll a Loop domain's seed (a fresh pattern). In a <i>Live</i> domain the same key
+    <b>captures</b> the live shadow &mdash; it freezes "what just played" as the new loop content.</li>
+  <li><b>UndoR / UndoM</b> (<span class="kbd">Shift</span>) restores the pre-NewR/NewM content (single-level, per
+    domain).</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="event">4 · The event model</h2>
+<p>A generated event is one <b>parent</b> hit. Internally each step holds a 6-byte record split into the two domains:</p>
+<table>
+  <thead><tr><th>Domain</th><th>Fields</th></tr></thead>
+  <tbody>
+    <tr><td><b>Rhythm</b></td><td>duration index (which LUT slot), density rank, burst tails (cluster size), burst rate,
+      <code>rest</code>, <code>legato</code>, <code>slide</code> flags, valid bit.</td></tr>
+    <tr><td><b>Melody</b></td><td>scale <code>degree</code> (0&ndash;127), <code>octave</code> (&minus;8&hellip;+7),
+      valid bit.</td></tr>
+  </tbody>
+</table>
+<p>An event can spawn a <b>burst</b> &mdash; a cluster of extra child hits packed after the parent (§8). The Loop
+buffer is up to <code>CONFIG_STEP_COUNT</code> steps; the active <b>window</b> (First + Size) chooses which slice
+plays.</p>
+<div class="note">In Loop mode the events are a <i>deterministic function</i> of the seed, the knobs and the tickets:
+the same settings always regenerate the same pattern. That's why a snapshot only needs to store the seeds and knobs,
+not the notes &mdash; the engine can rebuild the events on demand.</div>
+
+<!-- ============================================================ -->
+<h2 id="tickets">5 · The ticket / probability model</h2>
+<p>Pitch and duration are chosen by a weighted lottery. Every candidate (a scale degree, or a duration slot) holds a
+<b>ticket count</b>; the generator draws in proportion to the tickets. Three states per candidate:</p>
+<figure>
+<svg viewBox="0 0 760 180" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,system-ui,sans-serif">
+  <g font-size="11" text-anchor="middle">
+    <text x="380" y="18" font-weight="700" fill="#5b5b5b">Scale-degree tickets → draw probability</text>
+  </g>
+  <g>
+    <!-- bars -->
+    <rect x="40"  y="120" width="40" height="30" fill="#16a34a"/><text x="60" y="165" font-size="10" text-anchor="middle">root</text>
+    <rect x="100" y="70"  width="40" height="80" fill="#16a34a"/><text x="120" y="165" font-size="10" text-anchor="middle">2nd</text>
+    <rect x="160" y="110" width="40" height="40" fill="#16a34a"/><text x="180" y="165" font-size="10" text-anchor="middle">3rd</text>
+    <rect x="220" y="150" width="40" height="0"  fill="#dc2626"/><line x1="222" y1="146" x2="258" y2="146" stroke="#dc2626" stroke-width="3"/><text x="240" y="165" font-size="10" text-anchor="middle" fill="#dc2626">4th ✗</text>
+    <rect x="280" y="50"  width="40" height="100" fill="#16a34a"/><text x="300" y="165" font-size="10" text-anchor="middle">5th</text>
+    <rect x="340" y="130" width="40" height="20" fill="#9ab"/><text x="360" y="165" font-size="10" text-anchor="middle">6th</text>
+    <rect x="400" y="130" width="40" height="20" fill="#9ab"/><text x="420" y="165" font-size="10" text-anchor="middle">7th</text>
+  </g>
+  <g font-size="10" fill="#5b5b5b">
+    <text x="560" y="70">tall bar = many tickets = picked often</text>
+    <text x="560" y="92" fill="#9ab">grey = 0 tickets (flat baseline)</text>
+    <text x="560" y="114" fill="#dc2626">✗ = −1 ticket (degree excluded)</text>
+  </g>
+</svg>
+<figcaption>Scale Tickets weight pitch. <code>&minus;1</code> removes a degree entirely; <code>0</code> is the flat
+baseline; <code>1&ndash;100</code> raises its odds. Duration Tickets do the same for the 8 duration slots.</figcaption>
+</figure>
+<ul>
+  <li><b>&minus;1</b> &mdash; exclude. The degree / slot is never drawn.</li>
+  <li><b>0</b> &mdash; default flat weight (in with everyone else).</li>
+  <li><b>1&ndash;100</b> &mdash; emphasis. Higher = more likely.</li>
+</ul>
+<p>Two rotations re-index the pitch lottery without re-editing tickets:</p>
+<ul>
+  <li><b>Degree Rotation (DROT)</b> &plusmn;32 &mdash; rotates which degree each ticket belongs to (shift the whole
+    weighting around the scale).</li>
+  <li><b>Mask Rotation (MROT)</b> &plusmn;32 &mdash; rotates the surviving (non-excluded) set among themselves.</li>
+</ul>
+<div class="note">Tickets bias the draw; they don't force it. With all tickets at 0 you get an even random spread over
+the in-scale degrees. Hand the root and fifth 80 tickets and exclude the 4th, and the line leans tonal without ever
+sounding mechanical.</div>
+
+<!-- ============================================================ -->
+<h2 id="timing">6 · Timing &amp; the duration LUT</h2>
+<p>Stochastic is <b>event-driven</b>, not grid-driven. Each event carries a duration; the engine counts that many
+ticks, then fires the next event. The base clock is the sequence <b>Divisor</b> scaled by the <b>Clock Multiplier</b>;
+an event's duration is a fraction of that base, picked from an 8-slot table:</p>
+<table>
+  <thead><tr><th>Slot</th><th>Factor</th><th>Length at Divisor = 1/16</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>&times;8</td><td>1/2</td></tr>
+    <tr><td>1</td><td>&times;4</td><td>1/4</td></tr>
+    <tr><td>2</td><td>&times;3</td><td>3/16 (dotted 1/8)</td></tr>
+    <tr><td>3</td><td>&times;2</td><td>1/8</td></tr>
+    <tr><td>4</td><td>&times;4/3</td><td>1/8 triplet</td></tr>
+    <tr><td>5 <span class="tag t-green">default</span></td><td>&times;1</td><td>1/16 (= the Divisor)</td></tr>
+    <tr><td>6</td><td>&times;2/3</td><td>1/16 triplet</td></tr>
+    <tr><td>7</td><td>&times;1/2</td><td>1/32</td></tr>
+  </tbody>
+</table>
+<p><b>Note Duration</b> picks the centre slot; <b>Variation</b> spreads the draw around it; the <b>Duration Tickets</b>
+page can weight individual slots directly. <b>Reset Measure</b> re-anchors the sequence every <i>N</i> bars; a window
+edit (First/Size) snaps the engine immediately.</p>
+<div class="warn">Because durations vary per event, a Stochastic track doesn't sit on a fixed grid &mdash; it breathes.
+Pair a short Note Duration with high Variation for a skittering, irregular feel; lock Variation to 0 for a steady
+pulse.</div>
+
+<!-- ============================================================ -->
+<h2 id="rhythm">7 · Rhythm shaping</h2>
+<p>These knobs (the LIVE page top row, plus a few) shape <i>when</i> and <i>how</i> events fire:</p>
+<table>
+  <thead><tr><th>Knob</th><th>Range</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><b>Note Duration</b> (DURA)</td><td>0&ndash;7</td><td>Centre duration slot (§6).</td></tr>
+    <tr><td><b>Variation</b> (VARI)</td><td>0&ndash;100</td><td>How widely the duration draw spreads around DURA.</td></tr>
+    <tr><td><b>Rest</b> (REST)</td><td>0&ndash;100</td><td>Probability an event is silent.</td></tr>
+    <tr><td><b>Feel</b> (FEEL)</td><td>0&ndash;100, detent 45&ndash;55</td><td>Bends the bar toward 3 (low) or 5 (high) beats per cycle &mdash; a swing/groove warp. Centre = off.</td></tr>
+    <tr><td><b>Gate Length</b> (GATE)</td><td>0&ndash;100</td><td>Spread of per-event gate width around a 50% centre (0 = exact 50%, 100 = wide spread). Floored to stay audible.</td></tr>
+    <tr><td><b>Legato</b> (LEGA)</td><td>0&ndash;100</td><td>Probability events tie into the next (no re-trigger).</td></tr>
+    <tr><td><b>Complexity</b> (CMPX)</td><td>0&ndash;100</td><td>Rhythmic intricacy of the generated pattern &mdash; low = plain, high = busy/syncopated.</td></tr>
+    <tr><td><b>Slide</b> (SLID)</td><td>0&ndash;100</td><td>Probability an event glides to the next pitch (portamento, uses the track Slide Time).</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="burst">8 · Bursts &amp; clusters</h2>
+<p>A <b>burst</b> turns a single event into a cluster of rapid child hits &mdash; a ratchet, a flam, a trap roll. Four
+knobs control it:</p>
+<table>
+  <thead><tr><th>Knob</th><th>Range</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><b>Burst</b> (BURS)</td><td>0&ndash;100</td><td>Probability an event spawns a cluster.</td></tr>
+    <tr><td><b>Burst Count</b> (BCNT)</td><td>0&ndash;100</td><td>How many cluster cells (maps to 2&ndash;8 hits).</td></tr>
+    <tr><td><b>Burst Rate</b> (BRAT)</td><td>0&ndash;100</td><td>The cluster's internal speed / timing curve.</td></tr>
+    <tr><td><b>Burst Hold</b></td><td>4 modes</td><td>Pitch &amp; fit behaviour (below).</td></tr>
+  </tbody>
+</table>
+<p><b>Burst Hold</b> packs two orthogonal choices into one setting:</p>
+<table>
+  <thead><tr><th>Mode</th><th>Pitch</th><th>Timing</th></tr></thead>
+  <tbody>
+    <tr><td><code>Hold/Fit</code></td><td>cluster shares the parent's pitch</td><td>packs into one parent duration</td></tr>
+    <tr><td><code>Hold/Over</code> <span class="tag t-green">default</span></td><td>shares pitch</td><td>uniform rate, can overflow the duration</td></tr>
+    <tr><td><code>Roll/Fit</code></td><td>each cell rolls its own pitch</td><td>packs into one duration</td></tr>
+    <tr><td><code>Roll/Over</code></td><td>each cell rolls own pitch</td><td>uniform rate, can overflow</td></tr>
+  </tbody>
+</table>
+<div class="gotcha">Bursts need room. At very short Note Durations the cluster can't fit an audible hit, so the Burst
+knob goes inert &mdash; the engine flags this by appending <code>*</code> to the Burst readout. Lengthen the duration
+to bring bursts back.</div>
+
+<!-- ============================================================ -->
+<h2 id="melody">9 · Melody shaping</h2>
+<p>The pitch distribution is shaped Marbles-style &mdash; a bell of likely degrees you bias and widen, on top of the
+ticket weighting:</p>
+<table>
+  <thead><tr><th>Knob</th><th>Range</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><b>Bias</b> (BIAS)</td><td>0&ndash;100</td><td>Centre of the pitch distribution &mdash; low = lower notes, high = higher.</td></tr>
+    <tr><td><b>Spread</b> (SPRE)</td><td>0&ndash;100</td><td>Width of the distribution &mdash; 0 = one note, 100 = whole range.</td></tr>
+    <tr><td><b>Range</b> (RANG)</td><td>0&ndash;100, centre 50</td><td>Octave field: 50 = single octave; &gt;50 widens up to 4 octaves; &lt;50 adds a per-event octave-jump chance.</td></tr>
+    <tr><td><b>Contour</b> (CONT)</td><td>&plusmn;100</td><td>Directional tendency &mdash; positive favours rising lines, negative falling.</td></tr>
+    <tr><td><b>Repeat</b> (REPT)</td><td>0&ndash;100</td><td>Chance to reuse the previous event verbatim (note + octave + duration + articulation). 100% freezes on the last event.</td></tr>
+  </tbody>
+</table>
+<p>The LIVE page draws this distribution as a soft "bell haze" behind the event constellation &mdash; Bias moves it up
+and down, Spread fattens it, so you can dial pitch character by eye.</p>
+
+<!-- ============================================================ -->
+<h2 id="loopctl">10 · Loop controls</h2>
+<p>The LOOP page holds the controls that only matter once a domain is frozen &mdash; how the loop <i>evolves</i>, and
+how its window is shaped:</p>
+<table>
+  <thead><tr><th>Knob</th><th>Range</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><b>Patience R / M</b></td><td>0&ndash;100, 100 = off</td><td>Auto-reroll. As the loop repeats, a Poisson "boredom" builds; at the expected point it regenerates the domain. Lower = sooner. 100 disables it. Split per rhythm / melody.</td></tr>
+    <tr><td><b>Mutate</b></td><td>0&ndash;100</td><td>Per-cycle chance to alter one event in place &mdash; gentle drift instead of a full reroll.</td></tr>
+    <tr><td><b>Jump</b></td><td>0&ndash;100</td><td>Octave-walk register &mdash; chance the whole line jumps an octave at the cycle boundary.</td></tr>
+    <tr><td><b>Sleep</b></td><td>0&ndash;100</td><td>Chance of skipping (silencing) cycles &mdash; the loop drops out and returns.</td></tr>
+    <tr><td><b>First</b> / <b>Size</b></td><td>0&hellip; / 2&hellip;</td><td>The play window into the buffer &mdash; loop start and length.</td></tr>
+    <tr><td><b>Rotate</b></td><td>&plusmn;64</td><td>Rotate the events within the window (no change to window bounds).</td></tr>
+    <tr><td><b>Mask R</b> / <b>Tilt R</b></td><td>0&ndash;100 / 0&ndash;100</td><td>Deterministic rhythm thinning (LoopR only): Mask cuts events by rank, Tilt biases which survive (centre 50 = pure cut).</td></tr>
+    <tr><td><b>Mask M</b> / <b>Tilt M</b></td><td>0&ndash;100 / 0&ndash;100</td><td>Pitch-centrality filter (LoopM only): keep tonal (Mask, 100 = bypass) or anti-tonal (Tilt) notes.</td></tr>
+  </tbody>
+</table>
+<div class="note">Mask/Tilt and Patience are <b>inert in Live mode</b> &mdash; there's no stored loop to thin or
+re-roll. They light up only once their domain is in Loop.</div>
+
+<!-- ============================================================ -->
+<h2 id="pages">11 · The edit pages</h2>
+<p>The editor has <b>four pages</b>, cycled with <b>F5 Next</b>:</p>
+<table>
+  <thead><tr><th>Page</th><th>Header</th><th>What it shows</th></tr></thead>
+  <tbody>
+    <tr><td><b>Live</b></td><td><code>LIVE</code></td><td>An event "constellation" + the pitch bell-haze; hold a step to edit its knob.</td></tr>
+    <tr><td><b>Loop</b></td><td><code>LOOP</code></td><td>Loop evolution + window controls; hold a step to edit its knob.</td></tr>
+    <tr><td><b>Pitch</b></td><td><code>SCALE TICKETS</code></td><td>One bar per scale degree; set tickets + rotations.</td></tr>
+    <tr><td><b>Duration</b></td><td><code>DURATION TICKETS</code></td><td>8 duration slots; set tickets + per-slot rest.</td></tr>
+  </tbody>
+</table>
+
+<h3>The LIVE page</h3>
+<img class="shot" src="../ui-preview/stochastic-manual/stoch-live.png" alt="LIVE page: event constellation over the Bias/Spread pitch haze, knob readouts, footer LiveR/LiveM/NewR/NewM/NEXT">
+<p class="cap">The LIVE page: each recent event is a ring (newer = brighter) floating over the Bias/Spread pitch haze;
+the two readout rows show the live knob values. The 16 step keys map to the shaping knobs &mdash; hold a step and turn
+the encoder. Footer: <code>LiveR&middot;LiveM&middot;NewR&middot;NewM&middot;NEXT</code>.</p>
+<p><b>LIVE step → knob map</b> (hold a step + encoder):</p>
+<table>
+  <thead><tr><th>Steps 1&ndash;8 (top)</th><th>Steps 9&ndash;16 (bottom)</th></tr></thead>
+  <tbody>
+    <tr><td>1 DURA · 2 VARI · 3 REST · 4 FEEL</td><td>9 CMPX · 10 CONT · 11 BIAS · 12 SPRE</td></tr>
+    <tr><td>5 GATE · 6 LEGA · 7 BURS · 8 BCNT</td><td>13 RANG · 14 SLID · 15 REPT · 16 BRAT</td></tr>
+  </tbody>
+</table>
+
+<h3>The LOOP page</h3>
+<img class="shot" src="../ui-preview/stochastic-manual/stoch-loop.png" alt="LOOP page: loop tape window with First/Size markers, mask/tilt side bars, footer LoopR/LoopM/NewR/NewM/NEXT">
+<p class="cap">The LOOP page: the loop "tape" with the First/Size window and per-cycle evolution controls; the side bars are
+the Mask/Tilt filters. Footer: <code>LoopR&middot;LoopM&middot;NewR&middot;NewM&middot;NEXT</code>.</p>
+<p><b>LOOP step → knob map:</b></p>
+<table>
+  <thead><tr><th>Steps 1&ndash;8 (top)</th><th>Steps 9&ndash;16 (bottom)</th></tr></thead>
+  <tbody>
+    <tr><td>1 Patience R · 2 Patience M · 3 Mutate · 4 Jump</td><td>9 First · 10 Size · 11 Rotate</td></tr>
+    <tr><td>5 Sleep · 7 Mask M · 8 Tilt M</td><td>15 Mask R · 16 Tilt R</td></tr>
+  </tbody>
+</table>
+<p>On both hero pages the footer is the same: <b>F1 LoopR/LiveR · F2 LoopM/LiveM · F3 NewR/UndoR · F4 NewM/UndoM ·
+F5 NEXT</b>. <span class="kbd">Shift</span> swaps F3/F4 to the Undo actions and gives coarse (&times;10) encoder steps
+on most knobs. The LED rows colour-code the knob groups (rhythm vs pitch, Loop-only filters at the row ends).</p>
+
+<h3>The PITCH page <span class="tag t-blue">SCALE TICKETS</span></h3>
+<img class="shot" src="../ui-preview/stochastic-manual/stoch-pitch.png" alt="SCALE TICKETS page: one bar per scale degree, 4th excluded, active degree bright, footer LiveM/NewM/DROT/MROT/NEXT">
+<p class="cap">SCALE TICKETS: one bar per scale degree (tall = more tickets), an excluded degree shows as a baseline dash,
+the playing degree is bright, the cursor degree is boxed. Footer: <code>LiveM&middot;NewM&middot;DROT&middot;MROT&middot;NEXT</code>.</p>
+<p>Header <code>SCALE TICKETS</code>. Each step is one scale degree; press a step to select it, encoder sets its
+ticket (&minus;1&hellip;100). The active degree lights as it plays. Banks shift with
+<span class="kbd">&larr;</span>/<span class="kbd">&rarr;</span> when the scale has more than 16 degrees. Footer:
+<b>F1 LoopM/LiveM · F2 NewM · F3 DROT · F4 MROT · F5 NEXT</b> &mdash; DROT / MROT flip the encoder to edit Degree /
+Mask rotation instead of a ticket.</p>
+
+<h3>The DURATION page <span class="tag t-blue">DURATION TICKETS</span></h3>
+<img class="shot" src="../ui-preview/stochastic-manual/stoch-duration.png" alt="DURATION TICKETS page: eight duration-slot bars labelled by note value, footer LiveR/NewR/RST/NEXT">
+<p class="cap">DURATION TICKETS: the eight duration slots, labelled by their note value at the current Divisor. Weighted
+slots rise; an excluded slot shows a baseline dash. Footer: <code>LiveR&middot;NewR&middot;RST&middot;&mdash;&middot;NEXT</code>.</p>
+<p>Header <code>DURATION TICKETS</code>. Eight steps = the eight duration slots; encoder sets each slot's ticket. The
+slot labels track the current Divisor (so they read real note values, not hardcoded 1/16 strings). Footer:
+<b>F1 LoopR/LiveR · F2 NewR · F3 RST · F5 NEXT</b> &mdash; <b>RST</b> flips the encoder to edit the global Rest
+probability.</p>
+
+<h3>Shared controls</h3>
+<table>
+  <thead><tr><th>Control</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><b>Hold step + encoder</b></td><td>Edit that step's bound knob (Live/Loop) or its ticket (Pitch/Duration).</td></tr>
+    <tr><td><span class="kbd">Shift</span></td><td>Persist multi-select (hold a set, edit together); coarse encoder steps.</td></tr>
+    <tr><td><b>F5 NEXT</b></td><td>Cycle the four pages.</td></tr>
+    <tr><td><span class="kbd">Page</span>+step 15</td><td>On LIVE: <b>Random</b> &mdash; randomize the Live-row knobs.</td></tr>
+    <tr><td>Context menu</td><td><b>INIT · EVEN · RANDOM · BurstHold</b> (Hold&harr;Roll toggle).</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="config">12 · The config page</h2>
+<p>The track-global / clock settings live on a separate config list:</p>
+<table>
+  <thead><tr><th>Row</th><th>Range / values</th></tr></thead>
+  <tbody>
+    <tr><td>Lock</td><td>freeze the sequence content (A/B preview anchor)</td></tr>
+    <tr><td>Play Mode</td><td><code>Aligned</code> / <code>Free</code></td></tr>
+    <tr><td>Clock/Div</td><td>clock divisor (default 1/16)</td></tr>
+    <tr><td>Clock Mult</td><td>50&ndash;150 %, routable</td></tr>
+    <tr><td>Reset Measure</td><td>0&ndash;128 (0 = off)</td></tr>
+    <tr><td>Scale / Root Note</td><td>inherit (Default) or override, routable</td></tr>
+    <tr><td>Octave / Transpose</td><td>routable</td></tr>
+    <tr><td>CV Update</td><td><code>Gate</code> / <code>Always</code></td></tr>
+    <tr><td>Slide Time</td><td>0&ndash;100, routable (drives the Slide articulation)</td></tr>
+    <tr><td>Fill Mode</td><td><code>None</code> / <code>Gates</code> / <code>Next Pattern</code> / <code>Condition</code></td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="params">13 · Parameter reference</h2>
+<table>
+  <thead><tr><th>Parameter</th><th>Range</th><th>Default</th><th>Domain</th></tr></thead>
+  <tbody>
+    <tr><td>Note Duration</td><td>0&ndash;7</td><td>5 (&times;1)</td><td>rhythm</td></tr>
+    <tr><td>Variation</td><td>0&ndash;100</td><td>16</td><td>rhythm</td></tr>
+    <tr><td>Rest</td><td>0&ndash;100</td><td>0</td><td>rhythm</td></tr>
+    <tr><td>Feel</td><td>0&ndash;100</td><td>50 (off)</td><td>rhythm</td></tr>
+    <tr><td>Gate Length</td><td>0&ndash;100</td><td>0</td><td>rhythm</td></tr>
+    <tr><td>Legato</td><td>0&ndash;100</td><td>0</td><td>rhythm</td></tr>
+    <tr><td>Complexity</td><td>0&ndash;100</td><td>50</td><td>rhythm</td></tr>
+    <tr><td>Burst</td><td>0&ndash;100</td><td>0</td><td>rhythm</td></tr>
+    <tr><td>Burst Count</td><td>0&ndash;100</td><td>0</td><td>rhythm</td></tr>
+    <tr><td>Burst Rate</td><td>0&ndash;100</td><td>50</td><td>rhythm</td></tr>
+    <tr><td>Burst Hold</td><td>4 modes</td><td>Hold/Over</td><td>rhythm</td></tr>
+    <tr><td>Slide</td><td>0&ndash;100</td><td>0</td><td>rhythm</td></tr>
+    <tr><td>Bias</td><td>0&ndash;100</td><td>50</td><td>melody</td></tr>
+    <tr><td>Spread</td><td>0&ndash;100</td><td>50</td><td>melody</td></tr>
+    <tr><td>Range</td><td>0&ndash;100</td><td>50</td><td>melody</td></tr>
+    <tr><td>Contour</td><td>&plusmn;100</td><td>0</td><td>melody</td></tr>
+    <tr><td>Repeat</td><td>0&ndash;100</td><td>0</td><td>melody</td></tr>
+    <tr><td>Degree Tickets</td><td>&minus;1 / 0 / 1&ndash;100</td><td>0</td><td>melody</td></tr>
+    <tr><td>Degree / Mask Rotation</td><td>&plusmn;32</td><td>0</td><td>melody</td></tr>
+    <tr><td>Duration Tickets</td><td>&minus;1 / 0 / 1&ndash;100</td><td>0</td><td>rhythm</td></tr>
+    <tr><td>Patience R / M</td><td>0&ndash;100 (100=off)</td><td>100</td><td>loop</td></tr>
+    <tr><td>Mutate</td><td>0&ndash;100</td><td>0</td><td>loop</td></tr>
+    <tr><td>Jump</td><td>0&ndash;100</td><td>0</td><td>loop</td></tr>
+    <tr><td>Sleep</td><td>0&ndash;100</td><td>0</td><td>loop</td></tr>
+    <tr><td>First / Size</td><td>0&hellip; / 2&ndash;step count</td><td>0 / 32</td><td>loop</td></tr>
+    <tr><td>Rotate</td><td>&plusmn;64</td><td>0</td><td>loop</td></tr>
+    <tr><td>Mask R / Tilt R</td><td>0&ndash;100 / 0&ndash;100</td><td>100 / 50</td><td>loop (rhythm)</td></tr>
+    <tr><td>Mask M / Tilt M</td><td>0&ndash;100 / 0&ndash;100</td><td>100 / 0</td><td>loop (melody)</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="expect">14 · What to expect</h2>
+<ul>
+  <li>A fresh Stochastic track starts in <b>Live</b> for both domains &mdash; it plays an endless, never-repeating
+    stream the moment you hit play.</li>
+  <li>Switch a domain to <b>Loop</b> and press <b>NewR</b>/<b>NewM</b> to roll a pattern you can keep and shape.</li>
+  <li>Tickets steer character without killing surprise: emphasise a few degrees and the line stays in a mode but still
+    wanders.</li>
+  <li>Patience + Mutate make a Loop slowly mutate on its own &mdash; a generative bed that never quite settles.</li>
+  <li>Bursts add humanised ratchets/flams, but only when the duration is long enough to hold them (watch the
+    <code>*</code> flag).</li>
+  <li>Split mode &mdash; Loop rhythm + Live melody &mdash; gives a locked groove under an improvising lead, the classic
+    Stochastic trick.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="examples">15 · Worked setups</h2>
+<div class="setup"><h3>1 · Endless techno lead (pure Live)</h3>
+  <p class="recipe">Both domains <code>Live</code>. <code>Note Duration 5</code>, <code>Variation 20</code>,
+  <code>Rest 15</code>, <code>Bias 60</code>, <code>Spread 40</code>, <code>Range 55</code>. Exclude the 4th and 7th in
+  Scale Tickets &mdash; a restless, in-key stream that never loops.</p></div>
+<div class="setup"><h3>2 · Locked groove, improvising melody (Split)</h3>
+  <p class="recipe">Rhythm <code>Loop</code> + NewR until you like the groove; melody <code>Live</code>. Set
+  <code>Complexity 40</code> for the rhythm; drive the melody with Bias/Spread live.</p></div>
+<div class="setup"><h3>3 · Self-evolving generative bed</h3>
+  <p class="recipe">Both <code>Loop</code>, roll a pattern. <code>Patience R 60</code>, <code>Patience M 75</code>,
+  <code>Mutate 20</code> &mdash; the bed re-rolls and drifts on its own. Add <code>Sleep 15</code> for breathing gaps.</p></div>
+<div class="setup"><h3>4 · Trap hi-hat rolls</h3>
+  <p class="recipe"><code>Note Duration 3</code> (1/8), <code>Burst 70</code>, <code>Burst Count 60</code>,
+  <code>Burst Rate 80</code>, <code>Burst Hold Hold/Fit</code> &mdash; a single pitch with dense packed ratchets. Watch
+  the <code>*</code> flag if rolls go silent.</p></div>
+<div class="setup"><h3>5 · Tonal arpeggio from tickets</h3>
+  <p class="recipe">Melody <code>Loop</code>. Scale Tickets: root 80, 3rd 50, 5th 70, everything else 0, exclude the
+  2nd/6th. <code>Spread 30</code>, <code>Range 65</code> &mdash; a triadic arpeggio that re-voices on each NewM.</p></div>
+<div class="setup"><h3>6 · Slowly rotating loop</h3>
+  <p class="recipe">Both <code>Loop</code>, <code>Size 16</code>. Route an LFO to <b>Rotate</b> &mdash; the same 16
+  events keep re-ordering, a shifting riff from one frozen roll.</p></div>
+
+<div class="footer">
+  <b>Verified against the firmware.</b> Two domains (Rhythm/Melody), each Loop or Live (Split when they differ);
+  event-driven timing on an 8-slot duration LUT (&times;8&hellip;&times;1/2); pitch &amp; duration <b>tickets</b>
+  (&minus;1 exclude / 0 flat / 1&ndash;100 weight) with Degree + Mask rotation; rhythm knobs (Duration, Variation,
+  Rest, Feel, Gate Length, Legato, Complexity, Slide); burst clusters (Burst/Count/Rate + 4-mode Hold/Roll &times;
+  Fit/Over); Marbles-style melody (Bias, Spread, Range, Contour, Repeat); loop evolution (Patience R/M, Mutate, Jump,
+  Sleep) and window shaping (First, Size, Rotate, Mask/Tilt R, Mask/Tilt M). Four edit pages LIVE / LOOP / SCALE
+  TICKETS / DURATION TICKETS with NewR/NewM (+ Undo), DROT/MROT, RST; config page Lock…Fill Mode.
+  <br><br>
+  <b>Notes:</b> Mask/Tilt and Patience act only in Loop mode (inert in Live). The Burst <code>*</code> flag marks a
+  Note-Duration/Divisor combo too short to fit an audible cluster. OLED screens are rendered by
+  <code>ui-preview/pages_stochastic_manual.py</code> against the current <code>draw()</code>; the labelled SVGs are
+  concept diagrams.
+</div>
+
+</div>
+</body>
+</html>
