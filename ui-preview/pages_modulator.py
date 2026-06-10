@@ -874,3 +874,61 @@ def render_modulator_destinations_grid_proposed(canvas):
     canvas.draw_text(192, 50, "GATE")
     canvas.set_color(Color.Bright)
     canvas.draw_text(222, 50, "IN2")
+
+
+# --- PROPOSED: Geode mode (Just Friends rhythmic engine) on the modulator bank ---
+# Shift+Shape toggles the whole bank into Geode. M1 = clock + the 5 global knobs
+# (page 2), M2 = run source, M3-M8 = the 6 GeodeEngine voices (divs/repeats/tune).
+# Reuses the existing 2-row grid + destinations page; only the cell content changes.
+
+def _draw_geode_right_grid(canvas, values, selected):
+    # Same geometry as render_modulator_page_proposed_v2's 2-row right panel.
+    COL_L, COL_M, COL_R = 128, 190, 256
+    ROW1_Y, ROW2_Y = 22, 42
+    canvas.set_blend_mode(BlendMode.Set)
+    canvas.set_font(Font.Small)
+    for i in (0, 1):
+        if not values[i]:
+            continue
+        canvas.set_color(Color.Bright if selected == i else Color.Medium)
+        if i == 0:
+            canvas.draw_text(COL_L, ROW1_Y, values[0])
+        else:
+            canvas.draw_text(COL_R - canvas.text_width(values[1]), ROW1_Y, values[1])
+    for i in (2, 3, 4):
+        if not values[i]:
+            continue
+        canvas.set_color(Color.Bright if selected == i else Color.Medium)
+        if i == 2:
+            canvas.draw_text(COL_L, ROW2_Y, values[2])
+        elif i == 3:
+            canvas.draw_text(COL_M, ROW2_Y, values[3])
+        else:
+            canvas.draw_text(COL_R - canvas.text_width(values[4]), ROW2_Y, values[4])
+
+
+def render_modulator_geode_globals(canvas):
+    # M1 page 2: the 5 shared globals fill the 5 cells exactly.
+    eng = MockModulatorEngine(current_value=70)
+    WindowPainter.clear(canvas)
+    WindowPainter.draw_header(canvas, track=0, mode="MOD 1 - GEODE")
+    WindowPainter.draw_footer(canvas, ["TIME", "INTONE", "RAMP", "CURVE", "MODE"], highlight=1)
+    canvas.set_color(Color.Low)
+    canvas.set_font(Font.Tiny)
+    canvas.draw_text(56, 12, "Pg 2/2")
+    _draw_modulator_scope(canvas)
+    # TIME / INTONE (row 1), RAMP / CURVE / MODE (row 2). INTONE selected.
+    _draw_geode_right_grid(canvas, ["158ms", "+0.50", "0.50", "LIN", "SUST"], selected=1)
+
+
+def render_modulator_geode_voice(canvas):
+    # M5 = voice 3 (default tune 3:1). Page 1 grid = the per-voice rhythm params;
+    # the read-only derived envelope time sits in the last cell. Gate source + output
+    # live on the destinations page (reused, not shown here).
+    eng = MockModulatorEngine(current_value=55)
+    WindowPainter.clear(canvas)
+    WindowPainter.draw_header(canvas, track=0, mode="MOD 5 - GEODE")
+    WindowPainter.draw_footer(canvas, ["VOICE", "DIVS", "REPEAT", "TUNE", "TIME"], highlight=1)
+    _draw_modulator_scope(canvas)
+    # label / DIVS (row 1), REPEAT / TUNE / derived-time (row 2). DIVS selected.
+    _draw_geode_right_grid(canvas, ["V3", "8", "4", "3:1", "53ms"], selected=1)

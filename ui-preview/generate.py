@@ -112,6 +112,8 @@ from pages_modulator import (
     render_modulator_justf_follower,
     render_modulator_justf_adsr_follower,
     render_modulator_justf_adsr_intone,
+    render_modulator_geode_globals,
+    render_modulator_geode_voice,
 )
 from tracks import (
     DiscreteMapSequence, DiscreteMapTrackEngine,
@@ -396,6 +398,10 @@ def render_page(page: str, scale: int = 4):
         render_modulator_justf_adsr_follower(canvas)
     elif page == "modulator-justf-adsr-intone":
         render_modulator_justf_adsr_intone(canvas)
+    elif page == "modulator-geode-globals":
+        render_modulator_geode_globals(canvas)
+    elif page == "modulator-geode-voice":
+        render_modulator_geode_voice(canvas)
     elif page == "stochastic-loop-proposed":
         render_stochastic_loop_proposed(canvas)
     elif page == "stochastic-loop-proposed-held":
@@ -602,7 +608,7 @@ def main():
                                  'modulator-proposed-sine', 'modulator-proposed-adsr',
                                  'modulator-proposed-random', 'modulator-proposed-chaos',
                                  'modulator-proposed-adsr-page2', 'modulator-proposed-chaos-page2',
-                                 'modulator-rate-free-proposed', 'modulator-rate-tempo-proposed', 'modulator-gatemodes-proposed', 'modulator-scope-proposed', 'modulator-destinations-grid-proposed', 'modulator-justf-time', 'modulator-justf-intone', 'modulator-justf-follower', 'modulator-justf-adsr-follower', 'modulator-justf-adsr-intone',
+                                 'modulator-rate-free-proposed', 'modulator-rate-tempo-proposed', 'modulator-gatemodes-proposed', 'modulator-scope-proposed', 'modulator-destinations-grid-proposed', 'modulator-justf-time', 'modulator-justf-intone', 'modulator-justf-follower', 'modulator-justf-adsr-follower', 'modulator-justf-adsr-intone', 'modulator-geode-globals', 'modulator-geode-voice',
                                  'stochastic-loop-proposed', 'stochastic-loop-proposed-held',
                                  'stochastic-live-proposed', 'stochastic-live-proposed-held',
                                  'stochastic-live-proposed-burst', 'stochastic-live-proposed-spread',
