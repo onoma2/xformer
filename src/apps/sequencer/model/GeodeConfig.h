@@ -26,6 +26,10 @@ public:
     // globals: 0..16383 normalized (intone/curve bipolar, 8192 = centre)
     int time() const { return _time; }
     void setTime(int v) { _time = clamp(v, 0, 16383); }
+    // Normalized 0..1 for GeodeEngine, capped so the envelope max is musical (~4s)
+    // rather than GeodeEngine's full 60s JF range.
+    static constexpr float MaxTimeNorm = 0.55f;
+    float timeNorm() const { return (_time / 16383.f) * MaxTimeNorm; }
     int intone() const { return _intone; }
     void setIntone(int v) { _intone = clamp(v, 0, 16383); }
     int ramp() const { return _ramp; }

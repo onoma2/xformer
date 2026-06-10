@@ -209,7 +209,14 @@ void Engine::update() {
             int voice = modulatorIndex - 2;
             if (geodeActive && voice >= 0 && voice < GeodeEngine::VoiceCount) {
                 if (gate && !prevGate) {
+                    // Mirror the Teletype JF.VOX sequence: set up the burst AND fire the
+                    // first envelope now (update() alone won't, since the gate resets phase).
+                    float run = (_modulatorEngine.currentValue(1) - 64) / 64.f;
                     _geodeEngine.triggerVoice(voice, geode.divs(voice), geode.repeats(voice));
+                    _geodeEngine.setVoicePhase(voice, 0.f);
+                    _geodeEngine.markVoiceTriggered(voice);
+                    _geodeEngine.triggerImmediate(voice, geode.timeNorm(),
+                        (geode.intone() - 8192) / 8192.f, run, uint8_t(geode.mode()));
                 }
                 continue;
             }
@@ -230,7 +237,7 @@ void Engine::update() {
         if (geodeActive) {
             float mf = _modulatorEngine.currentPhase(0) / 65536.f;       // M1 = clock
             float run = (_modulatorEngine.currentValue(1) - 64) / 64.f;  // M2 = run, bipolar
-            float time = geode.time() / 16383.f;
+            float time = geode.timeNorm();
             float intone = (geode.intone() - 8192) / 8192.f;
             float ramp = geode.ramp() / 16383.f;
             float curve = (geode.curve() - 8192) / 8192.f;

@@ -10,6 +10,8 @@
 #include "ui/painters/WindowPainter.h"
 
 #include "core/math/Math.h"
+
+#include <cmath>
 #include "core/utils/StringBuilder.h"
 
 static const ContextMenuModel::Item contextMenuItems[] = {
@@ -63,6 +65,69 @@ void ModulatorPage::bakeJustf() {
     me.setIntone(0.f);
 }
 
+void ModulatorPage::toggleGeode() {
+    auto &geode = _project.geode();
+    bool now = !geode.active();
+    geode.setActive(now);
+    if (now) {
+        _engine.modulatorEngine().setJustfActive(false);   // mutually exclusive with JustF
+    }
+    _currentPage = 0;
+}
+
+void ModulatorPage::drawGeodeVoice(Canvas &canvas, int voice) {
+    auto &geode = _project.geode();
+    WindowPainter::clear(canvas);
+    FixedStringBuilder<32> title("MOD %d - GEODE", _selectedModulator + 1);
+    WindowPainter::drawHeader(canvas, _model, _engine, title);
+
+    const char *names[5] = { "VOICE", "DIVS", "REPEAT", "TUNE", "TIME" };
+    WindowPainter::drawFooter(canvas, names, pageKeyState(), int(_selectedFunction));
+
+    // Rolling scope of the voice output (same trace as every modulator page).
+    {
+        const int boxX = 1, boxY = 12, boxW = 119, boxH = 40;
+        int v = _engine.modulatorEngine().currentValue(_selectedModulator);
+        _scope[_scopeWrite] = clamp((v - 64) * 2, -127, 127);
+        _scopeWrite = (_scopeWrite + 1) % ScopeWidth;
+        canvas.setBlendMode(BlendMode::Set);
+        canvas.setColor(Color::Medium);
+        canvas.drawRect(boxX, boxY, boxW, boxH);
+        const int centerY = boxY + boxH / 2;
+        const int halfH = boxH / 2 - 3;
+        canvas.setColor(Color::Low);
+        canvas.hline(boxX + 2, centerY, boxW - 4);
+        canvas.setColor(Color::Bright);
+        ScopePainter::drawTrace(canvas, boxX + 1, centerY, halfH, _scope, ScopeWidth, _scopeWrite);
+    }
+
+    FixedStringBuilder<32> values[5];
+    values[0]("V%d", voice + 1);
+    values[1]("%d", geode.divs(voice));
+    if (geode.repeats(voice) < 0) values[2]("INF"); else values[2]("%d", geode.repeats(voice));
+    values[3]("%d:%d", geode.tuneNumerator(voice), geode.tuneDenominator(voice));
+    int ms = int(166.7f * std::pow(360.f, geode.timeNorm()) + 0.5f);
+    values[4]("%dms", ms);
+
+    const int colL = 128, colM = 190, colR = 256;
+    canvas.setBlendMode(BlendMode::Set);
+    canvas.setFont(Font::Small);
+    int sel = int(_selectedFunction);
+    for (int i = 0; i < 2; ++i) {
+        if (values[i][0] == '\0') continue;
+        canvas.setColor(i == sel ? Color::Bright : Color::Medium);
+        if (i == 0) canvas.drawText(colL, 22, values[0]);
+        else canvas.drawText(colR - canvas.textWidth(values[1]), 22, values[1]);
+    }
+    for (int i = 2; i < 5; ++i) {
+        if (values[i][0] == '\0') continue;
+        canvas.setColor(i == sel ? Color::Bright : Color::Medium);
+        if (i == 2) canvas.drawText(colL, 42, values[2]);
+        else if (i == 3) canvas.drawText(colM, 42, values[3]);
+        else canvas.drawText(colR - canvas.textWidth(values[4]), 42, values[4]);
+    }
+}
+
 void ModulatorPage::draw(Canvas &canvas) {
     auto &modulator = _project.modulator(_selectedModulator);
     bool isRandom = (modulator.shape() == Modulator::Shape::Random);
@@ -70,8 +135,19 @@ void ModulatorPage::draw(Canvas &canvas) {
     bool isADSR = (modulator.shape() == Modulator::Shape::ADSR);
     bool isChaos = Modulator::isChaosShape(modulator.shape());
 
-    // Update total pages for ADSR and chaos
-    if (isADSR || isChaos) {
+    // Geode mode: M3-M8 are voices (own page); M1 gains a globals page; M2 stays normal.
+    bool geodeActive = _project.geode().active() && !_showRoutingOverlay;
+    bool geodeVoice = geodeActive && _selectedModulator >= 2;
+    bool geodeM1 = geodeActive && _selectedModulator == 0;
+    if (geodeVoice) {
+        _totalPages = 1;
+        _currentPage = 0;
+        drawGeodeVoice(canvas, _selectedModulator - 2);
+        return;
+    }
+
+    // Update total pages for ADSR and chaos (M1 gains page 2 for the Geode globals)
+    if (isADSR || isChaos || geodeM1) {
         _totalPages = 2;
     } else {
         _totalPages = 1;
@@ -83,7 +159,8 @@ void ModulatorPage::draw(Canvas &canvas) {
     WindowPainter::clear(canvas);
 
     // Header
-    FixedStringBuilder<32> title("MOD %d - %s", _selectedModulator + 1, _showRoutingOverlay ? "ROUTING" : "MODULATOR");
+    const char *titleMode = _showRoutingOverlay ? "ROUTING" : (geodeActive ? "GEODE" : "MODULATOR");
+    FixedStringBuilder<32> title("MOD %d - %s", _selectedModulator + 1, titleMode);
     WindowPainter::drawHeader(canvas, _model, _engine, title);
 
     // Footer
@@ -147,6 +224,14 @@ void ModulatorPage::draw(Canvas &canvas) {
             } else if (!isChaos && !isRandom) {
                 functionNames[1] = "INTONE";
             }
+        }
+        // Geode: M1's page 2 hosts the shared globals.
+        if (geodeM1 && _currentPage == 1) {
+            functionNames[0] = "TIME";
+            functionNames[1] = "INTONE";
+            functionNames[2] = "RAMP";
+            functionNames[3] = "CURVE";
+            functionNames[4] = "MODE";
         }
         int highlight = isADSR ? int(_selectedFunction) : int(_selectedFunction);
         WindowPainter::drawFooter(canvas, functionNames, pageKeyState(), highlight);
@@ -221,24 +306,42 @@ void ModulatorPage::draw(Canvas &canvas) {
                     // Followers show M1's envelope spread by index (read-only); sustain
                     // is M1's level. M1 (master) keeps its own raw envelope.
                     int idx = _selectedModulator + 1;
+                    values[1].reset(); values[2].reset(); values[3].reset(); values[4].reset();
                     values[1]("%dms", ModulatorEngine::justfEffectiveMs(m1.attack(), intone, idx));
                     values[2]("%dms", ModulatorEngine::justfEffectiveMs(m1.decay(), intone, idx));
                     values[3]("%d", m1.sustain());
                     values[4]("%dms", ModulatorEngine::justfEffectiveMs(m1.release(), intone, idx));
                 } else if (_currentPage == 1 && _selectedModulator == 1) {
+                    values[1].reset();
                     values[1]("%+.2f", intone);   // INTONE on page 2, beside AMPLITUDE
                 }
             } else if (!isChaos && !isRandom) {
                 if (_selectedModulator == 1) {
+                    values[1].reset();
                     values[1]("%+.2f", me.intone());
                 } else if (_selectedModulator > 1) {
                     float hz = ModulatorEngine::justfEffectiveHz(
                         _project.modulator(0).rateHz(), me.intone(), _selectedModulator + 1);
+                    values[1].reset();
                     values[1]("%.2fHz", hz);
                 }
                 // M1 keeps its own printRate (the master).
             }
         }
+    }
+
+    // Geode: M1's page 2 shows the shared globals (TIME/INTONE/RAMP/CURVE/MODE).
+    if (geodeM1 && _currentPage == 1) {
+        auto &g = _project.geode();
+        for (auto &v : values) v.reset();   // replace the normal page-2 values, don't append
+        int ms = int(166.7f * std::pow(360.f, g.timeNorm()) + 0.5f);   // log time map (capped)
+        values[0]("%dms", ms);
+        values[1]("%+.2f", (g.intone() - 8192) / 8192.f);
+        values[2]("%.2f", g.ramp() / 16383.f);
+        float c = (g.curve() - 8192) / 8192.f;
+        values[3](c < -0.5f ? "STEP" : c < 0.f ? "LOG" : c < 0.5f ? "LIN" : "EXP");
+        static const char *modeNames[] = { "TRANS", "SUST", "CYCLE" };
+        values[4](modeNames[clamp(g.mode(), 0, 2)]);
     }
 
     // --- Left half: real-time scope of the modulator output (rolling trace, no level bar) ---
@@ -422,6 +525,12 @@ void ModulatorPage::keyPress(KeyPressEvent &event) {
             }
         } else {
             int func = key.function();
+            // Shift+SHAPE toggles Geode mode (bank-wide, mutually exclusive with JustF).
+            if (func == int(Function::Shape) && key.shiftModifier()) {
+                toggleGeode();
+                event.consume();
+                return;
+            }
             // Shift+RATE toggles JustF (Free-domain rate link). Toggling off bakes.
             if (func == int(Function::Rate) && key.shiftModifier()) {
                 auto &me = _engine.modulatorEngine();
@@ -488,6 +597,32 @@ void ModulatorPage::encoder(EncoderEvent &event) {
                 }
                 // M1 (index 0) falls through to normal rate editing — the master.
             }
+        }
+    }
+
+    // Geode: voice cells edit divs/repeats; M1 page 2 edits the globals. M1 page 1 (clock)
+    // and M2 (run) fall through to normal modulator editing.
+    if (_project.geode().active() && !_showRoutingOverlay) {
+        auto &g = _project.geode();
+        int d = event.value();
+        if (_selectedModulator >= 2) {
+            int voice = _selectedModulator - 2;
+            if (_selectedFunction == Function::Rate) g.setDivs(voice, g.divs(voice) + d);
+            else if (_selectedFunction == Function::Depth) g.setRepeats(voice, g.repeats(voice) + d);
+            event.consume();
+            return;
+        }
+        if (_selectedModulator == 0 && _currentPage == 1) {
+            int step = pressed ? 32 : 256;
+            switch (_selectedFunction) {
+            case Function::Shape:  g.setTime(g.time() + d * step); break;
+            case Function::Rate:   g.setIntone(g.intone() + d * step); break;
+            case Function::Depth:  g.setRamp(g.ramp() + d * step); break;
+            case Function::Offset: g.setCurve(g.curve() + d * step); break;
+            case Function::Phase:  g.setMode(g.mode() + d); break;
+            }
+            event.consume();
+            return;
         }
     }
 

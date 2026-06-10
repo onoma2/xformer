@@ -68,6 +68,8 @@ private:
     void drawDestinationsBody(Canvas &canvas, Modulator &modulator);
     void drawMembershipGrid(Canvas &canvas);
     void bakeJustf();
+    void drawGeodeVoice(Canvas &canvas, int voice);
+    void toggleGeode();
 
     bool cursorIsCv() const { return _destCursor < CONFIG_CHANNEL_COUNT; }
     int cursorCvIndex() const { return _destCursor; }
