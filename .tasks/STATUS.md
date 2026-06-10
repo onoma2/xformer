@@ -67,6 +67,25 @@ Envelope/FreqFollower/Activity/ProgDiv) are slated to leave the routing lane and
 **input-reading modulators** (needs a modulator input-source concept — separate prerequisite);
 VcaNext → scaleSource, ProgDiv → clock-util/drop.
 
+## ⚪ spring-modulator — struck-resonator modulator shape (SPRING)
+**Status:** ready — spec + JS prototype done (2026-06-11), no firmware started.
+**Where I stopped:** spec finalized at `docs/spring-modulator-spec.md` incl. control laws (§4) and
+clamping/numerical-safety (§6). A new `Modulator::Shape::Spring`: a mallet-struck 3-mode resonator
+(inharmonic ratios 1 / 2.76 / 5.40), semi-implicit Euler at control rate, **deterministic** strike
+(no RNG) so cloned slots phase-lock for a fake multitap. Output via `5·tanh(s)` soft-sat (no hard
+clamp). Driven by the universal gate `Mode` (Run=Free strike clock, Trig=gate edge, Gate=hold-then-
+release) — same plumbing the Random refactor just adopted. Names locked: **SPRING / STRIKE /
+TENSION / RING / CLANG / PICKUP**. Footer p1 `SHAPE·STRIKE·TENSION·RING·CLANG`, p2 `PICKUP`
+(default Position); 2-page shape (Pg in header).
+**Next action:** implement per spec — engine branch in `engine/ModulatorEngine.h` (beside Chaos),
+field reuse in `model/Modulator.h` (Chaos-style, no ProjectVersion bump), 2-page footer in
+`ui/pages/ModulatorPage.cpp`. Pin the open items in spec §10 first (TENSION→f0 range + dt stability
+ceiling, exact field map, DEPTH-scales-strike, Tempo-domain meaning of STRIKE).
+**Branch:** refactor/routing-matrix holds the spec; firmware impl wants its own branch.
+**Reference:** `docs/spring-modulator-spec.md`, prototype `.scratch/spring-modulator.html`. Sibling
+**double-pendulum-modulator** is the coupled/chaotic counterpart (θ1/θ2 = natural multitap), ref
+Tuesday `WobblerV2/Sources/Pendulum.c` — spec after Spring lands.
+
 ## 🟢 generator-preview-apply — Generator A/B preview, step selection, 64-step context, Tuesday AlgoGenerator
 **Status:** done — Phases A-F complete and hardware verified.
 **Where I stopped:** All phases committed. SequenceBuilder 3-copy state machine, RandomGenerator enhancements, GeneratorPage A/B workflow, 64-step bank visualization, context menu expansion, and Tuesday AlgoGenerator (15 algorithms via TuesdayAlgoCore). RAM: `.data + .bss = 118,884` (92.9%).
