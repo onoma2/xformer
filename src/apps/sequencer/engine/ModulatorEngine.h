@@ -400,6 +400,17 @@ public:
         return _phaseAccumulator[index] & 0xFFFF;
     }
 
+    // Geode: write an externally-driven voice level (0..1) into this modulator's output,
+    // through the same floor/invert transform a normal envelope uses (amplitude scales it).
+    void setVoiceOutput(int index, float level01, const Modulator &modulator) {
+        if (index < 0 || index >= CONFIG_MODULATOR_COUNT) {
+            return;
+        }
+        int env = int(clamp(level01, 0.f, 1.f) * modulator.amplitude() + 0.5f);
+        _currentValue[index] = unipolarOutput(env, modulator.amplitude(),
+                                              modulator.floorValue(), modulator.invert());
+    }
+
     ADSRState adsrState(int index) const {
         if (index < 0 || index >= CONFIG_MODULATOR_COUNT) {
             return ADSRState::Idle;

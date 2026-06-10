@@ -187,7 +187,9 @@ void Engine::update() {
 
         // tick modulators before the global recompute so a modulator used as a
         // routing/CV source reflects the current tick
-        const bool justf = _modulatorEngine.justfActive();
+        const auto &geode = _project.geode();
+        const bool geodeActive = geode.active();
+        const bool justf = !geodeActive && _modulatorEngine.justfActive();
         const float justfMasterHz = justf ? _project.modulator(0).rateHz() : 0.f;
         const float justfIntone = _modulatorEngine.intone();
         for (int modulatorIndex = 0; modulatorIndex < CONFIG_MODULATOR_COUNT; ++modulatorIndex) {
@@ -197,8 +199,21 @@ void Engine::update() {
             float level = (Routing::isModulatorSource(gs) &&
                            Routing::modulatorSourceIndex(gs) == modulatorIndex)
                 ? 0.f : _routingEngine.resolveSourceLevel(gs);
-            bool gate = ModulatorEngine::gateFromLevel(level, _modulatorGateState[modulatorIndex]);
+            bool prevGate = _modulatorGateState[modulatorIndex];
+            bool gate = ModulatorEngine::gateFromLevel(level, prevGate);
             _modulatorGateState[modulatorIndex] = gate;
+
+            // Geode: M3-M8 are GeodeEngine voices (output set after the update below). A gate
+            // rising edge fires that voice's burst. M1 (clock) and M2 (run) tick as normal
+            // modulators so their phase/output can be tapped.
+            int voice = modulatorIndex - 2;
+            if (geodeActive && voice >= 0 && voice < GeodeEngine::VoiceCount) {
+                if (gate && !prevGate) {
+                    _geodeEngine.triggerVoice(voice, geode.divs(voice), geode.repeats(voice));
+                }
+                continue;
+            }
+
             // JustF: Free-domain modulators run at M1 x INTONE-ratio (B-clamped); others as-is.
             float rateOverride = -1.f;
             const Modulator *envBase = nullptr;
@@ -208,6 +223,23 @@ void Engine::update() {
             }
             _modulatorEngine.tick(tick, dt, modulator, modulatorIndex, gate, rateOverride, envBase);
             _midiOutputEngine.sendModulator(modulatorIndex, _modulatorEngine.currentValue(modulatorIndex));
+        }
+
+        // Geode driver: M1's phase clocks the engine, M2's output is RUN, globals come from
+        // GeodeConfig. Voice levels become M3-M8's output (through the floor/invert transform).
+        if (geodeActive) {
+            float mf = _modulatorEngine.currentPhase(0) / 65536.f;       // M1 = clock
+            float run = (_modulatorEngine.currentValue(1) - 64) / 64.f;  // M2 = run, bipolar
+            float time = geode.time() / 16383.f;
+            float intone = (geode.intone() - 8192) / 8192.f;
+            float ramp = geode.ramp() / 16383.f;
+            float curve = (geode.curve() - 8192) / 8192.f;
+            _geodeEngine.update(dt, mf, time, intone, ramp, curve, run, uint8_t(geode.mode()));
+            for (int v = 0; v < GeodeEngine::VoiceCount; ++v) {
+                int mi = v + 2;
+                _modulatorEngine.setVoiceOutput(mi, _geodeEngine.voiceLevel(v), _project.modulator(mi));
+                _midiOutputEngine.sendModulator(mi, _modulatorEngine.currentValue(mi));
+            }
         }
 
         // single per-tick global recompute (was run once per firing track, T×
@@ -803,6 +835,7 @@ void Engine::reset() {
 
     _midiOutputEngine.reset();
     _modulatorEngine.reset();
+    _geodeEngine.reset();
 }
 
 void Engine::updatePlayState(bool ticked) {

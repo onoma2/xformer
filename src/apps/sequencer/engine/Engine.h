@@ -20,6 +20,7 @@
 #include "RoutingEngine.h"
 #include "MidiOutputEngine.h"
 #include "ModulatorEngine.h"
+#include "GeodeEngine.h"
 #include "MidiPort.h"
 #include "MidiLearn.h"
 #include "CvGateToMidiConverter.h"
@@ -280,6 +281,7 @@ private:
 
     RoutingEngine _routingEngine;
     ModulatorEngine _modulatorEngine;
+    GeodeEngine _geodeEngine;   // modulator-driven Geode (Just Friends) voices, M3-M8
     bool _modulatorGateState[CONFIG_MODULATOR_COUNT] = {}; // hysteresis latch per modulator gate
     MidiLearn _midiLearn;
     MidiReceiveHandler _midiReceiveHandler;
