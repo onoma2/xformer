@@ -499,6 +499,15 @@ def render_page(page: str, scale: int = 4):
     elif page == "routing-tab-global-source":
         from pages_routing_tabeditor import render_routing_tabeditor_source
         render_routing_tabeditor_source(canvas)
+    elif page == "routing-tab-shaper":
+        from pages_routing_tabeditor import render_routing_tabeditor_shaper
+        render_routing_tabeditor_shaper(canvas)
+    elif page == "routing-bus":
+        from pages_routing_tabeditor import render_routing_bus
+        render_routing_bus(canvas)
+    elif page == "routing-door":
+        from pages_routing_tabeditor import render_routing_door
+        render_routing_door(canvas)
     elif page == "routing-rowbar":
         from pages_routing_rowbar import render_routing_rowbar
         render_routing_rowbar(canvas, scenario=1)
@@ -597,7 +606,7 @@ def main():
                                  # Routing UI redesign
                                  'routing-list', 'routing-list-mid', 'routing-list-end',
                                  'routing-hero', 'routing-hero-step', 'routing-scope', 'routing-scope-global', 'routing-unified', 'routing-unified-clock', 'routing-spread', 'routing-target', 'routing-scope-bytype', 'routing-unified-idx', 'routing-unified-idx1', 'routing-source', 'routing-source-gate', 'routing-tabscope', 'routing-tabscope-bytype', 'routing-depth', 'routing-depth-abs', 'routing-tablane', 'routing-rowbar',
-                                 'routing-tab-global', 'routing-tab-clock', 'routing-tab-global-source',
+                                 'routing-tab-global', 'routing-tab-clock', 'routing-tab-global-source', 'routing-tab-shaper', 'routing-bus', 'routing-door',
                                  'mod-param-row', 'mod-param-depth', 'mod-spread', 'mod-source', 'mod-matrix', 'mod-matrix-bytype', 'mod-matrix-src',
                                  'bus', 'engine-curve-proposed', 'engine-note-proposed', 'bus-grid-proposed', 'bus-nav-proposed', 'bus-edit-source-proposed', 'bus-edit-depth-proposed',
                                  'midi-proposed', 'midi-empty-proposed', 'midi-edit-proposed', 'midi-learn-proposed',

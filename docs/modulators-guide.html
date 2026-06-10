@@ -394,7 +394,7 @@ the harmonic series). On the TUNE cell, <b>turn</b> edits the numerator, <b>push
   <li>High <b>DIVS</b> + long <b>TIME</b> = overlapping "machine-gun" hits. Keep DIVS modest relative to TIME.</li>
 </ul>
 
-<h3>Five setups to try</h3>
+<h3>Seven setups to try</h3>
 <div class="setup"><h3>1 · Percussive multi-voice <span class="tag t-blue">TRANS</span></h3>
   <p class="recipe"><code>MODE TRANS · TIME ~150ms · RAMP 0.1 · INTONE noon · DIVS 4/3/6/8/2/5 · REPEATS 0</code> &mdash; program rhythms on tracks 3&ndash;8.</p>
   <svg viewBox="0 0 740 175" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,system-ui,sans-serif" style="width:100%;height:auto">
@@ -481,6 +481,44 @@ the harmonic series). On the TUNE cell, <b>turn</b> edits the numerator, <b>push
     <text x="420" y="36" font-size="10" fill="#ca8a04">INTONE up &rarr; widens the fan</text>
   </svg>
   <p class="cap" style="margin:2px 0 0">All six fired together; INTONE sets six related envelope lengths from a single trigger.</p></div>
+
+<p style="margin:18px 0 4px"><b>These last two need editable TUNE</b> &mdash; the default integer harmonic series (1,2,3,4,5,6) can't make either.</p>
+
+<div class="setup" style="border-left-color:#7c3aed"><h3>6 · Just-intonation chord strum <span class="tag t-purp">tuned</span></h3>
+  <p class="recipe"><code>TUNE 1:1 / 5:4 / 3:2 / 2:1 / 5:2 / 3:1 · all six one gate · REPEATS 0 · sweep INTONE</code> &mdash; the fan now lands on a <b>major chord's</b> frequency ratios instead of the plain overtone series, so the strum is musically tuned.</p>
+  <svg viewBox="0 0 740 180" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,system-ui,sans-serif" style="width:100%;height:auto">
+    <line x1="50" y1="150" x2="730" y2="150" stroke="#e5e5e5"/>
+    <line x1="50" y1="30" x2="50" y2="160" stroke="#dc2626" stroke-width="2"/>
+    <text x="50" y="22" text-anchor="middle" font-size="10" font-weight="700" fill="#dc2626">ONE GATE</text>
+    <g fill="none" stroke-width="2.4">
+      <path stroke="#2563eb" d="M50,150 Q350,44 650,150"/>
+      <path stroke="#5b8def" d="M50,150 Q290,44 530,150"/>
+      <path stroke="#7c3aed" d="M50,150 Q250,44 450,150"/>
+      <path stroke="#9a63f0" d="M50,150 Q200,44 350,150"/>
+      <path stroke="#bb93f4" d="M50,150 Q170,46 290,150"/>
+      <path stroke="#d6bbf8" d="M50,150 Q150,48 250,150"/>
+    </g>
+    <text x="385" y="172" text-anchor="middle" font-size="10" fill="#7c3aed">widths spaced by chord intervals &mdash; 1 · 5:4 · 3:2 · 2 · 5:2 · 3</text>
+  </svg>
+  <p class="cap" style="margin:2px 0 0">Envelope speeds tuned to a chord &mdash; impossible with the fixed integer series.</p></div>
+
+<div class="setup" style="border-left-color:#7c3aed"><h3>7 · Inharmonic bell bank <span class="tag t-purp">tuned</span></h3>
+  <p class="recipe"><code>TUNE 1:1 / 7:4 / 11:5 / 13:6 / 17:7 / 23:8 · MODE CYCLE · REPEATS INF</code> &mdash; prime-ish, non-integer ratios spread the envelope speeds <b>inharmonically</b> &mdash; clangorous, metallic, bell-/gong-like. Adjacent ratios that nearly coincide beat against each other.</p>
+  <svg viewBox="0 0 740 180" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,system-ui,sans-serif" style="width:100%;height:auto">
+    <line x1="50" y1="150" x2="730" y2="150" stroke="#e5e5e5"/>
+    <line x1="50" y1="30" x2="50" y2="160" stroke="#dc2626" stroke-width="2"/>
+    <text x="50" y="22" text-anchor="middle" font-size="10" font-weight="700" fill="#dc2626">ONE GATE</text>
+    <g fill="none" stroke-width="2.4">
+      <path stroke="#2563eb" d="M50,150 Q350,44 650,150"/>
+      <path stroke="#7c3aed" d="M50,150 Q245,46 440,150"/>
+      <path stroke="#9a63f0" d="M50,150 Q210,46 370,150"/>
+      <path stroke="#a774f1" d="M50,150 Q216,48 382,150"/>
+      <path stroke="#bb93f4" d="M50,150 Q185,48 320,150"/>
+      <path stroke="#d6bbf8" d="M50,150 Q165,50 280,150"/>
+    </g>
+    <text x="385" y="172" text-anchor="middle" font-size="10" fill="#7c3aed">irregular widths &mdash; near-coincident pairs beat (the metallic shimmer)</text>
+  </svg>
+  <p class="cap" style="margin:2px 0 0">Non-musical interval relationships &mdash; the integer series is always harmonic; this needs custom ratios.</p></div>
 
 <div class="gotcha"><b>Nothing firing?</b> A voice only sounds when its <b>gate source</b> fires. Check the voice's
 destinations page, make sure that track has a gate, and that the transport is <b>playing</b> (or M1 is on a Free
