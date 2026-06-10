@@ -83,20 +83,6 @@ public:
         return nullptr;
     }
 
-    enum class RandomMode : uint8_t {
-        Clocked,
-        Triggered,
-        Last
-    };
-
-    static const char *randomModeName(RandomMode mode) {
-        switch (mode) {
-        case RandomMode::Clocked:    return "Clocked";
-        case RandomMode::Triggered:  return "Triggered";
-        case RandomMode::Last:       break;
-        }
-        return nullptr;
-    }
 
     //----------------------------------------
     // Properties
@@ -258,21 +244,6 @@ public:
         return cur;
     }
 
-    // randomMode (Clocked or Triggered)
-
-    RandomMode randomMode() const { return _randomMode; }
-    void setRandomMode(RandomMode mode) {
-        _randomMode = ModelUtils::clampedEnum(mode);
-    }
-
-    void editRandomMode(int value, bool shift) {
-        setRandomMode(ModelUtils::adjustedEnum(randomMode(), value));
-    }
-
-    void printRandomMode(StringBuilder &str) const {
-        str(randomModeName(randomMode()));
-    }
-
     // mode (Free/Sync/Retrigger for LFO shapes)
 
     Mode mode() const { return _mode; }
@@ -380,7 +351,6 @@ public:
         setPhase(0);
         setSmooth(100);
         setGateSource(Routing::Source::GateOut1);
-        setRandomMode(RandomMode::Clocked);
         setMode(Mode::Run);
         setAttack(900);   // P1 = 45 for chaos
         setDecay(1240);  // P2 = 62 for chaos
@@ -398,7 +368,6 @@ public:
         writer.write(_phase);
         writer.write(_smooth);
         writer.write(_gateSource);
-        writer.write(_randomMode);
         writer.write(_mode);
         writer.write(_attack);
         writer.write(_decay);
@@ -417,7 +386,6 @@ public:
         reader.read(_phase);
         reader.read(_smooth);
         reader.read(_gateSource);
-        reader.read(_randomMode);
         reader.read(_mode);
         reader.read(_attack);
         reader.read(_decay);
@@ -430,7 +398,6 @@ public:
         // Sanitize raw-read fields against bad/old file data: out-of-range enums
         // would fall through engine switches; rate is clamped to its domain range.
         _shape = ModelUtils::clampedEnum(_shape);
-        _randomMode = ModelUtils::clampedEnum(_randomMode);
         _mode = ModelUtils::clampedEnum(_mode);
         _rateDomain = ModelUtils::clampedEnum(_rateDomain);
         setRate(_rate);
@@ -444,7 +411,6 @@ private:
     uint16_t _phase = 0;
     uint16_t _smooth = 100;
     Routing::Source _gateSource = Routing::Source::GateOut1;
-    RandomMode _randomMode = RandomMode::Clocked;
     Mode _mode = Mode::Run;
     RateDomain _rateDomain = RateDomain::Free;
     uint16_t _attack = 100;
