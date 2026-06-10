@@ -132,6 +132,7 @@ private:
     bool _gateState = false;
     uint32_t _gateTimer = 0;
     float _cvOutput = 0.f;
+    float _cvOutputTarget = 0.f;
 
     // Activity LED.
     bool _activity = false;

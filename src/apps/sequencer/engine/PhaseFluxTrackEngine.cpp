@@ -2,6 +2,7 @@
 
 #include "AccumulatorOps.h"
 #include "Engine.h"
+#include "Slide.h"
 
 #include "model/Curve.h"
 #include "model/Scale.h"
@@ -133,6 +134,7 @@ void PhaseFluxTrackEngine::reset() {
     _gateState = false;
     _gateTimer = 0;
     _cvOutput = 0.f;
+    _cvOutputTarget = 0.f;
     _activity = false;
     _activityTimer = 0;
     _scheduleCount = 0;
@@ -725,8 +727,8 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
             float cv = scale.noteToVolts(degree);
             if (scale.isChromatic()) cv += float(rootNote) * (1.f / 12.f);
 
-            if (cv != _cvOutput) {
-                _cvOutput = cv;
+            if (cv != _cvOutputTarget) {
+                _cvOutputTarget = cv;
                 result = result | CvUpdate;
             }
         }
@@ -774,7 +776,7 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
 
         _pulseFired |= uint16_t(1u << k);
 
-        _cvOutput = _schedule[k].cv;
+        _cvOutputTarget = _schedule[k].cv;
         _gateState = true;
         _gateTimer = _schedule[k].gateTicks;
         _activity = true;
@@ -818,6 +820,13 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
 }
 
 void PhaseFluxTrackEngine::update(float dt) {
-    (void)dt;
-    // Slide / smoothing deferred to Phase C.
+    // CV glide. PhaseFlux has no per-event slide flag, so Slide Time > 0 is a
+    // global portamento: ease the output toward the target every frame. Both
+    // Gate and Always modes step the target (scale-quantised), so slide smooths
+    // either. Shared Slide::applySlide — same helper NoteTrack/Indexed use.
+    if (_phaseFluxTrack.slideTime() > 0) {
+        _cvOutput = Slide::applySlide(_cvOutput, _cvOutputTarget, _phaseFluxTrack.slideTime(), dt);
+    } else {
+        _cvOutput = _cvOutputTarget;
+    }
 }
