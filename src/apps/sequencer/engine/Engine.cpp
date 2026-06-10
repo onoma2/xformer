@@ -200,7 +200,10 @@ void Engine::update() {
                            Routing::modulatorSourceIndex(gs) == modulatorIndex)
                 ? 0.f : _routingEngine.resolveSourceLevel(gs);
             bool prevGate = _modulatorGateState[modulatorIndex];
-            bool gate = ModulatorEngine::gateFromLevel(level, prevGate);
+            // manual audition pulse (F1 re-press) ORs into the gate, then decays
+            bool gate = ModulatorEngine::gateFromLevel(level, prevGate) ||
+                        _modulatorEngine.manualGateHigh(modulatorIndex);
+            _modulatorEngine.decayManualGate(modulatorIndex, dt);
             _modulatorGateState[modulatorIndex] = gate;
 
             // Geode: M3-M8 are GeodeEngine voices (output set after the update below). A gate

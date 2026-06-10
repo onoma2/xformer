@@ -102,9 +102,24 @@ public:
             _lorenz[i].reset();
             _latoocarfian[i].reset();
             _freeRemainder[i] = 0.f;
+            _manualGateMs[i] = 0.f;
         }
         _justfActive = false;
         _intone = 0.f;
+    }
+
+    // Panel audition: a one-shot gate pulse OR'd into a modulator's gate (F1 re-press).
+    // ADSR/Random-Triggered/Chaos-Trig/Geode-voice respond; a Run-mode LFO ignores it.
+    void triggerManual(int index) {
+        if (index >= 0 && index < CONFIG_MODULATOR_COUNT) _manualGateMs[index] = 60.f;
+    }
+    bool manualGateHigh(int index) const {
+        return index >= 0 && index < CONFIG_MODULATOR_COUNT && _manualGateMs[index] > 0.f;
+    }
+    void decayManualGate(int index, float dt) {
+        if (index >= 0 && index < CONFIG_MODULATOR_COUNT && _manualGateMs[index] > 0.f) {
+            _manualGateMs[index] -= dt * 1000.f;
+        }
     }
 
     void tick(uint32_t tick, float dt, const Modulator &modulator, int index, bool gate,
@@ -451,6 +466,7 @@ private:
     bool _lastGate[CONFIG_MODULATOR_COUNT] = {};
     int _targetValue[CONFIG_MODULATOR_COUNT] = {};
     float _freeRemainder[CONFIG_MODULATOR_COUNT] = {};   // Free-domain phase fractional carry
+    float _manualGateMs[CONFIG_MODULATOR_COUNT] = {};    // panel audition one-shot pulse
     bool _justfActive = false;                           // JustF rate-link mode (runtime-only)
     float _intone = 0.f;                                 // JustF spread (-1..+1), runtime-only
     Random _rng[CONFIG_MODULATOR_COUNT];

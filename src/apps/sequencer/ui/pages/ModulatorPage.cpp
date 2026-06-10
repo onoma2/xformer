@@ -71,6 +71,7 @@ void ModulatorPage::toggleGeode() {
     geode.setActive(now);
     if (now) {
         _engine.modulatorEngine().setJustfActive(false);   // mutually exclusive with JustF
+        _project.modulator(1).setDepth(0);   // park M2 (run) flat -> run starts neutral (0)
     }
     _currentPage = 0;
 }
@@ -550,7 +551,10 @@ void ModulatorPage::keyPress(KeyPressEvent &event) {
                 auto &modulator = _project.modulator(_selectedModulator);
                 bool rateOnF2 = modulator.shape() != Modulator::Shape::Random &&
                                 modulator.shape() != Modulator::Shape::ADSR;
-                if (Function(func) == Function::Rate && _selectedFunction == Function::Rate && rateOnF2) {
+                if (Function(func) == Function::Shape && _selectedFunction == Function::Shape) {
+                    // Re-pressing SHAPE/F1 fires a one-shot audition pulse for this modulator.
+                    _engine.modulatorEngine().triggerManual(_selectedModulator);
+                } else if (Function(func) == Function::Rate && _selectedFunction == Function::Rate && rateOnF2) {
                     modulator.cycleRateDomain();
                 } else {
                     setSelectedFunction(Function(func));
