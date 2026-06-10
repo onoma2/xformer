@@ -932,3 +932,21 @@ def render_modulator_geode_voice(canvas):
     _draw_modulator_scope(canvas)
     # label / DIVS (row 1), REPEAT / TUNE / derived-time (row 2). DIVS selected.
     _draw_geode_right_grid(canvas, ["V3", "8", "4", "3:1", "53ms"], selected=1)
+
+
+# --- PROPOSED: output transform UI — ADSR floor cell + invert indicator ---
+
+def render_modulator_adsr_floor(canvas):
+    # ADSR page 2: AMPLITUDE (row 1) + FLOOR and INVERT side by side (row 2). FLOOR is the
+    # offset field relabelled for envelopes (rest voltage; 0.0V default, was -5V); INVERT
+    # is a plain toggle cell next to it.
+    eng = MockModulatorEngine(current_value=70)
+    WindowPainter.clear(canvas)
+    WindowPainter.draw_header(canvas, track=0, mode="MOD 1 - ADSR")
+    WindowPainter.draw_footer(canvas, ["AMPLIT", None, "FLOOR", "INVERT", None], highlight=2)
+    canvas.set_color(Color.Low)
+    canvas.set_font(Font.Tiny)
+    canvas.draw_text(56, 12, "Pg 2/2")
+    _draw_modulator_scope(canvas)
+    # AMPLIT (row1 left); FLOOR (row2 left, selected) + INVERT (row2 mid).
+    _draw_geode_right_grid(canvas, ["100", "", "0.0V", "OFF", ""], selected=2)

@@ -113,8 +113,8 @@ void ModulatorPage::draw(Canvas &canvas) {
             } else {
                 functionNames[0] = "AMPLIT";
                 functionNames[1] = nullptr;
-                functionNames[2] = nullptr;
-                functionNames[3] = nullptr;
+                functionNames[2] = "FLOOR";
+                functionNames[3] = "INVERT";
                 functionNames[4] = nullptr;
             }
         } else if (isChaos) {
@@ -176,6 +176,8 @@ void ModulatorPage::draw(Canvas &canvas) {
             modulator.printRelease(values[4]);
         } else {
             modulator.printAmplitude(values[0]);
+            values[2]("%.1fV", (modulator.floorValue() - 64) / 12.8f);   // rest voltage
+            values[3](modulator.invert() ? "ON" : "OFF");
         }
     } else if (isChaos) {
         if (_currentPage == 0) {
@@ -567,9 +569,13 @@ void ModulatorPage::encoder(EncoderEvent &event) {
                 break;
             }
         } else {
-            // ADSR page 2: only amplitude is meaningful; depth/offset are unused
+            // ADSR page 2: AMPLITUDE, FLOOR (offset), INVERT toggle.
             if (_selectedFunction == Function::Shape) {
                 modulator.editAmplitude(event.value(), pressed);
+            } else if (_selectedFunction == Function::Depth) {
+                modulator.editOffset(event.value(), pressed);
+            } else if (_selectedFunction == Function::Offset && event.value() != 0) {
+                modulator.setInvert(event.value() > 0);
             }
         }
     } else {
