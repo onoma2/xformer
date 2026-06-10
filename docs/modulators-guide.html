@@ -371,7 +371,10 @@ A <b>depth-0 + offset</b> M2 gives a fixed run <i>bias</i> with no movement.</di
 
 <h3>The voice page</h3>
 <img class="shot" src="../ui-preview/modulator-geode/geode-voice.png" alt="Geode voice page: VOICE DIVS REPEAT TUNE TIME">
-<p class="cap">A voice (M3&ndash;M8) &mdash; live scope + DIVS/REPEAT. Gate &amp; output live on its destinations page.</p>
+<p class="cap">A voice (M3&ndash;M8) &mdash; live scope + DIVS / REPEAT / TUNE. Gate &amp; output live on its destinations page.</p>
+<div class="note"><b>TUNE</b> sets the voice's base ratio that INTONE then spreads (default voice <i>i</i> = <code>i+1 : 1</code>,
+the harmonic series). On the TUNE cell, <b>turn</b> edits the numerator, <b>push + turn</b> edits the denominator
+&mdash; so you can dial just-intonation ratios like <code>3:2</code> per voice instead of plain integers.</div>
 
 <h3>Step-by-step: your first Geode patch</h3>
 <ol class="steps">
@@ -484,7 +487,7 @@ destinations page, make sure that track has a gate, and that the transport is <b
 clock). REPEATS = INF means a single gate keeps it going.</div>
 
 <div class="footer">
-  Geode is a first cut: tune ratios are stored but not yet editable; JF MIX output and quantize aren't wired.
+  Geode is a first cut: JF MIX output and quantize aren't wired yet (tune ratios are now live and editable).
   Everything else above is live in the firmware today. JustF and Geode are mutually exclusive; Geode saves with the project.
 </div>
 

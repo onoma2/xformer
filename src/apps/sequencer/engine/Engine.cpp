@@ -189,6 +189,15 @@ void Engine::update() {
         // routing/CV source reflects the current tick
         const auto &geode = _project.geode();
         const bool geodeActive = geode.active();
+        if (geodeActive) {
+            // push per-voice tune ratios into the engine (only on change, keeps the cache warm)
+            for (int v = 0; v < GeodeEngine::VoiceCount; ++v) {
+                if (_geodeEngine.voiceTuneNumerator(v) != geode.tuneNumerator(v) ||
+                    _geodeEngine.voiceTuneDenominator(v) != geode.tuneDenominator(v)) {
+                    _geodeEngine.setVoiceTune(v, geode.tuneNumerator(v), geode.tuneDenominator(v));
+                }
+            }
+        }
         const bool justf = !geodeActive && _modulatorEngine.justfActive();
         const float justfMasterHz = justf ? _project.modulator(0).rateHz() : 0.f;
         const float justfIntone = _modulatorEngine.intone();

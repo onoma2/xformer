@@ -613,6 +613,10 @@ void ModulatorPage::encoder(EncoderEvent &event) {
             int voice = _selectedModulator - 2;
             if (_selectedFunction == Function::Rate) g.setDivs(voice, g.divs(voice) + d);
             else if (_selectedFunction == Function::Depth) g.setRepeats(voice, g.repeats(voice) + d);
+            else if (_selectedFunction == Function::Offset) {   // TUNE: turn = num, push = den
+                if (pressed) g.setTune(voice, g.tuneNumerator(voice), clamp(g.tuneDenominator(voice) + d, 1, 32));
+                else g.setTune(voice, clamp(g.tuneNumerator(voice) + d, 1, 32), g.tuneDenominator(voice));
+            }
             event.consume();
             return;
         }
