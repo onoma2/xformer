@@ -67,6 +67,7 @@ void Project::clear() {
         modulator.clear();
     }
     _cvOutputModulators.fill(0);
+    _geode.clear();
 
     for (auto &userScale : UserScale::userScales) {
         userScale.clear();
@@ -163,6 +164,7 @@ void Project::write(VersionedSerializedWriter &writer) const {
 
     writeArray(writer, _modulators);
     writeArray(writer, _cvOutputModulators);
+    _geode.write(writer);
 
     writer.write(_selectedModulatorIndex);
 
@@ -219,6 +221,7 @@ bool Project::read(VersionedSerializedReader &reader) {
 
     readArray(reader, _modulators);
     readArray(reader, _cvOutputModulators);
+    _geode.read(reader);
 
     reader.read(_selectedModulatorIndex);
 

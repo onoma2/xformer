@@ -14,6 +14,7 @@
 #include "CvRoute.h"
 #include "MidiOutput.h"
 #include "Modulator.h"
+#include "GeodeConfig.h"
 #include "Serialize.h"
 #include "FileDefs.h"
 #include "TuesdaySequence.h"
@@ -406,6 +407,10 @@ public:
     const Modulator &selectedModulator() const { return _modulators[_selectedModulatorIndex]; }
           Modulator &selectedModulator()       { return _modulators[_selectedModulatorIndex]; }
 
+    // geode (modulator-driven Just Friends mode)
+    const GeodeConfig &geode() const { return _geode; }
+          GeodeConfig &geode()       { return _geode; }
+
     // song
 
     const Song &song() const { return _song; }
@@ -606,6 +611,7 @@ private:
     GateOutputArray _gateOutputTracks;
     ModulatorArray _modulators;
     CvOutputModulatorArray _cvOutputModulators{};
+    GeodeConfig _geode;
     int _selectedModulatorIndex = 0;
     Song _song;
     PlayState _playState;
