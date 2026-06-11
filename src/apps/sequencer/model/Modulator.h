@@ -27,6 +27,7 @@ public:
         ADSR,
         ChaosLorenz,
         ChaosLatoocarfian,
+        Spring,
         Last
     };
 
@@ -41,10 +42,22 @@ public:
         case Shape::ADSR:      return "ADSR";
         case Shape::ChaosLorenz:       return "Lorenz";
         case Shape::ChaosLatoocarfian: return "Latoocarfian";
+        case Shape::Spring:    return "Spring";
         case Shape::Last:      break;
         }
         return nullptr;
     }
+
+    // Spring shape reuses: rate=STRIKE, attack=TENSION, decay=RING, smooth=CLANG,
+    // phase=PICKUP (0..4). See docs/spring-modulator-spec.md.
+    static bool isSpringShape(Shape shape) { return shape == Shape::Spring; }
+    static const char *springPickupName(int p) {
+        static const char *n[5] = { "Position", "Velocity", "Kinetic", "Potential", "Total" };
+        return (p >= 0 && p < 5) ? n[p] : nullptr;
+    }
+    int springPickup() const { return clamp(int(_phase), 0, 4); }
+    void setSpringPickup(int p) { setPhase(clamp(p, 0, 4)); }
+    void editSpringPickup(int v, bool) { setSpringPickup(springPickup() + v); }
 
     // Gate behavior (orthogonal to the rate domain): Run = free-running (gate ignored);
     // Trig = reset phase to offset on gate rising (a 0 offset gives hard sync); Gate =

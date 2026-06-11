@@ -9,6 +9,7 @@
 #include "core/math/Math.h"
 
 #include <cstdint>
+#include <cmath>
 
 class ModulatorEngine {
 public:
@@ -31,6 +32,12 @@ public:
         remainder = inc - float(step);
         return step;
     }
+
+    // --- Spring shape param maps (shared by engine + UI). Reuses attack=TENSION,
+    // decay=RING, smooth=CLANG. See docs/spring-modulator-spec.md §4. ---
+    static float springTensionHz(int attack) { return 0.3f * std::pow(40.f, attack / 2000.f); }
+    static float springZeta(int decay)       { return 0.0015f * std::pow(800.f, 1.f - decay / 2000.f); }
+    static float springClang(int smooth)     { return smooth / 5000.f; }
 
     // A source level in [0,1] (0.5 = threshold) gated with hysteresis. Boolean
     // sources (0/1) cross cleanly; continuous ones get a debounce band.
@@ -103,6 +110,7 @@ public:
             _latoocarfian[i].reset();
             _freeRemainder[i] = 0.f;
             _manualGateMs[i] = 0.f;
+            for (int m = 0; m < 3; ++m) { _springX[i][m] = 0.f; _springV[i][m] = 0.f; }
         }
         _justfActive = false;
         _intone = 0.f;
@@ -165,6 +173,82 @@ public:
 
             int value = (current * modulator.depth()) / 127 + modulator.offset();
             _currentValue[index] = bipolarOutput(value + 64, modulator.invert());
+            return;
+        }
+
+        // Spring shape — mallet-struck 3-mode inharmonic resonator (semi-implicit
+        // Euler at control rate). Universal Mode: Run = Free strike clock,
+        // Trig = gate edge, Gate = hold-displaced then release. Deterministic
+        // strike (no RNG) so cloned slots phase-lock. docs/spring-modulator-spec.md.
+        if (modulator.shape() == Modulator::Shape::Spring) {
+            const Modulator::Mode mode = modulator.mode();
+            const bool gateRising = gate && !_lastGate[index];
+            _lastGate[index] = gate;
+
+            static const float R[3] = { 1.0f, 2.76f, 5.40f };
+            const float PI2 = 6.2831853f;
+            float w0 = PI2 * springTensionHz(modulator.attack());
+            // §6.3 stability: keep the top partial below the Euler limit (w·dt < 1.5).
+            const float wMaxStable = 1.5f / dt;
+            if (w0 * R[2] > wMaxStable) w0 = wMaxStable / R[2];
+            const float zeta = springZeta(modulator.decay());
+            const float clang = springClang(modulator.smooth());
+            const float strikeForce = 0.7f * (modulator.depth() / 127.f);   // §6.6 DEPTH = hit force
+            const float a[3] = { 1.f, clang, 0.6f * clang };   // pickup amplitude weights
+            float *X = _springX[index];
+            float *V = _springV[index];
+
+            // strike trigger
+            bool doStrike = false;
+            if (mode == Modulator::Mode::Trig) {
+                doStrike = gateRising;
+            } else if (mode == Modulator::Mode::Run) {
+                // freePhaseIncrement works in 16-bit phase units (one cycle = 65536),
+                // so detect the wrap on the low 16 bits, not the 32-bit overflow.
+                uint32_t inc = (modulator.rateDomain() == Modulator::RateDomain::Free)
+                    ? freePhaseIncrement(dt, effRateHz, _freeRemainder[index])
+                    : 65536 / (modulator.rate() * 2);
+                _phaseAccumulator[index] += inc;
+                uint16_t now16 = uint16_t(_phaseAccumulator[index] & 0xFFFF);
+                if (now16 < _lastPhase[index]) doStrike = true;          // cycle wrap = hit
+                _lastPhase[index] = now16;
+            }
+            if (doStrike) {
+                const float v0 = w0 * strikeForce;
+                for (int i = 0; i < 3; ++i) V[i] += v0;
+            }
+
+            const bool held = (mode == Modulator::Mode::Gate && gate);
+            if (held) {
+                for (int i = 0; i < 3; ++i) { X[i] = (strikeForce / R[i]) * a[i]; V[i] = 0.f; }
+            } else {
+                for (int i = 0; i < 3; ++i) {
+                    const float w = w0 * R[i];
+                    const float k = w * w;
+                    const float c = 2.f * zeta * w * (1.f + 0.8f * i);   // upper modes die faster
+                    V[i] += (-k * X[i] - c * V[i]) * dt;
+                    X[i] += V[i] * dt;
+                    if (X[i] > 4.f) X[i] = 4.f; else if (X[i] < -4.f) X[i] = -4.f;
+                    const float vMax = 4.f * w0;
+                    if (V[i] > vMax) V[i] = vMax; else if (V[i] < -vMax) V[i] = -vMax;
+                }
+            }
+
+            const float w0sq = w0 * w0 + 1e-9f;
+            float s = 0.f;
+            switch (modulator.springPickup()) {
+            case 1: for (int i = 0; i < 3; ++i) s += a[i] * V[i]; s /= (w0 > 1e-6f ? w0 : 1e-6f); break;        // velocity
+            case 2: for (int i = 0; i < 3; ++i) s += a[i]*a[i] * 0.5f*V[i]*V[i]/w0sq; s *= 4.f; break;          // kinetic
+            case 3: for (int i = 0; i < 3; ++i) s += a[i]*a[i] * 0.5f*R[i]*R[i]*X[i]*X[i]; s *= 4.f; break;     // potential
+            case 4: { float ke = 0.f, pe = 0.f;
+                for (int i = 0; i < 3; ++i) { ke += a[i]*a[i]*0.5f*V[i]*V[i]/w0sq; pe += a[i]*a[i]*0.5f*R[i]*R[i]*X[i]*X[i]; }
+                s = 4.f * (ke + pe); break; }                                                                  // total
+            default: for (int i = 0; i < 3; ++i) s += a[i] * X[i]; break;                                       // position
+            }
+
+            int value = int(64.f + 63.f * std::tanh(s)) + modulator.offset();   // soft-sat, no hard clip
+            if (value < 0) value = 0; else if (value > 127) value = 127;
+            _currentValue[index] = bipolarOutput(value, modulator.invert());
             return;
         }
 
@@ -447,6 +531,8 @@ private:
     int _targetValue[CONFIG_MODULATOR_COUNT] = {};
     float _freeRemainder[CONFIG_MODULATOR_COUNT] = {};   // Free-domain phase fractional carry
     float _manualGateMs[CONFIG_MODULATOR_COUNT] = {};    // panel audition one-shot pulse
+    float _springX[CONFIG_MODULATOR_COUNT][3] = {};      // Spring shape — 3-mode position
+    float _springV[CONFIG_MODULATOR_COUNT][3] = {};      // Spring shape — 3-mode velocity
     bool _justfActive = false;                           // JustF rate-link mode (runtime-only)
     float _intone = 0.f;                                 // JustF spread (-1..+1), runtime-only
     Random _rng[CONFIG_MODULATOR_COUNT];

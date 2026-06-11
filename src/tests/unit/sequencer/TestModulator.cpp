@@ -17,6 +17,18 @@ namespace {
 using Domain = Modulator::RateDomain;
 bool eq(const StringBuilder &b, const char *s) { return std::strcmp((const char *)b, s) == 0; }
 
+Modulator makeSpring(Modulator::Mode mode) {
+    Modulator m; m.clear();
+    m.setShape(Modulator::Shape::Spring);
+    m.setMode(mode);
+    m.setAttack(800);    // TENSION
+    m.setDecay(1600);    // RING — long, so it rings many cycles
+    m.setSmooth(2500);   // CLANG ~0.5
+    m.setDepth(127);     // full strike force
+    m.setSpringPickup(0); // Position
+    return m;
+}
+
 Modulator makeClockedRandom(Modulator::Mode mode) {
     Modulator m; m.clear();
     m.setShape(Modulator::Shape::Random);
@@ -285,6 +297,52 @@ CASE("Random Trig samples only on a gate rising edge") {
         if (eng.currentValue(0) != held) changed = true;
     }
     expect(changed, "gate rising edges resample");
+}
+
+// ---- Spring shape: struck multi-mode resonator -----------------------------
+
+CASE("Spring rings (crosses centre) after a Trig strike") {
+    ModulatorEngine eng; eng.reset();
+    Modulator m = makeSpring(Modulator::Mode::Trig);
+    for (uint32_t t = 0; t < 50; ++t) eng.tick(t, 0.001f, m, 0, false);  // at rest
+    int lo = 999, hi = -999;
+    uint32_t t = 50;
+    eng.tick(t++, 0.001f, m, 0, true);                                   // strike
+    for (int i = 0; i < 800; ++i) {
+        eng.tick(t++, 0.001f, m, 0, false);
+        int v = eng.currentValue(0);
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+    }
+    expect(hi > 64, "rings above centre");
+    expect(lo < 64, "rings below centre (a sine, not a one-way envelope)");
+}
+
+CASE("Spring Run self-strikes on the Free clock (no gate)") {
+    ModulatorEngine eng; eng.reset();
+    Modulator m = makeSpring(Modulator::Mode::Run);
+    m.setRateDomain(Modulator::RateDomain::Free);
+    m.setRate(200);   // 2 Hz strike clock
+    int lo = 999, hi = -999;
+    for (uint32_t t = 0; t < 1500; ++t) {   // ~1.5 s → several strikes
+        eng.tick(t, 0.001f, m, 0, false);
+        int v = eng.currentValue(0);
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+    }
+    expect(hi > 64, "Run clock strikes (rings above centre)");
+    expect(lo < 64, "Run clock strikes (rings below centre)");
+}
+
+CASE("Spring holds displaced while the gate is high") {
+    ModulatorEngine eng; eng.reset();
+    Modulator m = makeSpring(Modulator::Mode::Gate);
+    int held = 64;
+    for (uint32_t t = 0; t < 100; ++t) { eng.tick(t, 0.001f, m, 0, true); held = eng.currentValue(0); }
+    expect(held != 64, "pinned away from centre while held");
+    int held2 = held;
+    for (uint32_t t = 100; t < 300; ++t) { eng.tick(t, 0.001f, m, 0, true); held2 = eng.currentValue(0); }
+    expectEqual(held2, held, "stays put while the gate stays high");
 }
 
 }

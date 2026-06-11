@@ -110,22 +110,30 @@ void ModulatorPage::drawGeodeVoice(Canvas &canvas, int voice) {
     int ms = int(166.7f * std::pow(360.f, geode.timeNorm()) + 0.5f);
     values[4]("%dms", ms);
 
-    const int colL = 128, colM = 190, colR = 256;
+    // Tiny-font param list (name + value, boxed selection) — same as every
+    // other modulator page.
+    const int panelX = 124, panelY = 12, rowH = 8;
+    const int panelW = 256 - panelX - 2;
     canvas.setBlendMode(BlendMode::Set);
-    canvas.setFont(Font::Small);
+    canvas.setColor(Color::Low);
+    canvas.vline(122, 13, 39);
+    canvas.setFont(Font::Tiny);
     int sel = int(_selectedFunction);
-    for (int i = 0; i < 2; ++i) {
-        if (values[i][0] == '\0') continue;
-        canvas.setColor(i == sel ? Color::Bright : Color::Medium);
-        if (i == 0) canvas.drawText(colL, 22, values[0]);
-        else canvas.drawText(colR - canvas.textWidth(values[1]), 22, values[1]);
-    }
-    for (int i = 2; i < 5; ++i) {
-        if (values[i][0] == '\0') continue;
-        canvas.setColor(i == sel ? Color::Bright : Color::Medium);
-        if (i == 2) canvas.drawText(colL, 42, values[2]);
-        else if (i == 3) canvas.drawText(colM, 42, values[3]);
-        else canvas.drawText(colR - canvas.textWidth(values[4]), 42, values[4]);
+    for (int i = 0; i < 5; ++i) {
+        if (!names[i] || values[i][0] == '\0') continue;
+        bool s = (i == sel);
+        int ry = panelY + i * rowH;
+        int rh = rowH - 1;
+        if (s) {
+            canvas.setColor(Color::Bright);
+            canvas.drawRect(panelX, ry, panelW, rh);
+        }
+        int ty = ry + rh - 2;
+        canvas.setColor(s ? Color::Bright : Color::Medium);
+        canvas.drawText(panelX + 2, ty, names[i]);
+        int vw = canvas.textWidth(values[i]);
+        canvas.setColor(s ? Color::Bright : Color::MediumBright);
+        canvas.drawText(panelX + panelW - 2 - vw, ty, values[i]);
     }
 }
 
@@ -134,6 +142,7 @@ void ModulatorPage::draw(Canvas &canvas) {
     bool isRandom = (modulator.shape() == Modulator::Shape::Random);
     bool isADSR = (modulator.shape() == Modulator::Shape::ADSR);
     bool isChaos = Modulator::isChaosShape(modulator.shape());
+    bool isSpring = Modulator::isSpringShape(modulator.shape());
 
     // Geode mode: M3-M8 are voices (own page); M1 gains a globals page; M2 stays normal.
     bool geodeActive = _project.geode().active() && !_showRoutingOverlay;
@@ -147,7 +156,7 @@ void ModulatorPage::draw(Canvas &canvas) {
     }
 
     // Update total pages for ADSR and chaos (M1 gains page 2 for the Geode globals)
-    if (isADSR || isChaos || geodeM1) {
+    if (isADSR || isChaos || isSpring || geodeM1) {
         _totalPages = 2;
     } else {
         _totalPages = 1;
@@ -192,32 +201,46 @@ void ModulatorPage::draw(Canvas &canvas) {
                 functionNames[3] = "SUSTAIN";
                 functionNames[4] = "RELEASE";
             } else {
-                functionNames[0] = "AMPLIT";
+                functionNames[0] = nullptr;
                 functionNames[1] = nullptr;
-                functionNames[2] = "FLOOR";
+                functionNames[2] = "DEPTH";    // was AMPLIT
                 functionNames[3] = "INVERT";
-                functionNames[4] = nullptr;
+                functionNames[4] = "OFFSET";   // was FLOOR
             }
         } else if (isChaos) {
             if (_currentPage == 0) {
                 functionNames[0] = "SHAPE";
                 functionNames[1] = "RATE";
-                functionNames[2] = "P1";
-                functionNames[3] = "P2";
-                functionNames[4] = "DEPTH";
+                functionNames[2] = "DEPTH";
+                functionNames[3] = "P1";
+                functionNames[4] = "P2";
             } else {
                 functionNames[0] = "SLEW";
-                functionNames[1] = "OFFSET";
+                functionNames[1] = nullptr;
                 functionNames[2] = nullptr;
                 functionNames[3] = nullptr;
-                functionNames[4] = nullptr;
+                functionNames[4] = "OFFSET";
+            }
+        } else if (isSpring) {
+            if (_currentPage == 0) {
+                functionNames[0] = "SHAPE";
+                functionNames[1] = "STRIKE";
+                functionNames[2] = "TENS";
+                functionNames[3] = "RING";
+                functionNames[4] = "CLANG";
+            } else {
+                functionNames[0] = "PICKUP";
+                functionNames[1] = nullptr;
+                functionNames[2] = "DEPTH";    // F3, per the standard convention
+                functionNames[3] = nullptr;
+                functionNames[4] = "OFFSET";   // last slot
             }
         } else {
             functionNames[0] = "SHAPE";
             functionNames[1] = "RATE";
             functionNames[2] = "DEPTH";
-            functionNames[3] = "OFFSET";
-            functionNames[4] = isRandom ? "SLEW" : "PHASE";
+            functionNames[3] = isRandom ? "SLEW" : "PHASE";
+            functionNames[4] = "OFFSET";
         }
         // JustF: M2's RATE key becomes INTONE.
         if (_engine.modulatorEngine().justfActive() && _selectedModulator == 1) {
@@ -256,31 +279,43 @@ void ModulatorPage::draw(Canvas &canvas) {
             modulator.printSustain(values[3]);
             modulator.printRelease(values[4]);
         } else {
-            modulator.printAmplitude(values[0]);
-            values[2]("%.1fV", (modulator.floorValue() - 64) / 12.8f);   // rest voltage
-            values[3](modulator.invert() ? "ON" : "OFF");
+            modulator.printAmplitude(values[2]);                          // DEPTH (F3)
+            values[3](modulator.invert() ? "ON" : "OFF");                 // INVERT (F4)
+            values[4]("%.1fV", (modulator.floorValue() - 64) / 12.8f);    // OFFSET (F5) — rest voltage
         }
     } else if (isChaos) {
         if (_currentPage == 0) {
             values[0](Modulator::shapeName(modulator.shape()));
             modulator.printRate(values[1]);
-            values[2]("%d", modulator.attack() / 20);
-            values[3]("%d", modulator.decay() / 20);
-            modulator.printDepth(values[4]);
+            modulator.printDepth(values[2]);                  // DEPTH (F3)
+            values[3]("%d", modulator.attack() / 20);         // P1 (F4)
+            values[4]("%d", modulator.decay() / 20);          // P2 (F5)
         } else {
-            modulator.printSmooth(values[0]);
-            modulator.printOffset(values[1]);
+            modulator.printSmooth(values[0]);                 // SLEW (F1)
+            modulator.printOffset(values[4]);                 // OFFSET (F5)
+        }
+    } else if (isSpring) {
+        if (_currentPage == 0) {
+            values[0](Modulator::shapeName(modulator.shape()));
+            modulator.printRate(values[1]);                                   // STRIKE
+            values[2]("%.1fHz", ModulatorEngine::springTensionHz(modulator.attack()));
+            values[3]("%d%%", (modulator.decay() * 100) / 2000);              // RING
+            values[4]("%d%%", (modulator.smooth() * 100) / 5000);            // CLANG
+        } else {
+            values[0](Modulator::springPickupName(modulator.springPickup()));
+            modulator.printDepth(values[2]);    // DEPTH (F3)
+            modulator.printOffset(values[4]);   // OFFSET (F5)
         }
     } else {
         values[0](Modulator::shapeName(modulator.shape()));
         modulator.printRate(values[1]);
         modulator.printDepth(values[2]);
-        modulator.printOffset(values[3]);
         if (isRandom) {
-            modulator.printSmooth(values[4]);
+            modulator.printSmooth(values[3]);   // SLEW (F4)
         } else {
-            modulator.printPhase(values[4]);
+            modulator.printPhase(values[3]);    // PHASE (F4)
         }
+        modulator.printOffset(values[4]);       // OFFSET (F5)
     }
 
     // JustF: M2's RATE cell hosts INTONE; M3-M8 show their derived rate (read-only).
@@ -650,22 +685,22 @@ void ModulatorPage::encoder(EncoderEvent &event) {
                 modulator.editRate(event.value(), pressed);
                 break;
             case Function::Depth:
-                modulator.editAttack(event.value(), pressed);
+                modulator.editDepth(event.value(), pressed);    // DEPTH (F3)
                 break;
             case Function::Offset:
-                modulator.editDecay(event.value(), pressed);
+                modulator.editAttack(event.value(), pressed);   // P1 (F4)
                 break;
             case Function::Phase:
-                modulator.editDepth(event.value(), pressed);
+                modulator.editDecay(event.value(), pressed);    // P2 (F5)
                 break;
             }
         } else {
             switch (_selectedFunction) {
             case Function::Shape:
-                modulator.editSmooth(event.value(), pressed);
+                modulator.editSmooth(event.value(), pressed);   // SLEW (F1)
                 break;
-            case Function::Rate:
-                modulator.editOffset(event.value(), pressed);
+            case Function::Phase:
+                modulator.editOffset(event.value(), pressed);   // OFFSET (F5)
                 break;
             default:
                 break;
@@ -691,13 +726,30 @@ void ModulatorPage::encoder(EncoderEvent &event) {
                 break;
             }
         } else {
-            // ADSR page 2: AMPLITUDE, FLOOR (offset), INVERT toggle.
-            if (_selectedFunction == Function::Shape) {
+            // ADSR page 2: DEPTH (amplitude) F3, INVERT F4, OFFSET (floor) F5.
+            if (_selectedFunction == Function::Depth) {
                 modulator.editAmplitude(event.value(), pressed);
-            } else if (_selectedFunction == Function::Depth) {
-                modulator.editOffset(event.value(), pressed);
             } else if (_selectedFunction == Function::Offset && event.value() != 0) {
                 modulator.setInvert(event.value() > 0);
+            } else if (_selectedFunction == Function::Phase) {
+                modulator.editOffset(event.value(), pressed);
+            }
+        }
+    } else if (modulator.shape() == Modulator::Shape::Spring) {
+        if (_currentPage == 0) {
+            switch (_selectedFunction) {
+            case Function::Shape:  modulator.editShape(event.value(), pressed);  break;
+            case Function::Rate:   modulator.editRate(event.value(), pressed);   break;  // STRIKE
+            case Function::Depth:  modulator.editAttack(event.value(), pressed); break;  // TENSION
+            case Function::Offset: modulator.editDecay(event.value(), pressed);  break;  // RING
+            case Function::Phase:  modulator.editSmooth(event.value(), pressed); break;  // CLANG
+            }
+        } else {
+            switch (_selectedFunction) {
+            case Function::Shape: modulator.editSpringPickup(event.value(), pressed); break;  // PICKUP (F1)
+            case Function::Depth: modulator.editDepth(event.value(), pressed);  break;        // DEPTH (F3)
+            case Function::Phase: modulator.editOffset(event.value(), pressed); break;        // OFFSET (F5)
+            default: break;
             }
         }
     } else {
@@ -714,17 +766,14 @@ void ModulatorPage::encoder(EncoderEvent &event) {
             modulator.editRate(event.value(), pressed);
             break;
         case Function::Depth:
-            modulator.editDepth(event.value(), pressed);
+            modulator.editDepth(event.value(), pressed);        // DEPTH (F3)
             break;
         case Function::Offset:
-            modulator.editOffset(event.value(), pressed);
+            if (isRandom) modulator.editSmooth(event.value(), pressed);  // SLEW (F4)
+            else          modulator.editPhase(event.value(), pressed);   // PHASE (F4)
             break;
         case Function::Phase:
-            if (isRandom) {
-                modulator.editSmooth(event.value(), pressed);
-            } else {
-                modulator.editPhase(event.value(), pressed);
-            }
+            modulator.editOffset(event.value(), pressed);       // OFFSET (F5)
             break;
         }
     }
