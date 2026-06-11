@@ -130,38 +130,30 @@ def draw_pitch_scope_redesign(canvas: Canvas, stage: Stage, *,
         canvas.set_color(Color.Bright if passed else Color.Medium)
         canvas.fill_rect(dot_x - 1, dot_y - 1, 2, 2)
 
-    # Histogram of reachable degrees → top 4 by count, tie-broken by pitch.
+    # Slot 0 = current note (highlighted; blank when idle); slots 1..3 = the
+    # 3 most-frequent reachable degrees (raw top-3). Fixed positions, no sort.
     counts = degree_histogram(stage, range_degrees, direction)
-    if not counts:
-        return
     current = current_degree(stage, stage_phase, range_degrees, direction) \
         if selected_is_active else None
 
     sorted_by_count = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
-    top = [d for d, _ in sorted_by_count[:4]]
-    # Always include the currently-playing degree (push out the lowest-count one).
-    if current is not None and current in counts and current not in top:
-        if len(top) >= 4:
-            top = top[:3]
-        top.append(current)
+    freq = [d for d, _ in sorted_by_count[:3]]
+    if current is None and not freq:
+        return
 
-    # Sort visible by pitch — high at top, low at bottom.
-    visible = sorted(top, reverse=True)
-    n = len(visible)
-
-    # Evenly distribute label rows across the scope's inner height.
     inner_y0 = y + 2
     inner_h  = h - 4
     label_right = x + LABEL_COL_W - 2
+    K_SLOTS = 4
     canvas.set_font(Font.Tiny)
-    for i, deg in enumerate(visible):
-        # Slot centre y.
-        slot_cy = inner_y0 + int((i + 0.5) * inner_h / n)
+
+    def draw_slot(slot_idx, deg, highlight):
+        slot_cy = inner_y0 + int((slot_idx + 0.5) * inner_h / K_SLOTS)
         baseline = slot_cy + 2
         note_str = note_name(base_semitone + deg)
         tw = canvas.text_width(note_str)
         tx = label_right - tw
-        if deg == current:
+        if highlight:
             canvas.set_color(Color.Bright)
             canvas.fill_rect(tx - 1, baseline - 5, tw + 1, 7)
             canvas.set_blend_mode(BlendMode.Sub)
@@ -170,6 +162,11 @@ def draw_pitch_scope_redesign(canvas: Canvas, stage: Stage, *,
         else:
             canvas.set_color(Color.Medium)
             canvas.draw_text(tx, baseline, note_str)
+
+    if current is not None:
+        draw_slot(0, current, True)            # top = live note
+    for i, deg in enumerate(freq):
+        draw_slot(1 + i, deg, False)
 
 
 def render_pitch_scope_redesign(canvas: Canvas, stages, *,

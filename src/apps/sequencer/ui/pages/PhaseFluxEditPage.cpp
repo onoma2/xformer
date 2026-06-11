@@ -1195,12 +1195,12 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
         if (passesMelodyMask(baseDegree + candidate)) currentOff = candidate;
     }
 
-    // Find top 4 by count (linear repeated max — N=4, fine for small N).
-    int topDeg[5];
-    int topN = 0;
+    // Bottom 3 slots = the 3 most-frequent reachable degrees (raw top-3).
+    int freqDeg[3];
+    int freqN = 0;
     int countsCopy[kHistSize];
     for (int i = 0; i < kHistSize; ++i) countsCopy[i] = counts[i];
-    for (int slot = 0; slot < 4; ++slot) {
+    for (int slot = 0; slot < 3; ++slot) {
         int bestBin = -1;
         int bestCount = 0;
         for (int b = 0; b < kHistSize; ++b) {
@@ -1210,45 +1210,27 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
             }
         }
         if (bestBin < 0) break;
-        topDeg[topN++] = bestBin - kHistBias;
+        freqDeg[freqN++] = bestBin - kHistBias;
         countsCopy[bestBin] = 0;
     }
 
-    // Ensure current is in the visible set (push out lowest-count one).
-    if (currentOff != kNoCurrent) {
-        bool already = false;
-        for (int i = 0; i < topN; ++i) if (topDeg[i] == currentOff) { already = true; break; }
-        // Only include if reachable (its bucket non-zero in original histogram).
-        const int currentBin = currentOff + kHistBias;
-        const bool reachable = (currentBin >= 0 && currentBin < kHistSize && counts[currentBin] > 0);
-        if (!already && reachable) {
-            if (topN >= 4) topN = 3;
-            topDeg[topN++] = currentOff;
-        }
-    }
+    if (currentOff == kNoCurrent && freqN == 0) return;
 
-    if (topN == 0) return;
-
-    // Sort by pitch — high at top, low at bottom (descending).
-    for (int i = 0; i < topN; ++i) {
-        for (int j = i + 1; j < topN; ++j) {
-            if (topDeg[i] < topDeg[j]) std::swap(topDeg[i], topDeg[j]);
-        }
-    }
-
-    // Draw labels: evenly distribute slots in the label column.
+    // 4 fixed slots: [0] = current note (highlighted; blank when idle),
+    // [1..3] = the 3 most-frequent degrees. No pitch sort — fixed positions.
     canvas.setFont(Font::Tiny);
     const int innerY0 = y + 2;
     const int innerH  = ScopeH - 4;
     const int labelRight = x + PitchLabelColW - 2;
-    for (int i = 0; i < topN; ++i) {
-        const int slotCy  = innerY0 + ((2 * i + 1) * innerH) / (2 * topN);
+    constexpr int kSlots = 4;
+    auto drawSlot = [&](int slotIdx, int deg, bool highlight) {
+        const int slotCy = innerY0 + ((2 * slotIdx + 1) * innerH) / (2 * kSlots);
         const int baseline = slotCy + 2;
         FixedStringBuilder<5> noteStr;
-        scale.noteName(noteStr, baseDegree + topDeg[i], rootNote, Scale::Long);
+        scale.noteName(noteStr, baseDegree + deg, rootNote, Scale::Long);
         const int tw = canvas.textWidth(noteStr);
         const int tx = labelRight - tw;
-        if (topDeg[i] == currentOff) {
+        if (highlight) {
             canvas.setColor(Color::Bright);
             canvas.fillRect(tx - 1, baseline - 5, tw + 1, 7);
             canvas.setBlendMode(BlendMode::Sub);
@@ -1258,7 +1240,10 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
             canvas.setColor(Color::Medium);
             canvas.drawText(tx, baseline, noteStr);
         }
-    }
+    };
+
+    if (currentOff != kNoCurrent) drawSlot(0, currentOff, true);   // top = live note
+    for (int i = 0; i < freqN; ++i) drawSlot(1 + i, freqDeg[i], false);
 }
 
 void PhaseFluxEditPage::drawMacroScope(Canvas &canvas) {
