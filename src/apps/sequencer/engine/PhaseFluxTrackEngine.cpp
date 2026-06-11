@@ -89,13 +89,14 @@ inline float phaseFluxPitchValue(float phi, int pitchR, int warpKnob,
     return PhaseFluxMath::evalResponseFlipV(p_curved, respKnob, flipV);
 }
 
-// §6.1 temporal value chain — single source for gate + preview.
+// §6.1 temporal value chain (v0.2 order) — single source for gate + preview.
+// Warp stays on the local position here; Repeat (sub-section allocation) and
+// the FlipH schedule reversal live at the call site.
 inline float phaseFluxTemporalValue(float t_local, int warpKnob,
                                     Curve::Type curveType, bool flipV, int respKnob) {
     float t_warped = applyPowerBend(t_local, warpKnob);
     float t_curved = Curve::eval(curveType, t_warped);
-    float t_flipped = flipV ? (1.f - t_curved) : t_curved;
-    return applyPowerBend(t_flipped, respKnob);
+    return PhaseFluxMath::evalResponseFlipV(t_curved, respKnob, flipV);
 }
 
 } // namespace
