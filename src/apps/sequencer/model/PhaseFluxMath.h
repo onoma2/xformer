@@ -72,6 +72,16 @@ public:
                                  PhaseFluxSequence::RepeatType repeat,
                                  float &phiOut);
 
+    /** v0.2 pitch phase chain: Warp -> Repeat -> Window(hold) -> FlipH.
+     *  Returns phi_input for Curve::eval. warpKnob in [-64,64], 0 = identity.
+     *  repeat is the integer multiplier R (1/2/3/5). */
+    static float evalPitchPhase(float phi, int warpKnob, int repeat,
+                                PhaseFluxSequence::WindowType window, bool flipH);
+
+    /** v0.2 value tail: Response -> FlipV, on the raw curve output.
+     *  respKnob in [-64,64], 0 = identity. */
+    static float evalResponseFlipV(float pCurved, int respKnob, bool flipV);
+
     /**
      * §3.1 — Snake-walk cumulative duration table.
      *   stageDivisorTicksArr[i] — ticks/stage at clockMultiplier=100, by cell index

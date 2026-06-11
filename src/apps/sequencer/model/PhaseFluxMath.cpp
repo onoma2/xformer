@@ -158,6 +158,21 @@ bool PhaseFluxMath::evalWindowRepeat(float phi,
     return true;
 }
 
+float PhaseFluxMath::evalPitchPhase(float phi, int warpKnob, int repeat,
+                                    PhaseFluxSequence::WindowType window, bool flipH) {
+    float w = (warpKnob == 0) ? phi
+        : powerBend(std::max(0.f, std::min(1.f, phi)), powerBendKnobToParam(warpKnob));
+    float r = (repeat > 1) ? (w * float(repeat) - std::floor(w * float(repeat))) : w;
+    float windowed = holdPitchWindowBoundary(r, window);
+    return flipH ? (1.f - windowed) : windowed;
+}
+
+float PhaseFluxMath::evalResponseFlipV(float pCurved, int respKnob, bool flipV) {
+    float r = (respKnob == 0) ? pCurved
+        : powerBend(std::max(0.f, std::min(1.f, pCurved)), powerBendKnobToParam(respKnob));
+    return flipV ? (1.f - r) : r;
+}
+
 int PhaseFluxMath::computeCumulativeTicks(
     const std::array<uint8_t, kStageCount> &traversal,
     const int stageDivisorTicksArr[kStageCount],

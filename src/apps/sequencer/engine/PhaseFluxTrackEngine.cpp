@@ -78,18 +78,15 @@ inline bool isInWindow(float phi, PhaseFluxSequence::WindowType v) {
     return PhaseFluxMath::isInWindow(phi, v);
 }
 
-// §6.2 pitch curve pipeline — single source for gate + continuous + preview.
+// §6.2 pitch curve pipeline (v0.2 order) — single source for gate + continuous
+// + preview. Phase/value chains live in PhaseFluxMath so they stay unit-tested.
 inline float phaseFluxPitchValue(float phi, int pitchR, int warpKnob,
                                  bool flipH, Curve::Type curveType,
                                  bool flipV, int respKnob,
                                  PhaseFluxSequence::WindowType windowType) {
-    phi = PhaseFluxMath::holdPitchWindowBoundary(phi, windowType);
-    float phi_repeated = (pitchR > 1) ? std::fmod(phi * float(pitchR), 1.f) : phi;
-    float phi_warped = applyPowerBend(phi_repeated, warpKnob);
-    float phi_input = flipH ? (1.f - phi_warped) : phi_warped;
+    float phi_input = PhaseFluxMath::evalPitchPhase(phi, warpKnob, pitchR, windowType, flipH);
     float p_curved = Curve::eval(curveType, phi_input);
-    float p_flipped = flipV ? (1.f - p_curved) : p_curved;
-    return applyPowerBend(p_flipped, respKnob);
+    return PhaseFluxMath::evalResponseFlipV(p_curved, respKnob, flipV);
 }
 
 // §6.1 temporal value chain — single source for gate + preview.
