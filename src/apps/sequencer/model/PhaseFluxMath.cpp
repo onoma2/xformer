@@ -173,6 +173,20 @@ float PhaseFluxMath::evalResponseFlipV(float pCurved, int respKnob, bool flipV) 
     return flipV ? (1.f - r) : r;
 }
 
+void PhaseFluxMath::evalTemporalAlloc(int pulseIndex, int pulseCount, int R,
+                                      int warpKnob, int &subIdx, float &tLocal) {
+    if (R < 1) R = 1;
+    float seed = (pulseCount > 0) ? float(pulseIndex) / float(pulseCount) : 0.f;
+    float warped = (warpKnob == 0) ? seed
+        : powerBend(std::max(0.f, std::min(1.f, seed)), powerBendKnobToParam(warpKnob));
+    float scaled = warped * float(R);
+    int s = int(std::floor(scaled));
+    if (s < 0) s = 0;
+    if (s > R - 1) s = R - 1;
+    subIdx = s;
+    tLocal = scaled - float(s);
+}
+
 int PhaseFluxMath::computeCumulativeTicks(
     const std::array<uint8_t, kStageCount> &traversal,
     const int stageDivisorTicksArr[kStageCount],

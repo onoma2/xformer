@@ -82,6 +82,13 @@ public:
      *  respKnob in [-64,64], 0 = identity. */
     static float evalResponseFlipV(float pCurved, int respKnob, bool flipV);
 
+    /** v0.2 temporal Warp -> Repeat allocation. Seeds pulse at pulseIndex /
+     *  pulseCount, warps that whole-cell position, then splits by R: writes
+     *  subIdx (0..R-1) and the local position within the sub-section. warp 0
+     *  is globally even (sub+local)/R == pulseIndex/pulseCount. */
+    static void evalTemporalAlloc(int pulseIndex, int pulseCount, int R,
+                                  int warpKnob, int &subIdx, float &tLocal);
+
     /**
      * §3.1 — Snake-walk cumulative duration table.
      *   stageDivisorTicksArr[i] — ticks/stage at clockMultiplier=100, by cell index

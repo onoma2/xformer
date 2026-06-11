@@ -81,4 +81,39 @@ CASE("flipH_and_flipV_independent_on_ramp_with_response") {
     expectEqual(approxEq(hOut, vOut), false, "H and V give distinct results with response");
 }
 
+// ---- Temporal Warp BEFORE Repeat (v0.2, decision A): warped sub-section allocation ----
+CASE("temporal_alloc_warp0_even_divisible") {
+    // pulseCount 6, R 3, warp 0 -> even 2/2/2, each sub at local 0 and 0.5.
+    const int pc = 6, R = 3;
+    const int expSub[6]   = { 0, 0, 1, 1, 2, 2 };
+    const float expLoc[6] = { 0.f, 0.5f, 0.f, 0.5f, 0.f, 0.5f };
+    for (int i = 0; i < pc; ++i) {
+        int sub; float loc;
+        PhaseFluxMath::evalTemporalAlloc(i, pc, R, 0, sub, loc);
+        expectEqual(sub, expSub[i], "sub idx warp0");
+        expectEqual(approxEq(loc, expLoc[i]), true, "local pos warp0");
+    }
+}
+
+CASE("temporal_alloc_globally_even_at_warp0") {
+    // With Ramp (identity), global position = (sub + local)/R must equal i/pc.
+    const int pc = 6, R = 3;
+    for (int i = 0; i < pc; ++i) {
+        int sub; float loc;
+        PhaseFluxMath::evalTemporalAlloc(i, pc, R, 0, sub, loc);
+        float global = (float(sub) + loc) / float(R);
+        expectEqual(approxEq(global, float(i) / float(pc)), true, "globally even at warp0");
+    }
+}
+
+CASE("temporal_alloc_warp_shifts_subsection") {
+    // Pulse 3 of 6 sits in sub 1 at warp 0; strong positive warp pushes its
+    // whole-cell seed up so it crosses into sub 2 — uneven sub-sections.
+    int sub0, sub1; float loc0, loc1;
+    PhaseFluxMath::evalTemporalAlloc(3, 6, 3, 0,  sub0, loc0);
+    PhaseFluxMath::evalTemporalAlloc(3, 6, 3, 50, sub1, loc1);
+    expectEqual(sub0, 1, "warp0 -> sub 1");
+    expectEqual(sub1 != sub0, true, "warp moves pulse to a different sub-section");
+}
+
 }

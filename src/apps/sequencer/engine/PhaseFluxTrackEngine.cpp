@@ -90,12 +90,11 @@ inline float phaseFluxPitchValue(float phi, int pitchR, int warpKnob,
 }
 
 // §6.1 temporal value chain (v0.2 order) — single source for gate + preview.
-// Warp stays on the local position here; Repeat (sub-section allocation) and
-// the FlipH schedule reversal live at the call site.
-inline float phaseFluxTemporalValue(float t_local, int warpKnob,
-                                    Curve::Type curveType, bool flipV, int respKnob) {
-    float t_warped = applyPowerBend(t_local, warpKnob);
-    float t_curved = Curve::eval(curveType, t_warped);
+// Warp is consumed upstream in evalTemporalAlloc (Warp -> Repeat); Window-drop
+// and the FlipH schedule reversal live at the call site.
+inline float phaseFluxTemporalValue(float t_local, Curve::Type curveType,
+                                    bool flipV, int respKnob) {
+    float t_curved = Curve::eval(curveType, t_local);
     return PhaseFluxMath::evalResponseFlipV(t_curved, respKnob, flipV);
 }
 
@@ -356,12 +355,9 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
     PulseCandidate cands[kMaxPulses];
     int candCount = 0;
 
-    // §14.2 Window → Repeat (temporal). Repeat splits pulseCount into R
-    // sub-sections (earlier subs get the extra pulse(s) when not divisible).
+    // §14.2 Warp → Repeat (temporal, v0.2). evalTemporalAlloc warps each
+    // pulse's whole-cell position, then splits by R into (subIdx, local).
     const int tempR = repeatMultiplier(stage.temporalRepeat());
-    const int subBaseSize = pulseCount / tempR;
-    const int subRemainder = pulseCount % tempR;
-    const int subOversizeBoundary = subRemainder * (subBaseSize + 1);
 
     // §14.2 Pitch Window + Repeat — Cell mode only (Global has its own rate).
     const int pitchR = isGlobalPitch ? 1 : repeatMultiplier(stage.pitchRepeat());
@@ -374,31 +370,16 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         bool muted = (maskByte >> ((i + maskShift) & 7)) & 1;
         if (muted) continue;
 
-        // §14.2 Repeat — assign pulse i to a sub-section. Earlier subs hold
-        // (subBaseSize + 1) pulses if there's a remainder; later subs hold
-        // (subBaseSize).
+        // §14.2 Warp → Repeat (v0.2): warp whole-cell seed, split by R.
         int subIdx;
-        int localPulseIdx;
-        int pulsesInThisSub;
-        if (i < subOversizeBoundary) {
-            subIdx = i / (subBaseSize + 1);
-            localPulseIdx = i % (subBaseSize + 1);
-            pulsesInThisSub = subBaseSize + 1;
-        } else {
-            const int j = i - subOversizeBoundary;
-            subIdx = subRemainder + (subBaseSize > 0 ? j / subBaseSize : 0);
-            localPulseIdx = (subBaseSize > 0) ? (j % subBaseSize) : 0;
-            pulsesInThisSub = subBaseSize > 0 ? subBaseSize : 1;
-        }
-        const float t_raw_local = float(localPulseIdx) / float(pulsesInThisSub);
+        float t_raw_local;
+        PhaseFluxMath::evalTemporalAlloc(i, pulseCount, tempR, tempWarpKnob, subIdx, t_raw_local);
 
         // §14.2 temporal Window — drop pulse if outside the visible band.
         if (!isInWindow(t_raw_local, stage.temporalWindow())) continue;
 
-        // §6.1 temporal pipeline on the local position, then map back to
-        // global via the sub-section index.
         // §6.1 temporal value chain — see phaseFluxTemporalValue.
-        float t_final_local = phaseFluxTemporalValue(t_raw_local, tempWarpKnob, tempCurveType, tFlipV, tempRespKnob);
+        float t_final_local = phaseFluxTemporalValue(t_raw_local, tempCurveType, tFlipV, tempRespKnob);
         float t_final_global = (float(subIdx) + t_final_local) / float(tempR);
         float t_shifted = t_final_global + (float(phaseShift) * 0.125f);
         t_shifted = std::fmod(t_shifted, 1.f);
