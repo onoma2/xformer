@@ -130,27 +130,34 @@ def draw_pitch_scope_redesign(canvas: Canvas, stage: Stage, *,
         canvas.set_color(Color.Bright if passed else Color.Medium)
         canvas.fill_rect(dot_x - 1, dot_y - 1, 2, 2)
 
-    # Slot 0 = current note (highlighted; blank when idle); slots 1..3 = the
-    # 3 most-frequent reachable degrees (raw top-3). Fixed positions, no sort.
+    # Pool = the cell's SPAN: lowest, dwell-peak (home), highest reachable
+    # degree, each drawn pitch-positioned at its curve-output height.
     counts = degree_histogram(stage, range_degrees, direction)
-    current = current_degree(stage, stage_phase, range_degrees, direction) \
-        if selected_is_active else None
-
-    sorted_by_count = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
-    freq = [d for d, _ in sorted_by_count[:3]]
-    if current is None and not freq:
+    if not counts:
         return
+    lo = min(counts)
+    hi = max(counts)
+    dw = max(counts.items(), key=lambda kv: kv[1])[0]   # dwell-peak offset
 
     inner_y0 = y + 2
-    inner_h  = h - 4
     label_right = x + LABEL_COL_W - 2
-    K_SLOTS = 4
     canvas.set_font(Font.Tiny)
 
-    def draw_slot(slot_idx, deg, highlight):
-        slot_cy = inner_y0 + int((slot_idx + 0.5) * inner_h / K_SLOTS)
-        baseline = slot_cy + 2
-        note_str = note_name(base_semitone + deg)
+    def y_for_offset(off):
+        if direction == "Down":
+            p = -off / float(range_degrees)
+        elif direction == "Bipolar":
+            p = off / float(range_degrees) + 0.5
+        else:
+            p = off / float(range_degrees)
+        p = max(0.0, min(1.0, p))
+        return y + h - 2 - int(p * (h - 3))
+
+    def clamp_baseline(b):
+        return max(inner_y0 + 5, min(y + h - 2, b))
+
+    def draw_note_at(off, baseline, highlight):
+        note_str = note_name(base_semitone + off)
         tw = canvas.text_width(note_str)
         tx = label_right - tw
         if highlight:
@@ -163,10 +170,21 @@ def draw_pitch_scope_redesign(canvas: Canvas, stage: Stage, *,
             canvas.set_color(Color.Medium)
             canvas.draw_text(tx, baseline, note_str)
 
-    if current is not None:
-        draw_slot(0, current, True)            # top = live note
-    for i, deg in enumerate(freq):
-        draw_slot(1 + i, deg, False)
+    bl_lo = clamp_baseline(y_for_offset(lo) + 2)   # bottom edge
+    bl_hi = clamp_baseline(y_for_offset(hi) + 2)   # top edge
+    if dw != lo:
+        draw_note_at(lo, bl_lo, False)
+    if dw != hi:
+        draw_note_at(hi, bl_hi, False)
+    if dw == lo:
+        bl_dw = bl_lo
+    elif dw == hi:
+        bl_dw = bl_hi
+    else:
+        bl_dw = clamp_baseline(y_for_offset(dw) + 2)
+        bl_dw = min(bl_dw, bl_lo - 7)   # keep above the low label
+        bl_dw = max(bl_dw, bl_hi + 7)   # keep below the high label
+    draw_note_at(dw, bl_dw, True)   # dwell-peak (home), highlighted, on top
 
 
 def render_pitch_scope_redesign(canvas: Canvas, stages, *,

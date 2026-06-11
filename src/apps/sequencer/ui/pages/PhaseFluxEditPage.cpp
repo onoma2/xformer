@@ -1185,49 +1185,43 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
         if (bin >= 0 && bin < kHistSize) counts[bin]++;
     }
 
-    // Currently-playing offset (sentinel = INT_MIN-ish). Hidden if filter rejects.
-    constexpr int kNoCurrent = -10000;
-    int currentOff = kNoCurrent;
-    if (isActiveCell && stagePhase >= 0.f) {
-        float p_final = evalPitchFull(stage, stagePhase, pitchRep, pitchWindowType);
-        int candidate = int(std::round(
-            directionOffset(stage.pitchDirection(), p_final, rangeDegrees)));
-        if (passesMelodyMask(baseDegree + candidate)) currentOff = candidate;
-    }
-
-    // Bottom 3 slots = the 3 most-frequent reachable degrees (raw top-3).
-    int freqDeg[3];
-    int freqN = 0;
-    int countsCopy[kHistSize];
-    for (int i = 0; i < kHistSize; ++i) countsCopy[i] = counts[i];
-    for (int slot = 0; slot < 3; ++slot) {
-        int bestBin = -1;
-        int bestCount = 0;
-        for (int b = 0; b < kHistSize; ++b) {
-            if (countsCopy[b] > bestCount) {
-                bestCount = countsCopy[b];
-                bestBin = b;
-            }
+    // Pool = the cell's SPAN: lowest, dwell-peak (home), highest reachable
+    // degree, each drawn pitch-positioned at its curve-output height.
+    int loBin = -1, hiBin = -1, dwBin = -1, dwCount = 0;
+    for (int b = 0; b < kHistSize; ++b) {
+        if (counts[b] > 0) {
+            if (loBin < 0) loBin = b;
+            hiBin = b;
+            if (counts[b] > dwCount) { dwCount = counts[b]; dwBin = b; }
         }
-        if (bestBin < 0) break;
-        freqDeg[freqN++] = bestBin - kHistBias;
-        countsCopy[bestBin] = 0;
     }
+    if (loBin < 0) return;   // nothing reachable
 
-    if (currentOff == kNoCurrent && freqN == 0) return;
-
-    // 4 fixed slots: [0] = current note (highlighted; blank when idle),
-    // [1..3] = the 3 most-frequent degrees. No pitch sort — fixed positions.
     canvas.setFont(Font::Tiny);
     const int innerY0 = y + 2;
-    const int innerH  = ScopeH - 4;
     const int labelRight = x + PitchLabelColW - 2;
-    constexpr int kSlots = 4;
-    auto drawSlot = [&](int slotIdx, int deg, bool highlight) {
-        const int slotCy = innerY0 + ((2 * slotIdx + 1) * innerH) / (2 * kSlots);
-        const int baseline = slotCy + 2;
+
+    // curve-output p that yields this offset (inverse of direction), then the
+    // same y the trace uses for that p.
+    auto yForOffset = [&](int off) -> int {
+        float p;
+        switch (stage.pitchDirection()) {
+        case PhaseFluxSequence::PitchDirectionType::Down:
+            p = -float(off) / float(rangeDegrees); break;
+        case PhaseFluxSequence::PitchDirectionType::Bipolar:
+            p = float(off) / float(rangeDegrees) + 0.5f; break;
+        default:
+            p = float(off) / float(rangeDegrees); break;
+        }
+        p = std::max(0.f, std::min(1.f, p));
+        return y + ScopeH - 2 - int(p * float(ScopeH - 3));
+    };
+    auto clampBaseline = [&](int b) {
+        return std::max(innerY0 + 5, std::min(y + ScopeH - 2, b));
+    };
+    auto drawNoteAt = [&](int off, int baseline, bool highlight) {
         FixedStringBuilder<5> noteStr;
-        scale.noteName(noteStr, baseDegree + deg, rootNote, Scale::Long);
+        scale.noteName(noteStr, baseDegree + off, rootNote, Scale::Long);
         const int tw = canvas.textWidth(noteStr);
         const int tx = labelRight - tw;
         if (highlight) {
@@ -1242,8 +1236,21 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
         }
     };
 
-    if (currentOff != kNoCurrent) drawSlot(0, currentOff, true);   // top = live note
-    for (int i = 0; i < freqN; ++i) drawSlot(1 + i, freqDeg[i], false);
+    const int loOff = loBin - kHistBias, hiOff = hiBin - kHistBias, dwOff = dwBin - kHistBias;
+    const int blLo = clampBaseline(yForOffset(loOff) + 2);   // bottom edge
+    const int blHi = clampBaseline(yForOffset(hiOff) + 2);   // top edge
+    if (dwOff != loOff) drawNoteAt(loOff, blLo, false);
+    if (dwOff != hiOff) drawNoteAt(hiOff, blHi, false);
+    // dwell-peak at its pitch, nudged to clear the extremes (or merged into one).
+    int blDw;
+    if (dwOff == loOff)      blDw = blLo;
+    else if (dwOff == hiOff) blDw = blHi;
+    else {
+        blDw = clampBaseline(yForOffset(dwOff) + 2);
+        if (blDw > blLo - 7) blDw = blLo - 7;   // keep above the low label
+        if (blDw < blHi + 7) blDw = blHi + 7;   // keep below the high label
+    }
+    drawNoteAt(dwOff, blDw, true);   // dwell-peak (home), highlighted, on top
 }
 
 void PhaseFluxEditPage::drawMacroScope(Canvas &canvas) {
