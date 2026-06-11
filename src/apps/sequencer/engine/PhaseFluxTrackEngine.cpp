@@ -92,6 +92,15 @@ inline float phaseFluxPitchValue(float phi, int pitchR, int warpKnob,
     return applyPowerBend(p_flipped, respKnob);
 }
 
+// §6.1 temporal value chain — single source for gate + preview.
+inline float phaseFluxTemporalValue(float t_local, int warpKnob,
+                                    Curve::Type curveType, bool flipV, int respKnob) {
+    float t_warped = applyPowerBend(t_local, warpKnob);
+    float t_curved = Curve::eval(curveType, t_warped);
+    float t_flipped = flipV ? (1.f - t_curved) : t_curved;
+    return applyPowerBend(t_flipped, respKnob);
+}
+
 } // namespace
 
 void PhaseFluxTrackEngine::advanceCounter(int &counter, int8_t &pendulumDir,
@@ -390,10 +399,8 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
 
         // §6.1 temporal pipeline on the local position, then map back to
         // global via the sub-section index.
-        float t_warped = applyPowerBend(t_raw_local, tempWarpKnob);
-        float t_curved = Curve::eval(tempCurveType, t_warped);
-        float t_flipped = tFlipV ? (1.f - t_curved) : t_curved;
-        float t_final_local = applyPowerBend(t_flipped, tempRespKnob);
+        // §6.1 temporal value chain — see phaseFluxTemporalValue.
+        float t_final_local = phaseFluxTemporalValue(t_raw_local, tempWarpKnob, tempCurveType, tFlipV, tempRespKnob);
         float t_final_global = (float(subIdx) + t_final_local) / float(tempR);
         float t_shifted = t_final_global + (float(phaseShift) * 0.125f);
         t_shifted = std::fmod(t_shifted, 1.f);
