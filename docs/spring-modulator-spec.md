@@ -49,8 +49,10 @@ pure DC offset, identical to `Offset`, so it adds nothing.)
 
 ## 3. Controls
 
-Footer, page 1: `SHAPE · STRIKE · TENSION · RING · CLANG`. Page 2: `PICKUP`.
-(Two-page shape, like ADSR/Chaos; `Pg 1/2` shows in the header.)
+Footer, page 1: `SHAPE · STRIKE · TENSION · RING · CLANG`. Page 2: `PICKUP · DEPTH · OFFSET`.
+(Two-page shape, like ADSR/Chaos; `Pg 1/2` shows in the header.) DEPTH/OFFSET are the
+standard modulator fields but Spring's page-1 row is full, so they live on page 2 —
+without a slot they would be unreachable.
 
 | Control | Slot | Range | Meaning |
 |---|---|---|---|
@@ -59,9 +61,9 @@ Footer, page 1: `SHAPE · STRIKE · TENSION · RING · CLANG`. Page 2: `PICKUP`.
 | **TENSION** | F3 | exp pitch | Fundamental ring pitch (spring tension). |
 | **RING** | F4 | 0..max | Ring length. **High = longer.** Exponential. |
 | **CLANG** | F5 | 0..max | Inharmonicity: 0 = single decaying sine (fundamental only); up = partials beat. |
-| **PICKUP** | page 2 | enum (default **Position**) | Output: Position / Velocity / Kinetic / Potential / Total energy. |
-| DEPTH | routing/std | 0..127 | Strike force (harder hit = bigger ring). |
-| OFFSET | routing/std | bias | Output bias. |
+| **PICKUP** | page 2 F1 | enum (default **Position**) | Output: Position / Velocity / Kinetic / Potential / Total energy. |
+| **DEPTH** | page 2 F3 | 0..127 | Strike force (harder hit = bigger ring). |
+| **OFFSET** | page 2 F5 | bias | Output bias. |
 | MODE | routing overlay | Run/Trig/Gate | Gate behaviour (§5), the universal `Mode`. |
 
 ---

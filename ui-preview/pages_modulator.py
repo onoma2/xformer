@@ -731,6 +731,105 @@ def render_modulator_list_random_uniform(canvas):
     canvas.draw_text(3, 51, "-> CV4")
 
 
+def render_modulator_list_spring(canvas):
+    # SPRING shape, page 1: SHAPE/STRIKE/TENS/RING/CLANG (TENS selected).
+    mod = MockModulator(shape=ModulatorShape.Sine)
+    eng = MockModulatorEngine(current_value=96)
+    WindowPainter.clear(canvas)
+    WindowPainter.draw_header(canvas, track=2, mode="MOD 3 - MODULATOR")
+    WindowPainter.draw_active_function(canvas, "Pg 1/2")
+    labels = ["SHAPE", "STRIKE", "TENS", "RING", "CLANG"]
+    values = ["Spring", "1.50Hz", "4.5Hz", "80%", "50%"]
+    WindowPainter.draw_footer(canvas, labels, highlight=2)
+    _draw_waveform(canvas, mod, eng, 0)
+    canvas.set_color(Color.Low)
+    canvas.vline(122, 13, 39)
+    _draw_param_list_phaseflux(canvas, labels, values, 2)
+    canvas.set_font(Font.Tiny)
+    canvas.set_color(Color.Low)
+    canvas.draw_text(3, 51, "-> CV4")
+
+
+def _spring_chrome(canvas, mode, pg, labels, values, hi, dest):
+    WindowPainter.clear(canvas)
+    WindowPainter.draw_header(canvas, track=0, mode=mode)
+    WindowPainter.draw_active_function(canvas, pg)
+    WindowPainter.draw_footer(canvas, labels, highlight=hi)
+
+
+def render_modulator_list_lfo(canvas):
+    # LFO page, current layout: SHAPE/RATE/DEPTH/PHASE/OFFSET (DEPTH selected).
+    mod = MockModulator(shape=ModulatorShape.Sine, rate=96, depth=50, offset=0, phase=45)
+    eng = MockModulatorEngine(current_value=90, current_phase=16384)
+    labels = ["SHAPE", "RATE", "DEPTH", "PHASE", "OFFSET"]
+    values = ["Sine", "1.50Hz", "50", "45°", "+0"]
+    _spring_chrome(canvas, "MOD 1 - MODULATOR", "", labels, values, 2, None)
+    _draw_waveform(canvas, mod, eng, 0)
+    canvas.set_color(Color.Low); canvas.vline(122, 13, 39)
+    _draw_param_list_phaseflux(canvas, labels, values, 2)
+    canvas.set_font(Font.Tiny); canvas.set_color(Color.Low); canvas.draw_text(3, 51, "-> CV1")
+
+
+def render_modulator_list_adsr_p1(canvas):
+    mod = MockModulator(shape=ModulatorShape.ADSR, attack=300, decay=400, sustain=80, release=600, amplitude=100)
+    eng = MockModulatorEngine(current_value=70, adsr_state=2, adsr_timer=50)
+    labels = ["SHAPE", "ATTACK", "DECAY", "SUSTAIN", "RELEASE"]
+    values = ["ADSR", "300ms", "400ms", "80", "600ms"]
+    _spring_chrome(canvas, "MOD 1 - MODULATOR", "Pg 1/2", labels, values, 2, None)
+    _draw_waveform(canvas, mod, eng, 0)
+    canvas.set_color(Color.Low); canvas.vline(122, 13, 39)
+    _draw_param_list_phaseflux(canvas, labels, values, 2)
+
+
+def render_modulator_list_adsr_p2(canvas):
+    # ADSR page 2, current layout: DEPTH(F3) / INVERT(F4) / OFFSET(F5).
+    mod = MockModulator(shape=ModulatorShape.ADSR, attack=300, decay=400, sustain=80, release=600, amplitude=100)
+    eng = MockModulatorEngine(current_value=70)
+    labels = [None, None, "DEPTH", "INVERT", "OFFSET"]
+    values = ["", "", "100", "OFF", "0.0V"]
+    _spring_chrome(canvas, "MOD 1 - MODULATOR", "Pg 2/2", labels, values, 2, None)
+    _draw_waveform(canvas, mod, eng, 0)
+    canvas.set_color(Color.Low); canvas.vline(122, 13, 39)
+    _draw_param_list_phaseflux(canvas, labels, values, 2)
+
+
+def render_modulator_list_chaos_p1(canvas):
+    # Chaos page 1, current layout: SHAPE/RATE/DEPTH/P1/P2 (DEPTH selected).
+    mod = MockModulator(shape=ModulatorShape.ChaosLorenz, rate=120, depth=80, attack=900, decay=1240)
+    eng = MockModulatorEngine(current_value=55)
+    labels = ["SHAPE", "RATE", "DEPTH", "P1", "P2"]
+    values = ["Lorenz", "1.50Hz", "80", "45", "62"]
+    _spring_chrome(canvas, "MOD 1 - MODULATOR", "Pg 1/2", labels, values, 2, None)
+    _draw_waveform(canvas, mod, eng, 0)
+    canvas.set_color(Color.Low); canvas.vline(122, 13, 39)
+    _draw_param_list_phaseflux(canvas, labels, values, 2)
+
+
+def render_modulator_list_chaos_p2(canvas):
+    # Chaos page 2, current layout: SLEW(F1) / OFFSET(F5).
+    mod = MockModulator(shape=ModulatorShape.ChaosLorenz, rate=120, depth=80, smooth=200)
+    eng = MockModulatorEngine(current_value=55)
+    labels = ["SLEW", None, None, None, "OFFSET"]
+    values = ["200ms", "", "", "", "+0"]
+    _spring_chrome(canvas, "MOD 1 - MODULATOR", "Pg 2/2", labels, values, 0, None)
+    _draw_waveform(canvas, mod, eng, 0)
+    canvas.set_color(Color.Low); canvas.vline(122, 13, 39)
+    _draw_param_list_phaseflux(canvas, labels, values, 0)
+
+
+def render_modulator_list_spring_p2(canvas):
+    # SPRING page 2: PICKUP(F1) / DEPTH(F3) / OFFSET(F5).
+    mod = MockModulator(shape=ModulatorShape.Sine)
+    eng = MockModulatorEngine(current_value=96)
+    labels = ["PICKUP", None, "DEPTH", None, "OFFSET"]
+    values = ["Position", "", "110", "", "+0"]
+    _spring_chrome(canvas, "MOD 3 - MODULATOR", "Pg 2/2", labels, values, 2, None)
+    _draw_waveform(canvas, mod, eng, 0)
+    canvas.set_color(Color.Low); canvas.vline(122, 13, 39)
+    _draw_param_list_phaseflux(canvas, labels, values, 2)
+    canvas.set_font(Font.Tiny); canvas.set_color(Color.Low); canvas.draw_text(3, 51, "-> CV4")
+
+
 def render_modulator_current_sine(canvas):
     mod = MockModulator(shape=ModulatorShape.Sine, rate=96, depth=50, offset=+10, phase=45)
     eng = MockModulatorEngine(current_value=90, current_phase=16384)
@@ -1037,16 +1136,15 @@ def render_modulator_geode_globals(canvas):
 
 
 def render_modulator_geode_voice(canvas):
-    # M5 = voice 3 (default tune 3:1). Page 1 grid = the per-voice rhythm params;
-    # the read-only derived envelope time sits in the last cell. Gate source + output
-    # live on the destinations page (reused, not shown here).
-    eng = MockModulatorEngine(current_value=55)
+    # M5 = voice 3 (default tune 3:1). Tiny-font param list, like every other page.
+    labels = ["VOICE", "DIVS", "REPEAT", "TUNE", "TIME"]
+    values = ["V3", "8", "4", "3:1", "53ms"]
     WindowPainter.clear(canvas)
     WindowPainter.draw_header(canvas, track=0, mode="MOD 5 - GEODE")
-    WindowPainter.draw_footer(canvas, ["VOICE", "DIVS", "REPEAT", "TUNE", "TIME"], highlight=1)
+    WindowPainter.draw_footer(canvas, labels, highlight=1)
     _draw_modulator_scope(canvas)
-    # label / DIVS (row 1), REPEAT / TUNE / derived-time (row 2). DIVS selected.
-    _draw_geode_right_grid(canvas, ["V3", "8", "4", "3:1", "53ms"], selected=1)
+    canvas.set_color(Color.Low); canvas.vline(122, 13, 39)
+    _draw_param_list_phaseflux(canvas, labels, values, 1)
 
 
 # --- PROPOSED: output transform UI — ADSR floor cell + invert indicator ---

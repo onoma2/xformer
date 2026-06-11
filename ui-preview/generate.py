@@ -120,6 +120,13 @@ from pages_modulator import (
     render_modulator_list_random,
     render_modulator_list_chaos,
     render_modulator_list_random_uniform,
+    render_modulator_list_spring,
+    render_modulator_list_spring_p2,
+    render_modulator_list_chaos_p2,
+    render_modulator_list_chaos_p1,
+    render_modulator_list_adsr_p2,
+    render_modulator_list_adsr_p1,
+    render_modulator_list_lfo,
 )
 from tracks import (
     DiscreteMapSequence, DiscreteMapTrackEngine,
@@ -380,6 +387,20 @@ def render_page(page: str, scale: int = 4):
         render_modulator_list_random(canvas)
     elif page == "modulator-list-random-uniform-proposed":
         render_modulator_list_random_uniform(canvas)
+    elif page == "modulator-list-spring-proposed":
+        render_modulator_list_spring(canvas)
+    elif page == "modulator-list-spring-p2-proposed":
+        render_modulator_list_spring_p2(canvas)
+    elif page == "modulator-list-chaos-p2-proposed":
+        render_modulator_list_chaos_p2(canvas)
+    elif page == "modulator-list-chaos-p1-proposed":
+        render_modulator_list_chaos_p1(canvas)
+    elif page == "modulator-list-adsr-p2-proposed":
+        render_modulator_list_adsr_p2(canvas)
+    elif page == "modulator-list-adsr-p1-proposed":
+        render_modulator_list_adsr_p1(canvas)
+    elif page == "modulator-list-lfo-proposed":
+        render_modulator_list_lfo(canvas)
     elif page == "modulator-list-chaos-proposed":
         render_modulator_list_chaos(canvas)
     elif page == "modulator-proposed-sine":
@@ -636,7 +657,7 @@ def main():
                                  'modulator-proposed-random', 'modulator-proposed-chaos',
                                  'modulator-proposed-adsr-page2', 'modulator-proposed-chaos-page2',
                                  'modulator-rate-free-proposed', 'modulator-rate-tempo-proposed', 'modulator-gatemodes-proposed', 'modulator-scope-proposed', 'modulator-destinations-grid-proposed', 'modulator-justf-time', 'modulator-justf-intone', 'modulator-justf-follower', 'modulator-justf-adsr-follower', 'modulator-justf-adsr-intone', 'modulator-geode-globals', 'modulator-geode-voice', 'modulator-adsr-floor',
-                                 'modulator-list-sine-proposed', 'modulator-list-adsr-proposed', 'modulator-list-random-proposed', 'modulator-list-chaos-proposed', 'modulator-list-random-uniform-proposed',
+                                 'modulator-list-sine-proposed', 'modulator-list-adsr-proposed', 'modulator-list-random-proposed', 'modulator-list-chaos-proposed', 'modulator-list-random-uniform-proposed', 'modulator-list-spring-proposed', 'modulator-list-spring-p2-proposed', 'modulator-list-chaos-p2-proposed', 'modulator-list-chaos-p1-proposed', 'modulator-list-adsr-p2-proposed', 'modulator-list-adsr-p1-proposed', 'modulator-list-lfo-proposed',
                                  'stochastic-loop-proposed', 'stochastic-loop-proposed-held',
                                  'stochastic-live-proposed', 'stochastic-live-proposed-held',
                                  'stochastic-live-proposed-burst', 'stochastic-live-proposed-spread',
