@@ -1,6 +1,18 @@
-# PhaseFlux Track — Locked MVP Spec
+# PhaseFlux Track — Spec (v0.2)
 
-Monophonic grid sequencer as a new Performer TrackMode. Locked from grilling session against `retro/stochastic-retro.md` lessons. Mutation is post-MVP.
+Monophonic grid sequencer as a new Performer TrackMode. MVP was locked from a grilling session against `retro/stochastic-retro.md` lessons; v0.2 reopens the transform pipeline order (below). Mutation is post-MVP.
+
+## v0.2 amendment — pipeline reorder (supersedes MVP order)
+
+The per-axis transform pipeline is reordered to wake dead controls:
+
+**New order:** `Warp → Repeat → Window → FlipH → Curve → Response → FlipV` (pitch). For time, FlipH stays the post-schedule reversal (last), as before.
+
+- **Warp before Repeat** — warp bends the whole-cell position; Repeat then tiles the *warped* phase, so the N copies become uneven/progressive instead of identical. Temporal: `evalTemporalAlloc` seeds each pulse at `i/pulseCount`, warps it, then splits by R → warped sub-section allocation (bar-level rubato). `warp=0` is globally even and matches the old split for divisible pulseCount.
+- **Window after Repeat** — window now acts per repeated cycle.
+- **Response before FlipV** — puts a nonlinearity between FlipH and FlipV so they are independent on Ramp/Bounce (were redundant under the MVP order).
+
+**Implementation:** the phase chain (`PhaseFluxMath::evalPitchPhase`), value tail (`evalResponseFlipV`), and temporal allocation (`evalTemporalAlloc`) are unit-tested `PhaseFluxMath` functions; the engine (gate, continuous, preview) delegates to them so preview can never diverge from playback. `PhaseFluxMath::evalWindowRepeat` is superseded and unused by the engine (cleanup candidate). UI footer slot order (§17) is unchanged — it no longer mirrors the compute order. Older prose in §6.1/§6.2/§14.2 describing `Window → Repeat → Warp` is superseded by this section.
 
 ---
 
@@ -258,7 +270,7 @@ Per-cell 4-value enum (`UnsignedValue<2>`): **x1 / x2 / x3 / x5** (default x1 = 
 
 Storage: `temporalRepeat` as `UnsignedValue<2>` stored on `_data3` per §14.2 layout. Default value = 0 (x1, no repetition).
 
-Engine math in `rebuildSchedule` (pipeline: **Window → Repeat → Warp → Curve eval → FlipV → Response → FlipH**):
+Engine math in `rebuildSchedule` (pipeline: **Warp → Repeat → Window → FlipH → Curve eval → Response → FlipV**):
 
 ```
 R               = repeatValue(stage.temporalRepeat())          // 1, 2, 3, or 5
@@ -342,12 +354,13 @@ PhaseFlux pitch is an integer scale degree, voltage emerges via `Scale::noteToVo
 
 ```
 φ_i           = trigger_time[i] / stage_duration
-φ_warped      = WarpAxis(φ_i, pitchWarp)
-                                                                             // hflip first, base curve, vflip
-φ_input       = pitchFlipH ? (1.0 − φ_warped) : φ_warped
+φ_warped      = WarpAxis(φ_i, pitchWarp)                                      // v0.2: warp first
+φ_repeated    = pitchRepeat>1 ? frac(φ_warped × R) : φ_warped                 // repeat the warped phase
+φ_windowed    = HoldWindow(φ_repeated, pitchWindow)                          // window after repeat
+φ_input       = pitchFlipH ? (1.0 − φ_windowed) : φ_windowed                 // flipH, then curve
 p_curved      = PitchCurve(φ_input, pitchCurve)                              // 0..1
-p_flipped     = pitchFlipV ? (1.0 − p_curved) : p_curved
-p_final       = ResponseAxis(p_flipped, pitchResponse)                       // 0..1
+p_resp        = ResponseAxis(p_curved, pitchResponse)                        // response before flipV
+p_final       = pitchFlipV ? (1.0 − p_resp) : p_resp                          // 0..1
 
 rangeDegrees  = max(1, round(pitchRange × scale.notesPerOctave()))           // 0.5..3 octaves of active scale, rounded to nearest integer scale degree, minimum 1
                                                                              // e.g. pentatonic (N=5) + 0.5oct → round(2.5) = 3 degrees; chromatic (N=12) + 0.5oct → 6 degrees
@@ -474,7 +487,7 @@ i.e. the pitch head's position is projected forward from slot start to each sche
 
 Per-cell 4-value enum (`UnsignedValue<2>`): **x1 / x2 / x3 / x5** (default x1 = no repeat). Stored on `_data3` per §14.2 layout.
 
-Engine math (pipeline: **Window → Repeat → Warp → Curve eval → FlipV → Response → FlipH**). The pitch curve is sampled at the windowed-then-repeated position:
+Engine math (pipeline: **Warp → Repeat → Window → FlipH → Curve eval → Response → FlipV**). The pitch curve is sampled at the windowed-then-repeated position:
 
 ```
 R              = repeatValue(stage.pitchRepeat())                // 1, 2, 3, or 5
@@ -888,7 +901,7 @@ Coverage: multi-bump / multi-decay / N-cycle pulse patterns become reachable fro
   - Polarize concentrates pulses/pitches at the cell's edges with a silent middle (Bell at Polarize 50 = small rise on left, gap, small fall on right).
 - Hidden portion: engine does not evaluate; for temporal axis pulses falling in the hidden band are dropped; for pitch axis the curve doesn't contribute (held at boundary value or skipped depending on `cvUpdateMode`).
 
-**Pipeline order** (per axis): `Window → Repeat → Warp → Curve eval → FlipV → Response → FlipH`. Window applies on raw input, then Repeat multiplies the windowed result, then Warp bends, then the curve evaluates, then FlipV mirrors output, then Response bends output, then FlipH mirrors trigger timing. Window-then-Repeat (rather than Repeat-then-Window) was chosen so each repeated sub-section carries the windowed shape — gives `Bell + x3 + Polarize 50` three "rise-gap-fall" cycles, much richer than three half-bells with a single crop applied after.
+**Pipeline order** (per axis): `Warp → Repeat → Window → FlipH → Curve eval → Response → FlipV`. Window applies on raw input, then Repeat multiplies the windowed result, then Warp bends, then the curve evaluates, then FlipV mirrors output, then Response bends output, then FlipH mirrors trigger timing. Window-then-Repeat (rather than Repeat-then-Window) was chosen so each repeated sub-section carries the windowed shape — gives `Bell + x3 + Polarize 50` three "rise-gap-fall" cycles, much richer than three half-bells with a single crop applied after.
 
 - **Bit-pack cost**: 4 bits Repeat (2 per axis × 2 axes) + 6 bits Window (3 per axis × 2 axes) = 10 bits per stage × 16 stages = 160 bits total. `_data3` has 25 spare bits after `stageLen` (7 used); 10 used, **15 remain**.
 - Layout (locked):
