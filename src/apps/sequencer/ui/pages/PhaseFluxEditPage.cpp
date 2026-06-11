@@ -133,12 +133,14 @@ inline float evalTemporal(const PhaseFluxSequence::Stage &stage, float t_raw) {
     return PhaseFluxMath::powerBend(clamp01(t), PhaseFluxMath::powerBendKnobToParam(stage.temporalResponse()));
 }
 
-inline float evalPitch(const PhaseFluxSequence::Stage &stage, float phi) {
-    float p = PhaseFluxMath::powerBend(clamp01(phi), PhaseFluxMath::powerBendKnobToParam(stage.pitchWarp()));
-    if (stage.pitchFlipH()) p = 1.f - p;
-    p = Curve::eval(pitchCurveLut(stage.pitchCurve()), p);
-    if (stage.pitchFlipV()) p = 1.f - p;
-    return PhaseFluxMath::powerBend(clamp01(p), PhaseFluxMath::powerBendKnobToParam(stage.pitchResponse()));
+// v0.2 pitch pipeline — same PhaseFluxMath functions the engine uses, so the
+// scope matches playback (Warp->Repeat->Window->FlipH->Curve->Response->FlipV).
+inline float evalPitchFull(const PhaseFluxSequence::Stage &stage, float phi,
+                           int pitchRep, PhaseFluxSequence::WindowType win) {
+    float phi_input = PhaseFluxMath::evalPitchPhase(
+        phi, stage.pitchWarp(), pitchRep, win, stage.pitchFlipH());
+    float p_curved = Curve::eval(pitchCurveLut(stage.pitchCurve()), phi_input);
+    return PhaseFluxMath::evalResponseFlipV(p_curved, stage.pitchResponse(), stage.pitchFlipV());
 }
 
 } // namespace
@@ -1090,21 +1092,18 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
         ? PhaseFluxSequence::WindowType::Off
         : stage.pitchWindow();
 
-    // Curve trace — Medium so the shape reads but doesn't dominate.
-    // Window hides bands; Repeat multiplies the curve frequency.
+    // Curve trace — Medium so the shape reads but doesn't dominate. v0.2:
+    // warp->repeat->window(held) all inside evalPitchFull, so the line is
+    // continuous with flat held segments where a window clamps.
     canvas.setColor(Color::Medium);
     int prevPy = -1;
-    bool prevVisible = false;
     for (int px = 0; px < traceW; ++px) {
         float phi = float(px) / float(std::max(1, traceW - 1));
-        if (!isInWindow(phi, pitchWindowType)) { prevVisible = false; continue; }
-        float phi_repeated = (pitchRep > 1) ? std::fmod(phi * float(pitchRep), 1.f) : phi;
-        float p_final = evalPitch(stage, phi_repeated);
+        float p_final = evalPitchFull(stage, phi, pitchRep, pitchWindowType);
         int py = y + ScopeH - 2 - int(p_final * float(ScopeH - 3));
         int cx = traceX0 + px;
-        if (prevVisible) canvas.line(cx - 1, prevPy, cx, py);
+        if (px > 0) canvas.line(cx - 1, prevPy, cx, py);
         prevPy = py;
-        prevVisible = true;
     }
 
     // Engine state for playhead-aware highlight.
@@ -1147,10 +1146,8 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
         if (t_shifted < 0.f) t_shifted += 1.f;
         bool muted = (maskByte >> ((i + maskShift) & 7)) & 1;
         if (muted) continue;
-        // Pitch axis: window check, then repeat-multiply phi.
-        if (!isInWindow(t_shifted, pitchWindowType)) continue;
-        float phi_repeated = (pitchRep > 1) ? std::fmod(t_shifted * float(pitchRep), 1.f) : t_shifted;
-        float p_final = evalPitch(stage, phi_repeated);
+        // Pitch axis (v0.2): window held inside evalPitchFull (no drop).
+        float p_final = evalPitchFull(stage, t_shifted, pitchRep, pitchWindowType);
         int dx = traceX0 + int(t_shifted * float(std::max(1, traceW - 1)));
         int dy = y + ScopeH - 2 - int(p_final * float(ScopeH - 3));
         bool passed = (stagePhase >= 0.f) && (stagePhase >= t_shifted);
@@ -1192,7 +1189,7 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
     const int samples = 64;
     for (int s = 0; s < samples; ++s) {
         float phi = float(s) / float(samples);
-        float p_final = evalPitch(stage, phi);
+        float p_final = evalPitchFull(stage, phi, pitchRep, pitchWindowType);
         float off = directionOffset(stage.pitchDirection(), p_final, rangeDegrees);
         int deg = int(std::round(off));
         if (!passesMelodyMask(baseDegree + deg)) continue;
@@ -1204,7 +1201,7 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
     constexpr int kNoCurrent = -10000;
     int currentOff = kNoCurrent;
     if (isActiveCell && stagePhase >= 0.f) {
-        float p_final = evalPitch(stage, stagePhase);
+        float p_final = evalPitchFull(stage, stagePhase, pitchRep, pitchWindowType);
         int candidate = int(std::round(
             directionOffset(stage.pitchDirection(), p_final, rangeDegrees)));
         if (passesMelodyMask(baseDegree + candidate)) currentOff = candidate;
