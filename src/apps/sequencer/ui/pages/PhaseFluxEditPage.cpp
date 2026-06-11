@@ -125,12 +125,20 @@ inline Curve::Type pitchCurveLut(PhaseFluxSequence::PitchCurveType v) {
 
 inline float clamp01(float x) { return std::max(0.f, std::min(1.f, x)); }
 
-inline float evalTemporal(const PhaseFluxSequence::Stage &stage, float t_raw) {
-    float t = PhaseFluxMath::powerBend(clamp01(t_raw), PhaseFluxMath::powerBendKnobToParam(stage.temporalWarp()));
-    if (stage.temporalFlipH()) t = 1.f - t;
-    t = Curve::eval(temporalCurveLut(stage.temporalCurve()), t);
-    if (stage.temporalFlipV()) t = 1.f - t;
-    return PhaseFluxMath::powerBend(clamp01(t), PhaseFluxMath::powerBendKnobToParam(stage.temporalResponse()));
+// v0.2 temporal value tail (warp consumed upstream in evalTemporalAlloc):
+// Curve -> Response -> FlipV. FlipH is a schedule reversal, applied to the
+// final position at the call site (not a phase mirror).
+inline float evalTemporalValue(const PhaseFluxSequence::Stage &stage, float t_local) {
+    float t = Curve::eval(temporalCurveLut(stage.temporalCurve()), t_local);
+    return PhaseFluxMath::evalResponseFlipV(t, stage.temporalResponse(), stage.temporalFlipV());
+}
+
+// Continuous-trace phase (v0.2): Warp -> Repeat. Caller does the window-drop
+// and the FlipH left-right mirror of the screen sample.
+inline float evalTemporalTracePhase(const PhaseFluxSequence::Stage &stage, float t_raw, int tempRep) {
+    float t = (stage.temporalWarp() == 0) ? t_raw
+        : PhaseFluxMath::powerBend(clamp01(t_raw), PhaseFluxMath::powerBendKnobToParam(stage.temporalWarp()));
+    return (tempRep > 1) ? std::fmod(t * float(tempRep), 1.f) : t;
 }
 
 // v0.2 pitch pipeline — same PhaseFluxMath functions the engine uses, so the
@@ -985,12 +993,13 @@ void PhaseFluxEditPage::drawTemporalScope(Canvas &canvas, int stageIdx, int scop
     bool prevVisible = false;
     for (int px = 0; px < ScopeW - 2; ++px) {
         float t_raw = float(px) / float(ScopeW - 3);
-        float t_local = std::fmod(t_raw * float(tempRepeat), 1.f);
+        if (stage.temporalFlipH()) t_raw = 1.f - t_raw;   // v0.2: flipH mirrors the trace
+        float t_local = evalTemporalTracePhase(stage, t_raw, tempRepeat);
         if (!isInWindow(t_local, temporalWindowType)) {
             prevVisible = false;
             continue;
         }
-        float t_final = evalTemporal(stage, t_local);
+        float t_final = evalTemporalValue(stage, t_local);
         int py = y + ScopeH - 2 - int(t_final * float(ScopeH - 3));
         int cx = x + px;
         if (prevVisible) canvas.line(cx - 1, prevPy, cx, py);
@@ -1020,32 +1029,21 @@ void PhaseFluxEditPage::drawTemporalScope(Canvas &canvas, int stageIdx, int scop
     const int effective  = std::max(0, std::min(16, stage.pulseCount() + pulseAccOffset));
     const int basesDrawn = std::min(basePulses, effective);
 
-    // §14.2 sub-section + Window math (mirrors engine in PhaseFluxTrackEngine.cpp).
-    const int subBaseSize = effective / tempRepeat;
-    const int subRemainder = effective % tempRepeat;
-    const int subOversizeBoundary = subRemainder * (subBaseSize + 1);
+    // §14.2 v0.2 allocation (mirrors engine evalTemporalAlloc): warp-before-repeat.
     for (int i = 0; i < effective; ++i) {
-        // Same sub-section assignment the engine uses.
         int subIdx;
-        int localPulseIdx;
-        int pulsesInThisSub;
-        if (i < subOversizeBoundary) {
-            subIdx = i / (subBaseSize + 1);
-            localPulseIdx = i % (subBaseSize + 1);
-            pulsesInThisSub = subBaseSize + 1;
-        } else {
-            const int j = i - subOversizeBoundary;
-            subIdx = subRemainder + (subBaseSize > 0 ? j / subBaseSize : 0);
-            localPulseIdx = (subBaseSize > 0) ? (j % subBaseSize) : 0;
-            pulsesInThisSub = subBaseSize > 0 ? subBaseSize : 1;
-        }
-        const float t_raw_local = float(localPulseIdx) / float(pulsesInThisSub);
+        float t_raw_local;
+        PhaseFluxMath::evalTemporalAlloc(i, effective, tempRepeat, stage.temporalWarp(), subIdx, t_raw_local);
         if (!isInWindow(t_raw_local, temporalWindowType)) continue;
-        float t_final_local = evalTemporal(stage, t_raw_local);
+        float t_final_local = evalTemporalValue(stage, t_raw_local);
         float t_final_global = (float(subIdx) + t_final_local) / float(tempRepeat);
         float t_shifted = t_final_global + float(stage.phaseShift()) * 0.125f;
         t_shifted = std::fmod(t_shifted, 1.f);
         if (t_shifted < 0.f) t_shifted += 1.f;
+        if (stage.temporalFlipH()) {   // v0.2: FlipH reverses the schedule
+            t_shifted = std::fmod(1.f - t_shifted, 1.f);
+            if (t_shifted < 0.f) t_shifted += 1.f;
+        }
         bool muted = (maskByte >> ((i + maskShift) & 7)) & 1;
         bool passed = (stagePhase >= 0.f) && (stagePhase >= t_shifted);
         int px = x + 2 + int(t_shifted * float(innerSpan));
@@ -1119,31 +1117,21 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
     int maskShift = stage.maskShift();
     const int tempRep = repeatMultiplier(stage.temporalRepeat());
     const auto temporalWindowType = stage.temporalWindow();
-    // §14.2 sub-section + Window math (mirrors engine).
-    const int subBaseSize = pulses / tempRep;
-    const int subRemainder = pulses % tempRep;
-    const int subOversizeBoundary = subRemainder * (subBaseSize + 1);
+    // §14.2 v0.2 allocation (mirrors engine evalTemporalAlloc): warp-before-repeat.
     for (int i = 0; i < pulses; ++i) {
         int subIdx;
-        int localPulseIdx;
-        int pulsesInThisSub;
-        if (i < subOversizeBoundary) {
-            subIdx = i / (subBaseSize + 1);
-            localPulseIdx = i % (subBaseSize + 1);
-            pulsesInThisSub = subBaseSize + 1;
-        } else {
-            const int j = i - subOversizeBoundary;
-            subIdx = subRemainder + (subBaseSize > 0 ? j / subBaseSize : 0);
-            localPulseIdx = (subBaseSize > 0) ? (j % subBaseSize) : 0;
-            pulsesInThisSub = subBaseSize > 0 ? subBaseSize : 1;
-        }
-        const float t_raw_local = float(localPulseIdx) / float(pulsesInThisSub);
+        float t_raw_local;
+        PhaseFluxMath::evalTemporalAlloc(i, pulses, tempRep, stage.temporalWarp(), subIdx, t_raw_local);
         if (!isInWindow(t_raw_local, temporalWindowType)) continue;
-        float t_final_local = evalTemporal(stage, t_raw_local);
+        float t_final_local = evalTemporalValue(stage, t_raw_local);
         float t_final_global = (float(subIdx) + t_final_local) / float(tempRep);
         float t_shifted = t_final_global + float(stage.phaseShift()) * 0.125f;
         t_shifted = std::fmod(t_shifted, 1.f);
         if (t_shifted < 0.f) t_shifted += 1.f;
+        if (stage.temporalFlipH()) {   // v0.2: FlipH reverses the schedule
+            t_shifted = std::fmod(1.f - t_shifted, 1.f);
+            if (t_shifted < 0.f) t_shifted += 1.f;
+        }
         bool muted = (maskByte >> ((i + maskShift) & 7)) & 1;
         if (muted) continue;
         // Pitch axis (v0.2): window held inside evalPitchFull (no drop).
@@ -1379,28 +1367,22 @@ void PhaseFluxEditPage::drawMacroScope(Canvas &canvas) {
         if (s.skip()) { prevVisible = false; continue; }
 
         float t_slot = float(ticks - cumulative[slot]) / float(slotW);
+        if (s.temporalFlipH()) t_slot = 1.f - t_slot;   // v0.2: flipH mirrors within slot
 
-        // §14.2 Repeat — split slot into R sub-sections; figure out which sub
-        // this pixel falls in and the local position within it.
+        // v0.2 pipeline (WarpN/RespN applied): Warp → Repeat → Window →
+        // Curve → Response → FlipV.
         const int tempR = repeatMultiplier(s.temporalRepeat());
-        float t_local = std::fmod(t_slot * float(tempR), 1.f);
-
-        // §14.2 Window — drop this pixel if outside the visible band.
+        const int effWarp = clamp(s.temporalWarp() + warpNudge, -64, 64);
+        const int effResp = clamp(s.temporalResponse() + respNudge, -64, 64);
+        float t_warped = (effWarp == 0) ? t_slot
+            : PhaseFluxMath::powerBend(clamp01(t_slot), PhaseFluxMath::powerBendKnobToParam(effWarp));
+        float t_local = std::fmod(t_warped * float(tempR), 1.f);
         if (!isInWindow(t_local, s.temporalWindow())) {
             prevVisible = false;
             continue;
         }
-
-        // Effective warp/response with WarpN/RespN applied — pipeline is
-        // Window (above) → Repeat (above) → Warp → Curve → FlipV → Response → FlipH.
-        int effWarp = clamp(s.temporalWarp() + warpNudge, -64, 64);
-        int effResp = clamp(s.temporalResponse() + respNudge, -64, 64);
-        float t = clamp01(t_local);
-        t = PhaseFluxMath::powerBend(t, PhaseFluxMath::powerBendKnobToParam(effWarp));
-        if (s.temporalFlipH()) t = 1.f - t;
-        t = Curve::eval(temporalCurveLut(s.temporalCurve()), t);
-        if (s.temporalFlipV()) t = 1.f - t;
-        t = PhaseFluxMath::powerBend(clamp01(t), PhaseFluxMath::powerBendKnobToParam(effResp));
+        float t = PhaseFluxMath::evalResponseFlipV(
+            Curve::eval(temporalCurveLut(s.temporalCurve()), t_local), effResp, s.temporalFlipV());
 
         int py = innerY0 + innerH - 1 - int(t * float(innerH - 1));
         int cx = innerX0 + px;
@@ -1426,34 +1408,18 @@ void PhaseFluxEditPage::drawMacroScope(Canvas &canvas) {
         int effResp = clamp(s.temporalResponse() + respNudge, -64, 64);
 
         const int tempR = repeatMultiplier(s.temporalRepeat());
-        const int subBaseSize = effPulse / tempR;
-        const int subRemainder = effPulse % tempR;
-        const int subOversizeBoundary = subRemainder * (subBaseSize + 1);
         const auto windowType = s.temporalWindow();
 
         for (int i = 0; i < effPulse; ++i) {
-            int subIdx, localPulseIdx, pulsesInThisSub;
-            if (i < subOversizeBoundary) {
-                subIdx = i / (subBaseSize + 1);
-                localPulseIdx = i % (subBaseSize + 1);
-                pulsesInThisSub = subBaseSize + 1;
-            } else {
-                const int j = i - subOversizeBoundary;
-                subIdx = subRemainder + (subBaseSize > 0 ? j / subBaseSize : 0);
-                localPulseIdx = (subBaseSize > 0) ? (j % subBaseSize) : 0;
-                pulsesInThisSub = subBaseSize > 0 ? subBaseSize : 1;
-            }
-            const float t_raw_local = float(localPulseIdx) / float(pulsesInThisSub);
+            int subIdx; float t_raw_local;
+            PhaseFluxMath::evalTemporalAlloc(i, effPulse, tempR, effWarp, subIdx, t_raw_local);
             if (!isInWindow(t_raw_local, windowType)) continue;
 
-            float t = clamp01(t_raw_local);
-            t = PhaseFluxMath::powerBend(t, PhaseFluxMath::powerBendKnobToParam(effWarp));
-            if (s.temporalFlipH()) t = 1.f - t;
-            t = Curve::eval(temporalCurveLut(s.temporalCurve()), t);
-            if (s.temporalFlipV()) t = 1.f - t;
-            t = PhaseFluxMath::powerBend(clamp01(t), PhaseFluxMath::powerBendKnobToParam(effResp));
+            float t = PhaseFluxMath::evalResponseFlipV(
+                Curve::eval(temporalCurveLut(s.temporalCurve()), t_raw_local), effResp, s.temporalFlipV());
 
             float t_slot_global = (float(subIdx) + t) / float(tempR);
+            if (s.temporalFlipH()) t_slot_global = 1.f - t_slot_global;   // v0.2 schedule reversal
             float rawPhase = float(cumulative[slot] + int(t_slot_global * float(slotW))) / float(cycleTicks);
             float disp = PhaseFluxMath::powerBend(rawPhase, gwarpParam);
             disp -= globalPhase;
