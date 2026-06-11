@@ -1239,9 +1239,6 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
     const int loOff = loBin - kHistBias, hiOff = hiBin - kHistBias, dwOff = dwBin - kHistBias;
     const int blLo = clampBaseline(yForOffset(loOff) + 2);   // bottom edge
     const int blHi = clampBaseline(yForOffset(hiOff) + 2);   // top edge
-    if (dwOff != loOff) drawNoteAt(loOff, blLo, false);
-    if (dwOff != hiOff) drawNoteAt(hiOff, blHi, false);
-    // dwell-peak at its pitch, nudged to clear the extremes (or merged into one).
     int blDw;
     if (dwOff == loOff)      blDw = blLo;
     else if (dwOff == hiOff) blDw = blHi;
@@ -1250,7 +1247,24 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
         if (blDw > blLo - 7) blDw = blLo - 7;   // keep above the low label
         if (blDw < blHi + 7) blDw = blHi + 7;   // keep below the high label
     }
-    drawNoteAt(dwOff, blDw, true);   // dwell-peak (home), highlighted, on top
+
+    // Span pool — plain labels (low / dwelt / high).
+    if (dwOff != loOff) drawNoteAt(loOff, blLo, false);
+    if (dwOff != hiOff) drawNoteAt(hiOff, blHi, false);
+    drawNoteAt(dwOff, blDw, false);
+
+    // Live current note — inverted box, follows the playhead (original behavior).
+    if (isActiveCell && stagePhase >= 0.f) {
+        float pf = evalPitchFull(stage, stagePhase, pitchRep, pitchWindowType);
+        int curOff = int(std::round(directionOffset(stage.pitchDirection(), pf, rangeDegrees)));
+        if (passesMelodyMask(baseDegree + curOff)) {
+            int blCur = (curOff == dwOff) ? blDw
+                      : (curOff == loOff) ? blLo
+                      : (curOff == hiOff) ? blHi
+                      : clampBaseline(yForOffset(curOff) + 2);
+            drawNoteAt(curOff, blCur, true);
+        }
+    }
 }
 
 void PhaseFluxEditPage::drawMacroScope(Canvas &canvas) {

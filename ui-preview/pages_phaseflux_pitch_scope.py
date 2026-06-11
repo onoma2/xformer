@@ -172,10 +172,6 @@ def draw_pitch_scope_redesign(canvas: Canvas, stage: Stage, *,
 
     bl_lo = clamp_baseline(y_for_offset(lo) + 2)   # bottom edge
     bl_hi = clamp_baseline(y_for_offset(hi) + 2)   # top edge
-    if dw != lo:
-        draw_note_at(lo, bl_lo, False)
-    if dw != hi:
-        draw_note_at(hi, bl_hi, False)
     if dw == lo:
         bl_dw = bl_lo
     elif dw == hi:
@@ -184,7 +180,27 @@ def draw_pitch_scope_redesign(canvas: Canvas, stage: Stage, *,
         bl_dw = clamp_baseline(y_for_offset(dw) + 2)
         bl_dw = min(bl_dw, bl_lo - 7)   # keep above the low label
         bl_dw = max(bl_dw, bl_hi + 7)   # keep below the high label
-    draw_note_at(dw, bl_dw, True)   # dwell-peak (home), highlighted, on top
+
+    # span pool — plain labels (low / dwelt / high)
+    if dw != lo:
+        draw_note_at(lo, bl_lo, False)
+    if dw != hi:
+        draw_note_at(hi, bl_hi, False)
+    draw_note_at(dw, bl_dw, False)
+
+    # live current note — inverted box, follows the playhead (original behavior)
+    if selected_is_active:
+        cur = current_degree(stage, stage_phase, range_degrees, direction)
+        if cur in counts:
+            if cur == dw:
+                bl_cur = bl_dw
+            elif cur == lo:
+                bl_cur = bl_lo
+            elif cur == hi:
+                bl_cur = bl_hi
+            else:
+                bl_cur = clamp_baseline(y_for_offset(cur) + 2)
+            draw_note_at(cur, bl_cur, True)
 
 
 def render_pitch_scope_redesign(canvas: Canvas, stages, *,
