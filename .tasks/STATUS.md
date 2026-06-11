@@ -67,9 +67,11 @@ Envelope/FreqFollower/Activity/ProgDiv) are slated to leave the routing lane and
 **input-reading modulators** (needs a modulator input-source concept — separate prerequisite);
 VcaNext → scaleSource, ProgDiv → clock-util/drop.
 
-## ⚪ spring-modulator — struck-resonator modulator shape (SPRING)
-**Status:** ready — spec + JS prototype done (2026-06-11), no firmware started.
-**Where I stopped:** spec finalized at `docs/spring-modulator-spec.md` incl. control laws (§4) and
+## 🟡 spring-modulator — struck-resonator modulator shape (SPRING)
+**Status:** firmware WIRED (2026-06-11) — `Shape::Spring` engine + 2-page UI + TDD tests; sim+STM32 build clean. Hardware audition + range tuning pending.
+**Implemented:** `Modulator.h` (Shape::Spring, springPickup reuses phase, helpers), `ModulatorEngine.h` (3-mode integrator branch + `springTensionHz/Zeta/Clang` statics + `_springX/_springV` state), `ModulatorPage.cpp` (2-page footer `SHAPE·STRIKE·TENS·RING·CLANG` / p2 `PICKUP`, value print, encoder map). Tests: `TestModulator` Spring rings-on-Trig + holds-in-Gate (RED→GREEN). Render `ui-preview/modulator-list/modulator-list-spring.png`.
+**Next action:** flash + audition; tune TENSION f0 range, strike-force default (depth scales strike → default depth 25 = quiet), CLANG partial ratios. Confirm STRIKE Tempo-domain feel.
+**Where I stopped (spec):** spec finalized at `docs/spring-modulator-spec.md` incl. control laws (§4) and
 clamping/numerical-safety (§6). A new `Modulator::Shape::Spring`: a mallet-struck 3-mode resonator
 (inharmonic ratios 1 / 2.76 / 5.40), semi-implicit Euler at control rate, **deterministic** strike
 (no RNG) so cloned slots phase-lock for a fake multitap. Output via `5·tanh(s)` soft-sat (no hard

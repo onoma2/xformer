@@ -40,6 +40,9 @@ Append-only.
 - [x] JS prototype with control laws, modes, pickups, soft-sat, exponential decay.
 - [x] Names locked.
 - [x] Spec written with control laws + clamping (`docs/spring-modulator-spec.md`).
+- [x] 2026-06-11: **Firmware wired** — model `Shape::Spring` + helpers; engine 3-mode integrator branch (`springTensionHz/Zeta/Clang`, `_springX/_springV`); 2-page UI footer + value print + encoder map; PICKUP reuses `phase`; field reuse attack=TENSION/decay=RING/smooth=CLANG, no version bump.
+- [x] 2026-06-11: **TDD** — `TestModulator` Spring cases (rings-on-Trig-strike, holds-in-Gate) RED on stub → GREEN. Sim + STM32 release build clean.
+- [x] 2026-06-11: ui-preview render `modulator-list/modulator-list-spring.png`.
 
 ## Notes
 - Sibling/next task: **double-pendulum-modulator** — coupled, chaotic, θ1/θ2 = natural 2-tap. Ref `WobblerV2/Sources/Pendulum.c` (full Lagrangian, semi-implicit Euler, `dTheta *= Damping` near-1, Speed→g, Mod→damping). That's the "energy sloshing / never-repeats" side the linear spring deliberately omits.
