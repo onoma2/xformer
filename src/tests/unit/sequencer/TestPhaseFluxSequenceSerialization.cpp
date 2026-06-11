@@ -101,7 +101,9 @@ CASE("default_round_trip") {
 
     for (int i = 0; i < PhaseFluxSequence::StageCount; ++i) {
         const auto &s = restored.stage(i);
-        expectEqual(s.pulseCount(), 0, "default pulseCount");
+        // Fresh sequence = default NoteTrack: stages 0..3 are active Quarter
+        // beats (4 pulses each), 4..15 are skipped (pulseCount 0).
+        expectEqual(s.pulseCount(), i < 4 ? 4 : 0, "default pulseCount");
         expectEqual(s.basePitch(), 0, "default basePitch");
         expectEqual(int(s.pitchRange()), int(PhaseFluxSequence::PitchRangeType::One), "default pitchRange");
         expectEqual(int(s.pitchDirection()), int(PhaseFluxSequence::PitchDirectionType::Up), "default pitchDirection");
@@ -123,9 +125,9 @@ CASE("default_round_trip") {
         expectEqual(s.accumulatorStep(), 0, "default accumulatorStep");
         expectEqual(s.pulseAccumStep(), 0, "default pulseAccumStep");
         expectEqual(s.gateLength(), 50, "default gateLength");
-        expectEqual(int(s.stageDivisor()), int(PhaseFluxSequence::StageDivisorSlot::Bar), "default stageDivisor");
-        // clear() keeps stage 0 active and skips stages 1..15.
-        expectEqual(s.skip(), i != 0, "default skip (only stage 0 active)");
+        expectEqual(int(s.stageDivisor()), int(PhaseFluxSequence::StageDivisorSlot::Quarter), "default stageDivisor");
+        // Fresh sequence: stages 0..3 active beats, 4..15 skipped.
+        expectEqual(s.skip(), i >= 4, "default skip (stages 0..3 active)");
         expectEqual(int(s.accumulatorTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Stage), "default accumulatorTrigger");
         expectEqual(int(s.pulseAccumTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Stage), "default pulseAccumTrigger");
         expectEqual(s.stageLen(), 64, "default stageLen (×1 transparent — Phaseque STEP_LEN pattern)");
