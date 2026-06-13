@@ -147,6 +147,33 @@ inline TT2EvalResult evaluateModPrefix(const TT2Command &cmd,
                            tt2NativeOpTable, tt2NativeOpCount, true, program);
 }
 
+// Capture the post-':' body of a DEL* command and enqueue it at timeMs with
+// the active exec frame's origin context. Shared by every DEL variant.
+inline void tt2EnqueueDelayBody(const TT2Command &cmd, uint8_t preSepPos,
+                                TT2Runtime &runtime, int16_t timeMs) {
+    TT2RuntimeCommand bodyCmd = {};
+    uint8_t bodyLen = 0;
+    for (uint8_t pos = preSepPos + 1;
+         pos < cmd.length && bodyLen < TT2_COMMAND_MAX_LENGTH;
+         ++pos) {
+        bodyCmd.tag[bodyLen] = cmd.tag[pos];
+        bodyCmd.value[bodyLen] = cmd.value[pos];
+        bodyLen++;
+    }
+    bodyCmd.length = bodyLen;
+    const TT2ExecFrame &f = runtime.exec.frames[
+        runtime.exec.depth > 0 ? runtime.exec.depth - 1 : 0];
+    tt2DelayAdd(runtime, bodyCmd, timeMs, f.script_number,
+                f.i, f.fparam1, f.fparam2);
+}
+
+// Clamp a 32-bit ms deadline into the int16 delay-time range [1, 32767].
+inline int16_t tt2ClampDelayMs(int32_t ms) {
+    if (ms < 1) ms = 1;
+    if (ms > 32767) ms = 32767;
+    return int16_t(ms);
+}
+
 // Evaluate one flat TT2Command through the native v2 op table.
 //
 // - Splits the command at SUB_SEP (`;`) into segments, executes left-to-right.
@@ -422,37 +449,63 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 // L consumed all remaining segments; return directly.
                 return lastResult;
             } else if (modValue == E_MOD_DEL) {
-                // DEL n: body  —  schedule body to run n ms later, once.
-                // (Faithful to upstream: one-shot ms delay, queued with the
-                // caller's script/I/fparam context restored at fire time.)
+                // DEL n: body — schedule body n ms later, once.
                 auto prefix = evaluateModPrefix(cmd, s + 1, preSepPos,
                                               runtime, output, program);
-                if (prefix.error != TT2EvalError::None) {
-                    return prefix;
-                }
+                if (prefix.error != TT2EvalError::None) return prefix;
                 if (prefix.stackSize != 1) {
                     return {TT2EvalError::InvalidModArity, 0, 0, 0};
                 }
-                int16_t timeMs = prefix.value;
-
-                // Capture body command from after ':' through end.
-                TT2RuntimeCommand bodyCmd = {};
-                uint8_t bodyLen = 0;
-                for (uint8_t pos = preSepPos + 1;
-                     pos < cmd.length && bodyLen < TT2_COMMAND_MAX_LENGTH;
-                     ++pos) {
-                    bodyCmd.tag[bodyLen] = cmd.tag[pos];
-                    bodyCmd.value[bodyLen] = cmd.value[pos];
-                    bodyLen++;
+                tt2EnqueueDelayBody(cmd, preSepPos, runtime,
+                                    tt2ClampDelayMs(prefix.value));
+                return {TT2EvalError::None, 0, 0, 0};
+            } else if (modValue == E_MOD_DEL_X) {
+                // DEL.X x n: body — n copies at x, 2x, 3x … ms.
+                auto prefix = evaluateModPrefix(cmd, s + 1, preSepPos,
+                                              runtime, output, program);
+                if (prefix.error != TT2EvalError::None) return prefix;
+                if (prefix.stackSize != 2) {
+                    return {TT2EvalError::InvalidModArity, 0, 0, 0};
                 }
-                bodyCmd.length = bodyLen;
-
-                const TT2ExecFrame &f = runtime.exec.frames[
-                    runtime.exec.depth > 0 ? runtime.exec.depth - 1 : 0];
-                tt2DelayAdd(runtime, bodyCmd, timeMs, f.script_number,
-                            f.i, f.fparam1, f.fparam2);
-
-                // DEL consumed remaining segments; return without running body.
+                int32_t interval = prefix.value;   // x (leftmost)
+                int16_t count = prefix.underTop;   // n
+                for (int16_t k = 1; k <= count; ++k) {
+                    tt2EnqueueDelayBody(cmd, preSepPos, runtime,
+                                        tt2ClampDelayMs(int32_t(k) * interval));
+                }
+                return {TT2EvalError::None, 0, 0, 0};
+            } else if (modValue == E_MOD_DEL_R) {
+                // DEL.R n x: body — n copies, first at 1ms, then +x each.
+                auto prefix = evaluateModPrefix(cmd, s + 1, preSepPos,
+                                              runtime, output, program);
+                if (prefix.error != TT2EvalError::None) return prefix;
+                if (prefix.stackSize != 2) {
+                    return {TT2EvalError::InvalidModArity, 0, 0, 0};
+                }
+                int16_t count = prefix.value;      // n (leftmost)
+                int32_t interval = prefix.underTop; // x
+                for (int16_t k = 0; k < count; ++k) {
+                    tt2EnqueueDelayBody(cmd, preSepPos, runtime,
+                                        tt2ClampDelayMs(1 + int32_t(k) * interval));
+                }
+                return {TT2EvalError::None, 0, 0, 0};
+            } else if (modValue == E_MOD_DEL_B) {
+                // DEL.B base mask: body — fire at i*base ms for each set bit i
+                // of mask (bit 0 → 1ms via the <1 clamp).
+                auto prefix = evaluateModPrefix(cmd, s + 1, preSepPos,
+                                              runtime, output, program);
+                if (prefix.error != TT2EvalError::None) return prefix;
+                if (prefix.stackSize != 2) {
+                    return {TT2EvalError::InvalidModArity, 0, 0, 0};
+                }
+                int32_t base = prefix.value;       // base (leftmost)
+                uint16_t mask = uint16_t(prefix.underTop);
+                for (int i = 0; i < 16; ++i) {
+                    if (mask & (1u << i)) {
+                        tt2EnqueueDelayBody(cmd, preSepPos, runtime,
+                                            tt2ClampDelayMs(int32_t(i) * base));
+                    }
+                }
                 return {TT2EvalError::None, 0, 0, 0};
             } else {
                 // Unsupported mod — reject before prefix side effects.

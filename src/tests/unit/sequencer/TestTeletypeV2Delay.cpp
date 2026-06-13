@@ -94,4 +94,41 @@ CASE("sub_threshold_advance_does_not_fire") {
     expectEqual(int(f.output.cv[0].targetRaw), 9, "fires once cumulative >= 50");
 }
 
+CASE("del_x_schedules_n_copies_at_intervals") {
+    Fixture f;
+    f.load(0, "DEL.X 10 3: CV 1 9\n"); // x=10 interval, n=3 -> 10,20,30 ms
+    f.run(0);
+    expectEqual(int(f.runtime.delay.count), 3, "three copies queued");
+    f.advance(10);
+    expectEqual(int(f.runtime.delay.count), 2, "first copy fired at 10ms");
+    expectEqual(int(f.output.cv[0].targetRaw), 9, "body ran");
+    f.advance(10);
+    expectEqual(int(f.runtime.delay.count), 1, "second fired at 20ms");
+    f.advance(10);
+    expectEqual(int(f.runtime.delay.count), 0, "third fired at 30ms");
+}
+
+CASE("del_r_first_fires_immediately") {
+    Fixture f;
+    f.load(0, "DEL.R 2 100: CV 1 5\n"); // n=2, x=100 -> deadlines 1, 101
+    f.run(0);
+    expectEqual(int(f.runtime.delay.count), 2, "two copies queued");
+    f.advance(1);
+    expectEqual(int(f.runtime.delay.count), 1, "first fires at 1ms (immediate)");
+    expectEqual(int(f.output.cv[0].targetRaw), 5, "body ran");
+    f.advance(100);
+    expectEqual(int(f.runtime.delay.count), 0, "second fires at 101ms");
+}
+
+CASE("del_b_bitmask_positions") {
+    Fixture f;
+    f.load(0, "DEL.B 10 6: CV 1 1\n"); // mask 6 = bits 1,2 -> 10ms, 20ms
+    f.run(0);
+    expectEqual(int(f.runtime.delay.count), 2, "two set bits queued");
+    f.advance(10);
+    expectEqual(int(f.runtime.delay.count), 1, "bit 1 fires at 10ms");
+    f.advance(10);
+    expectEqual(int(f.runtime.delay.count), 0, "bit 2 fires at 20ms");
+}
+
 } // UNIT_TEST("TeletypeV2Delay")
