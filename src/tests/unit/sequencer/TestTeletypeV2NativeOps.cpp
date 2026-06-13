@@ -44,10 +44,10 @@ UNIT_TEST("TeletypeV2NativeOps") {
         TT2OutputState output;
         init(output);
 
-        expectEqual(int(sizeof(TT2CvOutput)), 2, "TT2CvOutput size");
-        expectEqual(int(sizeof(TT2TrOutput)), 1, "TT2TrOutput size");
-        expectEqual(int(sizeof(TT2OutputState)), 26, "TT2OutputState size");
-        expectEqual(int(sizeof(TT2TrackEngine)), 96, "TT2TrackEngine size");
+        expectEqual(int(sizeof(TT2CvOutput)), 16, "TT2CvOutput size");
+        expectEqual(int(sizeof(TT2TrOutput)), 4, "TT2TrOutput size");
+        expectEqual(int(sizeof(TT2OutputState)), 164, "TT2OutputState size");
+        expectEqual(int(sizeof(TT2TrackEngine)), 232, "TT2TrackEngine size");
         expectEqual(int(output.cvDirty), 0, "CV dirty clear");
         expectEqual(int(output.trDirty), 0, "TR dirty clear");
         for (int i = 0; i < TT2_OUTPUT_CV_COUNT; i++) {

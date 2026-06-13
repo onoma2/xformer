@@ -418,7 +418,8 @@ static void opCv(TT2Runtime &runtime, TT2OutputState &output,
         if (!popStack(stack, stackSize, val, error)) return;
         val = normaliseCvValue(val);
         runtime.variables.cv[idx] = val;
-        output.cv[idx].targetRaw = val;
+        int16_t target = normaliseCvValue(int16_t(val + runtime.variables.cv_off[idx]));
+        tt2SeedCvSlew(output.cv[idx], target, runtime.variables.cv_slew[idx]);
         output.cvDirty |= uint8_t(1 << idx);
     } else {
         pushStack(stack, stackSize, runtime.variables.cv[idx], error);

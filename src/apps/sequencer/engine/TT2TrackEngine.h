@@ -71,6 +71,15 @@ public:
         int whole = int(_msAccum);
         if (whole > 0) {
             _msAccum -= float(whole);
+            // Shape outputs first so anything seeded this pass (trigger scripts,
+            // delays/metro firing below) starts its ramp/pulse next pass at full
+            // length rather than losing `whole` ms on arming.
+            for (int i = 0; i < TT2_OUTPUT_CV_COUNT; ++i) {
+                tt2AdvanceCvSlew(_output.cv[i], whole);
+            }
+            for (int i = 0; i < TT2_OUTPUT_TR_COUNT; ++i) {
+                tt2AdvanceTrPulse(_output.tr[i], whole);
+            }
             auto &program = _tt2Track.program();
             auto &runtime = _tt2Track.runtime();
             tt2AdvanceDelays(program, runtime, _output, whole);
@@ -93,7 +102,7 @@ public:
         if (!(_output.cvDirty & (1 << index))) {
             return 0.f;
         }
-        return rawToVolts(_output.cv[index].targetRaw);
+        return rawToVolts(int16_t(_output.cv[index].currentQ >> 8));
     }
 
     // Execute one script by index against the bound track's program/runtime.
