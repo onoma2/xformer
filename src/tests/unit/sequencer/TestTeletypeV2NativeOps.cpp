@@ -300,12 +300,13 @@ UNIT_TEST("TeletypeV2NativeOps") {
         TT2OutputState output = {};
         init(output);
 
-        // HZ (pitch->hz) is parsed but not yet implemented in the native table.
-        auto r = tryParse("HZ 0");
-        expectEqual(int(r.error), int(E_OK), "parse HZ 0");
+        // SCENE is parsed but out of scope for the native dialect (no scene
+        // hardware), so it stays unsupported in the op table.
+        auto r = tryParse("SCENE 0");
+        expectEqual(int(r.error), int(E_OK), "parse SCENE 0");
         auto result = evaluateCommand(lower(r.cmd), runtime, output);
         expectEqual(int(result.error), int(TT2EvalError::UnsupportedOp),
-                    "HZ unsupported");
+                    "SCENE unsupported");
     }
 
     // -- batch 1: arithmetic / min-max / comparison / unary --------------

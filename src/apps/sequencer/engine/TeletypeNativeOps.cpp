@@ -450,6 +450,159 @@ static void opV(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     else pushStack(stack, stackSize, tt2VTable[a], error);
 }
 
+// table_vv[100]: hundredths of a volt -> raw fraction. Verbatim teletype/src/table.c.
+static const int16_t tt2VvTable[100] = {
+    0,    16,   33,   49,   66,   82,   98,   115,  131,  147,  164,  180,
+    197,  213,  229,  246,  262,  279,  295,  311,  328,  344,  360,  377,
+    393,  410,  426,  442,  459,  475,  492,  508,  524,  541,  557,  573,
+    590,  606,  623,  639,  655,  672,  688,  705,  721,  737,  754,  770,
+    786,  803,  819,  836,  852,  868,  885,  901,  918,  934,  950,  967,
+    983,  999,  1016, 1032, 1049, 1065, 1081, 1098, 1114, 1130, 1147, 1163,
+    1180, 1196, 1212, 1229, 1245, 1262, 1278, 1294, 1311, 1327, 1343, 1360,
+    1376, 1393, 1409, 1425, 1442, 1458, 1475, 1491, 1507, 1524, 1540, 1556,
+    1573, 1589, 1606, 1622
+};
+
+// table_hzv[76]: note (shifted +36) -> Hz value. Verbatim teletype/src/table.c.
+static const int16_t tt2HzvTable[76] = {
+    205,  217,  230,   244,   258,   273,   290,   307,   325,   344,  365,
+    387,  410,  434,   460,   487,   516,   547,   579,   614,   650,  689,
+    730,  773,  819,   868,   920,   974,   1032,  1094,  1159,  1227, 1300,
+    1378, 1460, 1546,  1638,  1736,  1839,  1948,  2064,  2187,  2317, 2455,
+    2601, 2755, 2919,  3093,  3277,  3472,  3678,  3897,  4129,  4374, 4634,
+    4910, 5202, 5511,  5839,  6186,  6554,  6943,  7356,  7794,  8257, 8748,
+    9268, 9819, 10403, 11022, 11677, 12372, 13107, 13887, 14712, 15587
+};
+
+// Linear rescale of i from [a,b] to [x,y] with rounding (upstream op_SCALE).
+static int16_t tt2ScaleVal(int32_t i, int32_t a, int32_t b, int32_t x, int32_t y) {
+    if ((b - a) == 0) return 0;
+    int32_t result = (i - a) * (y - x) * 2 / (b - a);
+    result = result / 2 + (result & 1);
+    return int16_t(result + x);
+}
+
+// Binary search the ET table for the nearest note to a raw volts value.
+static int16_t tt2VoltsToNote(int16_t vIn) {
+    int16_t target = (vIn < 0) ? -vIn : vIn;
+    const int len = 128;
+    if (target <= tt2EtTable[0]) return 0;
+    if (target >= tt2EtTable[len - 1]) return int16_t(len - 1);
+    int i = 0, j = len, mid = 0;
+    while (i < j) {
+        mid = (i + j) / 2;
+        if (tt2EtTable[mid] == target) return int16_t(vIn < 0 ? -mid : mid);
+        if (target < tt2EtTable[mid]) {
+            if (mid > 0 && target > tt2EtTable[mid - 1]) {
+                if ((target - tt2EtTable[mid - 1]) >= (tt2EtTable[mid] - target))
+                    return int16_t(vIn < 0 ? -mid : mid);
+                return int16_t(vIn < 0 ? -(mid - 1) : mid - 1);
+            }
+            j = mid;
+        } else {
+            if (mid < len - 1 && target < tt2EtTable[mid + 1]) {
+                if ((target - tt2EtTable[mid]) >= (tt2EtTable[mid + 1] - target))
+                    return int16_t(vIn < 0 ? -(mid + 1) : mid + 1);
+                return int16_t(vIn < 0 ? -mid : mid);
+            }
+            i = mid + 1;
+        }
+    }
+    return int16_t(vIn < 0 ? -mid : mid);
+}
+
+// SCALE a b x y i — rescale i from [a,b] to [x,y].
+static void opScale(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0, b = 0, x = 0, y = 0, i = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    if (!popStack(stack, stackSize, b, error)) return;
+    if (!popStack(stack, stackSize, x, error)) return;
+    if (!popStack(stack, stackSize, y, error)) return;
+    if (!popStack(stack, stackSize, i, error)) return;
+    pushStack(stack, stackSize, tt2ScaleVal(i, a, b, x, y), error);
+}
+
+// SCALE0 b y i — rescale i from [0,b] to [0,y].
+static void opScale0(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t b = 0, y = 0, i = 0;
+    if (!popStack(stack, stackSize, b, error)) return;
+    if (!popStack(stack, stackSize, y, error)) return;
+    if (!popStack(stack, stackSize, i, error)) return;
+    pushStack(stack, stackSize, tt2ScaleVal(i, 0, b, 0, y), error);
+}
+
+// QT a b — round b to the nearest multiple of a (ties round up).
+static void opQt(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0, b = 0;
+    if (!popBinary(stack, stackSize, a, b, error)) return;
+    if (a == 0) { pushStack(stack, stackSize, 0, error); return; }
+    int c = b / a;
+    int d = c * a;
+    int e = (c + 1) * a;
+    int dd = b - d; if (dd < 0) dd = -dd;
+    int ee = b - e; if (ee < 0) ee = -ee;
+    pushStack(stack, stackSize, int16_t(dd < ee ? d : e), error);
+}
+
+// VN v — nearest ET note number for a raw volts value.
+static void opVn(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t v = 0;
+    if (!popStack(stack, stackSize, v, error)) return;
+    pushStack(stack, stackSize, tt2VoltsToNote(v), error);
+}
+
+// VV x — hundredths of a volt to raw (0..1000 -> 0..10V).
+static void opVv(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    int16_t neg = 1;
+    if (a < 0) { neg = -1; a = -a; }
+    if (a > 1000) a = 1000;
+    pushStack(stack, stackSize, int16_t(neg * (tt2VTable[a / 100] + tt2VvTable[a % 100])), error);
+}
+
+// HZ v — raw volts to a Hz-domain value (interpolated over the note tables).
+static void opHz(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t vIn = 0;
+    if (!popStack(stack, stackSize, vIn, error)) return;
+    int16_t note = 0, hz = 0;
+    float interpolate = 0.f;
+    int16_t deltaTotal, delta;
+    const int sizeHzv = 76;
+    if (vIn < 0) {
+        vIn = -vIn;
+        for (int16_t i = 127; i >= 0; i--) {
+            if (vIn <= tt2EtTable[i]) note = i;
+        }
+        deltaTotal = tt2EtTable[note] - tt2EtTable[note - 1];
+        delta = tt2EtTable[note] - vIn;
+        interpolate = deltaTotal ? delta / float(deltaTotal) : 0.f;
+        note = -note;
+    } else {
+        for (int16_t i = 0; i <= 127; i++) {
+            if (vIn >= tt2EtTable[i]) note = i;
+        }
+        if (note < 128) {
+            deltaTotal = tt2EtTable[note + 1] - tt2EtTable[note];
+            delta = vIn - tt2EtTable[note];
+            interpolate = deltaTotal ? delta / float(deltaTotal) : 0.f;
+        }
+    }
+    note = note + 36;
+    if (note < 0) hz = tt2HzvTable[0];
+    else if (note >= sizeHzv) hz = tt2HzvTable[sizeHzv - 1];
+    else if (note < sizeHzv - 1)
+        hz = int16_t(tt2HzvTable[note] + (tt2HzvTable[note + 1] - tt2HzvTable[note]) * interpolate);
+    else hz = tt2HzvTable[note];
+    pushStack(stack, stackSize, hz, error);
+}
+
 // ---------------------------------------------------------------------------
 // Logic / range ops (boolean results are 1/0)
 // ---------------------------------------------------------------------------
@@ -1315,6 +1468,42 @@ static void opPN(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
     }
 }
 
+// Rescale every value in pattern pn's [start,end] window from [in_min,in_max]
+// to [out_min,out_max] (upstream p_pat_scale; uses the shared SCALE math).
+static void patScale(const TeletypeProgram *program, int16_t pn,
+                     int16_t inMin, int16_t inMax, int16_t outMin, int16_t outMax) {
+    TT2Pattern *p = mutablePattern(program, pn);
+    int start = p->start, end = p->end;
+    if (start < 0) start = 0;
+    if (end > TT2_PATTERN_LENGTH - 1) end = TT2_PATTERN_LENGTH - 1;
+    for (int idx = start; idx <= end; ++idx) {
+        p->val[idx] = tt2ScaleVal(p->val[idx], inMin, inMax, outMin, outMax);
+    }
+}
+
+// P.SCALE in_min in_max out_min out_max — rescale the working pattern.
+static void opPScale(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t inMin = 0, inMax = 0, outMin = 0, outMax = 0;
+    if (!popStack(stack, stackSize, inMin, error)) return;
+    if (!popStack(stack, stackSize, inMax, error)) return;
+    if (!popStack(stack, stackSize, outMin, error)) return;
+    if (!popStack(stack, stackSize, outMax, error)) return;
+    patScale(program, runtime.variables.p_n, inMin, inMax, outMin, outMax);
+}
+
+// PN.SCALE pn in_min in_max out_min out_max — rescale an explicit pattern.
+static void opPNScale(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                      int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t pn = 0, inMin = 0, inMax = 0, outMin = 0, outMax = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    if (!popStack(stack, stackSize, inMin, error)) return;
+    if (!popStack(stack, stackSize, inMax, error)) return;
+    if (!popStack(stack, stackSize, outMin, error)) return;
+    if (!popStack(stack, stackSize, outMax, error)) return;
+    patScale(program, pn, inMin, inMax, outMin, outMax);
+}
+
 // P.L / PN.L — length.
 static void opPL(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
@@ -2044,6 +2233,16 @@ namespace {
             table[E_OP_SGN]      = opSgn;
             table[E_OP_N]        = opN;
             table[E_OP_V]        = opV;
+            table[E_OP_SCALE]    = opScale;
+            table[E_OP_SCL]      = opScale;
+            table[E_OP_SCALE0]   = opScale0;
+            table[E_OP_SCL0]     = opScale0;
+            table[E_OP_QT]       = opQt;
+            table[E_OP_VN]       = opVn;
+            table[E_OP_VV]       = opVv;
+            table[E_OP_HZ]       = opHz;
+            table[E_OP_P_SCALE]  = opPScale;
+            table[E_OP_PN_SCALE] = opPNScale;
             table[E_OP_AND]                = opAnd;
             table[E_OP_SYM_AMPERSAND_x2]   = opAnd;
             table[E_OP_OR]                 = opOr;
