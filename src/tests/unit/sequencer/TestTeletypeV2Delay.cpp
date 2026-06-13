@@ -96,7 +96,7 @@ CASE("sub_threshold_advance_does_not_fire") {
 
 CASE("del_x_schedules_n_copies_at_intervals") {
     Fixture f;
-    f.load(0, "DEL.X 10 3: CV 1 9\n"); // x=10 interval, n=3 -> 10,20,30 ms
+    f.load(0, "DEL.X 3 10: CV 1 9\n"); // x=3 copies, delay_time=10ms -> 10,20,30 ms
     f.run(0);
     expectEqual(int(f.runtime.delay.count), 3, "three copies queued");
     f.advance(10);

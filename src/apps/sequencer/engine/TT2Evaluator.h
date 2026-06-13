@@ -460,15 +460,17 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                                     tt2ClampDelayMs(prefix.value));
                 return {TT2EvalError::None, 0, 0, 0};
             } else if (modValue == E_MOD_DEL_X) {
-                // DEL.X x n: body — n copies at x, 2x, 3x … ms.
+                // DEL.X x delay_time: body — x copies at delay_time, 2·dt, 3·dt …
+                // (upstream: num_delays = first pop = x; delay_time = second).
                 auto prefix = evaluateModPrefix(cmd, s + 1, preSepPos,
                                               runtime, output, program);
                 if (prefix.error != TT2EvalError::None) return prefix;
                 if (prefix.stackSize != 2) {
                     return {TT2EvalError::InvalidModArity, 0, 0, 0};
                 }
-                int32_t interval = prefix.value;   // x (leftmost)
-                int16_t count = prefix.underTop;   // n
+                int16_t count = prefix.value;      // x (leftmost) = number of copies
+                int32_t interval = prefix.underTop; // delay_time
+                if (interval < 1) interval = 1;    // upstream clamps the operand
                 for (int16_t k = 1; k <= count; ++k) {
                     tt2EnqueueDelayBody(cmd, preSepPos, runtime,
                                         tt2ClampDelayMs(int32_t(k) * interval));
@@ -484,6 +486,7 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 }
                 int16_t count = prefix.value;      // n (leftmost)
                 int32_t interval = prefix.underTop; // x
+                if (interval < 1) interval = 1;    // upstream clamps the operand
                 for (int16_t k = 0; k < count; ++k) {
                     tt2EnqueueDelayBody(cmd, preSepPos, runtime,
                                         tt2ClampDelayMs(1 + int32_t(k) * interval));
@@ -499,6 +502,7 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                     return {TT2EvalError::InvalidModArity, 0, 0, 0};
                 }
                 int32_t base = prefix.value;       // base (leftmost)
+                if (base < 1) base = 1;            // upstream clamps base before i·base
                 uint16_t mask = uint16_t(prefix.underTop);
                 for (int i = 0; i < 16; ++i) {
                     if (mask & (1u << i)) {
