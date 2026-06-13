@@ -50,3 +50,58 @@ inline TT2EvalResult runScript(const TeletypeProgram &program,
     runtime.exec.depth--;
     return {TT2EvalError::None, 0, 0, 0};
 }
+
+// Advance the delay queue by deltaMs (real elapsed milliseconds). Each live
+// slot's remaining time is decremented; due bodies fire via the evaluator with
+// the caller's origin context restored. Faithful to upstream tele_tick():
+// the firing slot is held busy (time=1) while its body runs so a body that
+// re-enqueues a delay won't reuse the slot, then freed.
+inline void tt2AdvanceDelays(const TeletypeProgram &program, TT2Runtime &runtime,
+                             TT2OutputState &output, int deltaMs) {
+    if (deltaMs <= 0) {
+        return;
+    }
+    for (int i = 0; i < TT2_DELAY_DEPTH; ++i) {
+        TT2DelayEntry &e = runtime.delay.entries[i];
+        if (e.time == 0) {
+            continue;
+        }
+        int32_t remaining = int32_t(e.time) - deltaMs;
+        if (remaining > 0) {
+            e.time = int16_t(remaining);
+            continue;
+        }
+        // Due — snapshot body + origin, hold the slot busy, run, then free.
+        e.time = 1;
+        TT2RuntimeCommand body = e.command;
+        uint8_t originScript = e.originScript;
+        int16_t originI = e.originI;
+        int16_t fparam1 = e.originFParam1;
+        int16_t fparam2 = e.originFParam2;
+
+        if (runtime.exec.depth < TT2_EXEC_DEPTH) {
+            TT2ExecFrame &frame = runtime.exec.frames[runtime.exec.depth];
+            memset(&frame, 0, sizeof(TT2ExecFrame));
+            frame.script_number = originScript;
+            frame.i = originI;
+            frame.fparam1 = fparam1;
+            frame.fparam2 = fparam2;
+            frame.delayed = 1;
+            ++runtime.exec.depth;
+
+            TT2Command cmd;
+            cmd.length = body.length;
+            for (int k = 0; k < TT2_COMMAND_MAX_LENGTH; ++k) {
+                cmd.tag[k] = body.tag[k];
+                cmd.value[k] = body.value[k];
+            }
+            evaluateCommand(cmd, runtime, output, &program);
+            --runtime.exec.depth;
+        }
+
+        e.time = 0;
+        if (runtime.delay.count > 0) {
+            --runtime.delay.count;
+        }
+    }
+}

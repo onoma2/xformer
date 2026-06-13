@@ -198,6 +198,14 @@ static void opScript(TT2Runtime &runtime, TT2OutputState &output,
     }
 }
 
+// DEL.CLR — clear the delay queue (faithful subset: TT2 has no TR pulse
+// timers / persistent op stack to also flush).
+static void opDelClr(TT2Runtime &runtime, TT2OutputState &,
+                     const TeletypeProgram *, int16_t *,
+                     uint8_t &, bool, TT2EvalError &) {
+    tt2DelayClear(runtime);
+}
+
 // ---------------------------------------------------------------------------
 // Native op table
 // ---------------------------------------------------------------------------
@@ -220,6 +228,7 @@ namespace {
             table[E_OP_M]        = opM;
             table[E_OP_M_ACT]    = opMAct;
             table[E_OP_SCRIPT]   = opScript;
+            table[E_OP_DEL_CLR]  = opDelClr;
         }
     };
     OpTableBuilder opTableBuilder;

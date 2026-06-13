@@ -421,6 +421,39 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
 
                 // L consumed all remaining segments; return directly.
                 return lastResult;
+            } else if (modValue == E_MOD_DEL) {
+                // DEL n: body  —  schedule body to run n ms later, once.
+                // (Faithful to upstream: one-shot ms delay, queued with the
+                // caller's script/I/fparam context restored at fire time.)
+                auto prefix = evaluateModPrefix(cmd, s + 1, preSepPos,
+                                              runtime, output, program);
+                if (prefix.error != TT2EvalError::None) {
+                    return prefix;
+                }
+                if (prefix.stackSize != 1) {
+                    return {TT2EvalError::InvalidModArity, 0, 0, 0};
+                }
+                int16_t timeMs = prefix.value;
+
+                // Capture body command from after ':' through end.
+                TT2RuntimeCommand bodyCmd = {};
+                uint8_t bodyLen = 0;
+                for (uint8_t pos = preSepPos + 1;
+                     pos < cmd.length && bodyLen < TT2_COMMAND_MAX_LENGTH;
+                     ++pos) {
+                    bodyCmd.tag[bodyLen] = cmd.tag[pos];
+                    bodyCmd.value[bodyLen] = cmd.value[pos];
+                    bodyLen++;
+                }
+                bodyCmd.length = bodyLen;
+
+                const TT2ExecFrame &f = runtime.exec.frames[
+                    runtime.exec.depth > 0 ? runtime.exec.depth - 1 : 0];
+                tt2DelayAdd(runtime, bodyCmd, timeMs, f.script_number,
+                            f.i, f.fparam1, f.fparam2);
+
+                // DEL consumed remaining segments; return without running body.
+                return {TT2EvalError::None, 0, 0, 0};
             } else {
                 // Unsupported mod — reject before prefix side effects.
                 return {TT2EvalError::UnsupportedMod, 0, 0, 0};

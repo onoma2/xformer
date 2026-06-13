@@ -49,7 +49,20 @@ public:
         return ran ? TickResult(CvUpdate | GateUpdate) : NoUpdate;
     }
 
-    virtual void update(float dt) override { (void)dt; }
+    // Real elapsed wall-time refresh (the 0.f recompose call is a no-op).
+    // Drains the ms delay queue, accumulating sub-millisecond remainder so
+    // slow refreshes still advance delays accurately.
+    virtual void update(float dt) override {
+        if (dt <= 0.f) {
+            return;
+        }
+        _msAccum += dt * 1000.f;
+        int whole = int(_msAccum);
+        if (whole > 0) {
+            _msAccum -= float(whole);
+            tt2AdvanceDelays(_tt2Track.program(), _tt2Track.runtime(), _output, whole);
+        }
+    }
 
     virtual bool activity() const override { return _output.cvDirty != 0 || _output.trDirty != 0; }
 
@@ -88,6 +101,7 @@ private:
     TT2Track &_tt2Track;
     TT2OutputState _output;
     uint32_t _tickCount = 0;
+    float _msAccum = 0.f;
     bool _firstTick = true;
 };
 

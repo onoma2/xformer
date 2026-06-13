@@ -282,6 +282,37 @@ inline uint8_t &tt2ActiveLineNumber(TT2Runtime &runtime) {
                                ? runtime.exec.depth - 1 : 0].line_number;
 }
 
+// Delay queue — faithful to upstream Teletype: parallel-slot model with a
+// time==0 empty sentinel, delay clamped to >= 1 ms, caller context (script /
+// I / fparams) snapshotted for restore at fire time. tt2DelayAdd returns
+// false if the queue is full.
+inline bool tt2DelayAdd(TT2Runtime &runtime, const TT2RuntimeCommand &command,
+                        int16_t timeMs, uint8_t originScript, int16_t originI,
+                        int16_t originFParam1, int16_t originFParam2) {
+    if (timeMs < 1) timeMs = 1;
+    for (int i = 0; i < TT2_DELAY_DEPTH; ++i) {
+        TT2DelayEntry &e = runtime.delay.entries[i];
+        if (e.time == 0) {
+            e.command = command;
+            e.time = timeMs;
+            e.originScript = originScript;
+            e.originI = originI;
+            e.originFParam1 = originFParam1;
+            e.originFParam2 = originFParam2;
+            ++runtime.delay.count;
+            return true;
+        }
+    }
+    return false;
+}
+
+inline void tt2DelayClear(TT2Runtime &runtime) {
+    for (int i = 0; i < TT2_DELAY_DEPTH; ++i) {
+        runtime.delay.entries[i].time = 0;
+    }
+    runtime.delay.count = 0;
+}
+
 // EVERY / SKIP helpers — per-(script, line) counter state.
 // Matches old Teletype semantics: tick does count++ then count %= mod.
 // EVERY fires when count == 0 after modulo.
