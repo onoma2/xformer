@@ -126,7 +126,7 @@ Independent 3-agent audit. Architecture verdict: faithful (no bridge/scene_state
 - **DEL.X arg order (count/interval swap), DEL.X/.R/.B operand `<1→1` clamp, smoke-test build regression** — `6b9261e5`.
 - **IF/ELIF/ELSE chain → exec frame + standalone PROB** — `2290512b`. Chain flag now on `tt2ActiveIfElse` (exec frame), so standalone `ELSE:`/`ELIF:` lines see the prior IF (multi-line idiom restored). IF resets + sets-on-true; ELIF always evaluates prefix, body gated; ELSE runs if not-taken; no orphan/duplicate errors; only IF resets the flag. PROB decoupled (standalone roll). Mirrors `controlflow.c` exactly; tests updated to upstream behaviour + multi-line cases added.
 
-Remaining audit notes (lower severity, not yet done): `bootEnabled` ignored (boot script always runs on first tick); delay depth 8 vs upstream 64; `loadScriptText` mis-splits >127-char lines; engine `reset()` doesn't flush pending delays.
+Remaining audit notes (lower severity): `bootEnabled` ignored (boot script always runs on first tick — debatable, upstream INIT always runs on load); delay depth 8 matches the on-module Teletype build (NOT a bug); `loadScriptText` mis-splits >127-char lines (unreachable with ≤16-token commands). **`reset()` now flushes the delay queue + accumulators (`20a6d919`).**
 
 **Governing contract (reaffirmed 2026-06-13): TT2 = the Teletype language, BEHAVIOUR-IDENTICAL.** Only the architecture changes (native runtime, no bridge, 8 outputs, hardware ops dropped). Every kept op's semantics must match upstream exactly — no native shortcuts. (Already in `docs/teletype_v2.md`: "preserve core Teletype syntax and behavior", "don't rename core ops".)
 
@@ -137,7 +137,7 @@ Phase 2b candidates:
 - **Delay scheduling (`DEL`, then `DEL.CLR`) — original plan note, faithful ms port.** Upstream model (grounded `teletype/src/ops/delay.c` + `teletype.c:362-419`): parallel-array queue (`TT2DelayEntry`/`TT2DelayQueue` already match — `command` + `time`(ms) + origin script/`I`/fparam), `time==0` = empty slot, delay `<1→1` clamp, drain decrements each slot's ms and fires due bodies via a fresh exec frame with origin restored. **`DEL` delay unit = MILLISECONDS** (identical Teletype). Drive the drain from `TT2TrackEngine::update(dt)` — `dt*1000` is real elapsed ms (the `update(0.f)` recompose call is guarded out), mirroring v1 `advanceTime`. Narrow slice = `DEL n: body` one-shot + `DEL.CLR`; `.X/.R/.G/.B` repeat variants follow.
 - `$` / function calls and return values
 - `BREAK` / `KILL`
-- Full trigger input and metro scheduling (wire TT2TrackEngine into `Engine::TrackEngineContainer` and `Engine.cpp` track creation)
+- **Metro — DONE (`20a6d919`)**: ms-based, fires METRO script every `M` ms when `M.ACT`, driven from `update(dt)` (`tt2AdvanceMetro`). **Remaining: trigger-input scheduling** — read gate/CV inputs, fire trigger scripts 1..8 on rising edges (needs engine input wiring).
 - Add `TT2Track` to `Track` container with `TrackMode::TeletypeV2` or mode-switching strategy
 - **LAST:** `E`/`LFO`/`G` → Modulator engine port (deferred to the final stage — see section below)
 
