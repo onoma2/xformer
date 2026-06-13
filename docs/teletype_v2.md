@@ -26,11 +26,11 @@ The goal is a native Performer scripting language derived from Teletype:
 - **Runtime/model:** variables store, scale tables, RNG slots, delay queue, 8 CV + 8 TR output state, serialized `TeletypeProgram` (6 scripts + 4 patterns).
 - **Trigger-input firing:** `TT2TrackEngine` samples 4 trigger inputs each update and fires scripts 0-3 on rising edges; per-input source (CvIn/GateOut/LogicalGate, mirroring the legacy dispatch) defaults to CvIn1-4 — the editing UI for it rides with the deferred editor I/O grid.
 - **Output shaping:** native linear ms CV slew (raw<<8 fixed-point, exact interpolation, no sub-LSB stall) + offset; one-shot TR pulse with rest polarity. Per-ms shaping pass in `update(dt)`; `cvOutput()` emits the ramped value. Ops `CV.SLEW`/`CV.OFF`/`TR.POL`/`TR.TIME`/`TR.PULSE`/`TR.P`/`TR.TOG`.
+- **Engine inputs:** six CV-mapped sources (`TT2CvInputSource`, defaulted CvIn1-4) feed `IN`/`PARAM` (scaled) and the working variables `X`/`Y`/`Z`/`T`; sampled each refresh in `update(dt)`. Ops `IN`/`IN.SCALE`/`PARAM`/`PARAM.SCALE`, plus `STATE` (latched trigger level) and `MUTE` (gates trigger firing). UI for the source routing rides with the deferred editor I/O grid.
 - **Build:** release switched to `-Os` (reclaimed ~352 KB flash; ~350 KB headroom); op breadth no longer flash-bound.
 
-### Remaining — engine mechanics (highest value; survey 2026-06-14)
-These change what TT2 *is* — a reactive Eurorack voice, not a self-contained calculator. Engine-level, not op-table. (Trigger-input firing and output shaping are now done; see above.)
-- **IN / PARAM inputs (PARTIAL)** — `IN`/`PARAM`/`IN.SCALE`/`PARAM.SCALE` ops + a sampling write from a Performer CV source. State (`in`/`param`/min/max) exists.
+### Remaining — engine mechanics
+All three engine mechanics (trigger-input firing, output shaping, IN/PARAM + engine inputs) are now done. What's left is **language-tail breadth** (below) and the **editor** — no engine-mechanic gaps remain.
 
 ### Remaining — language tail (PARTIAL — wire ops onto existing state)
 - Variable ops: `O` / `DRUNK` / `FLIP` / `TIME` / `LAST` (read-side mutation/tick source) + plain `A`–`Z`/`J`/`K` getters-setters. `LAST` also needs a per-script last-run timestamp array.
@@ -49,7 +49,7 @@ Repoint the editing UI to TeletypeV2, reusing the working pages. `tele2_ops[]` n
 Scenes/`SCENE`, i2c/Telex, grid/Arc, Ansible/WW/Meadow/Earthsea/ORCA, Just Friends/ER-301/Disting/`W/`, Crow, MIDI-query families.
 
 ### Recommended order
-**Engine mechanics first** (trigger-in ✅ → output-shaping ✅ → IN/PARAM next), *then* editor, *then* the language tail + turtle as breadth, *then* bridge deletion (Phase 5). Rationale: a script you can edit but that can't fire on a gate or slew a CV isn't auditionable as an instrument — the engine mechanics gate the hardware audition more than the editor does.
+**Engine mechanics first** (trigger-in ✅ → output-shaping ✅ → IN/PARAM ✅ — all done), *then* editor, *then* the language tail + turtle as breadth, *then* bridge deletion (Phase 5). Rationale: a script you can edit but that can't fire on a gate or slew a CV isn't auditionable as an instrument — the engine mechanics gate the hardware audition more than the editor does.
 
 ## Non-Goals
 

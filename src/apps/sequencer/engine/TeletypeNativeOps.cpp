@@ -541,6 +541,77 @@ static void opTrTog(TT2Runtime &runtime, TT2OutputState &output,
 }
 
 // ---------------------------------------------------------------------------
+// Engine input ops
+// ---------------------------------------------------------------------------
+
+// Map a sampled raw input (0..16383) into the configured [outMin, outMax] range.
+static int16_t scaleInput(int16_t raw, int16_t outMin, int16_t outMax) {
+    if (raw < 0) raw = 0;
+    if (raw > 16383) raw = 16383;
+    return int16_t(outMin + int32_t(raw) * (outMax - outMin) / 16383);
+}
+
+// IN / PARAM — scaled read of the sampled CV input.
+static void opIn(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    pushStack(stack, stackSize, scaleInput(runtime.variables.in,
+              runtime.variables.in_min, runtime.variables.in_max), error);
+}
+
+static void opParam(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    pushStack(stack, stackSize, scaleInput(runtime.variables.param,
+              runtime.variables.param_min, runtime.variables.param_max), error);
+}
+
+// IN.SCALE / PARAM.SCALE min max — set the output range (leftmost arg = min).
+static void opInScale(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                      int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t mn = 0, mx = 0;
+    if (!popStack(stack, stackSize, mn, error)) return;
+    if (!popStack(stack, stackSize, mx, error)) return;
+    runtime.variables.in_min = mn;
+    runtime.variables.in_max = mx;
+}
+
+static void opParamScale(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                         int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t mn = 0, mx = 0;
+    if (!popStack(stack, stackSize, mn, error)) return;
+    if (!popStack(stack, stackSize, mx, error)) return;
+    runtime.variables.param_min = mn;
+    runtime.variables.param_max = mx;
+}
+
+// STATE n — live level of trigger input n (latched by the engine). Out of
+// range pushes 0 (upstream semantics, no error).
+static void opState(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    int idx = a - 1;
+    int16_t level = (idx >= 0 && idx < TT2_TRIGGER_INPUT_COUNT)
+                        ? int16_t(runtime.inputLevel[idx]) : 0;
+    pushStack(stack, stackSize, level, error);
+}
+
+// MUTE n [v] — get/set the mute bit for trigger input n.
+static void opMute(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, TT2_TRIGGER_INPUT_COUNT)) return;
+    uint8_t bit = uint8_t(1 << idx);
+    if (isSetPosition && stackSize >= 1) {
+        int16_t val = 0;
+        if (!popStack(stack, stackSize, val, error)) return;
+        if (val > 0) runtime.variables.mutes |= bit;
+        else runtime.variables.mutes &= uint8_t(~bit);
+    } else {
+        pushStack(stack, stackSize, int16_t((runtime.variables.mutes >> idx) & 1), error);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Metro ops
 // ---------------------------------------------------------------------------
 
@@ -1894,6 +1965,12 @@ namespace {
             table[E_OP_TR_PULSE] = opTrPulse;
             table[E_OP_TR_P]     = opTrPulse;
             table[E_OP_TR_TOG]   = opTrTog;
+            table[E_OP_IN]          = opIn;
+            table[E_OP_IN_SCALE]    = opInScale;
+            table[E_OP_PARAM]       = opParam;
+            table[E_OP_PARAM_SCALE] = opParamScale;
+            table[E_OP_STATE]       = opState;
+            table[E_OP_MUTE]        = opMute;
             table[E_OP_M]        = opM;
             table[E_OP_M_ACT]    = opMAct;
             table[E_OP_SCRIPT]   = opScript;
