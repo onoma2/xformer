@@ -274,4 +274,24 @@ UNIT_TEST("TeletypeV2Pattern") {
         expectEqual(f.run("P.FND 8").value, int16_t(2), "P.FND finds index of 8");
         expectEqual(f.run("P.FND 99").value, int16_t(-1), "P.FND not-found = -1");
     }
+
+    CASE("random_read") {
+        Fixture f;
+        f.seed(0, {5, 5, 5}, 3);   // all equal -> deterministic regardless of rng
+        f.run("P.END 2");
+        expectEqual(f.run("P.RND").value, int16_t(5), "P.RND reads a window element");
+    }
+
+    CASE("random_fill") {
+        Fixture f;
+        f.seed(0, {0, 0, 0}, 3);
+        f.run("P.END 2");
+        f.run("RND.P 7 7");   // min==max -> all 7 deterministically
+        expectEqual(f.pat(0).val[0], int16_t(7), "RND.P fills [0]");
+        expectEqual(f.pat(0).val[2], int16_t(7), "RND.P fills [2]");
+        // ranged fill stays in bounds
+        f.run("RND.P 0 4");
+        for (int i = 0; i < 3; ++i)
+            expectTrue(f.pat(0).val[i] >= 0 && f.pat(0).val[i] <= 4, "RND.P value in [0,4]");
+    }
 }

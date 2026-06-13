@@ -1581,6 +1581,59 @@ static void opPNFnd(TT2Runtime &, TT2OutputState &, const TeletypeProgram *progr
     pushStack(stack, stackSize, patternFind(program->patterns[normalisePn(pn)], t), error);
 }
 
+// --- random (P.RND / RND.P) using the TT2 Pattern rng slot -----------------
+
+static int16_t patternRndVal(const TT2Pattern &p, TT2Rng &rng) {
+    if (p.end < p.start) return 0;
+    int16_t k = int16_t(tt2RngRange(rng, TT2RngSlot::Pattern, uint32_t(p.end - p.start + 1)) + p.start);
+    return p.val[k];
+}
+
+static void patternRndFill(const TeletypeProgram *program, int16_t pn, int16_t mn,
+                           int16_t mx, TT2Rng &rng) {
+    TT2Pattern *p = mutablePattern(program, pn);
+    if (!p || p->end < p->start) return;
+    if (mn > mx) { int16_t t = mn; mn = mx; mx = t; }
+    uint32_t range = uint32_t(mx - mn + 1);
+    for (int16_t i = p->start; i <= p->end; ++i)
+        p->val[i] = int16_t(tt2RngRange(rng, TT2RngSlot::Pattern, range) + mn);
+}
+
+static void opPRnd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    pushStack(stack, stackSize, patternRndVal(program->patterns[normalisePn(runtime.variables.p_n)], runtime.rng), error);
+}
+
+static void opPNRnd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t pn = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    pushStack(stack, stackSize, patternRndVal(program->patterns[normalisePn(pn)], runtime.rng), error);
+}
+
+// RND.P [min max] — fill the window with randoms; min/max optional (default 0..16383).
+static void opRndP(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t mn = 0, mx = 16383;
+    if (stackSize >= 2) {
+        if (!popStack(stack, stackSize, mn, error)) return;
+        if (!popStack(stack, stackSize, mx, error)) return;
+    }
+    patternRndFill(program, runtime.variables.p_n, mn, mx, runtime.rng);
+}
+
+static void opRndPN(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t pn = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    int16_t mn = 0, mx = 16383;
+    if (stackSize >= 2) {
+        if (!popStack(stack, stackSize, mn, error)) return;
+        if (!popStack(stack, stackSize, mx, error)) return;
+    }
+    patternRndFill(program, pn, mn, mx, runtime.rng);
+}
+
 // ---------------------------------------------------------------------------
 // Native op table
 // ---------------------------------------------------------------------------
@@ -1732,6 +1785,10 @@ namespace {
             table[E_OP_PN_AVG]   = opPNAvg;
             table[E_OP_P_FND]    = opPFnd;
             table[E_OP_PN_FND]   = opPNFnd;
+            table[E_OP_P_RND]    = opPRnd;
+            table[E_OP_PN_RND]   = opPNRnd;
+            table[E_OP_RND_P]    = opRndP;
+            table[E_OP_RND_PN]   = opRndPN;
             table[E_OP_CV]       = opCv;
             table[E_OP_TR]       = opTr;
             table[E_OP_M]        = opM;
