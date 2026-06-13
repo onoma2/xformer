@@ -83,6 +83,7 @@ public:
             }
             auto &program = _tt2Track.program();
             auto &runtime = _tt2Track.runtime();
+            runtime.clockMs += uint32_t(whole);  // drives TIME / LAST
             tt2AdvanceDelays(program, runtime, _output, whole);
             tt2AdvanceMetro(program, runtime, _output, whole, _metroAccumMs);
         }

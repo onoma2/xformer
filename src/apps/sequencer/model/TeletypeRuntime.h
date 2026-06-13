@@ -190,6 +190,8 @@ struct TT2Runtime {
     TT2ExecState exec;
     TT2Turtle turtle;
     uint8_t inputLevel[TT2_TRIGGER_INPUT_COUNT];  // latched trigger levels for STATE
+    uint32_t clockMs;                             // engine ms clock for TIME / LAST
+    uint32_t scriptLastMs[TT2_SCRIPT_COUNT];      // clockMs at each script's last run
 };
 
 inline void init(TT2Runtime &r) {
@@ -262,7 +264,7 @@ static_assert(sizeof(TT2Metro) <= 14, "TT2Metro size drift");
 static_assert(sizeof(TT2Rng) <= 22, "TT2Rng size drift");
 static_assert(sizeof(TT2ExecFrame) <= 22, "TT2ExecFrame size drift");
 static_assert(sizeof(TT2ExecState) <= 164, "TT2ExecState size drift");
-static_assert(sizeof(TT2Runtime) <= 2140, "TT2Runtime size drift");
+static_assert(sizeof(TT2Runtime) <= 2160, "TT2Runtime size drift");
 
 // Active execution context accessors — resolve through the exec stack.
 // depth must be > 0 (set by runScript or future nested execution).

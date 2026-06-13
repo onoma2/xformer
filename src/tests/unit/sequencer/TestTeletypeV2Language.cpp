@@ -1,0 +1,145 @@
+#include "UnitTest.h"
+
+#include "engine/TeletypeOutputState.h"
+#include "engine/TT2Evaluator.h"
+
+#include "model/Types.h"
+
+extern "C" {
+#include "command.h"
+#include "teletype.h"
+#include "ops/op_enum.h"
+}
+
+namespace {
+
+TT2EvalResult evalText(const char *text, TT2Runtime &runtime, TT2OutputState &output) {
+    tele_command_t src = {};
+    char errMsg[TELE_ERROR_MSG_LENGTH] = {};
+    parse(text, &src, errMsg);
+    TT2Command cmd = {};
+    lowerCommand(src, cmd);
+    return evaluateCommand(cmd, runtime, output);
+}
+
+int16_t getv(const char *text, TT2Runtime &runtime, TT2OutputState &output) {
+    return evalText(text, runtime, output).value;
+}
+
+} // namespace
+
+UNIT_TEST("TeletypeV2Language") {
+
+    CASE("simple_variables_set_get") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        evalText("C 33", runtime, output);
+        evalText("D 44", runtime, output);
+        evalText("Y 55", runtime, output);
+        evalText("Z 66", runtime, output);
+        evalText("T 77", runtime, output);
+        expectEqual(int(getv("C", runtime, output)), 33, "C");
+        expectEqual(int(getv("D", runtime, output)), 44, "D");
+        expectEqual(int(getv("Y", runtime, output)), 55, "Y");
+        expectEqual(int(getv("Z", runtime, output)), 66, "Z");
+        expectEqual(int(getv("T", runtime, output)), 77, "T");
+    }
+
+    CASE("jk_indexed_by_script") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        evalText("J 7", runtime, output);
+        evalText("K 9", runtime, output);
+        expectEqual(int(getv("J", runtime, output)), 7, "J round-trips");
+        expectEqual(int(getv("K", runtime, output)), 9, "K round-trips");
+    }
+
+    CASE("o_auto_increment_wraps") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        evalText("O.MIN 0", runtime, output);
+        evalText("O.MAX 3", runtime, output);
+        evalText("O.WRAP 1", runtime, output);
+        evalText("O.INC 1", runtime, output);
+        evalText("O 0", runtime, output);
+        expectEqual(int(getv("O", runtime, output)), 0, "O reads 0");
+        expectEqual(int(getv("O", runtime, output)), 1, "then 1");
+        expectEqual(int(getv("O", runtime, output)), 2, "then 2");
+        expectEqual(int(getv("O", runtime, output)), 3, "then 3");
+        expectEqual(int(getv("O", runtime, output)), 0, "wraps to 0");
+    }
+
+    CASE("drunk_walks_within_bounds") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        evalText("DRUNK.MIN 0", runtime, output);
+        evalText("DRUNK.MAX 5", runtime, output);
+        evalText("DRUNK.WRAP 0", runtime, output);
+        evalText("DRUNK 2", runtime, output);
+        for (int i = 0; i < 20; ++i) {
+            int16_t v = getv("DRUNK", runtime, output);
+            expectTrue(v >= 0 && v <= 5, "drunk stays in [0,5]");
+        }
+    }
+
+    CASE("flip_toggles") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        expectEqual(int(getv("FLIP", runtime, output)), 0, "first 0");
+        expectEqual(int(getv("FLIP", runtime, output)), 1, "then 1");
+        expectEqual(int(getv("FLIP", runtime, output)), 0, "then 0");
+    }
+
+    CASE("time_reads_clock") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        runtime.clockMs = 500;
+        expectEqual(int(getv("TIME", runtime, output)), 500, "elapsed since reset");
+        evalText("TIME 0", runtime, output);  // reset elapsed to 0 at now
+        expectEqual(int(getv("TIME", runtime, output)), 0, "reset to 0");
+        runtime.clockMs = 750;
+        expectEqual(int(getv("TIME", runtime, output)), 250, "250ms later");
+    }
+
+    CASE("last_reads_script_elapsed") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        runtime.clockMs = 350;
+        runtime.scriptLastMs[0] = 100;
+        expectEqual(int(getv("LAST 1", runtime, output)), 250, "script 1 ran 250ms ago");
+    }
+
+    CASE("rand_ranges") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        expectEqual(int(getv("RAND 0", runtime, output)), 0, "RAND 0 == 0");
+        for (int i = 0; i < 20; ++i) {
+            int16_t v = getv("RAND 10", runtime, output);
+            expectTrue(v >= 0 && v <= 10, "RAND 10 in [0,10]");
+        }
+    }
+
+    CASE("rrand_and_r_range") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        for (int i = 0; i < 20; ++i) {
+            int16_t v = getv("RRAND 5 8", runtime, output);
+            expectTrue(v >= 5 && v <= 8, "RRAND 5 8 in [5,8]");
+        }
+        evalText("R.MIN 20", runtime, output);
+        evalText("R.MAX 25", runtime, output);
+        for (int i = 0; i < 20; ++i) {
+            int16_t v = getv("R", runtime, output);
+            expectTrue(v >= 20 && v <= 25, "R in [R.MIN,R.MAX]");
+        }
+    }
+
+    CASE("toss_is_binary") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        for (int i = 0; i < 20; ++i) {
+            int16_t v = getv("TOSS", runtime, output);
+            expectTrue(v == 0 || v == 1, "TOSS in {0,1}");
+        }
+    }
+}

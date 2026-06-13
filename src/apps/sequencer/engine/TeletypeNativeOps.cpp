@@ -73,6 +73,206 @@ static void opI(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
     }
 }
 
+// Generate a plain get/set handler over a single runtime variable.
+#define TT2_SIMPLE_VAR_OP(fn, member)                                          \
+    static void fn(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *, \
+                   int16_t *stack, uint8_t &stackSize, bool isSetPosition,     \
+                   TT2EvalError &error) {                                       \
+        if (isSetPosition && stackSize >= 1) {                                 \
+            int16_t val = 0;                                                   \
+            if (!popStack(stack, stackSize, val, error)) return;              \
+            runtime.variables.member = val;                                    \
+        } else {                                                               \
+            pushStack(stack, stackSize, runtime.variables.member, error);      \
+        }                                                                      \
+    }
+
+TT2_SIMPLE_VAR_OP(opC, c)
+TT2_SIMPLE_VAR_OP(opD, d)
+TT2_SIMPLE_VAR_OP(opY, y)
+TT2_SIMPLE_VAR_OP(opZ, z)
+TT2_SIMPLE_VAR_OP(opT, t)
+TT2_SIMPLE_VAR_OP(opOInc, o_inc)
+TT2_SIMPLE_VAR_OP(opOMin, o_min)
+TT2_SIMPLE_VAR_OP(opOMax, o_max)
+TT2_SIMPLE_VAR_OP(opOWrap, o_wrap)
+TT2_SIMPLE_VAR_OP(opDrunkMin, drunk_min)
+TT2_SIMPLE_VAR_OP(opDrunkMax, drunk_max)
+TT2_SIMPLE_VAR_OP(opDrunkWrap, drunk_wrap)
+TT2_SIMPLE_VAR_OP(opRMin, r_min)
+TT2_SIMPLE_VAR_OP(opRMax, r_max)
+
+// J / K — per-script variables indexed by the active script number.
+static void opJ(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
+    uint8_t sn = tt2ActiveScriptNumber(runtime);
+    if (sn >= TT2_SCRIPT_COUNT) sn = 0;
+    if (isSetPosition && stackSize >= 1) {
+        int16_t val = 0;
+        if (!popStack(stack, stackSize, val, error)) return;
+        runtime.variables.j[sn] = val;
+    } else {
+        pushStack(stack, stackSize, runtime.variables.j[sn], error);
+    }
+}
+
+static void opK(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
+    uint8_t sn = tt2ActiveScriptNumber(runtime);
+    if (sn >= TT2_SCRIPT_COUNT) sn = 0;
+    if (isSetPosition && stackSize >= 1) {
+        int16_t val = 0;
+        if (!popStack(stack, stackSize, val, error)) return;
+        runtime.variables.k[sn] = val;
+    } else {
+        pushStack(stack, stackSize, runtime.variables.k[sn], error);
+    }
+}
+
+// Restrict value into [min,max]: wrap (clamp to the far bound) or clamp.
+static int16_t tt2Normalise(int16_t mn, int16_t mx, int16_t wrap, int16_t v) {
+    if (v >= mn && v <= mx) return v;
+    if (wrap) return v < mn ? mx : mn;
+    return v < mn ? mn : mx;
+}
+
+// O — read the current bounded value, then advance by O.INC (wrapped).
+static void opO(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    if (isSetPosition && stackSize >= 1) {
+        int16_t val = 0;
+        if (!popStack(stack, stackSize, val, error)) return;
+        v.o = val;
+        return;
+    }
+    int16_t cur = tt2Normalise(v.o_min, v.o_max, v.o_wrap, v.o);
+    pushStack(stack, stackSize, cur, error);
+    v.o = tt2Normalise(v.o_min, v.o_max, v.o_wrap, int16_t(cur + v.o_inc));
+}
+
+// DRUNK — read the bounded value, then take a random ±1 step (wrapped).
+static void opDrunk(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                    int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    if (isSetPosition && stackSize >= 1) {
+        int16_t val = 0;
+        if (!popStack(stack, stackSize, val, error)) return;
+        v.drunk = val;
+        return;
+    }
+    int16_t cur = tt2Normalise(v.drunk_min, v.drunk_max, v.drunk_wrap, v.drunk);
+    pushStack(stack, stackSize, cur, error);
+    int16_t step = int16_t(tt2RngRange(runtime.rng, TT2RngSlot::Drunk, 3)) - 1;  // -1/0/+1
+    v.drunk = tt2Normalise(v.drunk_min, v.drunk_max, v.drunk_wrap, int16_t(cur + step));
+}
+
+// FLIP — read the current toggle, then flip it.
+static void opFlip(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    if (isSetPosition && stackSize >= 1) {
+        int16_t val = 0;
+        if (!popStack(stack, stackSize, val, error)) return;
+        v.flip = (val != 0) ? 1 : 0;
+        return;
+    }
+    int16_t f = v.flip;
+    pushStack(stack, stackSize, f, error);
+    v.flip = (f == 0) ? 1 : 0;
+}
+
+// TIME — elapsed ms since reset (when active), masked to 15 bits.
+static void opTime(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    if (isSetPosition && stackSize >= 1) {
+        int16_t val = 0;
+        if (!popStack(stack, stackSize, val, error)) return;
+        v.time = v.time_act ? int64_t(runtime.clockMs) - val : val;
+        return;
+    }
+    int64_t delta = v.time_act ? int64_t(runtime.clockMs) - v.time : v.time;
+    pushStack(stack, stackSize, int16_t(delta & 0x7fff), error);
+}
+
+static void opTimeAct(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                      int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    if (isSetPosition && stackSize >= 1) {
+        int16_t act = 0;
+        if (!popStack(stack, stackSize, act, error)) return;
+        if ((act && v.time_act) || (!act && !v.time_act)) return;
+        v.time_act = act ? 1 : 0;
+        v.time = int64_t(runtime.clockMs) - v.time;
+        return;
+    }
+    pushStack(stack, stackSize, int16_t(v.time_act ? 1 : 0), error);
+}
+
+// LAST n — ms since script n last ran (n==0 -> init script), masked to 15 bits.
+static void opLast(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    int sn = a - 1;
+    if (sn < -1 || sn >= TT2_SCRIPT_COUNT) { pushStack(stack, stackSize, 0, error); return; }
+    if (sn == -1) sn = TT2_INIT_SCRIPT;
+    uint32_t delta = (runtime.clockMs - runtime.scriptLastMs[sn]) & 0x7fff;
+    pushStack(stack, stackSize, int16_t(delta), error);
+}
+
+// Pick a uniform value in [min,max] (inclusive), bounds either order.
+static int16_t tt2PushRandom(TT2Runtime &runtime, int16_t a, int16_t b) {
+    int16_t mn = a < b ? a : b;
+    int16_t mx = a < b ? b : a;
+    if (mn == mx) return mn;
+    uint32_t range = uint32_t(mx - mn) + 1;
+    return int16_t(int32_t(tt2RngRange(runtime.rng, TT2RngSlot::Rand, range)) + mn);
+}
+
+// RAND a — uniform in [0,a] (or [a,0] for negative a); a==32767 -> full range.
+static void opRand(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    if (a < 0) {
+        pushStack(stack, stackSize, int16_t(-int32_t(tt2RngRange(runtime.rng, TT2RngSlot::Rand, uint32_t(1 - a)))), error);
+    } else if (a == 32767) {
+        pushStack(stack, stackSize, int16_t(tt2RngNext(runtime.rng, TT2RngSlot::Rand)), error);
+    } else {
+        pushStack(stack, stackSize, int16_t(tt2RngRange(runtime.rng, TT2RngSlot::Rand, uint32_t(a) + 1)), error);
+    }
+}
+
+// RRAND a b — uniform in [min(a,b), max(a,b)].
+static void opRrand(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0, b = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    if (!popStack(stack, stackSize, b, error)) return;
+    pushStack(stack, stackSize, tt2PushRandom(runtime, a, b), error);
+}
+
+// R — uniform in [R.MIN, R.MAX]; a set form pins both bounds to one value.
+static void opR(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
+    if (isSetPosition && stackSize >= 1) {
+        int16_t val = 0;
+        if (!popStack(stack, stackSize, val, error)) return;
+        runtime.variables.r_min = val;
+        runtime.variables.r_max = val;
+        return;
+    }
+    pushStack(stack, stackSize, tt2PushRandom(runtime, runtime.variables.r_min, runtime.variables.r_max), error);
+}
+
+// TOSS — random 0 or 1.
+static void opToss(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    pushStack(stack, stackSize, int16_t(tt2RngNext(runtime.rng, TT2RngSlot::Toss) & 1), error);
+}
+
 // ---------------------------------------------------------------------------
 // Math ops
 // ---------------------------------------------------------------------------
@@ -1965,6 +2165,32 @@ namespace {
             table[E_OP_TR_PULSE] = opTrPulse;
             table[E_OP_TR_P]     = opTrPulse;
             table[E_OP_TR_TOG]   = opTrTog;
+            table[E_OP_C]        = opC;
+            table[E_OP_D]        = opD;
+            table[E_OP_Y]        = opY;
+            table[E_OP_Z]        = opZ;
+            table[E_OP_T]        = opT;
+            table[E_OP_J]        = opJ;
+            table[E_OP_K]        = opK;
+            table[E_OP_O]        = opO;
+            table[E_OP_O_INC]    = opOInc;
+            table[E_OP_O_MIN]    = opOMin;
+            table[E_OP_O_MAX]    = opOMax;
+            table[E_OP_O_WRAP]   = opOWrap;
+            table[E_OP_DRUNK]    = opDrunk;
+            table[E_OP_DRUNK_MIN]  = opDrunkMin;
+            table[E_OP_DRUNK_MAX]  = opDrunkMax;
+            table[E_OP_DRUNK_WRAP] = opDrunkWrap;
+            table[E_OP_FLIP]     = opFlip;
+            table[E_OP_TIME]     = opTime;
+            table[E_OP_TIME_ACT] = opTimeAct;
+            table[E_OP_LAST]     = opLast;
+            table[E_OP_RAND]     = opRand;
+            table[E_OP_RRAND]    = opRrand;
+            table[E_OP_R]        = opR;
+            table[E_OP_R_MIN]    = opRMin;
+            table[E_OP_R_MAX]    = opRMax;
+            table[E_OP_TOSS]     = opToss;
             table[E_OP_IN]          = opIn;
             table[E_OP_IN_SCALE]    = opInScale;
             table[E_OP_PARAM]       = opParam;

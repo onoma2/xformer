@@ -27,6 +27,9 @@ inline TT2EvalResult runScript(const TeletypeProgram &program,
         return {TT2EvalError::ExecDepthOverflow, 0, 0, 0};
     }
 
+    // Stamp the run time for LAST (clockMs advances in the engine update).
+    runtime.scriptLastMs[scriptIndex] = runtime.clockMs;
+
     // Push one execution frame.
     TT2ExecFrame &frame = runtime.exec.frames[runtime.exec.depth];
     memset(&frame, 0, sizeof(TT2ExecFrame));
