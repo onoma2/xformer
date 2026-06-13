@@ -186,6 +186,27 @@ inline void tt2EnqueueDelayBody(const TT2Command &cmd, uint8_t preSepPos,
                 f.i, f.fparam1, f.fparam2);
 }
 
+// Capture the post-':' body of an S command and push it onto the command stack
+// for later execution via S.ALL / S.POP. Silently drops when the stack is full
+// (upstream mod_S behaviour).
+inline void tt2PushStackBody(const TT2Command &cmd, uint8_t preSepPos,
+                             TT2Runtime &runtime) {
+    if (runtime.stack.top >= TT2_STACK_DEPTH) {
+        return;
+    }
+    TT2RuntimeCommand &dst = runtime.stack.commands[runtime.stack.top];
+    uint8_t bodyLen = 0;
+    for (uint8_t pos = preSepPos + 1;
+         pos < cmd.length && bodyLen < TT2_COMMAND_MAX_LENGTH;
+         ++pos) {
+        dst.tag[bodyLen] = cmd.tag[pos];
+        dst.value[bodyLen] = cmd.value[pos];
+        bodyLen++;
+    }
+    dst.length = bodyLen;
+    runtime.stack.top++;
+}
+
 // Clamp a 32-bit ms deadline into the int16 delay-time range [1, 32767].
 inline int16_t tt2ClampDelayMs(int32_t ms) {
     if (ms < 1) ms = 1;
@@ -531,6 +552,11 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                         interval = (interval * multNum) / multDenom;
                     }
                 }
+                return {TT2EvalError::None, 0, 0, 0};
+            } else if (modValue == E_MOD_S) {
+                // S: body — push the body onto the command stack for later
+                // execution via S.ALL / S.POP. No prefix args. (upstream mod_S)
+                tt2PushStackBody(cmd, preSepPos, runtime);
                 return {TT2EvalError::None, 0, 0, 0};
             } else {
                 // Unsupported mod — reject before prefix side effects.

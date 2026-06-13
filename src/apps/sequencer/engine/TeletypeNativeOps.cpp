@@ -801,6 +801,53 @@ static void opQI(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
 }
 
 // ---------------------------------------------------------------------------
+// Command-stack ops — S.* run/clear/measure the deferred-command stack the S
+// mod pushes onto. S.ALL/S.POP execute stored commands through the evaluator.
+// ---------------------------------------------------------------------------
+
+static void runStoredCommand(const TT2RuntimeCommand &body, TT2Runtime &runtime,
+                             TT2OutputState &output, const TeletypeProgram *program) {
+    TT2Command cmd;
+    cmd.length = body.length;
+    for (int k = 0; k < TT2_COMMAND_MAX_LENGTH; ++k) {
+        cmd.tag[k] = body.tag[k];
+        cmd.value[k] = body.value[k];
+    }
+    evaluateCommand(cmd, runtime, output, program);
+}
+
+// S.ALL — run every stacked command (most-recent first), then clear.
+static void opSAll(TT2Runtime &runtime, TT2OutputState &output,
+                   const TeletypeProgram *program, int16_t *, uint8_t &, bool,
+                   TT2EvalError &) {
+    uint8_t n = runtime.stack.top;
+    for (uint8_t i = 0; i < n; ++i) {
+        runStoredCommand(runtime.stack.commands[n - 1 - i], runtime, output, program);
+    }
+    runtime.stack.top = 0;
+}
+
+// S.POP — run the most-recently pushed command, leaving the rest.
+static void opSPop(TT2Runtime &runtime, TT2OutputState &output,
+                   const TeletypeProgram *program, int16_t *, uint8_t &, bool,
+                   TT2EvalError &) {
+    if (runtime.stack.top > 0) {
+        runtime.stack.top--;
+        runStoredCommand(runtime.stack.commands[runtime.stack.top], runtime, output, program);
+    }
+}
+
+static void opSClr(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *, uint8_t &, bool, TT2EvalError &) {
+    runtime.stack.top = 0;
+}
+
+static void opSL(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    pushStack(stack, stackSize, int16_t(runtime.stack.top), error);
+}
+
+// ---------------------------------------------------------------------------
 // Native op table
 // ---------------------------------------------------------------------------
 
@@ -882,6 +929,10 @@ namespace {
             table[E_OP_Q_DIV]    = opQDiv;
             table[E_OP_Q_MOD]    = opQMod;
             table[E_OP_Q_I]      = opQI;
+            table[E_OP_S_ALL]    = opSAll;
+            table[E_OP_S_POP]    = opSPop;
+            table[E_OP_S_CLR]    = opSClr;
+            table[E_OP_S_L]      = opSL;
             table[E_OP_CV]       = opCv;
             table[E_OP_TR]       = opTr;
             table[E_OP_M]        = opM;
