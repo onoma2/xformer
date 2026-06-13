@@ -125,8 +125,15 @@ Phase 2b candidates:
 - `BREAK` / `KILL`
 - Full trigger input and metro scheduling (wire TT2TrackEngine into `Engine::TrackEngineContainer` and `Engine.cpp` track creation)
 - Add `TT2Track` to `Track` container with `TrackMode::TeletypeV2` or mode-switching strategy
+- **LAST:** `E`/`LFO`/`G` → Modulator engine port (deferred to the final stage — see section below)
 
-## Native modules (E / LFO / G) → Modulator engine (design direction, open)
+## Native modules (E / LFO / G) → Modulator engine (DEFERRED — last stage)
+
+**Sequencing: this is the LAST stage of the dialect.** Port the `E`/`LFO`/`G` op
+families to the Modulator engine only after the core dialect, scheduling
+(DEL/metro/trigger), engine wiring (`TT2TrackEngine` into the Track container),
+and old-bridge deletion are all done. Design is captured here; do not start the
+port before everything else lands.
 
 The v1 engine self-generates envelope/LFO/Geode curves (`updateEnvelopes`/`updateLfos`/`updateGeode` → `handleCv`). Redesign: these ops **target the existing Modulator engine** instead of producing their own curves. Geode already proves the pattern — its 6 voices render in `GeodeEngine` and land in modulator slots M3-M8 via `setVoiceOutput`.
 
