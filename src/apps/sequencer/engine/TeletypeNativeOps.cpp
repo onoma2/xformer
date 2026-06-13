@@ -87,6 +87,115 @@ static void opAdd(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     pushStack(stack, stackSize, a + b, error);
 }
 
+// Binary ops pop the leftmost arg first (matches opCv index-first order).
+static bool popBinary(int16_t *stack, uint8_t &stackSize,
+                      int16_t &first, int16_t &second, TT2EvalError &error) {
+    if (!popStack(stack, stackSize, first, error)) return false;
+    if (!popStack(stack, stackSize, second, error)) return false;
+    return true;
+}
+
+static void opSub(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t first = 0, second = 0;
+    if (!popBinary(stack, stackSize, first, second, error)) return;
+    pushStack(stack, stackSize, int16_t(first - second), error);
+}
+
+static void opMul(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t first = 0, second = 0;
+    if (!popBinary(stack, stackSize, first, second, error)) return;
+    int32_t r = int32_t(first) * int32_t(second);
+    if (r > 32767) r = 32767;
+    if (r < -32768) r = -32768;
+    pushStack(stack, stackSize, int16_t(r), error);
+}
+
+static void opDiv(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t first = 0, second = 0;
+    if (!popBinary(stack, stackSize, first, second, error)) return;
+    pushStack(stack, stackSize, int16_t(second != 0 ? first / second : 0), error);
+}
+
+static void opMod(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t first = 0, second = 0;
+    if (!popBinary(stack, stackSize, first, second, error)) return;
+    pushStack(stack, stackSize, int16_t(second != 0 ? first % second : 0), error);
+}
+
+static void opMin(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t first = 0, second = 0;
+    if (!popBinary(stack, stackSize, first, second, error)) return;
+    pushStack(stack, stackSize, int16_t(second > first ? first : second), error);
+}
+
+static void opMax(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t first = 0, second = 0;
+    if (!popBinary(stack, stackSize, first, second, error)) return;
+    pushStack(stack, stackSize, int16_t(first > second ? first : second), error);
+}
+
+static void opEq(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t first = 0, second = 0;
+    if (!popBinary(stack, stackSize, first, second, error)) return;
+    pushStack(stack, stackSize, int16_t(first == second), error);
+}
+
+static void opNe(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t first = 0, second = 0;
+    if (!popBinary(stack, stackSize, first, second, error)) return;
+    pushStack(stack, stackSize, int16_t(first != second), error);
+}
+
+static void opLt(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t first = 0, second = 0;
+    if (!popBinary(stack, stackSize, first, second, error)) return;
+    pushStack(stack, stackSize, int16_t(first < second), error);
+}
+
+static void opGt(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t first = 0, second = 0;
+    if (!popBinary(stack, stackSize, first, second, error)) return;
+    pushStack(stack, stackSize, int16_t(first > second), error);
+}
+
+static void opLte(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t first = 0, second = 0;
+    if (!popBinary(stack, stackSize, first, second, error)) return;
+    pushStack(stack, stackSize, int16_t(first <= second), error);
+}
+
+static void opGte(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t first = 0, second = 0;
+    if (!popBinary(stack, stackSize, first, second, error)) return;
+    pushStack(stack, stackSize, int16_t(first >= second), error);
+}
+
+static void opAbs(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    pushStack(stack, stackSize, int16_t(a < 0 ? -a : a), error);
+}
+
+static void opSgn(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    pushStack(stack, stackSize, int16_t(a > 0 ? 1 : (a < 0 ? -1 : 0)), error);
+}
+
 // ---------------------------------------------------------------------------
 // Output ops
 // ---------------------------------------------------------------------------
@@ -240,6 +349,30 @@ namespace {
             table[E_OP_I]        = opI;
             table[E_OP_ADD]      = opAdd;
             table[E_OP_SYM_PLUS] = opAdd;
+            table[E_OP_SUB]      = opSub;
+            table[E_OP_SYM_DASH] = opSub;
+            table[E_OP_MUL]      = opMul;
+            table[E_OP_SYM_STAR] = opMul;
+            table[E_OP_DIV]                = opDiv;
+            table[E_OP_SYM_FORWARD_SLASH]  = opDiv;
+            table[E_OP_MOD]                = opMod;
+            table[E_OP_SYM_PERCENTAGE]     = opMod;
+            table[E_OP_MIN]      = opMin;
+            table[E_OP_MAX]      = opMax;
+            table[E_OP_EQ]                   = opEq;
+            table[E_OP_SYM_EQUAL_x2]         = opEq;
+            table[E_OP_NE]                   = opNe;
+            table[E_OP_SYM_EXCLAMATION_EQUAL] = opNe;
+            table[E_OP_LT]                   = opLt;
+            table[E_OP_SYM_LEFT_ANGLED]      = opLt;
+            table[E_OP_GT]                   = opGt;
+            table[E_OP_SYM_RIGHT_ANGLED]     = opGt;
+            table[E_OP_LTE]                      = opLte;
+            table[E_OP_SYM_LEFT_ANGLED_EQUAL]    = opLte;
+            table[E_OP_GTE]                      = opGte;
+            table[E_OP_SYM_RIGHT_ANGLED_EQUAL]   = opGte;
+            table[E_OP_ABS]      = opAbs;
+            table[E_OP_SGN]      = opSgn;
             table[E_OP_CV]       = opCv;
             table[E_OP_TR]       = opTr;
             table[E_OP_M]        = opM;
