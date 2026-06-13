@@ -10,6 +10,18 @@
 
 #include <cstdint>
 
+// Rising-edge detector over the trigger inputs. Returns a bitmask of inputs
+// that went low->high this pass; updates prev[] in place. Pure (no Engine) so
+// the firing logic is unit-testable without an Engine context.
+inline uint8_t tt2RisingEdges(const bool *now, bool *prev, int count) {
+    uint8_t fired = 0;
+    for (int i = 0; i < count; ++i) {
+        if (now[i] && !prev[i]) fired |= uint8_t(1 << i);
+        prev[i] = now[i];
+    }
+    return fired;
+}
+
 class TT2TrackEngine final : public TrackEngine {
 public:
     TT2TrackEngine(Engine &engine, const Model &model, Track &track) :
@@ -50,6 +62,8 @@ public:
     // Drives the ms delay queue and the metro, accumulating sub-millisecond
     // remainder so slow refreshes still advance time accurately.
     virtual void update(float dt) override {
+        // Sample trigger inputs every refresh (gate edges are async, not clocked).
+        updateInputTriggers();
         if (dt <= 0.f) {
             return;
         }
@@ -98,12 +112,18 @@ public:
     }
 
 private:
+    // Defined in TT2TrackEngine.cpp (needs the full Engine definition to read
+    // cvInput/gateOutput/trackEngine).
+    void updateInputTriggers();
+    bool inputState(uint8_t index) const;
+
     TT2Track &_tt2Track;
     TT2OutputState _output;
     uint32_t _tickCount = 0;
     float _msAccum = 0.f;
     int _metroAccumMs = 0;
     bool _firstTick = true;
+    bool _prevInputState[TT2_TRIGGER_INPUT_COUNT] = {};
 };
 
 static_assert(sizeof(TT2TrackEngine) <= 944, "TT2TrackEngine too large (TeletypeTrackEngine at 944 is the container limit)");
