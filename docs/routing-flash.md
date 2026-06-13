@@ -1,5 +1,10 @@
 # Routing Flash Reduction Notes
 
+> **Note 2026-06-13:** this note targets `Routing::writeTarget` in the **model**
+> layer and remains valid. The separate `RoutingPage` *UI* flash analysis
+> (`matrixEditSource`/`matrixEditScale` merge, shared footer/tab-cycle helpers) lives
+> in `docs/ui-editpages-flash.md`.
+
 Snapshot: 2026-06-05.
 
 Routing is under active development. It is acceptable to bake in structural changes now if they simplify ownership and reduce flash. Do not add project-version or migration ceremony unless release prep explicitly starts.

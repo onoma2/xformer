@@ -1,5 +1,12 @@
 # PhaseFlux Flash Reduction Notes
 
+> **Update 2026-06-13 — see `docs/ui-editpages-flash.md`** for the consolidated
+> UI/edit-page flash research. Correction to the figure below: `editSlot`'s
+> `std::function` cost is **~11.6 KB, not ~9.6 KB** — the 23 capturing lambdas emit
+> ~2 KB of out-of-line `_M_invoke`/`_M_manager` thunks that live OUTSIDE the
+> 9,770 B `editSlot` symbol. The `PhaseFluxStageEdit` + `editStage()` plan below is
+> confirmed correct and remains the biggest single-page win.
+
 Snapshot: 2026-06-05.
 
 PhaseFlux edit-page code is one of the largest remaining custom flash contributors after Asteroids was removed from the build.
