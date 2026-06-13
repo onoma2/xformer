@@ -166,11 +166,11 @@ Three major improvement categories documented in `doc/improvements/`:
 
 RAM is the tight resource. A feature is acceptable only if it stays within the budget below or identifies the exact RAM tradeoff it consumes.
 
-**Flash ceiling snapshot (2026-06-05 02:24:55 MSK).**
+**Flash ceiling snapshot (2026-06-13).**
 - Sequencer app partition: `src/apps/sequencer/sequencer.ld` places the app at `0x08010000` with `LENGTH = 960K` = 983,040 B.
 - Current STM32 release build: `build/stm32/release/src/apps/sequencer/sequencer`.
-- Loaded flash sections from `arm-none-eabi-size -A`: `.text=952,068`, `.preinit_array=4`, `.init_array=84`, `.ARM.extab=8,416`, `.ARM.exidx=13,128`, `.data=6,600`.
-- Total loaded flash = 980,300 B. Headroom to 960K partition = 2,740 B.
+- Loaded flash sections from `arm-none-eabi-size -A`: `.text=934,124`, `.preinit_array=4`, `.init_array=80`, `.ARM.extab=8,228`, `.ARM.exidx=12,704`, `.data=6,572`.
+- Total loaded flash = 961,712 B (= the flashed `sequencer.bin`). Headroom to 960K partition = 21,328 B. (Prior 2026-06-05 snapshot was 2,740 B — the routing-matrix reclaims, legacy collapse, and shaper-branch delete freed ~18.6 KB net.)
 - Flash measurement command:
   ```bash
   cd build/stm32/release
@@ -185,7 +185,7 @@ RAM is the tight resource. A feature is acceptable only if it stays within the b
     | rg ' [TtRrVvWw] ' \
     | tail -80
   ```
-- Current largest flash symbols include `match_token` (20,280 B), `stbsp_vsprintfcb` (16,128 B), `.ARM.exidx` (13,128 B), `Routing::writeTarget(...)` (11,008 B), and `PhaseFluxEditPage::editSlot(...)` (9,636 B).
+- Current largest flash symbols include `match_token` (20,280 B), `stbsp_vsprintfcb` (16,128 B), `.ARM.exidx` (12,704 B), `PhaseFluxEditPage::editSlot(...)` (9,770 B), and `Engine::update()` (7,612 B). (`Routing::writeTarget` is gone — deleted in the routing-matrix legacy collapse.)
 - Object/module culprit command:
   ```bash
   /opt/homebrew/bin/arm-none-eabi-size \
@@ -196,7 +196,7 @@ RAM is the tight resource. A feature is acceptable only if it stays within the b
     | sort -n \
     | tail -50
   ```
-- Current largest flash-bearing objects include `PhaseFluxEditPage.cpp.obj` (~42.3 KB), `IndexedSequenceEditPage.cpp.obj` (~32.8 KB), `DiscreteMapSequencePage.cpp.obj` (~31.0 KB), `StochasticSequenceEditPage.cpp.obj` (~30.4 KB), `CurveSequenceEditPage.cpp.obj` (~30.2 KB), `TrackPage.cpp.obj` (~26.9 KB), `FileManager.cpp.obj` (~22.8 KB), `Engine.cpp.obj` (~22.4 KB), `stb_sprintf.c.obj` (~21.3 KB), `match_token.c.obj` (20.3 KB), `TuesdayTrackEngine.cpp.obj` (~19.7 KB), and `Routing.cpp.obj` (~19.6 KB).
+- Current largest flash-bearing objects include `PhaseFluxEditPage.cpp.obj` (~42.0 KB), `IndexedSequenceEditPage.cpp.obj` (~32.8 KB), `DiscreteMapSequencePage.cpp.obj` (~31.0 KB), `StochasticSequenceEditPage.cpp.obj` (~30.1 KB), `CurveSequenceEditPage.cpp.obj` (~29.2 KB), `Engine.cpp.obj` (~24.9 KB), `TrackPage.cpp.obj` (~24.8 KB), `RoutingPage.cpp.obj` (~23.1 KB), `FileManager.cpp.obj` (~22.8 KB), `stb_sprintf.c.obj` (~21.3 KB), and `NoteSequenceEditPage.cpp.obj` (~21.0 KB).
 
 **Budget targets:**
 - Main SRAM target: `.data + .bss` at or below roughly **111-113 KB**.
@@ -204,14 +204,14 @@ RAM is the tight resource. A feature is acceptable only if it stays within the b
 - CCMRAM target: `.ccmram_bss` below roughly **56 KB** unless hardware testing proves safe margin.
 - Flash is secondary right now; still measure `.text`, but do not optimize flash before RAM unless flash is the stated task.
 
-**Current measured baseline (2026-05-24). Refresh this block after resource-optimization work or before major feature work.**
-- Flash: `.text` ≈ 867 KB.
-- SRAM (128 KB): `.data=6,416` + `.bss=112,912` = 119,328 B, about 91.0% used (in the hard warning zone, ~670 B under the 120 KB threshold). Largest blocks:
+**Current measured baseline (2026-06-13). Refresh this block after resource-optimization work or before major feature work.**
+- Flash: `.text` = 934,124 B (≈ 912 KB); total loaded image 961,712 B, 21,328 B under the 960K partition.
+- SRAM (128 KB): `.data=6,572` + `.bss=112,720` = 119,292 B, about 91.0% used (still in the hard warning zone, ~708 B under the 120 KB threshold — flat vs the 2026-05-24 baseline). Largest blocks:
   - `Model` = 88,312 B — dominates main SRAM. Inside it, `Project._tracks` = 80,960 B = 8 × 10,120 B track-variant container. The container is sized to the largest track mode (CurveTrack ≈ 10,092 B, NoteTrack ≈ 9,544 B); StochasticTrack at 8,444 B already fits, so stochastic-side shrinks do not free model SRAM unless every variant shrinks below the cap.
   - LCD driver DMA buffer = 8,192 B normal SRAM.
   - Teletype file slot globals = 4 × 1,226 B.
   - USB host / filesystem globals ≈ 6 KB, mostly functional buffers.
-- CCM RAM (64 KB): `.ccmram_bss=55,092`, about 84.1% used. Largest blocks:
+- CCM RAM (64 KB): `.ccmram_bss=48,352`, about 73.8% used (~6.7 KB freed since 2026-05-24 — routing-matrix removed `shaperState[8]` + per-route shaper state). Largest blocks:
   - `Ui` = 27,752 B (includes 16,384 B 8-bit Canvas framebuffer).
   - `Engine` = 11,940 B (engine-task slot — Stochastic cache adds 320 B per active stochastic track inside this slot; variant container also sized to the largest engine).
   - FreeRTOS static stacks: engine/fs/ui = 4,256 B each; usbh/profiler = 2,208 B each.
