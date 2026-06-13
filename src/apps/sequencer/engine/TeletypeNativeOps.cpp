@@ -1196,6 +1196,110 @@ static void opPNPrev(TT2Runtime &, TT2OutputState &, const TeletypeProgram *prog
     }
 }
 
+// --- insert / remove / push / pop (get-only edits) -------------------------
+
+static void patternIns(const TeletypeProgram *program, int16_t pn, int16_t idx, int16_t val) {
+    TT2Pattern *p = mutablePattern(program, pn);
+    if (!p) return;
+    idx = normaliseIdx(*p, idx);
+    int16_t len = int16_t(p->len);
+    if (len >= idx) {
+        int16_t hi = len < TT2_PATTERN_LENGTH ? len : int16_t(TT2_PATTERN_LENGTH - 1);
+        for (int16_t i = hi; i > idx; --i) p->val[i] = p->val[i - 1];
+        if (len < TT2_PATTERN_LENGTH - 1) p->len = uint16_t(len + 1);
+    }
+    p->val[idx] = val;
+}
+
+static int16_t patternRm(const TeletypeProgram *program, int16_t pn, int16_t idx) {
+    TT2Pattern *p = mutablePattern(program, pn);
+    if (!p) return 0;
+    int16_t len = int16_t(p->len);
+    if (len <= 0) return 0;
+    idx = normaliseIdx(*p, idx);
+    int16_t ret = p->val[idx];
+    if (idx < len) {
+        for (int16_t i = idx; i < len && i + 1 < TT2_PATTERN_LENGTH; ++i)
+            p->val[i] = p->val[i + 1];
+        p->len = uint16_t(len - 1);
+    }
+    return ret;
+}
+
+static void patternPush(const TeletypeProgram *program, int16_t pn, int16_t val) {
+    TT2Pattern *p = mutablePattern(program, pn);
+    if (!p) return;
+    int16_t len = int16_t(p->len);
+    if (len < TT2_PATTERN_LENGTH) { p->val[len] = val; p->len = uint16_t(len + 1); }
+}
+
+static int16_t patternPop(const TeletypeProgram *program, int16_t pn) {
+    TT2Pattern *p = mutablePattern(program, pn);
+    if (!p) return 0;
+    int16_t len = int16_t(p->len);
+    if (len > 0) { p->len = uint16_t(len - 1); return p->val[len - 1]; }
+    return 0;
+}
+
+static void opPIns(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t idx = 0, val = 0;
+    if (!popStack(stack, stackSize, idx, error)) return;
+    if (!popStack(stack, stackSize, val, error)) return;
+    patternIns(program, runtime.variables.p_n, idx, val);
+}
+
+static void opPNIns(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t pn = 0, idx = 0, val = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    if (!popStack(stack, stackSize, idx, error)) return;
+    if (!popStack(stack, stackSize, val, error)) return;
+    patternIns(program, pn, idx, val);
+}
+
+static void opPRm(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popStack(stack, stackSize, idx, error)) return;
+    pushStack(stack, stackSize, patternRm(program, runtime.variables.p_n, idx), error);
+}
+
+static void opPNRm(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t pn = 0, idx = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    if (!popStack(stack, stackSize, idx, error)) return;
+    pushStack(stack, stackSize, patternRm(program, pn, idx), error);
+}
+
+static void opPPush(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t val = 0;
+    if (!popStack(stack, stackSize, val, error)) return;
+    patternPush(program, runtime.variables.p_n, val);
+}
+
+static void opPNPush(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t pn = 0, val = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    if (!popStack(stack, stackSize, val, error)) return;
+    patternPush(program, pn, val);
+}
+
+static void opPPop(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    pushStack(stack, stackSize, patternPop(program, runtime.variables.p_n), error);
+}
+
+static void opPNPop(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t pn = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    pushStack(stack, stackSize, patternPop(program, pn), error);
+}
+
 // ---------------------------------------------------------------------------
 // Native op table
 // ---------------------------------------------------------------------------
@@ -1301,6 +1405,14 @@ namespace {
             table[E_OP_PN_NEXT]  = opPNNext;
             table[E_OP_P_PREV]   = opPPrev;
             table[E_OP_PN_PREV]  = opPNPrev;
+            table[E_OP_P_INS]    = opPIns;
+            table[E_OP_PN_INS]   = opPNIns;
+            table[E_OP_P_RM]     = opPRm;
+            table[E_OP_PN_RM]    = opPNRm;
+            table[E_OP_P_PUSH]   = opPPush;
+            table[E_OP_PN_PUSH]  = opPNPush;
+            table[E_OP_P_POP]    = opPPop;
+            table[E_OP_PN_POP]   = opPNPop;
             table[E_OP_CV]       = opCv;
             table[E_OP_TR]       = opTr;
             table[E_OP_M]        = opM;

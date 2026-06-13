@@ -150,4 +150,37 @@ UNIT_TEST("TeletypeV2Pattern") {
         expectEqual(f.run("P.PREV").value, int16_t(13), "PREV from start wraps to end (idx3=13)");
         expectEqual(f.pat(0).idx, int16_t(3), "idx wrapped to end");
     }
+
+    CASE("insert_remove") {
+        Fixture f;
+        f.seed(0, {1, 2, 3}, 3);
+        f.run("P.INS 1 9");   // insert 9 at idx 1
+        expectEqual(f.pat(0).val[1], int16_t(9), "INS places 9 at idx1");
+        expectEqual(f.pat(0).val[2], int16_t(2), "INS shifts old idx1 to idx2");
+        expectEqual(int(f.pat(0).len), 4, "INS bumps len to 4");
+        expectEqual(f.run("P.RM 1").value, int16_t(9), "RM returns removed value");
+        expectEqual(f.pat(0).val[1], int16_t(2), "RM shifts left");
+        expectEqual(int(f.pat(0).len), 3, "RM drops len to 3");
+    }
+
+    CASE("push_pop") {
+        Fixture f;
+        f.seed(0, {1, 2, 3}, 3);
+        f.run("P.PUSH 7");
+        expectEqual(f.pat(0).val[3], int16_t(7), "PUSH appends at len");
+        expectEqual(int(f.pat(0).len), 4, "PUSH bumps len");
+        expectEqual(f.run("P.POP").value, int16_t(7), "POP returns last");
+        expectEqual(int(f.pat(0).len), 3, "POP drops len");
+        // POP on empty is a safe 0
+        f.run("P.L 0");
+        expectEqual(f.run("P.POP").value, int16_t(0), "POP empty returns 0");
+    }
+
+    CASE("pn_insert") {
+        Fixture f;
+        f.seed(1, {5, 6}, 2);
+        f.run("PN.INS 1 0 99");  // pattern1, idx0, val99
+        expectEqual(f.pat(1).val[0], int16_t(99), "PN.INS into pattern1");
+        expectEqual(int(f.pat(1).len), 3, "PN.INS bumps pattern1 len");
+    }
 }
