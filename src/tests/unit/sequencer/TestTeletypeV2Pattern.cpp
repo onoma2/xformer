@@ -183,4 +183,38 @@ UNIT_TEST("TeletypeV2Pattern") {
         expectEqual(f.pat(1).val[0], int16_t(99), "PN.INS into pattern1");
         expectEqual(int(f.pat(1).len), 3, "PN.INS bumps pattern1 len");
     }
+
+    CASE("reverse") {
+        Fixture f;
+        f.seed(0, {1, 2, 3, 4}, 4);
+        f.run("P.END 3");
+        f.run("P.REV");
+        expectEqual(f.pat(0).val[0], int16_t(4), "REV [0]=4");
+        expectEqual(f.pat(0).val[3], int16_t(1), "REV [3]=1");
+    }
+
+    CASE("rotate") {
+        Fixture f;
+        f.seed(0, {1, 2, 3, 4}, 4);
+        f.run("P.END 3");
+        f.run("P.ROT 1");   // rotate right by 1 -> {4,1,2,3}
+        expectEqual(f.pat(0).val[0], int16_t(4), "ROT [0]=4");
+        expectEqual(f.pat(0).val[1], int16_t(1), "ROT [1]=1");
+    }
+
+    CASE("shuffle_is_permutation") {
+        Fixture f;
+        f.seed(0, {1, 2, 3, 4}, 4);
+        f.run("P.END 3");
+        f.run("P.SHUF");
+        bool seen[5] = { false, false, false, false, false };
+        int16_t sum = 0;
+        for (int i = 0; i < 4; ++i) {
+            int16_t v = f.pat(0).val[i];
+            if (v >= 1 && v <= 4) seen[v] = true;
+            sum += v;
+        }
+        expectEqual(int(sum), 10, "SHUF preserves sum (permutation)");
+        expectTrue(seen[1] && seen[2] && seen[3] && seen[4], "SHUF keeps all elements");
+    }
 }

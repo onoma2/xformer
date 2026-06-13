@@ -1300,6 +1300,93 @@ static void opPNPop(TT2Runtime &, TT2OutputState &, const TeletypeProgram *progr
     pushStack(stack, stackSize, patternPop(program, pn), error);
 }
 
+// --- reorder (REV / ROT / CYC / SHUF) over the [start, end] window ---------
+
+static void patternReverse(TT2Pattern &p, int16_t start, int16_t end) {
+    if (end < start) return;
+    int16_t mid = int16_t((end - start) / 2);
+    for (int16_t i = 0; i <= mid; ++i) {
+        int16_t t = p.val[end - i];
+        p.val[end - i] = p.val[start + i];
+        p.val[start + i] = t;
+    }
+}
+
+static void patternRotate(TT2Pattern &p, int16_t shift) {
+    int16_t start = p.start, end = p.end;
+    if (end < start) return;
+    int16_t len = int16_t(end - start + 1);
+    if (shift < 0) {
+        shift = int16_t((-shift) % len);
+        if (!shift) return;
+        patternReverse(p, start, int16_t(start + shift - 1));
+        patternReverse(p, int16_t(start + shift), end);
+        patternReverse(p, start, end);
+    } else {
+        shift = int16_t(shift % len);
+        if (!shift) return;
+        patternReverse(p, int16_t(end - shift + 1), end);
+        patternReverse(p, start, int16_t(end - shift));
+        patternReverse(p, start, end);
+    }
+}
+
+static void patternShuffle(TT2Pattern &p, TT2Rng &rng) {
+    int16_t start = p.start, end = p.end;
+    if (end < start) return;
+    for (int16_t i = end; i > start; --i) {
+        int16_t draw = int16_t(tt2RngRange(rng, TT2RngSlot::Pattern, uint32_t(i - start + 1)) + start);
+        int16_t t = p.val[draw];
+        p.val[draw] = p.val[i];
+        p.val[i] = t;
+    }
+}
+
+static void opPRev(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                   int16_t *, uint8_t &, bool, TT2EvalError &) {
+    TT2Pattern *p = mutablePattern(program, runtime.variables.p_n);
+    if (p) patternReverse(*p, p->start, p->end);
+}
+
+static void opPNRev(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t pn = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    TT2Pattern *p = mutablePattern(program, pn);
+    if (p) patternReverse(*p, p->start, p->end);
+}
+
+static void opPRot(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t shift = 0;
+    if (!popStack(stack, stackSize, shift, error)) return;
+    TT2Pattern *p = mutablePattern(program, runtime.variables.p_n);
+    if (p) patternRotate(*p, shift);
+}
+
+static void opPNRot(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t pn = 0, shift = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    if (!popStack(stack, stackSize, shift, error)) return;
+    TT2Pattern *p = mutablePattern(program, pn);
+    if (p) patternRotate(*p, shift);
+}
+
+static void opPShuf(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                    int16_t *, uint8_t &, bool, TT2EvalError &) {
+    TT2Pattern *p = mutablePattern(program, runtime.variables.p_n);
+    if (p) patternShuffle(*p, runtime.rng);
+}
+
+static void opPNShuf(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t pn = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    TT2Pattern *p = mutablePattern(program, pn);
+    if (p) patternShuffle(*p, runtime.rng);
+}
+
 // ---------------------------------------------------------------------------
 // Native op table
 // ---------------------------------------------------------------------------
@@ -1413,6 +1500,12 @@ namespace {
             table[E_OP_PN_PUSH]  = opPNPush;
             table[E_OP_P_POP]    = opPPop;
             table[E_OP_PN_POP]   = opPNPop;
+            table[E_OP_P_REV]    = opPRev;
+            table[E_OP_PN_REV]   = opPNRev;
+            table[E_OP_P_ROT]    = opPRot;
+            table[E_OP_PN_ROT]   = opPNRot;
+            table[E_OP_P_SHUF]   = opPShuf;
+            table[E_OP_PN_SHUF]  = opPNShuf;
             table[E_OP_CV]       = opCv;
             table[E_OP_TR]       = opTr;
             table[E_OP_M]        = opM;
