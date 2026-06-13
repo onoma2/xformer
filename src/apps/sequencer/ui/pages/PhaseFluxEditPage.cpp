@@ -412,10 +412,10 @@ void PhaseFluxEditPage::keyPress(KeyPressEvent &event) {
         if (isToggle) {
             togglePressSlot(slot);
         } else {
-            // TEMP P1 Len slot: double-press arms Σ-conserving length transfer
-            // (Indexed DUR-TR; firmware has no long-press, double-press instead).
+            // TEMP P1 Len slot: re-pressing the already-selected slot flips
+            // Len <-> Len-TR (Σ-conserving transfer), mirroring Indexed DUR-TR.
             const bool isLenSlot = (_currentSet == 0 && _topicPage == 1 && slot == 0);
-            if (isLenSlot && _selectedSlot == 0 && event.count() == 2) {
+            if (isLenSlot && _selectedSlot == 0) {
                 _lengthTransfer = !_lengthTransfer;
             } else {
                 if (!isLenSlot) _lengthTransfer = false;
