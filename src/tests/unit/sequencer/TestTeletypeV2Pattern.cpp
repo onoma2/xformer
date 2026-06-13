@@ -243,4 +243,35 @@ UNIT_TEST("TeletypeV2Pattern") {
         f.run("PN.+ 1 0 10");  // pattern1 val[0] += 10
         expectEqual(f.pat(1).val[0], int16_t(15), "PN.+ adds at pattern1 idx0");
     }
+
+    CASE("whole_pattern_arithmetic") {
+        Fixture f;
+        f.seed(0, {1, 2, 3}, 3);
+        f.run("P.END 2");
+        f.run("P.PA 10");
+        expectEqual(f.pat(0).val[0], int16_t(11), "P.PA adds to all [0]");
+        expectEqual(f.pat(0).val[2], int16_t(13), "P.PA adds to all [2]");
+        f.run("P.PM 2");
+        expectEqual(f.pat(0).val[0], int16_t(22), "P.PM multiplies all");
+        f.run("P.PD 0");  // div by zero = no-op
+        expectEqual(f.pat(0).val[0], int16_t(22), "P.PD by 0 is no-op");
+        f.seed(0, {7, 8, 9}, 3);
+        f.run("P.END 2");
+        f.run("P.PMOD 3");
+        expectEqual(f.pat(0).val[0], int16_t(1), "P.PMOD [0]=7%3=1");
+    }
+
+    CASE("queries_min_max_sum_avg_find") {
+        Fixture f;
+        f.seed(0, {5, 2, 8}, 3);
+        f.run("P.END 2");
+        expectEqual(f.run("P.MIN").value, int16_t(1), "P.MIN returns index of min (1)");
+        expectEqual(f.run("P.MAX").value, int16_t(2), "P.MAX returns index of max (2)");
+        expectEqual(f.run("P.MINV").value, int16_t(2), "P.MINV returns min value");
+        expectEqual(f.run("P.MAXV").value, int16_t(8), "P.MAXV returns max value");
+        expectEqual(f.run("P.SUM").value, int16_t(15), "P.SUM = 15");
+        expectEqual(f.run("P.AVG").value, int16_t(5), "P.AVG = 5");
+        expectEqual(f.run("P.FND 8").value, int16_t(2), "P.FND finds index of 8");
+        expectEqual(f.run("P.FND 99").value, int16_t(-1), "P.FND not-found = -1");
+    }
 }

@@ -1462,6 +1462,125 @@ static void opPNSubW(TT2Runtime &, TT2OutputState &, const TeletypeProgram *prog
     patternArithDispatch(program, pn, true, true, stack, stackSize, error);
 }
 
+// --- whole-window arithmetic (PA/PS/PM/PD/PMOD) and queries ----------------
+
+static int16_t clampI32(int32_t v) {
+    if (v > 32767) return 32767;
+    if (v < -32768) return -32768;
+    return int16_t(v);
+}
+
+// kind: '+' '-' '*' '/' '%' applied to every element in [start,end].
+static void patternPatArith(const TeletypeProgram *program, int16_t pn, int16_t arg, char kind) {
+    TT2Pattern *p = mutablePattern(program, pn);
+    if (!p) return;
+    int16_t s = p->start, e = p->end;
+    if (e < s) return;
+    if ((kind == '/' || kind == '%') && arg == 0) return;
+    for (int16_t i = s; i <= e; ++i) {
+        if (kind == '%') { p->val[i] = int16_t(p->val[i] % arg); continue; }
+        int32_t v = p->val[i];
+        if (kind == '+') v += arg;
+        else if (kind == '-') v -= arg;
+        else if (kind == '*') v *= int32_t(arg);
+        else v /= arg;
+        p->val[i] = clampI32(v);
+    }
+}
+
+static int16_t patternMinIdx(const TT2Pattern &p) {
+    int16_t pos = p.start, val = p.val[p.start];
+    for (int16_t i = int16_t(p.start + 1); i <= p.end; ++i)
+        if (p.val[i] < val) { val = p.val[i]; pos = i; }
+    return pos;
+}
+static int16_t patternMaxIdx(const TT2Pattern &p) {
+    int16_t pos = p.start, val = p.val[p.start];
+    for (int16_t i = int16_t(p.start + 1); i <= p.end; ++i)
+        if (p.val[i] > val) { val = p.val[i]; pos = i; }
+    return pos;
+}
+static int16_t patternMinVal(const TT2Pattern &p) {
+    if (p.end < p.start) return 0;
+    int16_t v = p.val[p.start];
+    for (int16_t i = int16_t(p.start + 1); i <= p.end; ++i) if (p.val[i] < v) v = p.val[i];
+    return v;
+}
+static int16_t patternMaxVal(const TT2Pattern &p) {
+    if (p.end < p.start) return 0;
+    int16_t v = p.val[p.start];
+    for (int16_t i = int16_t(p.start + 1); i <= p.end; ++i) if (p.val[i] > v) v = p.val[i];
+    return v;
+}
+static int16_t patternSum(const TT2Pattern &p) {
+    if (p.end < p.start) return 0;
+    int32_t s = 0;
+    for (int16_t i = p.start; i <= p.end; ++i) s += p.val[i];
+    return clampI32(s);
+}
+static int16_t patternAvg(const TT2Pattern &p) {
+    if (p.end < p.start) return 0;
+    int32_t s = 0, c = int32_t(p.end - p.start + 1);
+    for (int16_t i = p.start; i <= p.end; ++i) s += p.val[i];
+    return clampI32(s / c);
+}
+static int16_t patternFind(const TT2Pattern &p, int16_t t) {
+    if (p.end < p.start) return -1;
+    for (int16_t i = p.start; i <= p.end; ++i) if (p.val[i] == t) return i;
+    return -1;
+}
+
+#define TT2_P_ARITH_OP(NAME, KIND) \
+    static void opP##NAME(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program, \
+                          int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) { \
+        int16_t a = 0; if (!popStack(stack, stackSize, a, error)) return; \
+        patternPatArith(program, runtime.variables.p_n, a, KIND); } \
+    static void opPN##NAME(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program, \
+                           int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) { \
+        int16_t pn = 0, a = 0; \
+        if (!popStack(stack, stackSize, pn, error)) return; \
+        if (!popStack(stack, stackSize, a, error)) return; \
+        patternPatArith(program, pn, a, KIND); }
+
+TT2_P_ARITH_OP(PA, '+')
+TT2_P_ARITH_OP(PS, '-')
+TT2_P_ARITH_OP(PM, '*')
+TT2_P_ARITH_OP(PD, '/')
+TT2_P_ARITH_OP(PMOD, '%')
+#undef TT2_P_ARITH_OP
+
+#define TT2_P_QUERY_OP(NAME, FN) \
+    static void opP##NAME(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program, \
+                          int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) { \
+        pushStack(stack, stackSize, FN(program->patterns[normalisePn(runtime.variables.p_n)]), error); } \
+    static void opPN##NAME(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program, \
+                           int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) { \
+        int16_t pn = 0; if (!popStack(stack, stackSize, pn, error)) return; \
+        pushStack(stack, stackSize, FN(program->patterns[normalisePn(pn)]), error); }
+
+TT2_P_QUERY_OP(Min, patternMinIdx)
+TT2_P_QUERY_OP(Max, patternMaxIdx)
+TT2_P_QUERY_OP(Minv, patternMinVal)
+TT2_P_QUERY_OP(Maxv, patternMaxVal)
+TT2_P_QUERY_OP(Sum, patternSum)
+TT2_P_QUERY_OP(Avg, patternAvg)
+#undef TT2_P_QUERY_OP
+
+// FND takes a target arg.
+static void opPFnd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t t = 0;
+    if (!popStack(stack, stackSize, t, error)) return;
+    pushStack(stack, stackSize, patternFind(program->patterns[normalisePn(runtime.variables.p_n)], t), error);
+}
+static void opPNFnd(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t pn = 0, t = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    if (!popStack(stack, stackSize, t, error)) return;
+    pushStack(stack, stackSize, patternFind(program->patterns[normalisePn(pn)], t), error);
+}
+
 // ---------------------------------------------------------------------------
 // Native op table
 // ---------------------------------------------------------------------------
@@ -1589,6 +1708,30 @@ namespace {
             table[E_OP_PN_SUB]   = opPNSub;
             table[E_OP_P_SUBW]   = opPSubW;
             table[E_OP_PN_SUBW]  = opPNSubW;
+            table[E_OP_P_PA]     = opPPA;
+            table[E_OP_PN_PA]    = opPNPA;
+            table[E_OP_P_PS]     = opPPS;
+            table[E_OP_PN_PS]    = opPNPS;
+            table[E_OP_P_PM]     = opPPM;
+            table[E_OP_PN_PM]    = opPNPM;
+            table[E_OP_P_PD]     = opPPD;
+            table[E_OP_PN_PD]    = opPNPD;
+            table[E_OP_P_PMOD]   = opPPMOD;
+            table[E_OP_PN_PMOD]  = opPNPMOD;
+            table[E_OP_P_MIN]    = opPMin;
+            table[E_OP_PN_MIN]   = opPNMin;
+            table[E_OP_P_MAX]    = opPMax;
+            table[E_OP_PN_MAX]   = opPNMax;
+            table[E_OP_P_MINV]   = opPMinv;
+            table[E_OP_PN_MINV]  = opPNMinv;
+            table[E_OP_P_MAXV]   = opPMaxv;
+            table[E_OP_PN_MAXV]  = opPNMaxv;
+            table[E_OP_P_SUM]    = opPSum;
+            table[E_OP_PN_SUM]   = opPNSum;
+            table[E_OP_P_AVG]    = opPAvg;
+            table[E_OP_PN_AVG]   = opPNAvg;
+            table[E_OP_P_FND]    = opPFnd;
+            table[E_OP_PN_FND]   = opPNFnd;
             table[E_OP_CV]       = opCv;
             table[E_OP_TR]       = opTr;
             table[E_OP_M]        = opM;
