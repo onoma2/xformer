@@ -2,6 +2,7 @@
 
 #include "TeletypeProgram.h"
 #include "TeletypeRuntime.h"
+#include "Serialize.h"
 
 #include <cstdint>
 
@@ -19,6 +20,16 @@ public:
 
     TT2Runtime &runtime() { return _runtime; }
     const TT2Runtime &runtime() const { return _runtime; }
+
+    // Persist the program only — runtime is volatile and re-inits on load.
+    // Flat blob, no version gate (dev: files break freely).
+    void write(VersionedSerializedWriter &writer) const {
+        writer.write(_program);
+    }
+    void read(VersionedSerializedReader &reader) {
+        reader.read(_program);
+        init(_runtime);
+    }
 
 private:
     void setTrackIndex(int trackIndex) {

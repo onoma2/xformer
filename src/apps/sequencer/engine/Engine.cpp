@@ -630,6 +630,9 @@ void Engine::updateTrackSetups() {
             case Track::TrackMode::PhaseFlux:
                 trackEngine = trackContainer.create<PhaseFluxTrackEngine>(*this, _model, track);
                 break;
+            case Track::TrackMode::TeletypeV2:
+                trackEngine = trackContainer.create<TT2TrackEngine>(*this, _model, track);
+                break;
             case Track::TrackMode::Last:
                 break;
             }

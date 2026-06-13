@@ -1,46 +1,65 @@
 #pragma once
 
+#include "TrackEngine.h"
+
 #include "TT2Runner.h"
 #include "TeletypeOutputState.h"
 
+#include "model/Track.h"
 #include "model/TT2Track.h"
 
 #include <cstdint>
 
-class TT2TrackEngine {
+class TT2TrackEngine final : public TrackEngine {
 public:
-    TT2TrackEngine() {
+    TT2TrackEngine(Engine &engine, const Model &model, Track &track) :
+        TrackEngine(engine, model, track),
+        _tt2Track(track.tt2Track())
+    {
+        reset();
+    }
+
+    virtual Track::TrackMode trackMode() const override { return Track::TrackMode::TeletypeV2; }
+
+    virtual void reset() override {
         init(_output);
+        _tickCount = 0;
+        _firstTick = true;
     }
+    virtual void restart() override { _firstTick = true; }
 
-    TT2OutputState &output() { return _output; }
-    const TT2OutputState &output() const { return _output; }
-
-    void setTrack(TT2Track *track) { _track = track; }
-    TT2Track *track() { return _track; }
-    const TT2Track *track() const { return _track; }
-
-    // Execute one script by index against the bound track's program and runtime.
-    // Output state is written into this engine's TT2OutputState.
-    TT2EvalResult runScript(uint8_t scriptIndex) {
-        if (!_track) {
-            return {TT2EvalError::NoTrack, 0, 0};
+    // Minimal tick model: run the boot/init script once on (re)start, then the
+    // metro script every clockDivisor master ticks. No real metro/trigger
+    // scheduler yet — this is the first live slice. Empty scripts are no-ops.
+    virtual TickResult tick(uint32_t tick) override {
+        (void)tick;
+        bool ran = false;
+        if (_firstTick) {
+            _firstTick = false;
+            runScript(uint8_t(_tt2Track.program().bootScriptIndex));
+            ran = true;
         }
-        return ::runScript(_track->program(), _track->runtime(), _output, scriptIndex);
+        int div = _tt2Track.program().clockDivisor;
+        if (div < 1) div = 1;
+        if ((_tickCount % uint32_t(div)) == 0) {
+            runScript(uint8_t(TT2_METRO_SCRIPT));
+            ran = true;
+        }
+        ++_tickCount;
+        return ran ? TickResult(CvUpdate | GateUpdate) : NoUpdate;
     }
 
-    // Convert a raw 0..16383 CV value to Performer float volts (-5V .. +5V).
-    static float rawToVolts(int16_t raw) {
-        if (raw < 0) raw = 0;
-        if (raw > 16383) raw = 16383;
-        float norm = raw / 16383.f;
-        return norm * 10.f - 5.f;
-    }
+    virtual void update(float dt) override { (void)dt; }
 
-    // Performer CV output interface.
-    // Returns 0V for outputs that have never been written (dirty bit clear).
-    // Once written, the value persists until changed or the engine is re-init'd.
-    float cvOutput(int index) const {
+    virtual bool activity() const override { return _output.cvDirty != 0 || _output.trDirty != 0; }
+
+    virtual bool gateOutput(int index) const override {
+        if (mute() || index < 0 || index >= TT2_OUTPUT_TR_COUNT) {
+            return false;
+        }
+        return _output.tr[index].level != 0;
+    }
+    virtual float cvOutput(int index) const override {
         if (index < 0 || index >= TT2_OUTPUT_CV_COUNT) {
             return 0.f;
         }
@@ -50,17 +69,26 @@ public:
         return rawToVolts(_output.cv[index].targetRaw);
     }
 
-    // Performer gate output interface.
-    bool gateOutput(int index) const {
-        if (index < 0 || index >= TT2_OUTPUT_TR_COUNT) {
-            return false;
-        }
-        return _output.tr[index].level != 0;
+    // Execute one script by index against the bound track's program/runtime.
+    TT2EvalResult runScript(uint8_t scriptIndex) {
+        return ::runScript(_tt2Track.program(), _tt2Track.runtime(), _output, scriptIndex);
+    }
+
+    TT2OutputState &output() { return _output; }
+    const TT2OutputState &output() const { return _output; }
+
+    // Convert a raw 0..16383 CV value to Performer float volts (-5V .. +5V).
+    static float rawToVolts(int16_t raw) {
+        if (raw < 0) raw = 0;
+        if (raw > 16383) raw = 16383;
+        return raw / 16383.f * 10.f - 5.f;
     }
 
 private:
-    TT2Track *_track = nullptr;
+    TT2Track &_tt2Track;
     TT2OutputState _output;
+    uint32_t _tickCount = 0;
+    bool _firstTick = true;
 };
 
-static_assert(sizeof(TT2TrackEngine) <= 344, "TT2TrackEngine size drift");
+static_assert(sizeof(TT2TrackEngine) <= 944, "TT2TrackEngine too large (TeletypeTrackEngine at 944 is the container limit)");
