@@ -131,4 +131,19 @@ CASE("del_b_bitmask_positions") {
     expectEqual(int(f.runtime.delay.count), 0, "bit 2 fires at 20ms");
 }
 
+CASE("del_g_geometric_intervals") {
+    Fixture f;
+    // x=3 copies, delay_time=10, num=2, denom=1 -> intervals 10,20 (x2 each
+    // step); deadlines 1, 1+10=11, 11+20=31.
+    f.load(0, "DEL.G 3 10 2 1: CV 1 9\n");
+    f.run(0);
+    expectEqual(int(f.runtime.delay.count), 3, "three copies queued");
+    f.advance(1);
+    expectEqual(int(f.runtime.delay.count), 2, "first fires immediately (1ms)");
+    f.advance(10);
+    expectEqual(int(f.runtime.delay.count), 1, "second fires at 11ms");
+    f.advance(20);
+    expectEqual(int(f.runtime.delay.count), 0, "third fires at 31ms");
+}
+
 } // UNIT_TEST("TeletypeV2Delay")

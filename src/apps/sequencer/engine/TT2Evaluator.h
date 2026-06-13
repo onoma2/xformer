@@ -87,7 +87,9 @@ inline TT2EvalResult evaluateSegment(const TT2Command &cmd,
                                      const TT2OpFunc *table,
                                      size_t tableCount,
                                      bool forceGet = false,
-                                     const TeletypeProgram *program = nullptr) {
+                                     const TeletypeProgram *program = nullptr,
+                                     int16_t *outStack = nullptr,
+                                     uint8_t *outSize = nullptr) {
     int16_t stack[TT2_COMMAND_MAX_LENGTH];
     uint8_t stackSize = 0;
     TT2EvalError error = TT2EvalError::None;
@@ -124,6 +126,10 @@ inline TT2EvalResult evaluateSegment(const TT2Command &cmd,
         (stackSize > 0 && error == TT2EvalError::None) ? stack[stackSize - 1] : 0;
     int16_t underTopValue =
         (stackSize >= 2 && error == TT2EvalError::None) ? stack[stackSize - 2] : 0;
+    if (outStack && outSize) {
+        for (uint8_t i = 0; i < stackSize; ++i) outStack[i] = stack[i];
+        *outSize = stackSize;
+    }
     return {error, topValue, underTopValue, stackSize};
 }
 
@@ -145,6 +151,19 @@ inline TT2EvalResult evaluateModPrefix(const TT2Command &cmd,
                                        const TeletypeProgram *program = nullptr) {
     return evaluateSegment(cmd, start, end, runtime, output,
                            tt2NativeOpTable, tt2NativeOpCount, true, program);
+}
+
+// Like evaluateModPrefix but also copies the resulting stack out (bottom..top)
+// for mods that need more than 2 args (DEL.G).
+inline TT2EvalResult evaluateModPrefixStack(const TT2Command &cmd,
+                                            uint8_t start, uint8_t end,
+                                            TT2Runtime &runtime,
+                                            TT2OutputState &output,
+                                            int16_t *outStack, uint8_t *outSize,
+                                            const TeletypeProgram *program = nullptr) {
+    return evaluateSegment(cmd, start, end, runtime, output,
+                           tt2NativeOpTable, tt2NativeOpCount, true, program,
+                           outStack, outSize);
 }
 
 // Capture the post-':' body of a DEL* command and enqueue it at timeMs with
@@ -479,6 +498,37 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                     if (mask & (1u << i)) {
                         tt2EnqueueDelayBody(cmd, preSepPos, runtime,
                                             tt2ClampDelayMs(int32_t(i) * base));
+                    }
+                }
+                return {TT2EvalError::None, 0, 0, 0};
+            } else if (modValue == E_MOD_DEL_G) {
+                // DEL.G x delay_time num denom: body — x copies; first at 1ms,
+                // then each deadline += interval and interval scales by num/denom
+                // (geometric accel/decel). (upstream mod_DEL_G_func)
+                int16_t args[TT2_COMMAND_MAX_LENGTH];
+                uint8_t argc = 0;
+                auto prefix = evaluateModPrefixStack(cmd, s + 1, preSepPos,
+                                                     runtime, output, args, &argc,
+                                                     program);
+                if (prefix.error != TT2EvalError::None) return prefix;
+                if (argc != 4) {
+                    return {TT2EvalError::InvalidModArity, 0, 0, 0};
+                }
+                // Stack bottom..top = [denom, num, delay_time, x]; upstream pops
+                // x, delay_time, num, denom (top first).
+                int32_t count = args[3];      // x
+                int32_t interval = args[2];   // delay_time
+                int32_t multNum = args[1];    // num
+                int32_t multDenom = args[0];  // denom
+                if (interval < 1) interval = 1;
+                int32_t deadline = 1;         // first fires immediately
+                for (int32_t k = 0; k < count; ++k) {
+                    tt2EnqueueDelayBody(cmd, preSepPos, runtime,
+                                        tt2ClampDelayMs(deadline));
+                    deadline += interval;
+                    if (deadline > 32767) deadline = 32767;
+                    if (multDenom != 0) {
+                        interval = (interval * multNum) / multDenom;
                     }
                 }
                 return {TT2EvalError::None, 0, 0, 0};
