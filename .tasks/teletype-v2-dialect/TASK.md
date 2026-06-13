@@ -38,7 +38,7 @@ Define Teletype v2 as a Performer-native Teletype++ dialect: preserve hardware-i
 
 - [ ] Exact packed command record width for native program storage — resolved: `TT2_COMMAND_MAX_LENGTH = 16`.
 - [ ] Exact pattern storage shape — resolved: 4×64, same as current.
-- [ ] Whether `P.CYC` / `PN.CYC` dead implementations should be deleted — resolved: delete.
+- [ ] `P.CYC` / `PN.CYC` dead implementations — decided: delete; NOT yet executed (still in `teletype/src/ops/patterns.c`). Gated by the "don't patch `teletype/src` for native work without an explicit request" rule, so deferred to a dedicated upstream-cleanup pass.
 
 ## Project end state / scope guard
 
@@ -96,11 +96,16 @@ Scope guard:
 
 | Component | Size | Location | Gate |
 |-----------|------|----------|------|
-| TeletypeProgram | 2,374 B | model (SRAM) | |
-| TT2Runtime | 2,128 B | model (SRAM) | |
-| **TT2Track** | **4,504 B** | model (SRAM) | NoteTrack = 9,544 B |
-| TT2OutputState | 336 B | engine (CCMRAM) | |
-| **TT2TrackEngine** | **344 B** | engine (CCMRAM) | TeletypeTrackEngine = 912 B |
+| Component | Size (live `static_assert`) | Location | Gate |
+| TeletypeProgram | ≤ 2,376 B | model (SRAM) | |
+| TT2Runtime | ≤ 2,132 B (2,130 measured, post-`I`) | model (SRAM) | |
+| **TT2Track** | **== 4,504 B** | model (SRAM) | NoteTrack = 9,544 B |
+| TT2OutputState | == 26 B | engine (CCMRAM) | |
+| **TT2TrackEngine** | **≤ 344 B** (340 on ARM) | engine (CCMRAM) | TeletypeTrackEngine = 912 B |
+
+Numbers reconciled 2026-06-13 to the header `static_assert`s. (Drift fixed: the
+step-3 log's "336 B" for TT2OutputState was a mis-measurement — the live struct
+is 26 B; TT2Runtime is 2,130 B since the `I` field moved into the exec frame.)
 
 Phase 1 complete. No container wiring touched. No behavior change.
 
