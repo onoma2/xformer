@@ -126,6 +126,25 @@ Phase 2b candidates:
 - Full trigger input and metro scheduling (wire TT2TrackEngine into `Engine::TrackEngineContainer` and `Engine.cpp` track creation)
 - Add `TT2Track` to `Track` container with `TrackMode::TeletypeV2` or mode-switching strategy
 
+## Native modules (E / LFO / G) → Modulator engine (design direction, open)
+
+The v1 engine self-generates envelope/LFO/Geode curves (`updateEnvelopes`/`updateLfos`/`updateGeode` → `handleCv`). Redesign: these ops **target the existing Modulator engine** instead of producing their own curves. Geode already proves the pattern — its 6 voices render in `GeodeEngine` and land in modulator slots M3-M8 via `setVoiceOutput`.
+
+Decided (2026-06-13 design pass):
+- **One shared global modulator pool** (8 slots, `Project`-level), not per-track — dodges the CCMRAM engine-container gate. `CONFIG_MODULATOR_COUNT = 8` ↔ 8 tracks = natural 1:1 (track N → modulator N), cross-addressable by number.
+- **Address a modulator by number; the op name predefines the shape.** `E n` = "modulator n shaped envelope" (the op *is* `setShape`); `LFO n` = "shaped LFO". No separate set-shape op. Sub-ops (`E.A`, `LFO.R`, …) write that slot's fields, shape-scoped for free. Keeps upstream `E`/`LFO` spelling (pasted-script compat). Shape is last-writer-wins.
+- **Geode is the bank-takeover exception, not a per-slot shape** — a pool-mode where modulator-number = voice (M1 clock, M2 run, M3-8 voices), mutually exclusive like JustF.
+- **Delete** the v1 self-generating machines + their `_env*`/`_lfo*`/`_geode*` state + `handleCv` curve/slew + the `tele_env_*`/`tele_lfo_*`/`tele_g_*` bridge callbacks.
+- **Depends on engine-wiring** (the Phase 2b item above): the wiring must land already holding a `ModulatorEngine` pointer + this addressing model, so the output topology bakes in correctly.
+
+Open questions (parked):
+1. **Authority** — TT vs panel/routing writing the same modulator slot. The 8:8 convention softens contention, doesn't kill it. Tag TT-controlled? Last-writer-wins?
+2. **Output topology** — modulator renders to its jack on its own (Geode's model) with TT's `CV` op separate, vs TT *samples* `MOD.VAL n` into `TT2OutputState`. The first needs the engine to hand back `E.R`/`E.C` stage-end events + `MOD.VAL` readback (not emitted today).
+3. **Resolution** — modulator output is 0..127; TT ops + `TT2OutputState` speak 0..16383 / ±5V. Pick the reconciliation point.
+4. **`LFO.W`** — upstream morph knob vs the modulator's discrete shapes (Sine/Tri/SawUp/SawDown/Square).
+5. **Chaos / Spring** — TT-addressable, or panel/routing-only (leaning: out of the dialect).
+6. **`E` envelope topology** — TT `E` is **AD + loop (`E.L`) + stage-end gates (`E.R`/`E.C`)**; the modulator's envelope is a gated one-shot **ADSR** (sustain/release, no loop, no events). Add an AD/loop/event envelope shape to the engine, or map `E` lossy onto ADSR? Overlaps #2.
+
 ## Phase 2 outline
 
 Exit gate:
@@ -199,6 +218,6 @@ Phase 2b, not first slice:
 - STM32 release RAM numbers are the acceptance gate once structs exist.
 - TT2Runtime is volatile runtime state, not persisted. Reset deterministically on track init/load.
 - Do not move TT2Runtime into TT2TrackEngine. The engine container is the dangerous CCMRAM gate.
-- Envelope, LFO, and Geode are not pre-allocated in TT2TrackEngine. They may become control ops over the Modulator/engine layer.
+- Envelope, LFO, and Geode are not pre-allocated in TT2TrackEngine — decided: they drive the shared Modulator pool, not their own curves. See "Native modules (E / LFO / G) → Modulator engine".
 - TT2OutputState is ms-based (float) for pulse/slew timing. CV targets are raw int16_t; performer outputs are float volts.
 - I lives in `TT2ExecFrame.i`, not `TT2Variables`; use `tt2ActiveI()` only when an exec frame is active.
