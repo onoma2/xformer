@@ -300,12 +300,12 @@ UNIT_TEST("TeletypeV2NativeOps") {
         TT2OutputState output = {};
         init(output);
 
-        // N (pitch) is parsed but not yet implemented in the native table.
-        auto r = tryParse("N 0");
-        expectEqual(int(r.error), int(E_OK), "parse N 0");
+        // P (pattern) is parsed but not yet implemented (needs the pattern store).
+        auto r = tryParse("P 0");
+        expectEqual(int(r.error), int(E_OK), "parse P 0");
         auto result = evaluateCommand(lower(r.cmd), runtime, output);
         expectEqual(int(result.error), int(TT2EvalError::UnsupportedOp),
-                    "N unsupported");
+                    "P unsupported");
     }
 
     // -- batch 1: arithmetic / min-max / comparison / unary --------------
@@ -419,6 +419,40 @@ UNIT_TEST("TeletypeV2NativeOps") {
         expectEqual(v, int16_t(0), "SGN 0 = 0");
         expectEqual(int(evalValue("SGN 9", v)), int(TT2EvalError::None), "SGN ok");
         expectEqual(v, int16_t(1), "SGN 9 = 1");
+    }
+
+    CASE("pitch_n") {
+        int16_t v = 0;
+        expectEqual(int(evalValue("N 0", v)), int(TT2EvalError::None), "N ok");
+        expectEqual(v, int16_t(0), "N 0 = 0");
+        expectEqual(int(evalValue("N 12", v)), int(TT2EvalError::None), "N ok");
+        expectEqual(v, int16_t(1638), "N 12 = 1638 (1 octave)");
+        expectEqual(int(evalValue("N 60", v)), int(TT2EvalError::None), "N ok");
+        expectEqual(v, int16_t(8192), "N 60 = 8192 (5 octaves)");
+        expectEqual(int(evalValue("N 127", v)), int(TT2EvalError::None), "N ok");
+        expectEqual(v, int16_t(17340), "N 127 = 17340 (top, exceeds 14-bit)");
+        expectEqual(int(evalValue("N -12", v)), int(TT2EvalError::None), "N ok");
+        expectEqual(v, int16_t(-1638), "N -12 = -1638");
+        expectEqual(int(evalValue("N 200", v)), int(TT2EvalError::None), "N ok");
+        expectEqual(v, int16_t(17340), "N 200 clamps to note 127");
+    }
+
+    CASE("pitch_v") {
+        int16_t v = 0;
+        expectEqual(int(evalValue("V 0", v)), int(TT2EvalError::None), "V ok");
+        expectEqual(v, int16_t(0), "V 0 = 0");
+        expectEqual(int(evalValue("V 1", v)), int(TT2EvalError::None), "V ok");
+        expectEqual(v, int16_t(1638), "V 1 = 1638 (1 volt)");
+        expectEqual(int(evalValue("V 5", v)), int(TT2EvalError::None), "V ok");
+        expectEqual(v, int16_t(8192), "V 5 = 8192");
+        expectEqual(int(evalValue("V 10", v)), int(TT2EvalError::None), "V ok");
+        expectEqual(v, int16_t(16384), "V 10 = 16384");
+        expectEqual(int(evalValue("V -1", v)), int(TT2EvalError::None), "V ok");
+        expectEqual(v, int16_t(-1638), "V -1 = -1638");
+        expectEqual(int(evalValue("V 11", v)), int(TT2EvalError::None), "V ok");
+        expectEqual(v, int16_t(16384), "V 11 clamps to 10");
+        expectEqual(int(evalValue("V -20", v)), int(TT2EvalError::None), "V ok");
+        expectEqual(v, int16_t(-16384), "V -20 clamps to -10");
     }
 
     CASE("cv_get") {

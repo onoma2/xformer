@@ -197,6 +197,60 @@ static void opSgn(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // ---------------------------------------------------------------------------
+// Pitch ops — N (semitone -> value) and V (volts -> value). Values are upstream
+// Teletype verbatim (equal-temperament ET + 1V/oct table_v) so scripts are
+// copy-paste compatible; output offset/scaling is applied downstream at the
+// Performer track level, not here.
+// ---------------------------------------------------------------------------
+
+// ET[128]: semitone number -> raw value (1V/oct, 14-bit domain). Verbatim from
+// teletype/libavr32/src/music.c. High notes exceed 16383 by design — the value
+// is what the script sees; the CV write clamps.
+static const int16_t tt2EtTable[128] = {
+    0,     137,   273,   410,   546,   683,   819,   956,   1092,  1229,  1365,  1502,
+    1638,  1775,  1911,  2048,  2185,  2321,  2458,  2594,  2731,  2867,  3004,  3140,
+    3277,  3413,  3550,  3686,  3823,  3959,  4096,  4233,  4369,  4506,  4642,  4779,
+    4915,  5052,  5188,  5325,  5461,  5598,  5734,  5871,  6007,  6144,  6281,  6417,
+    6554,  6690,  6827,  6963,  7100,  7236,  7373,  7509,  7646,  7782,  7919,  8055,
+    8192,  8329,  8465,  8602,  8738,  8875,  9011,  9148,  9284,  9421,  9557,  9694,
+    9830,  9967,  10103, 10240, 10377, 10513, 10650, 10786, 10923, 11059, 11196, 11332,
+    11469, 11605, 11742, 11878, 12015, 12151, 12288, 12425, 12561, 12698, 12834, 12971,
+    13107, 13244, 13380, 13517, 13653, 13790, 13926, 14063, 14199, 14336, 14473, 14609,
+    14746, 14882, 15019, 15155, 15292, 15428, 15565, 15701, 15838, 15974, 16111, 16247,
+    16384, 16521, 16657, 16794, 16930, 17067, 17203, 17340,
+};
+
+// table_v[11]: integer volts 0..10 -> raw value. Verbatim from teletype/src/table.c.
+static const int16_t tt2VTable[11] = {
+    0, 1638, 3277, 4915, 6554, 8192, 9830, 11469, 13107, 14746, 16384,
+};
+
+static int16_t noteNumberToVolts(int16_t note) {
+    if (note < 0) {
+        if (note < -127) note = -127;
+        return int16_t(-tt2EtTable[-note]);
+    }
+    if (note > 127) note = 127;
+    return tt2EtTable[note];
+}
+
+static void opN(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    pushStack(stack, stackSize, noteNumberToVolts(a), error);
+}
+
+static void opV(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    if (a > 10) a = 10; else if (a < -10) a = -10;
+    if (a < 0) pushStack(stack, stackSize, int16_t(-tt2VTable[-a]), error);
+    else pushStack(stack, stackSize, tt2VTable[a], error);
+}
+
+// ---------------------------------------------------------------------------
 // Logic / range ops (boolean results are 1/0)
 // ---------------------------------------------------------------------------
 
@@ -787,6 +841,8 @@ namespace {
             table[E_OP_SYM_RIGHT_ANGLED_EQUAL]   = opGte;
             table[E_OP_ABS]      = opAbs;
             table[E_OP_SGN]      = opSgn;
+            table[E_OP_N]        = opN;
+            table[E_OP_V]        = opV;
             table[E_OP_AND]                = opAnd;
             table[E_OP_SYM_AMPERSAND_x2]   = opAnd;
             table[E_OP_OR]                 = opOr;
