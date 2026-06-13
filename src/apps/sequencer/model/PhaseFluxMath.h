@@ -101,6 +101,13 @@ public:
     static int transferLength(int &a, int &b, int delta, int minLen, int maxLen);
 
     /**
+     * Snap a length (in divisor units) to the nearest binary note value
+     * {1,2,4,8,16,32,64}. Geometric spacing → short lengths snap fine, long
+     * lengths snap coarse. Ties round up (coarser). Used by snapToGrid.
+     */
+    static int nearestNoteValue(int lengthUnits);
+
+    /**
      * §3.2 — Derive slot/cell/phase for a relativeTick. Returns false on idle
      * (cycleTicks == 0); outputs untouched in that case.
      */

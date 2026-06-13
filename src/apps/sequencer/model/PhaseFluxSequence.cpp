@@ -98,13 +98,26 @@ void PhaseFluxSequence::printTraversalPattern(StringBuilder &str) const {
 }
 
 void PhaseFluxSequence::snapToGrid(int beatTicks) {
-    // globalPhase snap to nearest 1/16 of cycle. (Per-stage length is now an
-    // integer count of divisor units — already on the grid by construction.)
     (void)beatTicks;
-    const float step = 1.f / 16.f;
-    _globalPhase = std::round(_globalPhase / step) * step;
-    if (_globalPhase < 0.f) _globalPhase = 0.f;
-    if (_globalPhase >= 1.f) _globalPhase -= 1.f;
+    // Quantize each non-skipped stage to the nearest binary note value, walking
+    // left to right and carrying the rounding residual forward into the next
+    // live stage (Len-TR style). Total length is conserved; the last live stage
+    // absorbs the remainder and is left unsnapped.
+    int live[StageCount];
+    int count = 0;
+    for (int i = 0; i < StageCount; ++i) {
+        if (!_stages[i].skip()) live[count++] = i;
+    }
+    if (count == 0) return;
+    int carry = 0;
+    for (int k = 0; k < count - 1; ++k) {
+        int v = _stages[live[k]].length() + carry;
+        int target = PhaseFluxMath::nearestNoteValue(v);
+        target = clamp(target, 1, 127);
+        carry = v - target;
+        _stages[live[k]].setLength(target);
+    }
+    _stages[live[count - 1]].setLength(clamp(_stages[live[count - 1]].length() + carry, 1, 127));
 }
 
 void PhaseFluxSequence::clear() {

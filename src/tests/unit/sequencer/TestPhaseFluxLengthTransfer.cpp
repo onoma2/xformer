@@ -40,4 +40,25 @@ CASE("negative_delta_pulls_back") {
     expectEqual(a + b, 40, "sum conserved");
 }
 
+CASE("nearest_note_value_snaps_to_powers_of_two") {
+    expectEqual(PhaseFluxMath::nearestNoteValue(1), 1, "1 -> 1");
+    expectEqual(PhaseFluxMath::nearestNoteValue(2), 2, "2 -> 2");
+    expectEqual(PhaseFluxMath::nearestNoteValue(4), 4, "4 -> 4");
+    expectEqual(PhaseFluxMath::nearestNoteValue(5), 4, "5 -> 4 (closer to 4)");
+    expectEqual(PhaseFluxMath::nearestNoteValue(7), 8, "7 -> 8 (closer to 8)");
+    expectEqual(PhaseFluxMath::nearestNoteValue(64), 64, "64 -> 64");
+    expectEqual(PhaseFluxMath::nearestNoteValue(120), 64, "120 -> 64 (capped)");
+}
+
+CASE("nearest_note_value_ties_round_up") {
+    expectEqual(PhaseFluxMath::nearestNoteValue(3), 4, "3 -> 4 (tie up)");
+    expectEqual(PhaseFluxMath::nearestNoteValue(6), 8, "6 -> 8 (tie up)");
+    expectEqual(PhaseFluxMath::nearestNoteValue(12), 16, "12 -> 16 (tie up)");
+}
+
+CASE("nearest_note_value_clamps_low") {
+    expectEqual(PhaseFluxMath::nearestNoteValue(0), 1, "0 clamps to 1");
+    expectEqual(PhaseFluxMath::nearestNoteValue(-5), 1, "negative clamps to 1");
+}
+
 } // UNIT_TEST("PhaseFluxLengthTransfer")

@@ -457,10 +457,10 @@ public:
         else { editFirstStage(value, false); editLastStage(value, false); }
     }
 
-    // Snap to grid — press-to-fire from MACRO P1. Snaps globalPhase to the
-    // nearest 1/16 of cycle. (Per-stage length is an integer count of divisor
-    // units, so it is already grid-aligned.) beatTicks unused, kept for the
-    // caller signature.
+    // Snap to grid — press-to-fire from MACRO P1. Quantizes each non-skipped
+    // stage's length to the nearest binary note value, carrying the rounding
+    // residual forward so total length (cycle span) is conserved; the last live
+    // stage absorbs the remainder. beatTicks unused, kept for the caller signature.
     void snapToGrid(int beatTicks);
 
     // Reset all 5 magnitude macros (nudges + cyclePhaseWarp) to 0.

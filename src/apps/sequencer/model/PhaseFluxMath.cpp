@@ -207,6 +207,15 @@ int PhaseFluxMath::computeCumulativeTicks(
     return cycleTicks;
 }
 
+int PhaseFluxMath::nearestNoteValue(int lengthUnits) {
+    int v = lengthUnits < 1 ? 1 : lengthUnits;
+    int p = 1;                              // largest power of two <= v, capped at 64
+    while (p * 2 <= v && p < 64) p *= 2;
+    if (p >= 64) return 64;
+    int upper = (p * 2 > 64) ? 64 : p * 2;
+    return (v * 2 < p * 3) ? p : upper;     // v < 1.5p snaps down, else up (ties up)
+}
+
 int PhaseFluxMath::transferLength(int &a, int &b, int delta, int minLen, int maxLen) {
     int minDelta = std::max(minLen - a, b - maxLen);
     int maxDelta = std::min(maxLen - a, b - minLen);

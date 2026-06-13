@@ -782,4 +782,26 @@ CASE("loop_bounds_offset_moves_window") {
     expectEqual(seq.lastStage() - seq.firstStage(), 3, "window width preserved at edge");
 }
 
+CASE("snap_quantizes_to_note_values_conserving_total") {
+    PhaseFluxSequence seq;
+    seq.clear();
+    // clear() leaves stages 0..3 live (non-skipped), 4..15 skipped. Give the
+    // four live stages length 5 each (off the binary grid) — total 20.
+    for (int i = 0; i < 4; ++i) seq.stage(i).setLength(5);
+    int before = 0;
+    for (int i = 0; i < 4; ++i) before += seq.stage(i).length();
+
+    seq.snapToGrid(0);
+
+    int after = 0;
+    for (int i = 0; i < 4; ++i) after += seq.stage(i).length();
+    expectEqual(after, before, "total length conserved across snap");
+
+    // All but the last live stage land on a binary note value (power of two).
+    for (int i = 0; i < 3; ++i) {
+        int v = seq.stage(i).length();
+        expectEqual((v & (v - 1)) == 0, true, "live stage snapped to power of two");
+    }
+}
+
 } // UNIT_TEST("PhaseFluxSequenceSerialization")
