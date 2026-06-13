@@ -6,7 +6,7 @@ add_custom_target(libopencm3 make -j1 AR=${CMAKE_AR} CC=${CMAKE_C_COMPILER} lib/
 # platform
 
 set(platform_dependencies libopencm3 PARENT_SCOPE)
-set(platform_compiler_flags "-mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -mthumb-interwork -funroll-loops -fshort-enums" PARENT_SCOPE)
+set(platform_compiler_flags "-mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -mthumb-interwork -fshort-enums" PARENT_SCOPE)
 set(platform_linker_flags "-nostartfiles --specs=nano.specs --specs=nosys.specs -Wl,--gc-sections" PARENT_SCOPE)
 
 set(platform_sources

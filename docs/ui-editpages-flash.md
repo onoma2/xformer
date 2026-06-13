@@ -5,7 +5,46 @@ Snapshot: 2026-06-13. Branch `feat/tt2-v2-native`.
 Measured with `arm-none-eabi-size` / `nm --print-size --size-sort` / `c++filt`
 (ArmGNUToolchain 15.2) against fresh `build/stm32/release` objects.
 
-## Situation
+## Resolution — adopted `-Os` (2026-06-13) — RESOLVED
+
+The flash wall is solved by a compiler-flag change, not by page refactors. The
+per-page work below is now **non-urgent** (cleanup only, not blocking).
+
+**Solution:** release builds switched `-O2` → `-Os` (`src/CMakeLists.txt`
+`CMAKE_C/CXX_FLAGS_RELEASE`) and dropped `-funroll-loops` from the STM32 platform
+flags (`src/platform/stm32/CMakeLists.txt`). `-fshort-enums` stays (ABI). `-O`
+level can vary per file freely, so a per-file `-O2` carve-out for hot engine code
+remains available if ever needed — but the timing check below showed it isn't.
+
+**Measurement (ROM = text + data, STM32 release):**
+
+| Build | ROM bytes | Δ |
+|---|---|---|
+| Baseline `-O2 -funroll-loops`, no Q | 982,300 | — |
+| `-Os`, no Q | 621,836 | −360,464 |
+| `-Os` + Q batch | 624,028 | −358,272 |
+
+~352 KB (−37%) reclaimed. Usable ROM is ~982 KB (a bootloader partition reserves
+the rest of the 1 MB chip), and the firmware had been ~40 bytes from the edge;
+now ~358 KB headroom. Q, the N/V batch, and the entire remaining op surface fit
+with room to spare.
+
+**Timing verification (hardware):** a wall-clock probe on MonitorPage → STATS
+(`Engine::update()` worst-case µs, ticks drained that call, and per-tick % of the
+tick budget) was read against a deliberately brutal stress patch — 8 active heavy
+engines (Stochastic ×1, PhaseFlux ×2, fast-sweep Curve, Tuesday, dense Note ×3) at
+240 BPM. Worst case: **834 µs/tick = 64 % of the 1302 µs budget**, audibly clean,
+stable over minutes. (`update()` batches pending ticks, so its >100 % *total*
+spikes were multi-tick drains, not per-tick overruns.) Conclusion: `-Os` holds the
+real-time budget with ~36 % margin even at the worst case — no per-file `-O2`
+needed.
+
+The probe and the stress patch (`STRESS_TIMING_DEMO` in `Project::clear()`, default
+**0**) are kept as off-by-default timing instrumentation for future checks.
+
+---
+
+## Situation (pre-resolution analysis)
 
 The firmware is at the 1 MB flash ceiling **on this branch**. At HEAD (without the
 pending Q op batch) it links; adding Q's ~4.5 KB overflows ROM by 4,460 bytes
