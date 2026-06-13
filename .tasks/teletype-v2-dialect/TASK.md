@@ -101,7 +101,7 @@ Scope guard:
 | TT2Runtime | ≤ 2,132 B (2,130 measured, post-`I`) | model (SRAM) | |
 | **TT2Track** | **== 4,504 B** | model (SRAM) | NoteTrack = 9,544 B |
 | TT2OutputState | == 26 B | engine (CCMRAM) | |
-| **TT2TrackEngine** | **≤ 344 B** (340 on ARM) | engine (CCMRAM) | TeletypeTrackEngine = 912 B |
+| **TT2TrackEngine** | **≤ 944 B** (real subclass since wiring) | engine (CCMRAM) | TeletypeTrackEngine = 944 B |
 
 Numbers reconciled 2026-06-13 to the header `static_assert`s. (Drift fixed: the
 step-3 log's "336 B" for TT2OutputState was a mis-measurement — the live struct
@@ -119,12 +119,22 @@ Phase 2 sandbox/smoke complete through narrow native SCRIPT calls. Cleanup done.
 
 Next semantic step is narrow delay scheduling.
 
+## Known faithfulness bugs (audit 2026-06-13) — violate "identical behaviour"
+
+Found by an independent 3-agent audit. The DEL ones are FIXED (`6b9261e5`); the IF/ELSE + PROB ones are **pre-existing** (predate the wiring session) and NOT yet fixed:
+
+- **IF/ELIF/ELSE chain is per-line-local, not exec-frame-persistent** (HIGH — breaks the most common Teletype idiom). `TT2Evaluator.h` declares `ChainState chainState` local in `evaluateCommand`; `runScript` calls it once per line, so a standalone `ELSE:` / `ELIF:` line can't see the prior `IF`. Upstream keeps the chain on `es_variables(es)->if_else_condition` (the exec frame), persisting across lines. The TT2 exec frame even carries an unused `if_else_condition` field for exactly this. **Fix:** chain bool on the exec frame; IF resets it then sets-on-true; ELIF/ELSE run only if not-taken; **no orphan/duplicate errors** (upstream a bare ELSE just runs); a **plain segment must NOT reset the chain** (current line ~520 does — only IF resets, per `controlflow.c:132-163`).
+- **PROB is wrongly coupled into the IF/ELSE chain** (MEDIUM). `mod_PROB_func` upstream (`controlflow.c:123-130`) is standalone — never touches `if_else_condition`. TT2 makes PROB read/write the chain (skips after a taken branch, sets Taken/Pending). **Fix:** decouple — PROB just rolls and runs its body.
+- **Tests encode the wrong behaviour:** `TestTeletypeV2ScriptRunner` asserts `OrphanElse`/`OrphanElif`/`DuplicateElse` + PROB-chain interaction — these must change to upstream behaviour, plus add multi-line IF/ELSE persistence tests.
+
+**FIXED (DEL):** DEL.X arg order (count/interval swap), DEL.X/.R/.B operand `<1→1` clamp, smoke-test build regression — all `6b9261e5`.
+
 **Governing contract (reaffirmed 2026-06-13): TT2 = the Teletype language, BEHAVIOUR-IDENTICAL.** Only the architecture changes (native runtime, no bridge, 8 outputs, hardware ops dropped). Every kept op's semantics must match upstream exactly — no native shortcuts. (Already in `docs/teletype_v2.md`: "preserve core Teletype syntax and behavior", "don't rename core ops".)
 
 **Engine wiring — DONE (`44289ed5`, 2026-06-13).** `TrackMode::TeletypeV2` live: `TT2Track` in the Track variant, `TT2TrackEngine` is a real `TrackEngine` subclass (boot-script-on-start + metro-script-every-`clockDivisor` minimal tick), Engine dispatch wired, serialize tag 9 (no version bump). `loadScriptText()` (Ragel→lower→store) + `TestTeletypeV2RealScript` run real script text end-to-end. sim + STM32 release green; 0 new test failures. Full trigger-input + true metro scheduling still pending (this was a minimal vertical slice).
 
 Phase 2b candidates:
-- **Delay family — `DEL` / `DEL.CLR` (`4977d8af`) + `DEL.X` / `DEL.R` / `DEL.B` (`59404b30`) DONE.** Faithful: parallel-slot queue, `<1→1` clamp, origin snapshot, ms drain from `update(dt)`, issue-80 busy-slot guard; X=n copies at x·k, R=n copies first-at-1ms then +x, B=i·base per set bit. `TestTeletypeV2Delay` 10 cases. **Remaining: `DEL.G` (4-arg geometric)** — needs (a) a stack-exposing mod-prefix helper (`TT2EvalResult` only exposes top+2nd), (b) the exact 4-arg pop order + `x = x·m/d` formula verified against `teletype/src/ops/delay.c` before claiming identical.
+- **Delay family — `DEL` / `DEL.CLR` (`4977d8af`) + `DEL.X` / `DEL.R` / `DEL.B` (`59404b30`) DONE.** Faithful: parallel-slot queue, `<1→1` clamp, origin snapshot, ms drain from `update(dt)`, issue-80 busy-slot guard; X=x copies at delay_time·k, R=n copies first-at-1ms then +x, B=i·base per set bit; operand `<1→1` clamp on all three (audit fix). `TestTeletypeV2Delay` 9 cases. **Remaining: `DEL.G` (4-arg geometric)** — needs (a) a stack-exposing mod-prefix helper (`TT2EvalResult` only exposes top+2nd), (b) the exact 4-arg pop order + `x = x·m/d` formula verified against `teletype/src/ops/delay.c` before claiming identical.
 - **Delay scheduling (`DEL`, then `DEL.CLR`) — original plan note, faithful ms port.** Upstream model (grounded `teletype/src/ops/delay.c` + `teletype.c:362-419`): parallel-array queue (`TT2DelayEntry`/`TT2DelayQueue` already match — `command` + `time`(ms) + origin script/`I`/fparam), `time==0` = empty slot, delay `<1→1` clamp, drain decrements each slot's ms and fires due bodies via a fresh exec frame with origin restored. **`DEL` delay unit = MILLISECONDS** (identical Teletype). Drive the drain from `TT2TrackEngine::update(dt)` — `dt*1000` is real elapsed ms (the `update(0.f)` recompose call is guarded out), mirroring v1 `advanceTime`. Narrow slice = `DEL n: body` one-shot + `DEL.CLR`; `.X/.R/.G/.B` repeat variants follow.
 - `$` / function calls and return values
 - `BREAK` / `KILL`
