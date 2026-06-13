@@ -51,6 +51,21 @@ struct TT2Script {
     TT2Command commands[TT2_COMMANDS_PER_SCRIPT];
 };
 
+static constexpr int TT2_TRIGGER_INPUT_COUNT = 4;
+
+// Per trigger-input source. Mirrors TeletypeTrack::TriggerInputSource so the
+// (deferred) editor I/O grid edits the same shape. Engine reads it to decide
+// which Performer input drives each trigger script. Defaults to CvIn1-4.
+enum class TT2TriggerSource : uint8_t {
+    None,
+    CvIn1, CvIn2, CvIn3, CvIn4,
+    GateOut1, GateOut2, GateOut3, GateOut4,
+    GateOut5, GateOut6, GateOut7, GateOut8,
+    LogicalGate1, LogicalGate2, LogicalGate3, LogicalGate4,
+    LogicalGate5, LogicalGate6, LogicalGate7, LogicalGate8,
+    Last
+};
+
 struct TeletypeProgram {
     uint8_t dialectVersion;
     uint8_t bootScriptIndex;
@@ -61,6 +76,7 @@ struct TeletypeProgram {
     uint8_t resetMetroOnLoad;
     TT2Script scripts[TT2_SCRIPT_COUNT];
     TT2Pattern patterns[TT2_PATTERN_COUNT];
+    TT2TriggerSource triggerSource[TT2_TRIGGER_INPUT_COUNT];
 };
 
 inline void init(TeletypeProgram &p) {
@@ -77,6 +93,10 @@ inline void init(TeletypeProgram &p) {
         p.patterns[i].wrap = 1;
         p.patterns[i].start = 0;
         p.patterns[i].end = TT2_PATTERN_LENGTH - 1;
+    }
+    // Default each trigger input to its matching CV input (CvIn1-4).
+    for (int i = 0; i < TT2_TRIGGER_INPUT_COUNT; i++) {
+        p.triggerSource[i] = TT2TriggerSource(int(TT2TriggerSource::CvIn1) + i);
     }
 }
 
@@ -112,4 +132,4 @@ inline int16_t *patternVal(TT2Pattern &pat, uint16_t index) {
 static_assert(sizeof(TT2Command) <= 52, "TT2Command size drift");
 static_assert(sizeof(TT2Pattern) <= 140, "TT2Pattern size drift");
 static_assert(sizeof(TT2Script) <= 304, "TT2Script size drift");
-static_assert(sizeof(TeletypeProgram) <= 2376, "TeletypeProgram size drift");
+static_assert(sizeof(TeletypeProgram) <= 2384, "TeletypeProgram size drift");
