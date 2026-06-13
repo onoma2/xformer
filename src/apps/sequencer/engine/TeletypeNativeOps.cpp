@@ -478,6 +478,275 @@ static void opKill(TT2Runtime &runtime, TT2OutputState &,
 }
 
 // ---------------------------------------------------------------------------
+// Queue ops — TT2_Q_LENGTH ring; get vs set by leftmost position + arg count.
+// Q.RND (rand source) and Q.2P / Q.P2 (pattern store) deferred to later batches.
+// ---------------------------------------------------------------------------
+
+static void opQ(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    if (isSet && stackSize >= 1) {
+        int16_t val = 0;
+        if (!popStack(stack, stackSize, val, error)) return;
+        for (int i = TT2_Q_LENGTH - 1; i > 0; --i) v.q[i] = v.q[i - 1];
+        v.q[0] = val;
+        if (v.q_grow && v.q_n < TT2_Q_LENGTH) v.q_n++;
+    } else {
+        pushStack(stack, stackSize, v.q[v.q_n - 1], error);
+        if (v.q_grow && v.q_n > 1) v.q_n--;
+    }
+}
+
+static void opQN(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    if (isSet && stackSize >= 1) {
+        int16_t a = 0;
+        if (!popStack(stack, stackSize, a, error)) return;
+        if (a < 1) a = 1; else if (a > TT2_Q_LENGTH) a = TT2_Q_LENGTH;
+        v.q_n = a;
+    } else {
+        pushStack(stack, stackSize, v.q_n, error);
+    }
+}
+
+static void opQAvg(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    if (isSet && stackSize >= 1) {
+        int16_t a = 0;
+        if (!popStack(stack, stackSize, a, error)) return;
+        for (int i = 0; i < TT2_Q_LENGTH; ++i) v.q[i] = a;
+    } else if (v.q_n == 0) {
+        pushStack(stack, stackSize, 0, error);
+    } else {
+        int32_t avg = 0;
+        for (int i = 0; i < v.q_n; ++i) avg += v.q[i];
+        avg = (avg * 2) / v.q_n;
+        if (avg % 2) avg += 1;
+        pushStack(stack, stackSize, int16_t(avg / 2), error);
+    }
+}
+
+static void opQClr(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    int16_t first = 0;
+    bool doSet = isSet && stackSize >= 1;
+    if (doSet && !popStack(stack, stackSize, first, error)) return;
+    v.q_n = 1;
+    for (int i = 0; i < TT2_Q_LENGTH; ++i) v.q[i] = 0;
+    if (doSet) v.q[0] = first;
+}
+
+static void opQGrw(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    if (isSet && stackSize >= 1) {
+        int16_t a = 0;
+        if (!popStack(stack, stackSize, a, error)) return;
+        v.q_grow = (a < 1) ? 0 : 1;
+        if (!v.q_grow && v.q_n < 1) v.q_n = 1;
+    } else {
+        pushStack(stack, stackSize, v.q_grow, error);
+    }
+}
+
+static void opQSum(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    int16_t sum = 0;
+    for (int i = 0; i < v.q_n; ++i) sum += v.q[i];
+    pushStack(stack, stackSize, sum, error);
+}
+
+static void opQMin(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    if (isSet && stackSize >= 1) {
+        int16_t mn = 0;
+        if (!popStack(stack, stackSize, mn, error)) return;
+        for (int i = 0; i < v.q_n; ++i) if (v.q[i] < mn) v.q[i] = mn;
+    } else {
+        int16_t mn = 32767;
+        for (int i = 0; i < v.q_n; ++i) if (v.q[i] < mn) mn = v.q[i];
+        pushStack(stack, stackSize, mn, error);
+    }
+}
+
+static void opQMax(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    if (isSet && stackSize >= 1) {
+        int16_t mx = 0;
+        if (!popStack(stack, stackSize, mx, error)) return;
+        for (int i = 0; i < v.q_n; ++i) if (v.q[i] > mx) v.q[i] = mx;
+    } else {
+        int16_t mx = -32768;
+        for (int i = 0; i < v.q_n; ++i) if (v.q[i] > mx) mx = v.q[i];
+        pushStack(stack, stackSize, mx, error);
+    }
+}
+
+// Selection sort over [lo, hi).
+static void qSortRange(int16_t *q, int lo, int hi) {
+    for (int i = lo; i < hi; ++i) {
+        int16_t mn = 32767;
+        int mnIdx = i;
+        for (int j = i; j < hi; ++j) {
+            if (q[j] < mn) { mn = q[j]; mnIdx = j; }
+        }
+        int16_t tmp = q[mnIdx]; q[mnIdx] = q[i]; q[i] = tmp;
+    }
+}
+
+static void opQSrt(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    if (isSet && stackSize >= 1) {
+        int16_t bound = 0;
+        if (!popStack(stack, stackSize, bound, error)) return;
+        int lo, hi;
+        if (bound > 0)      { lo = 0; hi = bound > v.q_n ? v.q_n : bound; }
+        else if (bound < 0) { hi = v.q_n; lo = -bound > v.q_n ? v.q_n : -bound; }
+        else                { lo = 0; hi = v.q_n; }
+        qSortRange(v.q, lo, hi);
+    } else {
+        qSortRange(v.q, 0, v.q_n);
+    }
+}
+
+static void opQRev(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *, uint8_t &, bool, TT2EvalError &) {
+    auto &v = runtime.variables;
+    for (int i = 0; i < v.q_n / 2; ++i) {
+        int16_t tmp = v.q[i];
+        v.q[i] = v.q[v.q_n - 1 - i];
+        v.q[v.q_n - 1 - i] = tmp;
+    }
+}
+
+static void opQSh(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    if (isSet && stackSize >= 1) {
+        int16_t n = 0;
+        if (!popStack(stack, stackSize, n, error)) return;
+        if (n > 0) n = n % v.q_n;
+        else if (n < 0) n = v.q_n - (-n % v.q_n);
+        if (!n) return;
+        int16_t tmp[TT2_Q_LENGTH];
+        for (int i = 0; i < v.q_n; ++i) tmp[i] = v.q[i];
+        for (int i = 0; i < v.q_n; ++i) v.q[(i + n) % v.q_n] = tmp[i];
+    } else {
+        int16_t tmp = v.q[v.q_n - 1];
+        for (int i = v.q_n - 1; i > 0; --i) v.q[i] = v.q[i - 1];
+        v.q[0] = tmp;
+    }
+}
+
+// Q.ADD/SUB/MUL/DIV/MOD: get (1 arg) applies to all; set (2 args: amount, index)
+// applies to one slot. Upstream pop order is amount-first, index-second.
+static int qClampIndex(int16_t i, int16_t q_n) {
+    if (i < 0) return 0;
+    if (i > q_n - 1) return q_n - 1;
+    return i;
+}
+
+static void opQAdd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    int16_t amt = 0;
+    if (!popStack(stack, stackSize, amt, error)) return;
+    if (isSet && stackSize >= 1) {
+        int16_t idx = 0;
+        if (!popStack(stack, stackSize, idx, error)) return;
+        idx = qClampIndex(idx, v.q_n);
+        v.q[idx] = v.q[idx] + amt;
+    } else {
+        for (int i = 0; i < v.q_n; ++i) v.q[i] = v.q[i] + amt;
+    }
+}
+
+static void opQSub(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    int16_t amt = 0;
+    if (!popStack(stack, stackSize, amt, error)) return;
+    if (isSet && stackSize >= 1) {
+        int16_t idx = 0;
+        if (!popStack(stack, stackSize, idx, error)) return;
+        idx = qClampIndex(idx, v.q_n);
+        v.q[idx] = v.q[idx] - amt;
+    } else {
+        for (int i = 0; i < v.q_n; ++i) v.q[i] = v.q[i] - amt;
+    }
+}
+
+static void opQMul(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    int16_t amt = 0;
+    if (!popStack(stack, stackSize, amt, error)) return;
+    if (isSet && stackSize >= 1) {
+        int16_t idx = 0;
+        if (!popStack(stack, stackSize, idx, error)) return;
+        idx = qClampIndex(idx, v.q_n);
+        v.q[idx] = v.q[idx] * amt;
+    } else {
+        for (int i = 0; i < v.q_n; ++i) v.q[i] = v.q[i] * amt;
+    }
+}
+
+static void opQDiv(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    int16_t amt = 0;
+    if (!popStack(stack, stackSize, amt, error)) return;
+    if (isSet && stackSize >= 1) {
+        int16_t idx = 0;
+        if (!popStack(stack, stackSize, idx, error)) return;
+        if (amt == 0) return;
+        idx = qClampIndex(idx, v.q_n);
+        v.q[idx] = v.q[idx] / amt;
+    } else if (amt != 0) {
+        for (int i = 0; i < v.q_n; ++i) v.q[i] = v.q[i] / amt;
+    }
+}
+
+static void opQMod(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    int16_t amt = 0;
+    if (!popStack(stack, stackSize, amt, error)) return;
+    if (isSet && stackSize >= 1) {
+        int16_t idx = 0;
+        if (!popStack(stack, stackSize, idx, error)) return;
+        if (amt == 0) return;
+        idx = qClampIndex(idx, v.q_n);
+        v.q[idx] = v.q[idx] % amt;
+    } else if (amt != 0) {
+        for (int i = 0; i < v.q_n; ++i) v.q[i] = v.q[i] % amt;
+    }
+}
+
+static void opQI(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    int16_t idx = 0;
+    if (!popStack(stack, stackSize, idx, error)) return;
+    if (idx < 0) idx = 0;
+    if (idx > TT2_Q_LENGTH - 1) idx = TT2_Q_LENGTH - 1;
+    if (isSet && stackSize >= 1) {
+        int16_t value = 0;
+        if (!popStack(stack, stackSize, value, error)) return;
+        v.q[idx] = value;
+    } else {
+        pushStack(stack, stackSize, v.q[idx], error);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Native op table
 // ---------------------------------------------------------------------------
 
@@ -540,6 +809,23 @@ namespace {
             table[E_OP_OUTR]     = opOutr;
             table[E_OP_INRI]     = opInri;
             table[E_OP_OUTRI]    = opOutri;
+            table[E_OP_Q]        = opQ;
+            table[E_OP_Q_N]      = opQN;
+            table[E_OP_Q_AVG]    = opQAvg;
+            table[E_OP_Q_CLR]    = opQClr;
+            table[E_OP_Q_GRW]    = opQGrw;
+            table[E_OP_Q_SUM]    = opQSum;
+            table[E_OP_Q_MIN]    = opQMin;
+            table[E_OP_Q_MAX]    = opQMax;
+            table[E_OP_Q_SRT]    = opQSrt;
+            table[E_OP_Q_REV]    = opQRev;
+            table[E_OP_Q_SH]     = opQSh;
+            table[E_OP_Q_ADD]    = opQAdd;
+            table[E_OP_Q_SUB]    = opQSub;
+            table[E_OP_Q_MUL]    = opQMul;
+            table[E_OP_Q_DIV]    = opQDiv;
+            table[E_OP_Q_MOD]    = opQMod;
+            table[E_OP_Q_I]      = opQI;
             table[E_OP_CV]       = opCv;
             table[E_OP_TR]       = opTr;
             table[E_OP_M]        = opM;
