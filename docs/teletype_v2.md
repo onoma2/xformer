@@ -25,11 +25,11 @@ The goal is a native Performer scripting language derived from Teletype:
 - **Op families:** math (ADD/SUB/MUL/DIV/MOD/MIN/MAX/ABS/SGN + symbols), comparison (EQ/NE/LT/GT/LTE/GTE + symbols), logic (AND/OR/AND3/OR3/AND4/OR4/NZ/EZ), range (LIM/WRAP/WRP/AVG/INR/OUTR/INRI/OUTRI), queue (`Q.*`), stack (`S.*`), pitch (`N`, `V`), and the **full pattern family** (`P`/`PN` — value/bounds/nav/insert-remove/reorder/whole-window arith/query/random).
 - **Runtime/model:** variables store, scale tables, RNG slots, delay queue, 8 CV + 8 TR output state, serialized `TeletypeProgram` (6 scripts + 4 patterns).
 - **Trigger-input firing:** `TT2TrackEngine` samples 4 trigger inputs each update and fires scripts 0-3 on rising edges; per-input source (CvIn/GateOut/LogicalGate, mirroring the legacy dispatch) defaults to CvIn1-4 — the editing UI for it rides with the deferred editor I/O grid.
+- **Output shaping:** native linear ms CV slew (raw<<8 fixed-point, exact interpolation, no sub-LSB stall) + offset; one-shot TR pulse with rest polarity. Per-ms shaping pass in `update(dt)`; `cvOutput()` emits the ramped value. Ops `CV.SLEW`/`CV.OFF`/`TR.POL`/`TR.TIME`/`TR.PULSE`/`TR.P`/`TR.TOG`.
 - **Build:** release switched to `-Os` (reclaimed ~352 KB flash; ~350 KB headroom); op breadth no longer flash-bound.
 
 ### Remaining — engine mechanics (highest value; survey 2026-06-14)
-These change what TT2 *is* — a reactive Eurorack voice, not a self-contained calculator. Engine-level, not op-table. (Trigger-input firing — the first of these — is now done; see above.)
-- **Output shaping (PORT)** — CV slew, TR pulse/offset/polarity. `CV`/`TR` are instant-snap today; `TT2OutputState` needs slew-accumulator / pulse-remaining / offset fields + a per-tick output pass. Variable storage (`cv_slew`/`tr_time`/`tr_pol`/`cv_off`) already exists.
+These change what TT2 *is* — a reactive Eurorack voice, not a self-contained calculator. Engine-level, not op-table. (Trigger-input firing and output shaping are now done; see above.)
 - **IN / PARAM inputs (PARTIAL)** — `IN`/`PARAM`/`IN.SCALE`/`PARAM.SCALE` ops + a sampling write from a Performer CV source. State (`in`/`param`/min/max) exists.
 
 ### Remaining — language tail (PARTIAL — wire ops onto existing state)
@@ -49,7 +49,7 @@ Repoint the editing UI to TeletypeV2, reusing the working pages. `tele2_ops[]` n
 Scenes/`SCENE`, i2c/Telex, grid/Arc, Ansible/WW/Meadow/Earthsea/ORCA, Just Friends/ER-301/Disting/`W/`, Crow, MIDI-query families.
 
 ### Recommended order
-**Engine mechanics first** (trigger-in → output-shaping → IN/PARAM), *then* editor, *then* the language tail + turtle as breadth, *then* bridge deletion (Phase 5). Rationale: a script you can edit but that can't fire on a gate or slew a CV isn't auditionable as an instrument — the engine mechanics gate the hardware audition more than the editor does.
+**Engine mechanics first** (trigger-in ✅ → output-shaping ✅ → IN/PARAM next), *then* editor, *then* the language tail + turtle as breadth, *then* bridge deletion (Phase 5). Rationale: a script you can edit but that can't fire on a gate or slew a CV isn't auditionable as an instrument — the engine mechanics gate the hardware audition more than the editor does.
 
 ## Non-Goals
 
@@ -374,7 +374,7 @@ Useful suggestions that still apply:
 
 ## Action Plan
 
-**Status (2026-06-14) — see Current State for the live roadmap.** Phase 0 (dialect definition) ✅, Phase 1 (native data model) ✅, Phase 2 (native core interpreter) ✅ **and well beyond** (the full op surface + control-flow MODs + patterns are native and tested). Phase 3 (native output semantics) is **partial** — instant `CV`/`TR` on 1–8 work; slew / pulse / offset / polarity (the "output shaping" engine) is the remaining piece. Phase 4 (native modules: envelopes/LFO/Geode) **not started** (lower priority). Phase 5 (delete bridge) **pending**, gated on native editor + scheduler (trigger/input) parity. The phase definitions below stay as the architectural frame; the prioritized remaining work lives in Current State.
+**Status (2026-06-14) — see Current State for the live roadmap.** Phase 0 (dialect definition) ✅, Phase 1 (native data model) ✅, Phase 2 (native core interpreter) ✅ **and well beyond** (the full op surface + control-flow MODs + patterns are native and tested). Phase 3 (native output semantics) ✅ — instant `CV`/`TR` plus slew / pulse / offset / polarity (the "output shaping" engine) are native and tested. Phase 4 (native modules: envelopes/LFO/Geode) **not started** (lower priority). Phase 5 (delete bridge) **pending**, gated on native editor + scheduler (trigger/input) parity. The phase definitions below stay as the architectural frame; the prioritized remaining work lives in Current State.
 
 ### Phase 0: Dialect Definition
 
