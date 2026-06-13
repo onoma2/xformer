@@ -24,11 +24,11 @@ The goal is a native Performer scripting language derived from Teletype:
 - **Control/timing language (MODs):** IF / ELIF / ELSE, PROB, EVERY / SKIP, L, BREAK / BRK, SCRIPT, KILL, S (stack push), the full DEL family; ms-based metro.
 - **Op families:** math (ADD/SUB/MUL/DIV/MOD/MIN/MAX/ABS/SGN + symbols), comparison (EQ/NE/LT/GT/LTE/GTE + symbols), logic (AND/OR/AND3/OR3/AND4/OR4/NZ/EZ), range (LIM/WRAP/WRP/AVG/INR/OUTR/INRI/OUTRI), queue (`Q.*`), stack (`S.*`), pitch (`N`, `V`), and the **full pattern family** (`P`/`PN` — value/bounds/nav/insert-remove/reorder/whole-window arith/query/random).
 - **Runtime/model:** variables store, scale tables, RNG slots, delay queue, 8 CV + 8 TR output state, serialized `TeletypeProgram` (6 scripts + 4 patterns).
+- **Trigger-input firing:** `TT2TrackEngine` samples 4 trigger inputs each update and fires scripts 0-3 on rising edges; per-input source (CvIn/GateOut/LogicalGate, mirroring the legacy dispatch) defaults to CvIn1-4 — the editing UI for it rides with the deferred editor I/O grid.
 - **Build:** release switched to `-Os` (reclaimed ~352 KB flash; ~350 KB headroom); op breadth no longer flash-bound.
 
 ### Remaining — engine mechanics (highest value; survey 2026-06-14)
-These change what TT2 *is* — a reactive Eurorack voice, not a self-contained calculator. Engine-level, not op-table.
-- **Trigger-input firing (PARTIAL)** — the defining gap. The native engine reads no external gates (only metro/delay self-run). Wire an edge-detect loop in `TT2TrackEngine::update()` → `runScript(0..N)`; state (`script_pol[8]`) + runner exist, and the legacy engine's `updateInputTriggers()` is the reference.
+These change what TT2 *is* — a reactive Eurorack voice, not a self-contained calculator. Engine-level, not op-table. (Trigger-input firing — the first of these — is now done; see above.)
 - **Output shaping (PORT)** — CV slew, TR pulse/offset/polarity. `CV`/`TR` are instant-snap today; `TT2OutputState` needs slew-accumulator / pulse-remaining / offset fields + a per-tick output pass. Variable storage (`cv_slew`/`tr_time`/`tr_pol`/`cv_off`) already exists.
 - **IN / PARAM inputs (PARTIAL)** — `IN`/`PARAM`/`IN.SCALE`/`PARAM.SCALE` ops + a sampling write from a Performer CV source. State (`in`/`param`/min/max) exists.
 
