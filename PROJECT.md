@@ -359,6 +359,19 @@ open -W build/sim/Performer.app       # blocks until exit
 
 (`open -W` may fail with PID errors on macOS 15.x — use `open` without `-W` and check `/tmp/performer-sim.log` for output.)
 
+### Demo Project (Simulator Boot)
+
+The project the simulator boots with is **not a file** — it is assembled in code
+in `Project::clear()` inside an `#if PLATFORM_SIM` block
+(`src/apps/sequencer/model/Project.cpp`). Edit that block to change what plays on
+a fresh simulator launch. Hardware boots the same `clear()` without the block.
+
+Current layout: tempo 80, Minor scale. Track 1 a slow full-range Curve (CV
+source); tracks 2–6 NoteTracks with assorted gate patterns; track 8 a PhaseFlux
+track that boots straight from `PhaseFluxSequence::clear()` — stages 0..3 active
+at 4 pulses each over a 1-bar cycle at the 1/16 divisor, a NoteTrack-equivalent
+1/16 metronome in sync with the NoteTracks (octave +1, no per-stage override).
+
 ### Simulator Keyboard Mapping
 
 | Physical Button  | Keyboard Key |

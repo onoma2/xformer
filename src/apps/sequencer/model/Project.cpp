@@ -104,15 +104,12 @@ void Project::clear() {
 
     // Track 7: Note with empty sequence (gates all off — NoteSequence::clear default).
 
-    // Track 8: PhaseFlux — boot to NoteTrack-equivalent metronome. Stage 0
-    // active (Sequence::clear() defaults), pulseCount overridden to 16 so the
-    // simulator emits 1/16-grid pulses out of the box. Dialing pulseCount
-    // back down to 0 silences. Other stages remain skipped per clear().
+    // Track 8: PhaseFlux — boots to a NoteTrack-equivalent metronome straight
+    // from Sequence::clear(): stages 0..3 active (4 pulses each) over a 1-bar
+    // cycle at the 1/16 divisor = 16 sixteenths across the bar, in sync with
+    // the NoteTracks above. No per-stage override needed.
     track(7).setTrackMode(Track::TrackMode::PhaseFlux);
-    auto &pfTrack = track(7).phaseFluxTrack();
-    auto &pfSeq = pfTrack.sequence(0);
-    pfSeq.stage(0).setPulseCount(16);
-    pfTrack.setOctave(+1);
+    track(7).phaseFluxTrack().setOctave(+1);
 
     setTempo(80.f);
     setScale(2); // 2 corresponds to Minor scale
