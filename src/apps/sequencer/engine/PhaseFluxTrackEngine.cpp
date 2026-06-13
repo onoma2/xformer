@@ -203,6 +203,8 @@ bool PhaseFluxTrackEngine::detectLayoutChange() {
     int8_t  lenN = int8_t(_sequence->lenNudge());
     if (div != _cachedDivisor || mult != _cachedClockMult) return true;
     if (lenN != _cachedLenNudge) return true;
+    if (uint8_t(_sequence->firstStage()) != _cachedFirstStage) return true;
+    if (uint8_t(_sequence->lastStage()) != _cachedLastStage) return true;
     for (int i = 0; i < kStageCount; ++i) {
         const auto &s = _sequence->stage(i);
         if (uint8_t(s.length()) != _cachedLength[i]) return true;
@@ -215,12 +217,17 @@ void PhaseFluxTrackEngine::rebuildCumulativeTable() {
     int lengthArr[kStageCount];
     bool skipArr[kStageCount];
     const int lenNudge = _sequence->lenNudge();
+    const int firstStage = _sequence->firstStage();
+    const int lastStage = _sequence->lastStage();
     for (int i = 0; i < kStageCount; ++i) {
         const auto &s = _sequence->stage(i);
         // LenNudge adds to every stage's length uniformly; clamp to storage range.
         int effLen = s.length() + lenNudge;
         if (effLen < 0)   effLen = 0;
         if (effLen > 127) effLen = 127;
+        // Loop bounds: stages outside [first..last] contribute zero, dropping
+        // them from the cycle (single-stage loop when first==last).
+        if (i < firstStage || i > lastStage) effLen = 0;
         lengthArr[i] = effLen;
         skipArr[i] = s.skip();
         _cachedLength[i] = uint8_t(s.length());
@@ -229,6 +236,8 @@ void PhaseFluxTrackEngine::rebuildCumulativeTable() {
     _cachedDivisor = uint16_t(_sequence->divisor());
     _cachedClockMult = uint8_t(_sequence->clockMultiplier());
     _cachedLenNudge = int8_t(_sequence->lenNudge());
+    _cachedFirstStage = uint8_t(firstStage);
+    _cachedLastStage = uint8_t(lastStage);
 
     const bool fixedCycle =
         _sequence->cycleLength() == PhaseFluxSequence::CycleLengthMode::Fixed;

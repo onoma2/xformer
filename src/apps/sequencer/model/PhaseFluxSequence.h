@@ -432,6 +432,31 @@ public:
     void editTraversalPattern(int value, bool) { setTraversalPattern(traversalPattern() + value); }
     void printTraversalPattern(StringBuilder &str) const;
 
+    // Loop bounds — restrict the played cycle to stages [first..last] by grid
+    // index (FLUX LOOP/LAST). Single stage when first==last. Out-of-range
+    // stages contribute zero length; the cycle sums only the in-range stages.
+    int firstStage() const { return _firstStage; }
+    void setFirstStage(int v) { _firstStage = clamp(v, 0, int(_lastStage)); }
+    void editFirstStage(int value, bool shift) {
+        if (shift) offsetFirstAndLastStage(value);
+        else setFirstStage(firstStage() + value);
+    }
+    void printFirstStage(StringBuilder &str) const { str("%d", firstStage() + 1); }
+
+    int lastStage() const { return std::max(int(_firstStage), int(_lastStage)); }
+    void setLastStage(int v) { _lastStage = clamp(v, int(_firstStage), StageCount - 1); }
+    void editLastStage(int value, bool shift) {
+        if (shift) offsetFirstAndLastStage(value);
+        else setLastStage(lastStage() + value);
+    }
+    void printLastStage(StringBuilder &str) const { str("%d", lastStage() + 1); }
+
+    void offsetFirstAndLastStage(int value) {
+        value = clamp(value, -int(_firstStage), StageCount - 1 - int(_lastStage));
+        if (value > 0) { editLastStage(value, false); editFirstStage(value, false); }
+        else { editFirstStage(value, false); editLastStage(value, false); }
+    }
+
     // Snap to grid — press-to-fire from MACRO P1. Snaps globalPhase to the
     // nearest 1/16 of cycle. (Per-stage length is an integer count of divisor
     // units, so it is already grid-aligned.) beatTicks unused, kept for the
@@ -574,6 +599,8 @@ private:
     int8_t _lenNudge = 0;
     int8_t _cyclePhaseWarp = 0;
     uint8_t _traversalPattern = 0;
+    uint8_t _firstStage = 0;
+    uint8_t _lastStage = StageCount - 1;
     uint16_t _divisor;
     uint8_t _clockMultiplier;
 

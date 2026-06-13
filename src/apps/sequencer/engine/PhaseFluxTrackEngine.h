@@ -100,6 +100,8 @@ private:
     uint16_t _cachedDivisor = 0;
     uint8_t _cachedClockMult = 0;
     int8_t _cachedLenNudge = 0;
+    uint8_t _cachedFirstStage = 0;
+    uint8_t _cachedLastStage = 0;
 
     // Dual-accumulator state (spec §13.3, Task 5).
     // Local scope uses [cell] index; Track scope shares [0].

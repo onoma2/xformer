@@ -97,6 +97,8 @@ CASE("default_round_trip") {
     expectEqual(restored.divisor(), 12, "divisor default");
     expectEqual(restored.clockMultiplier(), 100, "clockMultiplier default");
     expectEqual(restored.resetMeasure(), 0, "resetMeasure default");
+    expectEqual(restored.firstStage(), 0, "firstStage default");
+    expectEqual(restored.lastStage(), PhaseFluxSequence::StageCount - 1, "lastStage default");
 
     for (int i = 0; i < PhaseFluxSequence::StageCount; ++i) {
         const auto &s = restored.stage(i);
@@ -144,6 +146,8 @@ CASE("chassis_fields_persist") {
     seq.setDivisor(24);
     seq.setClockMultiplier(133);
     seq.setResetMeasure(8);
+    seq.setLastStage(11);
+    seq.setFirstStage(3);
 
     uint8_t buf[4096];
     std::memset(buf, 0, sizeof(buf));
@@ -158,6 +162,8 @@ CASE("chassis_fields_persist") {
     expectEqual(restored.divisor(), 24, "divisor persists");
     expectEqual(restored.clockMultiplier(), 133, "clockMultiplier persists");
     expectEqual(restored.resetMeasure(), 8, "resetMeasure persists");
+    expectEqual(restored.firstStage(), 3, "firstStage persists");
+    expectEqual(restored.lastStage(), 11, "lastStage persists");
 
     // Track-level chassis
     PhaseFluxTrack track;
@@ -735,6 +741,45 @@ CASE("bit_pack_no_collision") {
     expectEqual(rs.skip(), true, "skip survives collision check");
     expectEqual(int(rs.accumulatorTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Pulse), "accumulatorTrigger survives collision check");
     expectEqual(int(rs.pulseAccumTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Pulse), "pulseAccumTrigger survives collision check");
+}
+
+CASE("loop_bounds_clamp_and_single_stage") {
+    PhaseFluxSequence seq;
+    seq.clear();
+    expectEqual(seq.firstStage(), 0, "first defaults to 0");
+    expectEqual(seq.lastStage(), PhaseFluxSequence::StageCount - 1, "last defaults to 15");
+
+    // last cannot drop below first
+    seq.setFirstStage(6);
+    seq.setLastStage(3);
+    expectEqual(seq.lastStage(), 6, "last clamped up to first");
+
+    // single-stage loop: raise last first (first clamps to <= last), then first
+    seq.setLastStage(9);
+    seq.setFirstStage(9);
+    expectEqual(seq.firstStage(), 9, "single-stage first");
+    expectEqual(seq.lastStage(), 9, "single-stage last");
+
+    // first cannot exceed last
+    seq.setFirstStage(15);
+    expectEqual(seq.firstStage(), 9, "first clamped down to last");
+}
+
+CASE("loop_bounds_offset_moves_window") {
+    PhaseFluxSequence seq;
+    seq.clear();
+    seq.setFirstStage(2);
+    seq.setLastStage(5);
+
+    // shift gesture slides both bounds together
+    seq.editFirstStage(3, true);
+    expectEqual(seq.firstStage(), 5, "window first slid +3");
+    expectEqual(seq.lastStage(), 8, "window last slid +3");
+
+    // window clamps at the top edge without collapsing
+    seq.editLastStage(20, true);
+    expectEqual(seq.lastStage(), 15, "window last pinned at 15");
+    expectEqual(seq.lastStage() - seq.firstStage(), 3, "window width preserved at edge");
 }
 
 } // UNIT_TEST("PhaseFluxSequenceSerialization")

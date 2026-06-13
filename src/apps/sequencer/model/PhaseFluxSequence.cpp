@@ -122,6 +122,8 @@ void PhaseFluxSequence::clear() {
     _lenNudge = 0;
     _cyclePhaseWarp = 0;
     _traversalPattern = 0;
+    _firstStage = 0;
+    _lastStage = StageCount - 1;
     _divisor = 12;                       // 1/16 at PPQN 48
     _clockMultiplier = 100;
     _noteAccumConfig = AccumulatorConfig();
@@ -164,6 +166,8 @@ void PhaseFluxSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_lenNudge);
     writer.write(_cyclePhaseWarp);
     writer.write(_traversalPattern);
+    writer.write(_firstStage);
+    writer.write(_lastStage);
     writer.write(_divisor);
     writer.write(_clockMultiplier);
     _noteAccumConfig.write(writer);
@@ -197,6 +201,8 @@ void PhaseFluxSequence::read(VersionedSerializedReader &reader) {
     reader.read(_lenNudge);
     reader.read(_cyclePhaseWarp);
     reader.read(_traversalPattern);
+    reader.read(_firstStage);
+    reader.read(_lastStage);
     reader.read(_divisor);
     reader.read(_clockMultiplier);
     _noteAccumConfig.read(reader);

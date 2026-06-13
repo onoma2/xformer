@@ -40,6 +40,8 @@ private:
         PitchMode,
         PitchRate,
         Traversal,
+        FirstStage,
+        LastStage,
         CycleLength,
         NoteAccumMode,
         PulseAccumMode,
@@ -63,6 +65,8 @@ private:
         case PitchMode:      return "Pitch Mode";
         case PitchRate:      return "Pitch Rate";
         case Traversal:      return "Traversal";
+        case FirstStage:     return "First Stage";
+        case LastStage:      return "Last Stage";
         case CycleLength:    return "Cycle Length";
         case NoteAccumMode:  return "Note Accum Mode";
         case PulseAccumMode: return "Pulse Accum Mode";
@@ -89,6 +93,8 @@ private:
         case PitchMode:      _sequence->printPitchMode(str); break;
         case PitchRate:      _sequence->printPitchRate(str); break;
         case Traversal:      _sequence->printTraversalPattern(str); break;
+        case FirstStage:     _sequence->printFirstStage(str); break;
+        case LastStage:      _sequence->printLastStage(str); break;
         case CycleLength:    _sequence->printCycleLength(str); break;
         case NoteAccumMode:  _sequence->printNoteAccumMode(str); break;
         case PulseAccumMode: _sequence->printPulseAccumMode(str); break;
@@ -112,6 +118,8 @@ private:
         case PitchMode:      _sequence->editPitchMode(value, shift); break;
         case PitchRate:      _sequence->editPitchRate(value, shift); break;
         case Traversal:      _sequence->editTraversalPattern(value, shift); break;
+        case FirstStage:     _sequence->editFirstStage(value, shift); break;
+        case LastStage:      _sequence->editLastStage(value, shift); break;
         case CycleLength:    _sequence->editCycleLength(value, shift); break;
         case NoteAccumMode:  _sequence->editNoteAccumMode(value, shift); break;
         case PulseAccumMode: _sequence->editPulseAccumMode(value, shift); break;
