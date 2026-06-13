@@ -138,7 +138,7 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
         TeletypeProgram program = {};
         init(program);
         writeLine(program.scripts[0], 0, "A 10");
-        writeLine(program.scripts[0], 1, "P 0"); // unsupported in native table
+        writeLine(program.scripts[0], 1, "HZ 0"); // unsupported in native table
         writeLine(program.scripts[0], 2, "B 20");
         program.scripts[0].length = 3;
 

@@ -300,12 +300,12 @@ UNIT_TEST("TeletypeV2NativeOps") {
         TT2OutputState output = {};
         init(output);
 
-        // P (pattern) is parsed but not yet implemented (needs the pattern store).
-        auto r = tryParse("P 0");
-        expectEqual(int(r.error), int(E_OK), "parse P 0");
+        // HZ (pitch->hz) is parsed but not yet implemented in the native table.
+        auto r = tryParse("HZ 0");
+        expectEqual(int(r.error), int(E_OK), "parse HZ 0");
         auto result = evaluateCommand(lower(r.cmd), runtime, output);
         expectEqual(int(result.error), int(TT2EvalError::UnsupportedOp),
-                    "P unsupported");
+                    "HZ unsupported");
     }
 
     // -- batch 1: arithmetic / min-max / comparison / unary --------------

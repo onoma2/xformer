@@ -50,4 +50,56 @@ UNIT_TEST("TeletypeV2Pattern") {
         f.run("P.N -1");
         expectEqual(f.runtime.variables.p_n, int16_t(0), "P.N clamps low to 0");
     }
+
+    CASE("p_value_get_set") {
+        Fixture f;
+        f.seed(0, {10, 20, 30}, 3);
+        expectEqual(f.run("P 0").value, int16_t(10), "P 0 reads val[0]");
+        expectEqual(f.run("P 2").value, int16_t(30), "P 2 reads val[2]");
+        f.run("P 1 99");  // set idx 1 to 99
+        expectEqual(f.pat(0).val[1], int16_t(99), "P set writes val[1]");
+        expectEqual(f.run("P -1").value, int16_t(30), "P -1 reads from back (val[2])");
+    }
+
+    CASE("pn_value_get_set") {
+        Fixture f;
+        f.seed(1, {5, 6, 7}, 3);
+        expectEqual(f.run("PN 1 2").value, int16_t(7), "PN 1 2 reads pattern1 val[2]");
+        f.run("PN 1 0 42");  // pattern1 idx0 = 42
+        expectEqual(f.pat(1).val[0], int16_t(42), "PN set writes pattern1 val[0]");
+        expectEqual(f.runtime.variables.p_n, int16_t(0), "PN leaves working pattern untouched");
+    }
+
+    CASE("p_length") {
+        Fixture f;
+        f.seed(0, {1, 2, 3, 4}, 4);
+        expectEqual(f.run("P.L").value, int16_t(4), "P.L reads 4");
+        f.run("P.L 2");
+        expectEqual(int(f.pat(0).len), 2, "P.L set to 2");
+        f.run("P.L 99");
+        expectEqual(int(f.pat(0).len), 64, "P.L clamps high to 64");
+        f.run("P.L -1");
+        expectEqual(int(f.pat(0).len), 0, "P.L clamps low to 0");
+        expectEqual(f.run("PN.L 1").value, int16_t(0), "PN.L reads pattern1 len");
+    }
+
+    CASE("p_index") {
+        Fixture f;
+        f.seed(0, {1, 2, 3, 4}, 4);
+        f.run("P.I 2");
+        expectEqual(f.pat(0).idx, int16_t(2), "P.I set to 2");
+        expectEqual(f.run("P.I").value, int16_t(2), "P.I reads 2");
+        f.run("P.I 99");  // clamps to len-1 = 3
+        expectEqual(f.pat(0).idx, int16_t(3), "P.I clamps to len-1");
+    }
+
+    CASE("p_here") {
+        Fixture f;
+        f.seed(0, {11, 22, 33}, 3);
+        f.run("P.I 1");
+        expectEqual(f.run("P.HERE").value, int16_t(22), "P.HERE reads val at idx 1");
+        f.run("P.HERE 88");
+        expectEqual(f.pat(0).val[1], int16_t(88), "P.HERE set writes at idx 1");
+        expectEqual(f.pat(0).idx, int16_t(1), "P.HERE does not advance idx");
+    }
 }

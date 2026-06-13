@@ -890,6 +890,145 @@ static void opPatternN(TT2Runtime &runtime, TT2OutputState &, const TeletypeProg
     }
 }
 
+// --- value workers (shared by P.* and PN.*) -------------------------------
+
+static int16_t patternGetVal(const TeletypeProgram *program, int16_t pn, int16_t idx) {
+    const TT2Pattern &p = program->patterns[normalisePn(pn)];
+    return p.val[normaliseIdx(p, idx)];
+}
+
+static void patternSetVal(const TeletypeProgram *program, int16_t pn, int16_t idx,
+                          int16_t val) {
+    TT2Pattern *p = mutablePattern(program, pn);
+    if (p) p->val[normaliseIdx(*p, idx)] = val;
+}
+
+static void patternSetLen(const TeletypeProgram *program, int16_t pn, int16_t l) {
+    TT2Pattern *p = mutablePattern(program, pn);
+    if (!p) return;
+    if (l < 0) l = 0; else if (l > TT2_PATTERN_LENGTH) l = TT2_PATTERN_LENGTH;
+    p->len = uint16_t(l);
+}
+
+static void patternSetIdx(const TeletypeProgram *program, int16_t pn, int16_t i) {
+    TT2Pattern *p = mutablePattern(program, pn);
+    if (!p) return;
+    i = normaliseIdx(*p, i);
+    int16_t len = int16_t(p->len);
+    if (i < 0 || len == 0) p->idx = 0;
+    else if (i >= len) p->idx = int16_t(len - 1);
+    else p->idx = i;
+}
+
+// P / PN — indexed value access. P: idx [val] (working pattern). PN: pn idx [val].
+static void opP(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popStack(stack, stackSize, idx, error)) return;
+    if (isSet && stackSize >= 1) {
+        int16_t val = 0;
+        if (!popStack(stack, stackSize, val, error)) return;
+        patternSetVal(program, runtime.variables.p_n, idx, val);
+    } else {
+        pushStack(stack, stackSize, patternGetVal(program, runtime.variables.p_n, idx), error);
+    }
+}
+
+static void opPN(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                 int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    int16_t pn = 0, idx = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    if (!popStack(stack, stackSize, idx, error)) return;
+    if (isSet && stackSize >= 1) {
+        int16_t val = 0;
+        if (!popStack(stack, stackSize, val, error)) return;
+        patternSetVal(program, pn, idx, val);
+    } else {
+        pushStack(stack, stackSize, patternGetVal(program, pn, idx), error);
+    }
+}
+
+// P.L / PN.L — length.
+static void opPL(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                 int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    if (isSet && stackSize >= 1) {
+        int16_t l = 0;
+        if (!popStack(stack, stackSize, l, error)) return;
+        patternSetLen(program, runtime.variables.p_n, l);
+    } else {
+        pushStack(stack, stackSize, int16_t(program->patterns[normalisePn(runtime.variables.p_n)].len), error);
+    }
+}
+
+static void opPNL(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    int16_t pn = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    if (isSet && stackSize >= 1) {
+        int16_t l = 0;
+        if (!popStack(stack, stackSize, l, error)) return;
+        patternSetLen(program, pn, l);
+    } else {
+        pushStack(stack, stackSize, int16_t(program->patterns[normalisePn(pn)].len), error);
+    }
+}
+
+// P.I / PN.I — working index.
+static void opPI(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                 int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    if (isSet && stackSize >= 1) {
+        int16_t i = 0;
+        if (!popStack(stack, stackSize, i, error)) return;
+        patternSetIdx(program, runtime.variables.p_n, i);
+    } else {
+        pushStack(stack, stackSize, program->patterns[normalisePn(runtime.variables.p_n)].idx, error);
+    }
+}
+
+static void opPNI(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    int16_t pn = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    if (isSet && stackSize >= 1) {
+        int16_t i = 0;
+        if (!popStack(stack, stackSize, i, error)) return;
+        patternSetIdx(program, pn, i);
+    } else {
+        pushStack(stack, stackSize, program->patterns[normalisePn(pn)].idx, error);
+    }
+}
+
+// P.HERE / PN.HERE — value at the working index (no advance).
+static void opPHere(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    int16_t pn = normalisePn(runtime.variables.p_n);
+    const TT2Pattern &p = program->patterns[pn];
+    if (isSet && stackSize >= 1) {
+        int16_t a = 0;
+        if (!popStack(stack, stackSize, a, error)) return;
+        TT2Pattern *m = mutablePattern(program, pn);
+        if (m) m->val[m->idx] = a;
+    } else {
+        pushStack(stack, stackSize, p.val[p.idx], error);
+    }
+}
+
+static void opPNHere(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                     int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    int16_t pn = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    pn = normalisePn(pn);
+    const TT2Pattern &p = program->patterns[pn];
+    if (isSet && stackSize >= 1) {
+        int16_t a = 0;
+        if (!popStack(stack, stackSize, a, error)) return;
+        TT2Pattern *m = mutablePattern(program, pn);
+        if (m) m->val[m->idx] = a;
+    } else {
+        pushStack(stack, stackSize, p.val[p.idx], error);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Native op table
 // ---------------------------------------------------------------------------
@@ -977,6 +1116,14 @@ namespace {
             table[E_OP_S_CLR]    = opSClr;
             table[E_OP_S_L]      = opSL;
             table[E_OP_P_N]      = opPatternN;
+            table[E_OP_P]        = opP;
+            table[E_OP_PN]       = opPN;
+            table[E_OP_P_L]      = opPL;
+            table[E_OP_PN_L]     = opPNL;
+            table[E_OP_P_I]      = opPI;
+            table[E_OP_PN_I]     = opPNI;
+            table[E_OP_P_HERE]   = opPHere;
+            table[E_OP_PN_HERE]  = opPNHere;
             table[E_OP_CV]       = opCv;
             table[E_OP_TR]       = opTr;
             table[E_OP_M]        = opM;
