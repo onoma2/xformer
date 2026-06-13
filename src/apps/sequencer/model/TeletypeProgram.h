@@ -66,6 +66,24 @@ enum class TT2TriggerSource : uint8_t {
     Last
 };
 
+// Six analog/engine inputs feed runtime values: IN and PARAM (scaled, read via
+// the IN/PARAM ops) plus the working variables X/Y/Z/T. Each maps to a
+// configurable CV source mirroring TeletypeTrack::CvInputSource. UI deferred to
+// the editor I/O grid; defaults wire IN/PARAM/X/Y to CvIn1-4.
+enum class TT2CvInput : uint8_t { In, Param, X, Y, Z, T };
+static constexpr int TT2_CV_INPUT_COUNT = 6;
+
+enum class TT2CvInputSource : uint8_t {
+    None,
+    CvIn1, CvIn2, CvIn3, CvIn4,
+    CvOut1, CvOut2, CvOut3, CvOut4,
+    CvOut5, CvOut6, CvOut7, CvOut8,
+    CvRoute1, CvRoute2, CvRoute3, CvRoute4,
+    LogicalCv1, LogicalCv2, LogicalCv3, LogicalCv4,
+    LogicalCv5, LogicalCv6, LogicalCv7, LogicalCv8,
+    Last
+};
+
 struct TeletypeProgram {
     uint8_t dialectVersion;
     uint8_t bootScriptIndex;
@@ -77,6 +95,7 @@ struct TeletypeProgram {
     TT2Script scripts[TT2_SCRIPT_COUNT];
     TT2Pattern patterns[TT2_PATTERN_COUNT];
     TT2TriggerSource triggerSource[TT2_TRIGGER_INPUT_COUNT];
+    TT2CvInputSource cvInputSource[TT2_CV_INPUT_COUNT];
 };
 
 inline void init(TeletypeProgram &p) {
@@ -98,6 +117,11 @@ inline void init(TeletypeProgram &p) {
     for (int i = 0; i < TT2_TRIGGER_INPUT_COUNT; i++) {
         p.triggerSource[i] = TT2TriggerSource(int(TT2TriggerSource::CvIn1) + i);
     }
+    // Default IN/PARAM/X/Y to CvIn1-4; Z/T unmapped (memset leaves them None).
+    p.cvInputSource[int(TT2CvInput::In)]    = TT2CvInputSource::CvIn1;
+    p.cvInputSource[int(TT2CvInput::Param)] = TT2CvInputSource::CvIn2;
+    p.cvInputSource[int(TT2CvInput::X)]     = TT2CvInputSource::CvIn3;
+    p.cvInputSource[int(TT2CvInput::Y)]     = TT2CvInputSource::CvIn4;
 }
 
 inline TT2Command *scriptCommand(TT2Script &s, uint8_t index) {
