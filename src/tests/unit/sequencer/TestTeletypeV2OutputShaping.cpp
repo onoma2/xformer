@@ -1,6 +1,29 @@
 #include "UnitTest.h"
 
 #include "engine/TeletypeOutputState.h"
+#include "engine/TT2Evaluator.h"
+
+#include "model/Types.h"
+
+extern "C" {
+#include "command.h"
+#include "teletype.h"
+#include "ops/op_enum.h"
+}
+
+namespace {
+
+// Parse + lower + evaluate one command line against runtime/output.
+TT2EvalResult evalText(const char *text, TT2Runtime &runtime, TT2OutputState &output) {
+    tele_command_t src = {};
+    char errMsg[TELE_ERROR_MSG_LENGTH] = {};
+    parse(text, &src, errMsg);
+    TT2Command cmd = {};
+    lowerCommand(src, cmd);
+    return evaluateCommand(cmd, runtime, output);
+}
+
+} // namespace
 
 // Pure shaping-advance helpers: native linear ms CV ramp + one-shot TR pulse.
 // No Engine, no runtime — just the testable core of the output-shaping pass.
@@ -73,5 +96,69 @@ UNIT_TEST("TeletypeV2OutputShaping") {
         tt2AdvanceTrPulse(tr, 100);
         expectEqual(int(tr.level), 0, "unarmed level unchanged");
         expectTrue(tr.pulseRemainingMs == 0, "unarmed remains idle");
+    }
+
+    CASE("op_cv_slew_set_get_then_cv_ramps") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        evalText("CV.SLEW 1 100", runtime, output);
+        expectEqual(runtime.variables.cv_slew[0], int16_t(100), "CV.SLEW set");
+        expectEqual(int(evalText("CV.SLEW 1", runtime, output).value), 100, "CV.SLEW get");
+        evalText("CV 1 16383", runtime, output);
+        expectEqual(int(output.cv[0].targetRaw), 16383, "CV target seeded");
+        expectTrue(output.cv[0].remainingMs == 100, "ramp pending, not instant");
+    }
+
+    CASE("op_cv_off_applies_to_target") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        evalText("CV.OFF 1 1000", runtime, output);
+        expectEqual(runtime.variables.cv_off[0], int16_t(1000), "CV.OFF set");
+        expectEqual(int(evalText("CV.OFF 1", runtime, output).value), 1000, "CV.OFF get");
+        evalText("CV 1 5000", runtime, output);
+        expectEqual(int(output.cv[0].targetRaw), 6000, "target = value + offset");
+    }
+
+    CASE("op_tr_time_set_get_and_pulse") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        evalText("TR.TIME 1 50", runtime, output);
+        expectEqual(runtime.variables.tr_time[0], int16_t(50), "TR.TIME set");
+        expectEqual(int(evalText("TR.TIME 1", runtime, output).value), 50, "TR.TIME get");
+        evalText("TR.P 1", runtime, output);
+        expectEqual(int(output.tr[0].level), 1, "TR.P active level (pol 1)");
+        expectTrue(output.tr[0].pulseRemainingMs == 50, "pulse armed at TR.TIME");
+    }
+
+    CASE("op_tr_pulse_alias_matches_tr_p") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        evalText("TR.TIME 1 40", runtime, output);
+        evalText("TR.PULSE 1", runtime, output);
+        expectEqual(int(output.tr[0].level), 1, "TR.PULSE arms like TR.P");
+        expectTrue(output.tr[0].pulseRemainingMs == 40, "TR.PULSE armed");
+    }
+
+    CASE("op_tr_pol_set_get_and_inverted_pulse") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        evalText("TR.POL 1 0", runtime, output);
+        expectEqual(runtime.variables.tr_pol[0], int16_t(0), "TR.POL set 0");
+        expectEqual(int(evalText("TR.POL 1", runtime, output).value), 0, "TR.POL get");
+        evalText("TR.TIME 1 30", runtime, output);
+        evalText("TR.P 1", runtime, output);
+        expectEqual(int(output.tr[0].level), 0, "inverted pol active level low");
+        tt2AdvanceTrPulse(output.tr[0], 30);
+        expectEqual(int(output.tr[0].level), 1, "inverted pol rest level high");
+    }
+
+    CASE("op_tr_tog_flips_level") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        evalText("TR 1 0", runtime, output);
+        evalText("TR.TOG 1", runtime, output);
+        expectEqual(int(output.tr[0].level), 1, "TOG 0 -> 1");
+        evalText("TR.TOG 1", runtime, output);
+        expectEqual(int(output.tr[0].level), 0, "TOG 1 -> 0");
     }
 }

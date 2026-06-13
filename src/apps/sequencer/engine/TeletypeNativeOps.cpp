@@ -439,10 +439,105 @@ static void opTr(TT2Runtime &runtime, TT2OutputState &output,
         uint8_t boolLevel = (level != 0) ? 1 : 0;
         runtime.variables.tr[idx] = boolLevel;
         output.tr[idx].level = boolLevel;
+        output.tr[idx].pulseRemainingMs = 0;  // a direct set cancels any pulse
         output.trDirty |= uint8_t(1 << idx);
     } else {
         pushStack(stack, stackSize, runtime.variables.tr[idx], error);
     }
+}
+
+// CV.SLEW n [ms] — per-channel slew time in ms (min 1, upstream).
+static void opCvSlew(TT2Runtime &runtime, TT2OutputState &,
+                     const TeletypeProgram *, int16_t *stack,
+                     uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_CV_COUNT)) return;
+    if (isSetPosition && stackSize >= 1) {
+        int16_t val = 0;
+        if (!popStack(stack, stackSize, val, error)) return;
+        if (val < 1) val = 1;
+        runtime.variables.cv_slew[idx] = val;
+    } else {
+        pushStack(stack, stackSize, runtime.variables.cv_slew[idx], error);
+    }
+}
+
+// CV.OFF n [v] — per-channel output offset. A set re-seeds the live ramp so
+// the new offset takes effect immediately (upstream re-calls tele_cv).
+static void opCvOff(TT2Runtime &runtime, TT2OutputState &output,
+                    const TeletypeProgram *, int16_t *stack,
+                    uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_CV_COUNT)) return;
+    if (isSetPosition && stackSize >= 1) {
+        int16_t val = 0;
+        if (!popStack(stack, stackSize, val, error)) return;
+        runtime.variables.cv_off[idx] = val;
+        int16_t target = normaliseCvValue(int16_t(runtime.variables.cv[idx] + val));
+        tt2SeedCvSlew(output.cv[idx], target, runtime.variables.cv_slew[idx]);
+        output.cvDirty |= uint8_t(1 << idx);
+    } else {
+        pushStack(stack, stackSize, runtime.variables.cv_off[idx], error);
+    }
+}
+
+// TR.POL n [p] — per-channel rest polarity (0/1).
+static void opTrPol(TT2Runtime &runtime, TT2OutputState &,
+                    const TeletypeProgram *, int16_t *stack,
+                    uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_TR_COUNT)) return;
+    if (isSetPosition && stackSize >= 1) {
+        int16_t val = 0;
+        if (!popStack(stack, stackSize, val, error)) return;
+        runtime.variables.tr_pol[idx] = (val > 0) ? 1 : 0;
+    } else {
+        pushStack(stack, stackSize, runtime.variables.tr_pol[idx], error);
+    }
+}
+
+// TR.TIME n [ms] — per-channel pulse length in ms (>= 0).
+static void opTrTime(TT2Runtime &runtime, TT2OutputState &,
+                     const TeletypeProgram *, int16_t *stack,
+                     uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_TR_COUNT)) return;
+    if (isSetPosition && stackSize >= 1) {
+        int16_t val = 0;
+        if (!popStack(stack, stackSize, val, error)) return;
+        if (val < 0) val = 0;
+        runtime.variables.tr_time[idx] = val;
+    } else {
+        pushStack(stack, stackSize, runtime.variables.tr_time[idx], error);
+    }
+}
+
+// TR.PULSE / TR.P n — fire a one-shot pulse: set the active level (tr_pol),
+// arm the timer at tr_time. Action op (no value pushed).
+static void opTrPulse(TT2Runtime &runtime, TT2OutputState &output,
+                      const TeletypeProgram *, int16_t *stack,
+                      uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_TR_COUNT)) return;
+    int16_t timeMs = runtime.variables.tr_time[idx];
+    if (timeMs <= 0) return;
+    uint8_t pol = runtime.variables.tr_pol[idx] ? 1 : 0;
+    runtime.variables.tr[idx] = pol;
+    tt2ArmTrPulse(output.tr[idx], pol, timeMs);
+    output.trDirty |= uint8_t(1 << idx);
+}
+
+// TR.TOG n — flip the current level. Action op (no value pushed).
+static void opTrTog(TT2Runtime &runtime, TT2OutputState &output,
+                    const TeletypeProgram *, int16_t *stack,
+                    uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_TR_COUNT)) return;
+    uint8_t level = runtime.variables.tr[idx] ? 0 : 1;
+    runtime.variables.tr[idx] = level;
+    output.tr[idx].level = level;
+    output.tr[idx].pulseRemainingMs = 0;
+    output.trDirty |= uint8_t(1 << idx);
 }
 
 // ---------------------------------------------------------------------------
@@ -1791,7 +1886,14 @@ namespace {
             table[E_OP_RND_P]    = opRndP;
             table[E_OP_RND_PN]   = opRndPN;
             table[E_OP_CV]       = opCv;
+            table[E_OP_CV_SLEW]  = opCvSlew;
+            table[E_OP_CV_OFF]   = opCvOff;
             table[E_OP_TR]       = opTr;
+            table[E_OP_TR_POL]   = opTrPol;
+            table[E_OP_TR_TIME]  = opTrTime;
+            table[E_OP_TR_PULSE] = opTrPulse;
+            table[E_OP_TR_P]     = opTrPulse;
+            table[E_OP_TR_TOG]   = opTrTog;
             table[E_OP_M]        = opM;
             table[E_OP_M_ACT]    = opMAct;
             table[E_OP_SCRIPT]   = opScript;
