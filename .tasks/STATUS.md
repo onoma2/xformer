@@ -49,17 +49,16 @@ _Prior 2026-05-29 (PhaseFlux polish round landed: mask+tilt orthogonal union rep
 
 ---
 
-## ⚪ modulator-enhancements — free wallclock Hz mode + post-depth shaper selector
-**Status:** ready — captured 2026-06-08 from the routing/shaper discussion, no code started.
-**Where I stopped:** Two independent items spec'd in `.tasks/modulator-enhancements.md`. (1) A
-completely free **wallclock Hz mode** — today even `Mode::Free` sets rate in ticks
-(`Modulator::rate()` 6..6144, clock-relative); the new mode advances phase from real wall-time
-at a Hz rate (depends on the `wallclock-time-architecture` WallClock substrate). (2) Put the
-routing **shaper selector** (None/Fold/Crease + off-center) into the modulator chain **after
-depth** (model+engine+ui) so a modulator can fold its own output. Both ui-preview-render first.
-**Next action:** Settle the item-1 open questions (Hz range/resolution, separate-field-vs-
-reinterpret, clock-stopped behavior), then build item 2 first (no dependency) if item 1's
-wallclock substrate isn't ready.
+## 🟡 modulator-enhancements — free wallclock Hz mode ✅ + post-depth shaper selector
+**Status:** item 1 SHIPPED, item 2 remaining (verified 2026-06-13).
+**Where I stopped:** Two independent items spec'd in `.tasks/modulator-enhancements.md`. **(1) free
+wallclock Hz mode — DONE:** `Modulator::RateDomain::Free/Tempo` shipped (Free = centi-Hz 0.01..16Hz,
+runs when stopped; Tempo = PPQN ticks); engine advances phase from the real wall-time `dt`
+(`ModulatorEngine::freePhaseIncrement`, carries the fractional remainder); defaults start Free at
+0.05Hz. Rides the `WallClock` substrate (now also shipped). **(2) post-depth shaper selector —
+NOT done:** put the routing shaper (None/Fold/Crease + off-center) into the modulator chain **after
+depth** (model+engine+ui) so a modulator can fold its own output. ui-preview-render first.
+**Next action:** Build item 2 (post-depth shaper) — no dependency, reuses `RouteShaper`.
 **Depends on:** item 1 → `wallclock-time-architecture`; item 2 → nothing (reuses `RouteShaper`).
 **Branch:** TBD
 **Reference:** `.tasks/modulator-enhancements.md`. Related: the 5 stateful shapers (Location/
@@ -272,10 +271,10 @@ Tuesday `WobblerV2/Sources/Pendulum.c` — spec after Spring lands.
 
 ---
 
-## ⚪ wallclock-time-architecture — Unify time handling: WallClock service (B) + PhaseFlux/Stochastic onto tickPosition (A)
-**Status:** ready — design validated against ER-101 reference, no code started.
-**Where I stopped:** Two gaps. (A) PhaseFlux + Stochastic re-derive phase from discrete integer tick while six other engines read the continuous `Clock::tickPosition()`. (B) Real wall-time is scattered across 3 `os::ticks()` behavioral sites (modulator `dt` `Engine.cpp:72`, MidiOutput CC rate-limit, MidiCv voice) with no service, and `os::ticks()` is 32-bit (wraps). ER-101's lesson (`OTHERS/ortagonal/er-101/wallclock.h`): single 64-bit free-running reference + `walltimer` with drift-free `end_time += delay` restart. NOT importing ER-101's synthetic-clock/tick-adjustment — xformer transport already centralizes cross-track sync.
-**Next action:** B first (substrate): add a 64-bit µs `WallClock` + `WallTimer` value type, migrate the 3 scattered sites, fold the slave-period outlier guard (ER-101 0.5×–2× latch) in — this absorbs the Phase 0 slave-clock item. A is parallel/independent: PhaseFlux + Stochastic read `tickPosition()`. Verify sim + STM32 + timing parity; hardware-check slave guard against a jittery clock.
+## 🟡 wallclock-time-architecture — WallClock service ✅ (B) + PhaseFlux/Stochastic onto tickPosition (A, remaining)
+**Status:** B SHIPPED, A remaining (verified 2026-06-13).
+**Where I stopped:** Two gaps. **(B) WallClock service — DONE:** `src/apps/sequencer/engine/WallClock.h` (+ `TestWallClock.cpp`) is the 64-bit µs free-running reference; Engine.cpp computes a wrap-safe `dt` from it and the scattered `os::ticks()` sites moved onto it (modulator `dt`, MidiOutputEngine, CvGateToMidiConverter, TeletypeBridge). The modulator Hz mode is its first consumer. **(A) PhaseFlux + Stochastic onto `tickPosition()` — NOT done:** both still re-derive phase from discrete integer tick while six other engines read the continuous `Clock::tickPosition()`. ER-101 ref `OTHERS/ortagonal/er-101/wallclock.h`.
+**Next action:** Item A — PhaseFlux + Stochastic read `Clock::tickPosition()`; verify timing parity. (Also confirm whether the ER-101 slave-period outlier guard landed with B or is still open.)
 **Depends on:** nothing. Overlaps performer-improvements Phase 0 (slave-clock filter — same fix, this is its proper home).
 **Branch:** TBD
 **Reference:** `docs/plans/2026-05-29-wallclock-time-architecture-design.md` (validated design). ER-101 source at `OTHERS/ortagonal/er-101/` (`wallclock.h`, `res-er-clock.md`).
