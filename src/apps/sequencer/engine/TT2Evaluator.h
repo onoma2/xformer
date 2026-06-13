@@ -395,6 +395,7 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                         if (lastResult.error != TT2EvalError::None) {
                             return lastResult;
                         }
+                        if (tt2ActiveBreaking(runtime)) break; // BREAK
                         tt2ActiveI(runtime) += step;
                     }
                 } else {
@@ -404,12 +405,17 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                         if (lastResult.error != TT2EvalError::None) {
                             return lastResult;
                         }
+                        if (tt2ActiveBreaking(runtime)) break; // BREAK
                         tt2ActiveI(runtime) += step;
                     }
                 }
-                // Back off the final post-loop increment; leave I at
-                // the last in-range value, matching Teletype behavior.
-                tt2ActiveI(runtime) -= step;
+                // On normal completion back off the final post-loop increment
+                // (leaving I at the last in-range value). On BREAK, I already
+                // holds the break value — don't back off. Then clear the flag.
+                if (!tt2ActiveBreaking(runtime)) {
+                    tt2ActiveI(runtime) -= step;
+                }
+                tt2ActiveBreaking(runtime) = 0;
 
                 // L consumed all remaining segments; return directly.
                 return lastResult;

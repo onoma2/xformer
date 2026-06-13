@@ -206,6 +206,23 @@ static void opDelClr(TT2Runtime &runtime, TT2OutputState &,
     tt2DelayClear(runtime);
 }
 
+// BREAK / BRK — flag the active exec frame so the enclosing L loop stops.
+static void opBreak(TT2Runtime &runtime, TT2OutputState &,
+                    const TeletypeProgram *, int16_t *,
+                    uint8_t &, bool, TT2EvalError &) {
+    tt2ActiveBreaking(runtime) = 1;
+}
+
+// KILL — clear the stack, disable the metro, and clear the delay queue
+// (upstream op_KILL_get; TT2 has no TR pulse timers to also flush).
+static void opKill(TT2Runtime &runtime, TT2OutputState &,
+                   const TeletypeProgram *, int16_t *,
+                   uint8_t &, bool, TT2EvalError &) {
+    runtime.stack.top = 0;
+    runtime.variables.m_act = 0;
+    tt2DelayClear(runtime);
+}
+
 // ---------------------------------------------------------------------------
 // Native op table
 // ---------------------------------------------------------------------------
@@ -229,6 +246,9 @@ namespace {
             table[E_OP_M_ACT]    = opMAct;
             table[E_OP_SCRIPT]   = opScript;
             table[E_OP_DEL_CLR]  = opDelClr;
+            table[E_OP_BREAK]    = opBreak;
+            table[E_OP_BRK]      = opBreak;
+            table[E_OP_KILL]     = opKill;
         }
     };
     OpTableBuilder opTableBuilder;

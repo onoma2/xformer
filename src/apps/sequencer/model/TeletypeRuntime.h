@@ -290,6 +290,13 @@ inline uint8_t &tt2ActiveIfElse(TT2Runtime &runtime) {
                                ? runtime.exec.depth - 1 : 0].if_else_condition;
 }
 
+// BREAK flag on the active exec frame — set by BREAK/BRK, checked + reset by
+// the L loop (upstream es_variables->breaking).
+inline uint8_t &tt2ActiveBreaking(TT2Runtime &runtime) {
+    return runtime.exec.frames[runtime.exec.depth > 0
+                               ? runtime.exec.depth - 1 : 0].breaking;
+}
+
 // Delay queue — faithful to upstream Teletype: parallel-slot model with a
 // time==0 empty sentinel, delay clamped to >= 1 ms, caller context (script /
 // I / fparams) snapshotted for restore at fire time. tt2DelayAdd returns
