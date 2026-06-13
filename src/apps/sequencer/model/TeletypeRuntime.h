@@ -282,6 +282,14 @@ inline uint8_t &tt2ActiveLineNumber(TT2Runtime &runtime) {
                                ? runtime.exec.depth - 1 : 0].line_number;
 }
 
+// IF/ELIF/ELSE chain flag — lives on the exec frame (like upstream
+// es_variables->if_else_condition) so it persists across script lines, not
+// just across segments of one command. Only IF resets it.
+inline uint8_t &tt2ActiveIfElse(TT2Runtime &runtime) {
+    return runtime.exec.frames[runtime.exec.depth > 0
+                               ? runtime.exec.depth - 1 : 0].if_else_condition;
+}
+
 // Delay queue — faithful to upstream Teletype: parallel-slot model with a
 // time==0 empty sentinel, delay clamped to >= 1 ms, caller context (script /
 // I / fparams) snapshotted for restore at fire time. tt2DelayAdd returns

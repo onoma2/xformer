@@ -581,7 +581,8 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
         expectEqual(runtime.variables.b, int16_t(2), "B unchanged");
     }
 
-    CASE("orphan_else_fails") {
+    CASE("bare_else_runs") {
+        // Upstream: a standalone ELSE with the flag false (frame default) runs.
         TeletypeProgram program = {};
         init(program);
         writeLine(program.scripts[0], 0, "ELSE: A 10");
@@ -593,12 +594,12 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
         init(output);
 
         auto result = runScript(program, runtime, output, 0);
-        expectEqual(int(result.error), int(TT2EvalError::OrphanElse),
-                    "orphan ELSE rejected");
-        expectEqual(runtime.variables.a, int16_t(1), "A unchanged");
+        expectEqual(int(result.error), int(TT2EvalError::None), "no orphan error");
+        expectEqual(runtime.variables.a, int16_t(10), "bare ELSE runs");
     }
 
-    CASE("orphan_elif_fails") {
+    CASE("bare_elif_runs_when_cond") {
+        // Upstream: a standalone ELIF with flag false + cond true runs.
         TeletypeProgram program = {};
         init(program);
         writeLine(program.scripts[0], 0, "ELIF 1: A 10");
@@ -610,12 +611,13 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
         init(output);
 
         auto result = runScript(program, runtime, output, 0);
-        expectEqual(int(result.error), int(TT2EvalError::OrphanElif),
-                    "orphan ELIF rejected");
-        expectEqual(runtime.variables.a, int16_t(1), "A unchanged");
+        expectEqual(int(result.error), int(TT2EvalError::None), "no orphan error");
+        expectEqual(runtime.variables.a, int16_t(10), "bare ELIF runs");
     }
 
-    CASE("duplicate_else_fails") {
+    CASE("second_else_skipped") {
+        // Upstream: first ELSE runs (flag false), sets flag; second ELSE is
+        // skipped. No duplicate-error.
         TeletypeProgram program = {};
         init(program);
         writeLine(program.scripts[0], 0, "IF 0: A 10; ELSE: A 20; ELSE: A 30");
@@ -627,9 +629,8 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
         init(output);
 
         auto result = runScript(program, runtime, output, 0);
-        expectEqual(int(result.error), int(TT2EvalError::DuplicateElse),
-                    "duplicate ELSE rejected");
-        expectEqual(runtime.variables.a, int16_t(20), "first ELSE executed");
+        expectEqual(int(result.error), int(TT2EvalError::None), "no duplicate error");
+        expectEqual(runtime.variables.a, int16_t(20), "first ELSE runs, second skipped");
     }
 
     CASE("prob_100_runs") {
@@ -767,9 +768,9 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
         expectEqual(runtime.variables.a, int16_t(1), "A unchanged");
     }
 
-    CASE("prob_skipped_allows_else") {
-        // PROB participates in conditional chains.
-        // A skipped PROB leaves the chain Pending, so ELSE can run.
+    CASE("prob_does_not_touch_chain_else_still_runs") {
+        // PROB is standalone — it never sets the IF/ELSE flag. With no prior
+        // IF the flag is false, so ELSE runs regardless of the PROB roll.
         TeletypeProgram program = {};
         init(program);
         writeLine(program.scripts[0], 0, "PROB 0: A 10; ELSE: A 20");
@@ -782,11 +783,12 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
 
         auto result = runScript(program, runtime, output, 0);
         expectEqual(int(result.error), int(TT2EvalError::None), "ok");
-        expectEqual(runtime.variables.a, int16_t(20), "ELSE executed after PROB 0");
+        expectEqual(runtime.variables.a, int16_t(20), "ELSE runs (PROB doesn't set flag)");
     }
 
-    CASE("prob_in_if_chain_blocks_else") {
-        // IF sets Pending; PROB executes and sets Taken; ELSE is skipped.
+    CASE("prob_runs_but_else_also_runs_after_if_false") {
+        // IF 0 leaves flag false; PROB 100 runs its body (standalone); ELSE
+        // then runs too because the flag is still false. Both bodies execute.
         TeletypeProgram program = {};
         init(program);
         writeLine(program.scripts[0], 0, "IF 0: ; PROB 100: A 10; ELSE: A 20");
@@ -799,11 +801,12 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
 
         auto result = runScript(program, runtime, output, 0);
         expectEqual(int(result.error), int(TT2EvalError::None), "ok");
-        expectEqual(runtime.variables.a, int16_t(10), "PROB executed");
+        // PROB ran A=10, then ELSE (flag still false) ran A=20.
+        expectEqual(runtime.variables.a, int16_t(20), "PROB body then ELSE both run");
     }
 
-    CASE("prob_skipped_when_prior_if_taken") {
-        // IF sets Taken; PROB sees Taken and skips its body.
+    CASE("prob_runs_even_after_if_taken") {
+        // PROB ignores the chain: IF 1 takes (sets flag), PROB 100 still runs.
         TeletypeProgram program = {};
         init(program);
         writeLine(program.scripts[0], 0, "IF 1: ; PROB 100: A 10");
@@ -816,7 +819,43 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
 
         auto result = runScript(program, runtime, output, 0);
         expectEqual(int(result.error), int(TT2EvalError::None), "ok");
-        expectEqual(runtime.variables.a, int16_t(1), "PROB skipped because IF was taken");
+        expectEqual(runtime.variables.a, int16_t(10), "PROB runs regardless of IF");
+    }
+
+    CASE("multiline_if_else_persists_across_lines") {
+        // The core fix: IF on one line, ELSE on the next — the chain flag lives
+        // on the exec frame, so the ELSE line sees the prior IF.
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "IF 0: A 10");
+        writeLine(program.scripts[0], 1, "ELSE: A 20");
+        program.scripts[0].length = 2;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(20), "multi-line ELSE runs after IF 0");
+    }
+
+    CASE("multiline_if_true_skips_else_line") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "IF 1: A 10");
+        writeLine(program.scripts[0], 1, "ELSE: A 20");
+        program.scripts[0].length = 2;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(10), "multi-line ELSE skipped after IF 1");
     }
 
 

@@ -208,15 +208,9 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
     segEnd[segCount] = cmd.length;
     segCount++;
 
-    enum class ChainState : uint8_t {
-        None,     // not inside a conditional chain
-        Pending,  // inside chain, no branch taken yet
-        Taken,    // a branch was already executed
-        ElseSeen, // ELSE encountered (branch executed or skipped)
-    };
-
+    // The IF/ELIF/ELSE chain flag lives on the exec frame (tt2ActiveIfElse),
+    // so it persists across script lines exactly like upstream Teletype.
     TT2EvalResult lastResult = {TT2EvalError::None, 0, 0, 0};
-    ChainState chainState = ChainState::None;
 
     for (uint8_t seg = 0; seg < segCount; ++seg) {
         uint8_t s = segStart[seg];
@@ -244,10 +238,8 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
             int16_t modValue = cmd.value[s];
 
             if (modValue == E_MOD_IF) {
-                // IF always starts a fresh conditional chain.
-                chainState = ChainState::None;
-
-                // Evaluate prefix expression (skip the MOD token itself).
+                // IF cond: body — reset the chain flag, then set it + run the
+                // body if cond is non-zero. (upstream mod_IF_func)
                 auto prefix = evaluateModPrefix(cmd, s + 1, preSepPos,
                                               runtime, output, program);
                 if (prefix.error != TT2EvalError::None) {
@@ -256,27 +248,20 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 if (prefix.stackSize != 1) {
                     return {TT2EvalError::InvalidModArity, 0, 0, 0};
                 }
-
+                tt2ActiveIfElse(runtime) = 0;
                 if (prefix.value != 0) {
+                    tt2ActiveIfElse(runtime) = 1;
                     lastResult = evaluateSegment(cmd, preSepPos + 1, e,
                                                  runtime, output, program);
                     if (lastResult.error != TT2EvalError::None) {
                         return lastResult;
                     }
-                    chainState = ChainState::Taken;
-                } else {
-                    chainState = ChainState::Pending;
                 }
             } else if (modValue == E_MOD_ELIF) {
-                if (chainState == ChainState::None) {
-                    return {TT2EvalError::OrphanElif, 0, 0, 0};
-                }
-                if (chainState == ChainState::Taken ||
-                    chainState == ChainState::ElseSeen) {
-                    // A prior branch was already selected; skip this one.
-                    continue;
-                }
-                // chainState == Pending
+                // ELIF cond: body — prefix is ALWAYS evaluated (upstream pops
+                // unconditionally); body runs only if the chain isn't taken yet
+                // and cond is non-zero. No orphan error — a bare ELIF with the
+                // flag false (default) just runs. (upstream mod_ELIF_func)
                 auto prefix = evaluateModPrefix(cmd, s + 1, preSepPos,
                                               runtime, output, program);
                 if (prefix.error != TT2EvalError::None) {
@@ -285,42 +270,28 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 if (prefix.stackSize != 1) {
                     return {TT2EvalError::InvalidModArity, 0, 0, 0};
                 }
-
-                if (prefix.value != 0) {
+                if (!tt2ActiveIfElse(runtime) && prefix.value != 0) {
+                    tt2ActiveIfElse(runtime) = 1;
                     lastResult = evaluateSegment(cmd, preSepPos + 1, e,
                                                  runtime, output, program);
                     if (lastResult.error != TT2EvalError::None) {
                         return lastResult;
                     }
-                    chainState = ChainState::Taken;
                 }
-                // else remain Pending
             } else if (modValue == E_MOD_ELSE) {
-                if (chainState == ChainState::None) {
-                    return {TT2EvalError::OrphanElse, 0, 0, 0};
+                // ELSE: body — run the body if the chain isn't taken yet (no
+                // prefix). No orphan/duplicate error. (upstream mod_ELSE_func)
+                if (!tt2ActiveIfElse(runtime)) {
+                    tt2ActiveIfElse(runtime) = 1;
+                    lastResult = evaluateSegment(cmd, preSepPos + 1, e,
+                                                 runtime, output, program);
+                    if (lastResult.error != TT2EvalError::None) {
+                        return lastResult;
+                    }
                 }
-                if (chainState == ChainState::ElseSeen) {
-                    return {TT2EvalError::DuplicateElse, 0, 0, 0};
-                }
-                if (chainState == ChainState::Taken) {
-                    chainState = ChainState::ElseSeen;
-                    continue;
-                }
-                // chainState == Pending
-                lastResult = evaluateSegment(cmd, preSepPos + 1, e,
-                                             runtime, output, program);
-                if (lastResult.error != TT2EvalError::None) {
-                    return lastResult;
-                }
-                chainState = ChainState::ElseSeen;
             } else if (modValue == E_MOD_PROB) {
-                // PROB participates in conditional chains like IF/ELIF.
-                if (chainState == ChainState::Taken ||
-                    chainState == ChainState::ElseSeen) {
-                    continue;
-                }
-
-                // PROB n: body  —  execute body with probability n%.
+                // PROB n: body — standalone probability, NOT part of the IF/ELSE
+                // chain (upstream mod_PROB_func never touches if_else_condition).
                 auto prefix = evaluateModPrefix(cmd, s + 1, preSepPos,
                                               runtime, output, program);
                 if (prefix.error != TT2EvalError::None) {
@@ -329,7 +300,6 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 if (prefix.stackSize != 1) {
                     return {TT2EvalError::InvalidModArity, 0, 0, 0};
                 }
-
                 int16_t pct = prefix.value;
                 bool executeBody = false;
                 if (pct >= 100) {
@@ -339,17 +309,12 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                                                 TT2RngSlot::Prob, 100);
                     executeBody = (roll < static_cast<uint32_t>(pct));
                 }
-                // pct <= 0: executeBody stays false
-
                 if (executeBody) {
                     lastResult = evaluateSegment(cmd, preSepPos + 1, e,
                                                  runtime, output, program);
                     if (lastResult.error != TT2EvalError::None) {
                         return lastResult;
                     }
-                    chainState = ChainState::Taken;
-                } else {
-                    chainState = ChainState::Pending;
                 }
             } else if (modValue == E_MOD_EVERY || modValue == E_MOD_EV ||
                        modValue == E_MOD_SKIP) {
@@ -516,10 +481,8 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 return {TT2EvalError::UnsupportedMod, 0, 0, 0};
             }
         } else {
-            // No PRE_SEP: plain segment ends any active conditional chain.
-            if (chainState != ChainState::None) {
-                chainState = ChainState::None;
-            }
+            // No PRE_SEP: plain segment. Does NOT reset the IF/ELSE chain —
+            // upstream only IF resets if_else_condition.
             lastResult = evaluateSegment(cmd, s, e, runtime, output, program);
             if (lastResult.error != TT2EvalError::None) {
                 return lastResult;
