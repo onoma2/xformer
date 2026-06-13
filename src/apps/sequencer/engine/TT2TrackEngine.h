@@ -62,8 +62,9 @@ public:
     // Drives the ms delay queue and the metro, accumulating sub-millisecond
     // remainder so slow refreshes still advance time accurately.
     virtual void update(float dt) override {
-        // Sample trigger inputs every refresh (gate edges are async, not clocked).
+        // Sample trigger inputs + CV-mapped inputs every refresh (async, not clocked).
         updateInputTriggers();
+        sampleInputs();
         if (dt <= 0.f) {
             return;
         }
@@ -120,11 +121,20 @@ public:
         return raw / 16383.f * 10.f - 5.f;
     }
 
+    // Inverse: clamp -5V..+5V into raw 0..16383.
+    static int16_t voltsToRaw(float volts) {
+        if (volts < -5.f) volts = -5.f;
+        if (volts > 5.f) volts = 5.f;
+        return int16_t((volts + 5.f) / 10.f * 16383.f + 0.5f);
+    }
+
 private:
     // Defined in TT2TrackEngine.cpp (needs the full Engine definition to read
     // cvInput/gateOutput/trackEngine).
     void updateInputTriggers();
+    void sampleInputs();
     bool inputState(uint8_t index) const;
+    float cvSourceVolts(TT2CvInputSource source) const;
 
     TT2Track &_tt2Track;
     TT2OutputState _output;
