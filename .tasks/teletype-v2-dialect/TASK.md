@@ -119,15 +119,14 @@ Phase 2 sandbox/smoke complete through narrow native SCRIPT calls. Cleanup done.
 
 Next semantic step is narrow delay scheduling.
 
-## Known faithfulness bugs (audit 2026-06-13) — violate "identical behaviour"
+## Audit (2026-06-13) — faithfulness bugs FIXED
 
-Found by an independent 3-agent audit. The DEL ones are FIXED (`6b9261e5`); the IF/ELSE + PROB ones are **pre-existing** (predate the wiring session) and NOT yet fixed:
+Independent 3-agent audit. Architecture verdict: faithful (no bridge/scene_state/heap; parse→lower→run). Kept-op behaviour bugs all now fixed:
 
-- **IF/ELIF/ELSE chain is per-line-local, not exec-frame-persistent** (HIGH — breaks the most common Teletype idiom). `TT2Evaluator.h` declares `ChainState chainState` local in `evaluateCommand`; `runScript` calls it once per line, so a standalone `ELSE:` / `ELIF:` line can't see the prior `IF`. Upstream keeps the chain on `es_variables(es)->if_else_condition` (the exec frame), persisting across lines. The TT2 exec frame even carries an unused `if_else_condition` field for exactly this. **Fix:** chain bool on the exec frame; IF resets it then sets-on-true; ELIF/ELSE run only if not-taken; **no orphan/duplicate errors** (upstream a bare ELSE just runs); a **plain segment must NOT reset the chain** (current line ~520 does — only IF resets, per `controlflow.c:132-163`).
-- **PROB is wrongly coupled into the IF/ELSE chain** (MEDIUM). `mod_PROB_func` upstream (`controlflow.c:123-130`) is standalone — never touches `if_else_condition`. TT2 makes PROB read/write the chain (skips after a taken branch, sets Taken/Pending). **Fix:** decouple — PROB just rolls and runs its body.
-- **Tests encode the wrong behaviour:** `TestTeletypeV2ScriptRunner` asserts `OrphanElse`/`OrphanElif`/`DuplicateElse` + PROB-chain interaction — these must change to upstream behaviour, plus add multi-line IF/ELSE persistence tests.
+- **DEL.X arg order (count/interval swap), DEL.X/.R/.B operand `<1→1` clamp, smoke-test build regression** — `6b9261e5`.
+- **IF/ELIF/ELSE chain → exec frame + standalone PROB** — `2290512b`. Chain flag now on `tt2ActiveIfElse` (exec frame), so standalone `ELSE:`/`ELIF:` lines see the prior IF (multi-line idiom restored). IF resets + sets-on-true; ELIF always evaluates prefix, body gated; ELSE runs if not-taken; no orphan/duplicate errors; only IF resets the flag. PROB decoupled (standalone roll). Mirrors `controlflow.c` exactly; tests updated to upstream behaviour + multi-line cases added.
 
-**FIXED (DEL):** DEL.X arg order (count/interval swap), DEL.X/.R/.B operand `<1→1` clamp, smoke-test build regression — all `6b9261e5`.
+Remaining audit notes (lower severity, not yet done): `bootEnabled` ignored (boot script always runs on first tick); delay depth 8 vs upstream 64; `loadScriptText` mis-splits >127-char lines; engine `reset()` doesn't flush pending delays.
 
 **Governing contract (reaffirmed 2026-06-13): TT2 = the Teletype language, BEHAVIOUR-IDENTICAL.** Only the architecture changes (native runtime, no bridge, 8 outputs, hardware ops dropped). Every kept op's semantics must match upstream exactly — no native shortcuts. (Already in `docs/teletype_v2.md`: "preserve core Teletype syntax and behavior", "don't rename core ops".)
 
