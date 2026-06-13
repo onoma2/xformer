@@ -400,12 +400,13 @@ public:
 
     // globalPhase — fraction [0, 1] of cycle to shift the read phase by.
     // CurveTrack precedent (model/CurveTrack.h:201). Stored as plain float.
-    float globalPhase() const { return _globalPhase; }
+    float globalPhase() const { return Routing::routedValue(ParamKey::Phase, _trackIndex, _globalPhase, 0.f, 1.f); }
     void setGlobalPhase(float v) { _globalPhase = clamp(v, 0.f, 1.f); }
     void editGlobalPhase(int value, bool shift) {
-        setGlobalPhase(globalPhase() + value * (shift ? 0.1f : 0.01f));
+        setGlobalPhase(_globalPhase + value * (shift ? 0.1f : 0.01f));
     }
     void printGlobalPhase(StringBuilder &str) const {
+        printRouted(str, Routing::Target::Phase);
         str("%.2f", globalPhase());
     }
 

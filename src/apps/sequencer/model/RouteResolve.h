@@ -52,6 +52,7 @@ namespace RouteResolve {
         case Routing::Target::RootNote:                  return ParamKey::RootNote;
         case Routing::Target::Divisor:                   return ParamKey::Divisor;
         case Routing::Target::ClockMult:                 return ParamKey::ClockMultiplier;
+        case Routing::Target::Phase:                     return ParamKey::Phase;
         case Routing::Target::Run:                       return ParamKey::Run;
         case Routing::Target::Reset:                     return ParamKey::Reset;
         case Routing::Target::CvOutputRotate:            return ParamKey::CvOutputRotate;

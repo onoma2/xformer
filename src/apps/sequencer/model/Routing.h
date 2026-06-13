@@ -79,6 +79,7 @@ public:
         RunMode,
         Divisor,
         ClockMult,
+        Phase,          // Curve/PhaseFlux globalPhase (shared ParamKey::Phase, 0..1)
         Scale,
         RootNote,
         SequenceLast = RootNote,
@@ -206,6 +207,7 @@ public:
         case Target::RunMode:                   return "Run Mode";
         case Target::Divisor:                   return "Divisor";
         case Target::ClockMult:                return "Clock Mult";
+        case Target::Phase:                     return "Phase";
         case Target::Scale:                     return "Scale";
         case Target::RootNote:                  return "Root Note";
 
@@ -290,6 +292,7 @@ public:
         case Target::FirstStep:                 return 15;
         case Target::LastStep:                  return 16;
         case Target::ClockMult:                 return 56;
+        case Target::Phase:                     return 85;
 
         case Target::Mute:                      return 17;
         case Target::Fill:                      return 18;

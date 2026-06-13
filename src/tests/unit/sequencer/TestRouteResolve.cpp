@@ -1,6 +1,7 @@
 #include "UnitTest.h"
 
 #include "apps/sequencer/model/RouteResolve.h"
+#include "apps/sequencer/model/RouteBrowse.h"
 #include "apps/sequencer/model/RouteParamKey.h"
 #include "apps/sequencer/model/RouteApply.h"
 #include "apps/sequencer/model/RouteShaper.h"
@@ -99,6 +100,16 @@ CASE("Curve migrates its sequence-level and track-level Target-backed params") {
 
     // A target with no row in the Curve table -> not migrated for Curve.
     expectFalse(RouteResolve::overrideParam(Mode::Curve, Routing::Target::IndexedA, key, range), "IndexedA not Curve");
+}
+
+CASE("Phase routes for both Curve and PhaseFlux (globalPhase, shared key)") {
+    uint8_t key = 0; RouteParam::Range range{};
+    for (auto mode : { Mode::Curve, Mode::PhaseFlux }) {
+        expectTrue(RouteResolve::overrideParam(mode, Routing::Target::Phase, key, range), "Phase migrated");
+        expectEqual(int(key), int(ParamKey::Phase), "Phase key");
+        expectTrue(near(range.min, 0.f) && near(range.max, 1.f), "Phase range 0..1");
+    }
+    expectEqual(int(RouteBrowse::paramKeyToTarget(ParamKey::Phase)), int(Routing::Target::Phase), "Phase reverse-resolves");
 }
 
 CASE("modes not wired into overrideParam() stay on the old path") {

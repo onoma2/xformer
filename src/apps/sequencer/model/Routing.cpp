@@ -375,6 +375,7 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     [int(Routing::Target::RunMode)]                         = { 0,      5,      0,      5,      1       },
     [int(Routing::Target::Divisor)]                         = { 1,      768,    6,      24,     1       },
     [int(Routing::Target::ClockMult)]                       = { 50,     150,    50,     150,    10      },
+    [int(Routing::Target::Phase)]                           = { 0,      1,      0,      1,      1       },
     [int(Routing::Target::Scale)]                           = { 0,      23,     0,      23,     1       },
     [int(Routing::Target::RootNote)]                        = { 0,      11,     0,      11,     1       },
     // Tuesday targets
@@ -561,6 +562,9 @@ void Routing::printTargetValue(Routing::Target target, float normalized, StringB
         break;
     case Target::DiscreteMapScanner:
         str("%.1f", value);
+        break;
+    case Target::Phase:
+        str("%.2f", value);
         break;
     case Target::DiscreteMapSync:
         str(intValue ? "on" : "off");

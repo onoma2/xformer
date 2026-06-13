@@ -189,16 +189,17 @@ public:
 
     // globalPhase
 
-    float globalPhase() const { return _globalPhase; }
+    float globalPhase() const { return Routing::routedValue(ParamKey::Phase, _trackIndex, _globalPhase, 0.f, 1.f); }
     void setGlobalPhase(float globalPhase) {
         _globalPhase = clamp(globalPhase, 0.f, 1.f);
     }
 
     void editGlobalPhase(float value, bool shift) {
-        setGlobalPhase(globalPhase() + value * (shift ? 0.1f : 0.01f));
+        setGlobalPhase(_globalPhase + value * (shift ? 0.1f : 0.01f));
     }
 
     void printGlobalPhase(StringBuilder &str) const {
+        printRouted(str, Routing::Target::Phase);
         str("%.2f", globalPhase());
     }
 
