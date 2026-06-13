@@ -207,6 +207,15 @@ int PhaseFluxMath::computeCumulativeTicks(
     return cycleTicks;
 }
 
+int PhaseFluxMath::transferLength(int &a, int &b, int delta, int minLen, int maxLen) {
+    int minDelta = std::max(minLen - a, b - maxLen);
+    int maxDelta = std::min(maxLen - a, b - minLen);
+    int d = std::max(minDelta, std::min(delta, maxDelta));
+    a += d;
+    b -= d;
+    return d;
+}
+
 bool PhaseFluxMath::deriveTickPosition(
     const std::array<uint8_t, kStageCount> &traversal,
     uint32_t relativeTick,

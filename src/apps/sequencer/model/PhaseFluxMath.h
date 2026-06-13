@@ -94,6 +94,13 @@ public:
         bool fixedCycleLength = false);
 
     /**
+     * Length transfer — move `delta` units of length from stage a to b,
+     * conserving a+b. Clamps so both stay in [minLen, maxLen]. Returns the
+     * applied (clamped) delta. Mirrors the Indexed DUR-TR gesture.
+     */
+    static int transferLength(int &a, int &b, int delta, int minLen, int maxLen);
+
+    /**
      * §3.2 — Derive slot/cell/phase for a relativeTick. Returns false on idle
      * (cycleTicks == 0); outputs untouched in that case.
      */

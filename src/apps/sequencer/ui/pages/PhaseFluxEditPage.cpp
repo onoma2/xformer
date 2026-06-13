@@ -226,6 +226,10 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
             ? seqForHeader.noteAccumConfig() : seqForHeader.pulseAccumConfig();
         footer[1] = (cfg.scope() == AccumulatorConfig::Scope::Track) ? "M:Seq" : "M:Sta";
     }
+    // TEMP P1 Len slot armed for transfer — flag it in the footer.
+    if (_currentSet == 0 && _topicPage == 1 && _lengthTransfer) {
+        footer[0] = "Len-TR";
+    }
     WindowPainter::drawFooter(canvas, footer, pageKeyState(), _selectedSlot);
 
     // ACCUM owns the full content area — 1x16 row + pancakes + glyphs.
@@ -351,6 +355,7 @@ void PhaseFluxEditPage::keyPress(KeyPressEvent &event) {
         _currentSet = (_currentSet + kSetCount - 1) % kSetCount;
         _topicPage = 0;
         _selectedSlot = 0;
+        _lengthTransfer = false;
         event.consume();
         return;
     }
@@ -358,6 +363,7 @@ void PhaseFluxEditPage::keyPress(KeyPressEvent &event) {
         _currentSet = (_currentSet + 1) % kSetCount;
         _topicPage = 0;
         _selectedSlot = 0;
+        _lengthTransfer = false;
         event.consume();
         return;
     }
@@ -378,6 +384,7 @@ void PhaseFluxEditPage::keyPress(KeyPressEvent &event) {
             const int pageCount = hasThreePages ? 3 : 2;
             _topicPage = (_topicPage + 1) % pageCount;
             _selectedSlot = 0;
+            _lengthTransfer = false;
             event.consume();
             return;
         }
@@ -405,7 +412,15 @@ void PhaseFluxEditPage::keyPress(KeyPressEvent &event) {
         if (isToggle) {
             togglePressSlot(slot);
         } else {
-            _selectedSlot = slot;
+            // TEMP P1 Len slot: double-press arms Σ-conserving length transfer
+            // (Indexed DUR-TR; firmware has no long-press, double-press instead).
+            const bool isLenSlot = (_currentSet == 0 && _topicPage == 1 && slot == 0);
+            if (isLenSlot && _selectedSlot == 0 && event.count() == 2) {
+                _lengthTransfer = !_lengthTransfer;
+            } else {
+                if (!isLenSlot) _lengthTransfer = false;
+                _selectedSlot = slot;
+            }
         }
         event.consume();
         return;
@@ -499,7 +514,19 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
             }
         } else if (_topicPage == 1) {
             switch (slot) {
-            case 0: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setLength(ModelUtils::adjusted(s.length(), value, 1, 127)); }); break;
+            case 0:
+                if (_lengthTransfer) {
+                    int idx = _selectedCell;
+                    int nextIdx = (idx + 1) % PhaseFluxSequence::StageCount;
+                    int a = seq.stage(idx).length();
+                    int b = seq.stage(nextIdx).length();
+                    PhaseFluxMath::transferLength(a, b, value, 1, 127);
+                    seq.stage(idx).setLength(a);
+                    seq.stage(nextIdx).setLength(b);
+                } else {
+                    forEachCell([&](PhaseFluxSequence::Stage &s) { s.setLength(ModelUtils::adjusted(s.length(), value, 1, 127)); });
+                }
+                break;
             // slots 1, 2 are FlipV / FlipH toggles (press-only)
             case 3: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setMask(PhaseFluxSequence::MaskType(cycle(int(s.mask()) + value, 0, 7))); }); break;
             }
@@ -1700,7 +1727,7 @@ void PhaseFluxEditPage::drawParamList(Canvas &canvas) {
             labels[2] = "Resp";  values[2]("%+d", activeStage.temporalResponse());
             labels[3] = "Puls";  values[3]("%d",  activeStage.pulseCount());
         } else if (_topicPage == 1) {
-            labels[0] = "Len";   values[0]("%d", activeStage.length());
+            labels[0] = _lengthTransfer ? "Len-TR" : "Len"; values[0]("%d", activeStage.length());
             labels[1] = "FlipV"; values[1]("%s", activeStage.temporalFlipV() ? "On" : "Off");
             labels[2] = "FlipH"; values[2]("%s", activeStage.temporalFlipH() ? "On" : "Off");
             labels[3] = "Mask";  values[3]("%s", kMask[clamp(int(activeStage.mask()), 0, 7)]);
