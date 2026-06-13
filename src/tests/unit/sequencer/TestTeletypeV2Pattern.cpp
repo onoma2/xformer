@@ -102,4 +102,52 @@ UNIT_TEST("TeletypeV2Pattern") {
         expectEqual(f.pat(0).val[1], int16_t(88), "P.HERE set writes at idx 1");
         expectEqual(f.pat(0).idx, int16_t(1), "P.HERE does not advance idx");
     }
+
+    CASE("bounds_wrap_start_end") {
+        Fixture f;
+        f.run("P.WRAP 1");
+        expectEqual(int(f.pat(0).wrap), 1, "P.WRAP set 1");
+        f.run("P.WRAP 0");
+        expectEqual(int(f.pat(0).wrap), 0, "P.WRAP set 0");
+        f.seed(0, {1, 2, 3, 4}, 4);
+        f.run("P.START 1");
+        expectEqual(f.pat(0).start, int16_t(1), "P.START set 1");
+        f.run("P.END 3");
+        expectEqual(f.pat(0).end, int16_t(3), "P.END set 3");
+        expectEqual(f.run("P.START").value, int16_t(1), "P.START reads 1");
+        expectEqual(f.run("P.END").value, int16_t(3), "P.END reads 3");
+    }
+
+    CASE("next_wraps_within_bounds") {
+        Fixture f;
+        f.seed(0, {10, 11, 12, 13}, 4);
+        f.run("P.START 1");
+        f.run("P.END 3");
+        f.run("P.WRAP 1");
+        f.run("P.I 3");           // at end
+        expectEqual(f.run("P.NEXT").value, int16_t(11), "NEXT from end wraps to start (idx1=11)");
+        expectEqual(f.pat(0).idx, int16_t(1), "idx wrapped to start");
+        expectEqual(f.run("P.NEXT").value, int16_t(12), "NEXT advances to idx2");
+    }
+
+    CASE("next_no_wrap_holds_at_end") {
+        Fixture f;
+        f.seed(0, {10, 11, 12, 13}, 4);
+        f.run("P.END 3");
+        f.run("P.WRAP 0");
+        f.run("P.I 3");
+        f.run("P.NEXT");
+        expectEqual(f.pat(0).idx, int16_t(3), "no-wrap NEXT holds at end");
+    }
+
+    CASE("prev_wraps") {
+        Fixture f;
+        f.seed(0, {10, 11, 12, 13}, 4);
+        f.run("P.START 0");
+        f.run("P.END 3");
+        f.run("P.WRAP 1");
+        f.run("P.I 0");
+        expectEqual(f.run("P.PREV").value, int16_t(13), "PREV from start wraps to end (idx3=13)");
+        expectEqual(f.pat(0).idx, int16_t(3), "idx wrapped to end");
+    }
 }
