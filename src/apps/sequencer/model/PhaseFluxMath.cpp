@@ -39,21 +39,6 @@ static const char *kTraversalPatternNames[PhaseFluxMath::kTraversalPatternCount]
     "Snake", "Rows", "SnakeUp", "Cols", "ColSnake", "Spiral", "Inward", "Diag",
 };
 
-// Per-stage divisor as a fraction (num/den) multiplied against the sequence
-// divisor — Stochastic's `kStochasticDurationLut` pattern. At the NoteTrack
-// reference seqDivisor=12, slot labels match their musical name; change
-// seqDivisor and every cell scales uniformly. Slot 6 (Bar) is the default.
-static const PhaseFluxMath::StageDivisorFraction kStageDivisorFrac[8] = {
-    {  1, 1 },   // 0 Sixteenth — ×1     → 1/16 at seqDiv=12
-    {  4, 3 },   // 1 EighthT   — ×4/3   → 1/8T
-    {  2, 1 },   // 2 Eighth    — ×2     → 1/8
-    {  8, 3 },   // 3 QuarterT  — ×8/3   → 1/4T
-    {  4, 1 },   // 4 Quarter   — ×4     → 1/4
-    {  8, 1 },   // 5 Half      — ×8     → 1/2
-    { 16, 1 },   // 6 Bar       — ×16    → 1 bar  (DEFAULT)
-    { 32, 1 },   // 7 TwoBar    — ×32    → 2 bars
-};
-
 const std::array<uint8_t, PhaseFluxMath::kStageCount> &PhaseFluxMath::traversalOrder(int patternIdx) {
     if (patternIdx < 0) patternIdx = 0;
     if (patternIdx >= kTraversalPatternCount) patternIdx = kTraversalPatternCount - 1;
@@ -68,21 +53,6 @@ const char *PhaseFluxMath::traversalPatternName(int patternIdx) {
     if (patternIdx < 0) patternIdx = 0;
     if (patternIdx >= kTraversalPatternCount) patternIdx = kTraversalPatternCount - 1;
     return kTraversalPatternNames[patternIdx];
-}
-
-PhaseFluxMath::StageDivisorFraction PhaseFluxMath::stageDivisorFraction(PhaseFluxSequence::StageDivisorSlot slot) {
-    int idx = int(slot);
-    if (idx < 0) idx = 0;
-    if (idx > 7) idx = 7;
-    return kStageDivisorFrac[idx];
-}
-
-int PhaseFluxMath::stageDivisorTicks(PhaseFluxSequence::StageDivisorSlot slot) {
-    // Master-PPQN-192 ticks at the calibration point (seqDivisor=12).
-    // kReferenceSequenceDivisor (= 12 in sequencer-PPQN-48) × 4 (master/seq ratio)
-    // = 48 master ticks per ×1 multiplier. Multiply by the slot's fraction.
-    auto frac = stageDivisorFraction(slot);
-    return (48 * int(frac.num)) / int(frac.den);
 }
 
 float PhaseFluxMath::powerBend(float z, float p) {
@@ -189,8 +159,7 @@ void PhaseFluxMath::evalTemporalAlloc(int pulseIndex, int pulseCount, int R,
 
 int PhaseFluxMath::computeCumulativeTicks(
     const std::array<uint8_t, kStageCount> &traversal,
-    const int stageDivisorTicksArr[kStageCount],
-    const int stageLenArr[kStageCount],
+    const int lengthArr[kStageCount],
     const bool skip[kStageCount],
     int sequenceDivisor,
     int measureDivisor,
@@ -199,28 +168,20 @@ int PhaseFluxMath::computeCumulativeTicks(
     bool fixedCycleLength) {
 
     if (clockMultiplier <= 0) clockMultiplier = 100;
-    if (sequenceDivisor <= 0) sequenceDivisor = kReferenceSequenceDivisor;
+    if (sequenceDivisor <= 0) sequenceDivisor = 12;
+    // ticks per divisor unit at master resolution (one unit = the sequence divisor)
+    const int unitTicks = sequenceDivisor * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
 
     int durationTicks[kStageCount];
     cumulativeTicks[0] = 0;
     for (int i = 0; i < kStageCount; ++i) {
         int cell = int(traversal[i]);
-        // Fixed cycle: skipped stages still contribute their slot to the cycle
-        // (engine emits silence during the slot). Adaptive: skipped stages
-        // drop out, cycle shrinks.
-        int raw = (!fixedCycleLength && skip[cell]) ? 0 : stageDivisorTicksArr[cell];
-        // Sequence divisor scales the whole cycle uniformly. Stage slot table
-        // is calibrated at the 1/16 reference (= kReferenceSequenceDivisor);
-        // raw * (sequenceDivisor / reference) gives the per-stage tick count.
-        int scaledBySeq = (raw * sequenceDivisor) / kReferenceSequenceDivisor;
-        // Per-stage length multiplier: factor = (100 + stageLen) / 100.
-        // stageLen = -100 → factor 0; +100 → factor 2×. kMinCycleTicks floor
-        // stretches all-zero cycles proportionally.
-        // stageLen unipolar 0..127 mapped to factor 0..~2 via /64 (= Phaseque
-        // STEP_LEN pattern). Stored 64 = factor 1 = transparent.
-        int scaledByLen = (scaledBySeq * stageLenArr[cell]) / 64;
-        // Apply clockMultiplier: 100=identity, 50=×2 length, 150=×2/3 length.
-        int scaled = (scaledByLen * 100) / clockMultiplier;
+        // Fixed cycle: skipped stages still contribute their length to the cycle
+        // (engine emits silence). Adaptive: skipped stages drop out, cycle shrinks.
+        int len = (!fixedCycleLength && skip[cell]) ? 0 : lengthArr[cell];
+        // FLUX LENG: stage ticks = length × ticks-per-divisor-unit, then Rate
+        // (100=identity, 50=×2 length, 150=×2/3).
+        int scaled = (len * unitTicks * 100) / clockMultiplier;
         durationTicks[i] = scaled;
         cumulativeTicks[i + 1] = cumulativeTicks[i] + scaled;
     }

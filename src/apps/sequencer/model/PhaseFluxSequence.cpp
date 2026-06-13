@@ -71,9 +71,8 @@ void PhaseFluxSequence::Stage::clear() {
     setAccumulatorTrigger(AccumulatorTriggerType::Stage);
     setPulseAccumTrigger(AccumulatorTriggerType::Stage);
     setGateLength(50);
-    setStageDivisor(StageDivisorSlot::Quarter);
     setSkip(false);
-    setStageLen(64);   // 64 = ×1 transparent default; sequence runs unchanged when stageLen is added
+    setLength(4);   // FLUX LENG — 4 divisor units = one beat at the 1/16 default
     setTemporalRepeat(RepeatType::x1);
     setPitchRepeat(RepeatType::x1);
     setTemporalWindow(WindowType::Off);
@@ -99,34 +98,13 @@ void PhaseFluxSequence::printTraversalPattern(StringBuilder &str) const {
 }
 
 void PhaseFluxSequence::snapToGrid(int beatTicks) {
-    // 1. globalPhase snap to nearest 1/16 of cycle.
+    // globalPhase snap to nearest 1/16 of cycle. (Per-stage length is now an
+    // integer count of divisor units — already on the grid by construction.)
+    (void)beatTicks;
     const float step = 1.f / 16.f;
     _globalPhase = std::round(_globalPhase / step) * step;
     if (_globalPhase < 0.f) _globalPhase = 0.f;
     if (_globalPhase >= 1.f) _globalPhase -= 1.f;
-
-    if (beatTicks <= 0) return;
-    int seqDivisor = int(_divisor);
-    if (seqDivisor <= 0) return;
-
-    // 2. Per-stage stageLen → nearest whole project beat. Floor at 1 beat
-    //    so cells never snap to silence. Silent cells (stageLen=0) preserved.
-    for (auto &stage : _stages) {
-        if (stage.skip()) continue;
-        int currentLen = stage.stageLen();
-        if (currentLen == 0) continue;
-        int stageDivisorTicks = PhaseFluxMath::stageDivisorTicks(stage.stageDivisor());
-        int cellTicksBase = (stageDivisorTicks * seqDivisor) / 12;
-        if (cellTicksBase == 0) continue;
-        int cellTicks = (cellTicksBase * currentLen) / 64;
-        int targetBeats = (cellTicks + beatTicks / 2) / beatTicks;
-        if (targetBeats < 1) targetBeats = 1;
-        int targetTicks = targetBeats * beatTicks;
-        int newStageLen = (targetTicks * 64) / cellTicksBase;
-        if (newStageLen < 0) newStageLen = 0;
-        if (newStageLen > 127) newStageLen = 127;
-        stage.setStageLen(newStageLen);
-    }
 }
 
 void PhaseFluxSequence::clear() {

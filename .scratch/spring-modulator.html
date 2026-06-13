@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring — modulator</title>
+<style>
+  :root{ --ink:#1a1a1a; --mut:#5b5b5b; --line:#e5e5e5; --bg:#f6f7f8; --card:#fff;
+         --blue:#2563eb; --red:#dc2626; --amber:#ca8a04; }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,system-ui,"Segoe UI",sans-serif; line-height:1.4}
+  .wrap{max-width:980px; margin:0 auto; padding:18px}
+  h1{font-size:1.2rem; margin:0 0 2px}
+  .sub{color:var(--mut); font-size:.85rem; margin:0 0 14px}
+  .main{display:grid; grid-template-columns:260px 1fr; gap:16px}
+  @media(max-width:760px){.main{grid-template-columns:1fr}}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px}
+  .row{margin:0 0 16px}
+  .row label{display:flex; justify-content:space-between; font-size:.78rem; font-weight:600;
+    color:var(--mut); text-transform:uppercase; letter-spacing:.03em; margin-bottom:5px}
+  .row .val{font-family:ui-monospace,Menlo,monospace; color:var(--ink); font-weight:700}
+  input[type=range]{width:100%}
+  .seg{display:flex; gap:6px}
+  .seg button{flex:1; cursor:pointer; font:inherit; font-size:.82rem; font-weight:700; color:var(--mut);
+    padding:8px; border:1px solid #ccd; border-radius:7px; background:#fff}
+  .seg button.on{background:var(--blue); color:#fff; border-color:var(--blue)}
+  .hit{width:100%; cursor:pointer; font:inherit; font-weight:700; background:var(--red); color:#fff;
+    border:none; border-radius:7px; padding:12px}
+  .hit.held{background:var(--amber)}
+  canvas{width:100%; height:320px; background:#0c1116; border-radius:8px; display:block}
+  .readout{display:flex; gap:20px; margin-top:10px; font-family:ui-monospace,Menlo,monospace; font-size:.9rem}
+  .readout b{color:var(--blue)}
+  .note{font-size:.78rem; color:var(--mut); margin-top:10px}
+  .pill{display:inline-block; font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:99px; background:#eef; color:var(--blue)}
+  hr{border:none; border-top:1px solid var(--line); margin:14px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Spring <span class="pill">modulator</span></h1>
+  <p class="sub">A spring struck by a mallet — it rings down with internal wobble. Output −5…+5&nbsp;V.</p>
+
+  <div class="main">
+    <div class="card">
+      <div class="row">
+        <label>Mode</label>
+        <div class="seg" id="mode">
+          <button data-m="free" class="on">FREE</button>
+          <button data-m="trig">TRIG</button>
+          <button data-m="gate">GATE</button>
+        </div>
+      </div>
+      <div class="row">
+        <label>Pickup (output)</label>
+        <select id="tap" style="width:100%">
+          <option value="pos">Position</option>
+          <option value="vel">Velocity</option>
+          <option value="ke">Kinetic energy</option>
+          <option value="pe">Potential energy</option>
+          <option value="te">Total energy</option>
+        </select>
+      </div>
+      <div class="row" id="rateRow"><label>Strike (rate) <span class="val" id="rateV"></span></label>
+        <input type="range" id="rate" min="0.1" max="8" step="0.1" value="0.5"></div>
+      <hr>
+      <div class="row"><label>Tension (pitch) <span class="val" id="pitchV"></span></label>
+        <input type="range" id="pitch" min="0.3" max="12" step="0.1" value="2.5"></div>
+      <div class="row"><label>Ring (length) <span class="val" id="decayV"></span></label>
+        <input type="range" id="decay" min="0" max="100" step="1" value="60"></div>
+      <div class="row"><label>Clang (harmonic → inharmonic) <span class="val" id="toneV"></span></label>
+        <input type="range" id="tone" min="0" max="100" step="1" value="40"></div>
+      <button class="hit" id="hit">HIT / GATE</button>
+      <div class="note" id="hitNote"></div>
+    </div>
+
+    <div class="card">
+      <canvas id="scope"></canvas>
+      <div class="readout">
+        <div>OUT <b id="outV">0.00 V</b></div>
+        <div id="led">●</div>
+      </div>
+      <div class="note">FREE: re-struck on the Strike clock. TRIG: press HIT = one strike. GATE: hold HIT (pinned), release to ring back.
+      Clang&nbsp;0 = a single decaying sine (a plain pluck); raise it and inharmonic partials beat as they settle — the part nothing else in the module does.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const P = { mode:'free', tap:'pos', rate:0.5, pitch:2.5, decay:35, tone:40 };
+const el = id => document.getElementById(id);
+
+// 3 inharmonic partials (metal-ish). Upper partials are voiced by Tone and
+// decay faster, so the timbre evolves as it settles.
+const RATIO = [1.0, 2.76, 5.40];
+let pos=[0,0,0], vel=[0,0,0], strikeTimer=0, gateHeld=false, flash=0;
+
+const tone = ()=>P.tone/100;
+const w0   = ()=> 2*Math.PI*P.pitch;
+// Decay = ring LENGTH: high = long ring (low damping), low = quick/dead.
+// Exponential so equal steps = equal ratio (fine control across the range).
+const zeta = ()=> 0.0015*Math.pow(800, (100-P.decay)/100);
+function ampWeight(i){ return i===0 ? 1 : tone()*(i===1?1:0.6); }
+
+function strike(){
+  const v0 = w0()*0.7;            // headroom; soft-sat fills the rest of the range
+  for(let i=0;i<3;i++) vel[i] += v0;   // equal impulse; ampWeight shapes output
+  flash=1;
+}
+function pinHeld(){
+  for(let i=0;i<3;i++){ pos[i] = 0.9/RATIO[i] * (i===0?1:tone()); vel[i]=0; }
+}
+function step(dt){
+  if(P.mode==='gate' && gateHeld){ pinHeld(); return; }
+  if(P.mode==='free'){ strikeTimer+=dt; const T=1/P.rate; if(strikeTimer>=T){ strikeTimer-=T; strike(); } }
+  const z=zeta();
+  for(let i=0;i<3;i++){
+    const w=w0()*RATIO[i], k=w*w, c=2*z*w*(1+i*0.8);  // upper modes damp faster
+    const acc=-k*pos[i]-c*vel[i];
+    vel[i]+=acc*dt; pos[i]+=vel[i]*dt;
+  }
+}
+function energies(){
+  const W=w0(); let ke=0, pe=0;
+  for(let i=0;i<3;i++){
+    const aw=ampWeight(i), wr=RATIO[i];
+    ke += aw*aw * 0.5*vel[i]*vel[i]/(W*W);   // normalized so it's O(1)
+    pe += aw*aw * 0.5*wr*wr*pos[i]*pos[i];
+  }
+  return {ke, pe};
+}
+function tapRaw(){
+  switch(P.tap){
+    case 'vel': { let o=0; for(let i=0;i<3;i++) o+=vel[i]*ampWeight(i)/w0(); return {v:o, bip:true}; }
+    case 'ke':  return {v:energies().ke*4, bip:false};
+    case 'pe':  return {v:energies().pe*4, bip:false};
+    case 'te':  { const e=energies(); return {v:(e.ke+e.pe)*4, bip:false}; }
+    default:    { let o=0; for(let i=0;i<3;i++) o+=pos[i]*ampWeight(i); return {v:o, bip:true}; }
+  }
+}
+function outVolts(){
+  // position/velocity bipolar (±5V); energies unipolar (0..+5V, rest at 0)
+  return 5*Math.tanh(tapRaw().v);
+}
+
+// scope
+const cv=el('scope'), cx=cv.getContext('2d'); let hist=[];
+function fit(){ const r=cv.getBoundingClientRect(), d=devicePixelRatio||1;
+  cv.width=r.width*d; cv.height=r.height*d; cx.setTransform(d,0,0,d,0,0); }
+addEventListener('resize',fit); fit();
+function draw(){
+  const w=cv.width/(devicePixelRatio||1), h=cv.height/(devicePixelRatio||1);
+  cx.clearRect(0,0,w,h);
+  cx.strokeStyle='#1d2733';
+  for(let i=-5;i<=5;i++){ const y=h/2-(i/5)*(h/2-10);
+    cx.globalAlpha=i===0?0.9:0.3; cx.beginPath(); cx.moveTo(0,y); cx.lineTo(w,y); cx.stroke(); }
+  cx.globalAlpha=1; cx.fillStyle='#3a4a5a'; cx.font='10px ui-monospace,monospace';
+  cx.fillText('+5V',4,12); cx.fillText('0V',4,h/2-3); cx.fillText('-5V',4,h-5);
+  cx.strokeStyle='#37d67a'; cx.lineWidth=2; cx.beginPath();
+  for(let i=0;i<hist.length;i++){ const x=w*i/(hist.length-1||1), y=h/2-(hist[i]/5)*(h/2-10);
+    i?cx.lineTo(x,y):cx.moveTo(x,y); }
+  cx.stroke();
+}
+const DT=0.001, HIST=1500; let acc=0, last=performance.now();
+function frame(now){
+  let e=(now-last)/1000; last=now; if(e>0.1)e=0.1; acc+=e;
+  while(acc>=DT){ step(DT); hist.push(outVolts()); if(hist.length>HIST)hist.shift(); acc-=DT; }
+  if(flash>0) flash-=e*4;
+  el('outV').textContent=outVolts().toFixed(2)+' V';
+  el('led').style.color=flash>0?'#ff4757':'#2a3744';
+  draw(); requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+function bind(id,key,fmt){ const s=el(id), v=el(key+'V');
+  const u=()=>{ P[key]=parseFloat(s.value); v.textContent=fmt(P[key]); }; s.addEventListener('input',u); u(); }
+bind('rate','rate', x=>x.toFixed(1)+' Hz');
+bind('pitch','pitch', x=>x.toFixed(1)+' Hz');
+bind('decay','decay', x=>x+'%');
+bind('tone','tone', x=>x+'%');
+el('tap').addEventListener('change', e=>P.tap=e.target.value);
+
+document.querySelectorAll('#mode button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#mode button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); P.mode=b.dataset.m; gateHeld=false;
+  el('rateRow').style.display = P.mode==='free' ? '' : 'none';
+  el('hit').classList.toggle('held',false);
+  el('hitNote').textContent = P.mode==='free' ? 'FREE: auto-struck on Rate. HIT adds a strike.'
+    : P.mode==='trig' ? 'TRIG: each HIT = one strike (gate rising edge).'
+    : 'GATE: hold HIT to pin it; release to ring back.';
+}));
+el('mode').querySelector('button').click();
+
+const hit=el('hit');
+const press=()=>{ if(P.mode==='gate'){ gateHeld=true; hit.classList.add('held'); } else strike(); };
+const release=()=>{ if(P.mode==='gate'){ gateHeld=false; hit.classList.remove('held'); } };
+hit.addEventListener('mousedown',press); hit.addEventListener('mouseup',release); hit.addEventListener('mouseleave',release);
+hit.addEventListener('touchstart',e=>{e.preventDefault();press();}); hit.addEventListener('touchend',e=>{e.preventDefault();release();});
+
+strike(); // boot moving
+</script>
+</body>
+</html>

@@ -205,29 +205,25 @@ bool PhaseFluxTrackEngine::detectLayoutChange() {
     if (lenN != _cachedLenNudge) return true;
     for (int i = 0; i < kStageCount; ++i) {
         const auto &s = _sequence->stage(i);
-        if (uint8_t(s.stageDivisor()) != _cachedStageDivisor[i]) return true;
-        if (uint8_t(s.stageLen()) != _cachedStageLen[i]) return true;
+        if (uint8_t(s.length()) != _cachedLength[i]) return true;
         if (s.skip() != _cachedSkip[i]) return true;
     }
     return false;
 }
 
 void PhaseFluxTrackEngine::rebuildCumulativeTable() {
-    int stageDivisorTicksArr[kStageCount];
-    int stageLenArr[kStageCount];
+    int lengthArr[kStageCount];
     bool skipArr[kStageCount];
     const int lenNudge = _sequence->lenNudge();
     for (int i = 0; i < kStageCount; ++i) {
         const auto &s = _sequence->stage(i);
-        stageDivisorTicksArr[i] = PhaseFluxMath::stageDivisorTicks(s.stageDivisor());
-        // LenNudge adds to every stage's stageLen uniformly; clamp to storage range.
-        int effLen = s.stageLen() + lenNudge;
+        // LenNudge adds to every stage's length uniformly; clamp to storage range.
+        int effLen = s.length() + lenNudge;
         if (effLen < 0)   effLen = 0;
         if (effLen > 127) effLen = 127;
-        stageLenArr[i] = effLen;
+        lengthArr[i] = effLen;
         skipArr[i] = s.skip();
-        _cachedStageDivisor[i] = uint8_t(s.stageDivisor());
-        _cachedStageLen[i] = uint8_t(s.stageLen());
+        _cachedLength[i] = uint8_t(s.length());
         _cachedSkip[i] = s.skip();
     }
     _cachedDivisor = uint16_t(_sequence->divisor());
@@ -238,7 +234,7 @@ void PhaseFluxTrackEngine::rebuildCumulativeTable() {
         _sequence->cycleLength() == PhaseFluxSequence::CycleLengthMode::Fixed;
     _cycleTicks = PhaseFluxMath::computeCumulativeTicks(
         PhaseFluxMath::traversalOrder(_sequence->traversalPattern()),
-        stageDivisorTicksArr, stageLenArr, skipArr,
+        lengthArr, skipArr,
         _sequence->divisor(),
         int(_engine.measureDivisor()),
         _sequence->clockMultiplier(),
@@ -263,11 +259,11 @@ void PhaseFluxTrackEngine::rebuildCumulativeTable() {
         const auto &s = _sequence->stage(i);
         if (s.skip()) continue;
         ++activeCount;
-        DBG_PFX("  stage[%d] ACTIVE pulseCount=%d tRep=%d tWin=%d pRep=%d pWin=%d stageLen=%d",
+        DBG_PFX("  stage[%d] ACTIVE pulseCount=%d tRep=%d tWin=%d pRep=%d pWin=%d length=%d",
                 i, s.pulseCount(),
                 int(s.temporalRepeat()), int(s.temporalWindow()),
                 int(s.pitchRepeat()),    int(s.pitchWindow()),
-                s.stageLen());
+                s.length());
     }
     DBG_PFX("  total active stages = %d", activeCount);
 #endif

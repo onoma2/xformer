@@ -1,0 +1,83 @@
+- generic [ref=e2]:
+  - heading "PhaseFlux curve against a NoteTrack melody" [level=1] [ref=e3]
+  - paragraph [ref=e4]: Fixed C-minor melody (gray blocks). The PhaseFlux Bell curve (red) re-runs the pitch pipeline live — change scale and the curve re-quantizes; the melody stays put as your reference. 4 measures of 4/4, columns are 16th notes.
+  - generic [ref=e5]:
+    - generic [ref=e6]: NoteTrack melody — fixed pitches, block width = gate length
+    - generic [ref=e8]: PhaseFlux curve — base C4, range Up, recomputed
+  - generic [ref=e10]:
+    - generic [ref=e11]:
+      - generic [ref=e12]: Curve
+      - combobox [ref=e13]:
+        - option "Ramp"
+        - option "Bell" [selected]
+        - option "Triangle"
+        - option "Bounce"
+    - generic [ref=e14]:
+      - generic [ref=e15]: Scale
+      - combobox [ref=e16]:
+        - option "Minor Pentatonic (5)"
+        - option "Minor (7)" [selected]
+        - option "Semitones / 12-tet (12)"
+        - option "24-tet (24)"
+    - generic [ref=e17]:
+      - generic [ref=e18]: Range
+      - combobox [ref=e19]:
+        - option "Half octave"
+        - option "One octave" [selected]
+        - option "Two octaves"
+        - option "Three octaves"
+    - generic [ref=e20]:
+      - generic [ref=e21]: Window
+      - combobox [ref=e22]:
+        - option "Off" [selected]
+        - option "Focus 70"
+        - option "Focus 50"
+        - option "Polarize 70"
+        - option "Polarize 50"
+    - generic [ref=e23]:
+      - generic [ref=e24]: Repeat
+      - combobox [ref=e25]:
+        - option "x1" [selected]
+        - option "x2"
+        - option "x3"
+        - option "x5"
+    - generic [ref=e26]:
+      - generic [ref=e27]: Warp 0
+      - slider [ref=e28]: "0"
+    - generic [ref=e29]:
+      - generic [ref=e30]: Response 0
+      - slider [ref=e31]: "0"
+  - generic [ref=e32]:
+    - generic [ref=e33]:
+      - generic [ref=e99]: C5
+      - generic [ref=e239]: B4
+      - generic [ref=e369]: Bb4
+      - generic [ref=e509]: A4
+      - generic [ref=e639]: Ab4
+      - generic [ref=e775]: G4
+      - generic [ref=e911]: Gb4
+      - generic [ref=e1041]: F4
+      - generic [ref=e1177]: E4
+      - generic [ref=e1307]: Eb4
+      - generic [ref=e1443]: D4
+      - generic [ref=e1581]: Db4
+      - generic [ref=e1711]: C4
+    - generic [ref=e1853]:
+      - generic [ref=e1855]: "1"
+      - generic [ref=e1856]: "2"
+      - generic [ref=e1857]: "3"
+      - generic [ref=e1858]: "4"
+      - generic [ref=e1859]: "2"
+      - generic [ref=e1860]: "2"
+      - generic [ref=e1861]: "3"
+      - generic [ref=e1862]: "4"
+      - generic [ref=e1863]: "3"
+      - generic [ref=e1864]: "2"
+      - generic [ref=e1865]: "3"
+      - generic [ref=e1866]: "4"
+      - generic [ref=e1867]: "4"
+      - generic [ref=e1868]: "2"
+      - generic [ref=e1869]: "3"
+      - generic [ref=e1870]: "4"
+    - generic [ref=e1871]: bar . beat →
+    - generic [ref=e1872]: "pipeline: phi → window(off) → repeat(x1) → warp(0) → Bell → response(0) → ×7 deg (Up) → round → Minor noteToVolts"

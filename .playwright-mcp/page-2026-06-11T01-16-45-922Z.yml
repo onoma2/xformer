@@ -1,0 +1,35 @@
+- generic [ref=e2]:
+  - heading "PhaseFlux curve against a NoteTrack melody" [level=1] [ref=e3]
+  - paragraph [ref=e4]: "Same note axis (left), real musical time across the bottom: 4 measures of 4/4. The written melody is the solid blocks; the PhaseFlux curve is the red trail laid over the same bars."
+  - generic [ref=e5]:
+    - generic [ref=e6]: NoteTrack melody (16 quarter-note steps, block width = gate length)
+    - generic [ref=e8]: PhaseFlux — Bell, one cycle over the 4 bars
+  - generic [ref=e10]: scale Minor root C · NoteTrack 16 steps @ divisor 48 (1 step = 1 quarter) · PhaseFlux range 1 oct Up, base C4, sampled per 16th
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e13]: C5
+      - generic [ref=e88]: Bb4
+      - generic [ref=e163]: Ab4
+      - generic [ref=e234]: G4
+      - generic [ref=e305]: F4
+      - generic [ref=e376]: Eb4
+      - generic [ref=e447]: D4
+      - generic [ref=e520]: C4
+    - generic [ref=e597]:
+      - generic [ref=e599]: "1"
+      - generic [ref=e600]: "2"
+      - generic [ref=e601]: "3"
+      - generic [ref=e602]: "4"
+      - generic [ref=e603]: "2"
+      - generic [ref=e604]: "2"
+      - generic [ref=e605]: "3"
+      - generic [ref=e606]: "4"
+      - generic [ref=e607]: "3"
+      - generic [ref=e608]: "2"
+      - generic [ref=e609]: "3"
+      - generic [ref=e610]: "4"
+      - generic [ref=e611]: "4"
+      - generic [ref=e612]: "2"
+      - generic [ref=e613]: "3"
+      - generic [ref=e614]: "4"
+    - generic [ref=e615]: bar . beat →

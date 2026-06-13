@@ -27,23 +27,6 @@ public:
      *  that don't yet thread the pattern argument keep working. */
     static const std::array<uint8_t, kStageCount> &snakeOrder();
 
-    /** Per-stage divisor as a fraction (num/den) — multiplier against the
-     *  sequence divisor. Stochastic's `kStochasticDurationLut` pattern.
-     *  effectiveSequencerTicks = seqDivisor × num / den. Labels follow
-     *  seqDivisor via ModelUtils::printDivisorShort against the effective
-     *  divisor (which is then a known entry in the KnownDivisor table). */
-    struct StageDivisorFraction { uint16_t num; uint16_t den; };
-    static StageDivisorFraction stageDivisorFraction(PhaseFluxSequence::StageDivisorSlot slot);
-
-    /** Master-PPQN-192 ticks at the calibration point (seqDivisor=12).
-     *  Computed from stageDivisorFraction. Preserved as a function so
-     *  existing computeCumulativeTicks math (which rescales by current
-     *  seqDivisor) keeps working without changes. */
-    static int stageDivisorTicks(PhaseFluxSequence::StageDivisorSlot slot);
-
-    /** Reference sequence divisor (= 1/16 at PPQN-48). Stage tick table is
-     *  calibrated against this; other divisor values scale uniformly. */
-    static constexpr int kReferenceSequenceDivisor = 12;
 
     /** §6 — PowerBend(z, p) = z ^ ((1 − p) / (1 + p)), z∈[0,1], p∈(−1,+1). */
     static float powerBend(float z, float p);
@@ -90,20 +73,19 @@ public:
                                   int warpKnob, int &subIdx, float &tLocal);
 
     /**
-     * §3.1 — Snake-walk cumulative duration table.
-     *   stageDivisorTicksArr[i] — ticks/stage at clockMultiplier=100, by cell index
-     *   stageLenArr[i]          — per-stage ±100 length multiplier (factor = 1 + v/100)
-     *   skip[i]                 — true if cell contributes 0
-     *   measureDivisor          — floor source: kMinCycleTicks = measureDivisor/32
-     *   clockMultiplier         — 50..150 (/100 = factor)
-     *   cumulativeTicks[17]     — output, snake-walk order, [0]=0, [16]=cycleTicks
-     * Returns cycleTicks; idle (all-skipped) returns 0 with array zeroed;
-     * cycle < floor is proportionally stretched.
+     * §3.1 — Snake-walk cumulative duration table (FLUX bottom-up).
+     *   lengthArr[i]    — stage length as a count of divisor units, by cell index
+     *   skip[i]         — true if cell contributes 0 (Adaptive)
+     *   sequenceDivisor — ticks per divisor unit (×4 to master inside)
+     *   measureDivisor  — floor source: kMinCycleTicks = measureDivisor/32
+     *   clockMultiplier — 50..150 (/100 = factor)
+     *   cumulativeTicks[17] — output, snake-walk order, [0]=0, [16]=cycleTicks
+     * stage ticks = length × (sequenceDivisor × master/seq ratio) × 100/clockMult.
+     * Returns cycleTicks; idle (all-skipped) returns 0; cycle < floor stretched.
      */
     static int computeCumulativeTicks(
         const std::array<uint8_t, kStageCount> &traversal,
-        const int stageDivisorTicksArr[kStageCount],
-        const int stageLenArr[kStageCount],
+        const int lengthArr[kStageCount],
         const bool skip[kStageCount],
         int sequenceDivisor,
         int measureDivisor,

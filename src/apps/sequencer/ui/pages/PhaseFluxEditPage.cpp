@@ -262,14 +262,14 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
 void PhaseFluxEditPage::updateLeds(Leds &leds) {
     // Step matrix LEDs — port of NoteSequenceEditPage::updateLeds pattern.
     //   red   = playhead (current cell) OR edit cursor (selected cell)
-    //   green = cell will fire (not skipped AND stageLen > 0)
+    //   green = cell will fire (not skipped AND length > 0)
     // Overlap → yellow (R+G both on).
     const auto *te = trackEngine();
     int currentCell = te ? te->activeCell() : -1;
     const auto &seq = _project.selectedPhaseFluxSequence();
     for (int i = 0; i < 16; ++i) {
         bool red   = (i == currentCell) || (i == _selectedCell);
-        bool green = !seq.stage(i).skip() && seq.stage(i).stageLen() > 0;
+        bool green = !seq.stage(i).skip() && seq.stage(i).length() > 0;
         leds.set(MatrixMap::fromStep(i), red, green);
     }
 
@@ -499,7 +499,7 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
             }
         } else if (_topicPage == 1) {
             switch (slot) {
-            case 0: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setStageLen(ModelUtils::adjusted(s.stageLen(), value, 0, 127)); }); break;
+            case 0: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setLength(ModelUtils::adjusted(s.length(), value, 1, 127)); }); break;
             // slots 1, 2 are FlipV / FlipH toggles (press-only)
             case 3: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setMask(PhaseFluxSequence::MaskType(cycle(int(s.mask()) + value, 0, 7))); }); break;
             }
@@ -577,7 +577,7 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
 // Next" in the footer). TEMP and PTCH scope to the selected cell only;
 // ACCUM scopes to non-skipped cells; MACRO is sequence-level.
 //
-// Always excluded ("chassis-feel" — stable across shakes): stageLen,
+// Always excluded ("chassis-feel" — stable across shakes): length,
 // basePitch, skip flag. MACRO P1 Snap/Zero slots are press-only, skipped.
 // Randomized pulseCount never goes to 0 (silence stays intentional).
 void PhaseFluxEditPage::shake(bool wholeTopic) {
@@ -777,7 +777,7 @@ void PhaseFluxEditPage::initTopic() {
         s.setPhaseShift(0);
         s.setTemporalWindow(PhaseFluxSequence::WindowType::Off);
         s.setTemporalRepeat(PhaseFluxSequence::RepeatType::x1);
-        // stageLen preserved (chassis-feel, mirror of shake exclusion).
+        // length preserved (chassis-feel, mirror of shake exclusion).
     };
     auto resetStagePitch = [](PhaseFluxSequence::Stage &s) {
         s.setPitchCurve(PhaseFluxSequence::PitchCurveType::Ramp);
@@ -1295,22 +1295,20 @@ void PhaseFluxEditPage::drawMacroScope(Canvas &canvas) {
 
     // Recompute cumulative ticks UI-side with LenN applied — mirrors
     // PhaseFluxTrackEngine::rebuildCumulativeTable.
-    int stageDivisorTicksArr[PhaseFluxMath::kStageCount];
-    int stageLenArr[PhaseFluxMath::kStageCount];
+    int lengthArr[PhaseFluxMath::kStageCount];
     bool skipArr[PhaseFluxMath::kStageCount];
     for (int i = 0; i < PhaseFluxMath::kStageCount; ++i) {
         const auto &s = seq.stage(i);
-        stageDivisorTicksArr[i] = PhaseFluxMath::stageDivisorTicks(s.stageDivisor());
-        int effLen = s.stageLen() + lenNudge;
+        int effLen = s.length() + lenNudge;
         if (effLen < 0)   effLen = 0;
         if (effLen > 127) effLen = 127;
-        stageLenArr[i] = effLen;
+        lengthArr[i] = effLen;
         skipArr[i] = s.skip();
     }
     int cumulative[PhaseFluxMath::kStageCount + 1];
     int cycleTicks = PhaseFluxMath::computeCumulativeTicks(
         PhaseFluxMath::traversalOrder(seq.traversalPattern()),
-        stageDivisorTicksArr, stageLenArr, skipArr,
+        lengthArr, skipArr,
         seq.divisor(), int(_engine.measureDivisor()),
         seq.clockMultiplier(), cumulative);
     if (cycleTicks <= 0) return;
@@ -1702,7 +1700,7 @@ void PhaseFluxEditPage::drawParamList(Canvas &canvas) {
             labels[2] = "Resp";  values[2]("%+d", activeStage.temporalResponse());
             labels[3] = "Puls";  values[3]("%d",  activeStage.pulseCount());
         } else if (_topicPage == 1) {
-            labels[0] = "Len";   values[0]("%.2fx", activeStage.stageLen() / 64.0f);
+            labels[0] = "Len";   values[0]("%d", activeStage.length());
             labels[1] = "FlipV"; values[1]("%s", activeStage.temporalFlipV() ? "On" : "Off");
             labels[2] = "FlipH"; values[2]("%s", activeStage.temporalFlipH() ? "On" : "Off");
             labels[3] = "Mask";  values[3]("%s", kMask[clamp(int(activeStage.mask()), 0, 7)]);

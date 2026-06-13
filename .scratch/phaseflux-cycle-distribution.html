@@ -1,0 +1,149 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>PhaseFlux — phase across 16 stages &amp; CycleLength</title>
+<style>
+  :root{
+    --bg:#fafafa; --card:#ffffff; --ink:#1a1a1a; --soft:#6b7280; --rule:#e5e5e5; --grid:#e8eaee;
+    --ph:#2563eb;    /* phase = blue */
+    --bnd:#ca8a04;   /* stage boundary / cycle = amber */
+    --skip:#9aa3ad;  /* skipped / silent = gray */
+    --act:#7c3aed;   /* emphasis = violet */
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);
+    font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    max-width:880px;margin:0 auto;padding:24px}
+  h1{font-size:1.45rem;line-height:1.3;margin:0 0 4px}
+  h2{font-size:1.2rem;line-height:1.3;margin:30px 0 8px;padding-bottom:6px;border-bottom:2px solid var(--rule)}
+  p{margin:9px 0} .lead{color:var(--soft);margin:0 0 8px}
+  code,pre{font-family:ui-monospace,"SF Mono",Menlo,monospace}
+  pre{background:var(--card);border:1px solid var(--rule);border-left:3px solid var(--ph);
+    border-radius:6px;padding:13px 15px;overflow:auto;font-size:12.5px;line-height:1.5;margin:12px 0}
+  .ph{color:var(--ph)} .bnd{color:var(--bnd)} .skip{color:var(--soft)} .act{color:var(--act)} .key{color:var(--soft);font-size:12.5px}
+  figure{margin:12px 0 4px;background:var(--card);border:1px solid var(--rule);border-radius:8px;padding:12px 14px 8px}
+  figcaption{color:var(--soft);font-size:12.5px;margin-top:6px}
+  svg text{font:10.5px ui-monospace,Menlo,monospace;fill:var(--soft)}
+  .fork{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:12px 0}
+  .fork section{background:var(--card);border:1px solid var(--rule);border-radius:8px;padding:12px 14px}
+  section.ad{border-left:4px solid var(--ph)} section.fx{border-left:4px solid var(--bnd)}
+  .fork h3{margin:0 0 5px;font-size:1rem}
+</style>
+
+<h1>PhaseFlux — distributing the <span class="ph">0→1</span> cycle across <b>16 stages</b></h1>
+<p class="lead">PhaseFlux walks 16 cells (a 4×4 grid, in <code>traversalPattern</code> order). The cycle phase
+runs <b>0→1</b> once per cycle; each stage owns a <i>slice</i> of that 0→1 whose width is its own — stages
+are <b>not</b> evenly spaced. <code>CycleLength</code> (Adaptive / Fixed) decides what a <i>skipped</i>
+stage does to the partition.</p>
+
+<h2>How a stage's slice width is computed</h2>
+<pre>slotWidth[cell] = stageDivisorTicks(stageDivisor)        <span class="key">// base slot at the 1/16 reference</span>
+                × (stageLen + lenNudge) / 64             <span class="key">// per-stage length: 64 = ×1, 0 = ×0, 127 ≈ ×2</span>
+                × seqDivisor / referenceDivisor          <span class="key">// global divisor scales the whole cycle</span>
+                × 100 / clockMultiplier                  <span class="key">// clock mult: 50 = ×2 longer, 150 = ×⅔</span>
+
+cumulative[i+1] = cumulative[i] + slotWidth[ traversal[i] ]
+cycleTicks      = cumulative[16]
+cyclePhase      = relativeTick / cycleTicks              <span class="key">// 0 → 1 over the whole cycle</span>
+activeCell      = bin(cyclePhase) via cumulative[]        <span class="key">// which slice we're in</span>
+stagePhase      = (pos − cumulative[i]) / slotWidth[i]    <span class="key">// 0 → 1 within that stage</span></pre>
+<p class="key">Floor: if the whole cycle comes out shorter than <code>measureDivisor/32</code>, every endpoint is
+proportionally stretched — relative weights preserved, no cell ever snaps to zero length.</p>
+
+<h2>The partition — one 0→1 cycle, 16 uneven slices</h2>
+<figure>
+<svg viewBox="0 0 840 170" width="100%" height="170" aria-label="cycle phase and per-stage phase">
+  <!-- global cycle ramp 0->1 -->
+  <text x="6" y="20" fill="#6b7280">cyclePhase</text>
+  <line x1="40" y1="22" x2="40" y2="74" stroke="#c2c6cd"/><line x1="40" y1="74" x2="808" y2="74" stroke="#c2c6cd"/>
+  <!-- uneven stage dividers -->
+  <g stroke="#ca8a04" stroke-width="1" stroke-dasharray="3 3" opacity=".7">
+    <line x1="92" y1="22" x2="92" y2="150"/><line x1="130" y1="22" x2="130" y2="150"/>
+    <line x1="170" y1="22" x2="170" y2="150"/><line x1="235" y1="22" x2="235" y2="150"/>
+    <line x1="262" y1="22" x2="262" y2="150"/><line x1="315" y1="22" x2="315" y2="150"/>
+    <line x1="355" y1="22" x2="355" y2="150"/><line x1="385" y1="22" x2="385" y2="150"/>
+    <line x1="440" y1="22" x2="440" y2="150"/><line x1="480" y1="22" x2="480" y2="150"/>
+    <line x1="506" y1="22" x2="506" y2="150"/><line x1="575" y1="22" x2="575" y2="150"/>
+    <line x1="615" y1="22" x2="615" y2="150"/><line x1="645" y1="22" x2="645" y2="150"/>
+    <line x1="705" y1="22" x2="705" y2="150"/></g>
+  <polyline fill="none" stroke="#2563eb" stroke-width="2.5" points="40,74 808,28"/>
+  <!-- per-stage local phase -->
+  <text x="6" y="100" fill="#6b7280">stagePhase</text>
+  <line x1="40" y1="98" x2="40" y2="150" stroke="#c2c6cd"/><line x1="40" y1="150" x2="808" y2="150" stroke="#c2c6cd"/>
+  <polyline fill="none" stroke="#2563eb" stroke-width="2" points="
+    40,150 92,104 92,150 130,104 130,150 170,104 170,150 235,104 235,150 262,104 262,150 315,104
+    315,150 355,104 355,150 385,104 385,150 440,104 440,150 480,104 480,150 506,104 506,150 575,104
+    575,150 615,104 615,150 645,104 645,150 705,104 705,150 808,104"/>
+  <text x="100" y="166">wide stage (big stageLen)</text>
+  <text x="486" y="166">narrow</text>
+</svg>
+<figcaption>Top: the <span class="ph">cycle phase</span> 0→1, with <span class="bnd">stage boundaries</span> at
+the cumulative tick positions — unevenly spaced. Bottom: each stage gets its own local <span class="ph">stagePhase</span>
+0→1, and its slice width = its <code>slotWidth</code>. A high <code>stageLen</code> stage eats more of the cycle; a low one less.</figcaption>
+</figure>
+
+<h2>What sets each slice</h2>
+<figure>
+<svg viewBox="0 0 840 96" width="100%" height="96" aria-label="width controls per stage">
+  <line x1="40" y1="20" x2="40" y2="72" stroke="#c2c6cd"/><line x1="40" y1="72" x2="808" y2="72" stroke="#c2c6cd"/>
+  <!-- four cells: wide, normal, narrow, skipped -->
+  <g stroke="#ca8a04" stroke-width="1" stroke-dasharray="3 3"><line x1="320" y1="20" x2="320" y2="80"/><line x1="470" y1="20" x2="470" y2="80"/><line x1="560" y1="20" x2="560" y2="80"/></g>
+  <polyline fill="none" stroke="#2563eb" stroke-width="2.5" points="40,72 320,30 320,72 470,30 470,72 560,30 560,72 808,30"/>
+  <text x="150" y="90" fill="#2563eb">stageLen +100 → ×2</text>
+  <text x="365" y="90" fill="#2563eb">×1 (64)</text>
+  <text x="500" y="90" fill="#7c3aed">low</text>
+  <text x="640" y="90">stageDivisor sets the base; ×stageLen ×seqDiv ÷clockMult</text>
+</svg>
+<figcaption>Slice width is the product of base <code>stageDivisor</code>, the ±100% <code>stageLen</code> multiplier
+(+ uniform <code>lenNudge</code>), the global <code>seqDivisor</code>, and <code>clockMultiplier</code>. Same four
+factors for every cell — only <code>stageDivisor</code>/<code>stageLen</code> differ per stage.</figcaption>
+</figure>
+
+<h2>CycleLength — what a <i>skipped</i> stage does to the cycle</h2>
+<div class="fork">
+  <section class="ad"><h3 class="ph">Adaptive</h3>
+    <p>A skipped stage gets <code>slotWidth = 0</code> — it <b>drops out</b>. The cycle is the sum of only the
+    active stages, so it <b>shrinks</b> and wraps sooner. Active stages keep their absolute width; the 0→1 just
+    spans fewer of them.</p></section>
+  <section class="fx"><h3 class="bnd">Fixed</h3>
+    <p>A skipped stage <b>keeps its slot</b> — the engine emits silence during it. The cycle length is unchanged
+    regardless of skips, so active stages stay at the same absolute position; the 0→1 still walks through the
+    silent slot.</p></section>
+</div>
+<figure>
+<svg viewBox="0 0 840 200" width="100%" height="200" aria-label="adaptive vs fixed with skipped stages">
+  <!-- FIXED row: full cycle, two skipped slots shown as gray gaps -->
+  <text x="6" y="34" fill="#ca8a04">Fixed</text>
+  <line x1="80" y1="20" x2="80" y2="66" stroke="#c2c6cd"/><line x1="80" y1="66" x2="800" y2="66" stroke="#c2c6cd"/>
+  <!-- cells: a,b,SKIP,d,e,SKIP,g,h across full width; dividers -->
+  <g stroke="#ca8a04" stroke-width="1" stroke-dasharray="3 3"><line x1="170" y1="20" x2="170" y2="72"/>
+    <line x1="260" y1="20" x2="260" y2="72"/><line x1="350" y1="20" x2="350" y2="72"/>
+    <line x1="440" y1="20" x2="440" y2="72"/><line x1="530" y1="20" x2="530" y2="72"/>
+    <line x1="620" y1="20" x2="620" y2="72"/><line x1="710" y1="20" x2="710" y2="72"/></g>
+  <!-- silent slots shaded -->
+  <rect x="260" y="24" width="90" height="42" fill="#9aa3ad" opacity=".18"/>
+  <rect x="530" y="24" width="90" height="42" fill="#9aa3ad" opacity=".18"/>
+  <text x="282" y="50" fill="#9aa3ad">silent</text><text x="552" y="50" fill="#9aa3ad">silent</text>
+  <polyline fill="none" stroke="#2563eb" stroke-width="2.2" points="80,66 170,28 170,66 260,28
+    350,66 440,28 440,66 530,28 620,66 710,28 710,66 800,28"/>
+  <line x1="800" y1="14" x2="800" y2="80" stroke="#ca8a04" stroke-width="1.5"/><text x="770" y="12" fill="#ca8a04">wrap</text>
+
+  <!-- ADAPTIVE row: skipped slots removed, cycle ends earlier -->
+  <text x="6" y="134" fill="#2563eb">Adaptive</text>
+  <line x1="80" y1="120" x2="80" y2="166" stroke="#c2c6cd"/><line x1="80" y1="166" x2="800" y2="166" stroke="#c2c6cd"/>
+  <g stroke="#ca8a04" stroke-width="1" stroke-dasharray="3 3"><line x1="170" y1="120" x2="170" y2="172"/>
+    <line x1="260" y1="120" x2="260" y2="172"/><line x1="350" y1="120" x2="350" y2="172"/>
+    <line x1="440" y1="120" x2="440" y2="172"/><line x1="530" y1="120" x2="530" y2="172"/></g>
+  <!-- active cells only, same absolute widths, cycle ends at 530 then wraps -->
+  <polyline fill="none" stroke="#2563eb" stroke-width="2.2" points="80,166 170,128 170,166 260,128 260,166 350,128 350,166 440,128 440,166 530,128"/>
+  <line x1="530" y1="114" x2="530" y2="180" stroke="#ca8a04" stroke-width="1.5"/><text x="500" y="112" fill="#ca8a04">wrap</text>
+  <text x="560" y="150" fill="#9aa3ad">skipped widths removed → cycle shorter →</text>
+</svg>
+<figcaption>Same sequence, stages 3 &amp; 6 skipped. <span class="bnd">Fixed</span> keeps the silent slots — the
+cycle (and every active stage's absolute timing) is unchanged. <span class="ph">Adaptive</span> drops them — the
+active stages keep their widths but the cycle ends sooner, so it loops faster and phases differently against the bar.</figcaption>
+</figure>
+
+<p class="key">Order vs width: <code>traversalPattern</code> sets <i>which</i> cell occupies each slot (the walk
+order through the 4×4 grid); <code>stageDivisor</code>/<code>stageLen</code> set <i>how wide</i> each slot is.
+Together they place all 16 stages along the single 0→1 cycle, and <code>CycleLength</code> decides whether skips
+compress that cycle (Adaptive) or leave gaps in it (Fixed).</p>

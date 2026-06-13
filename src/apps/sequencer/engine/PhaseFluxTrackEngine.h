@@ -95,8 +95,7 @@ private:
     bool _layoutDirty = true;
 
     // Cached layout inputs for change detection.
-    uint8_t _cachedStageDivisor[kStageCount];
-    uint8_t _cachedStageLen[kStageCount];
+    uint8_t _cachedLength[kStageCount];
     bool _cachedSkip[kStageCount];
     uint16_t _cachedDivisor = 0;
     uint8_t _cachedClockMult = 0;

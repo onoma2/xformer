@@ -45,8 +45,7 @@ public:
     using AccumulatorStep = SignedValue<5>;
     using PulseAccumStep = SignedValue<4>;
     using GateLength = UnsignedValue<7>;
-    using StageDivisor = UnsignedValue<3>;
-    using StageLen = UnsignedValue<7>;   // 0..127 mapped to 0..~2× factor via /64
+    using Length = UnsignedValue<7>;     // FLUX LENG — stage length in divisor units (1..127)
     using Repeat = UnsignedValue<2>;     // x1 / x2 / x3 / x5 (RepeatType enum)
     using Window = UnsignedValue<3>;     // Off / F70 / F50 / P70 / P50 (WindowType, 3 spare)
 
@@ -116,20 +115,6 @@ public:
         // 5..7 reserved
     };
 
-    // 3-bit slot index. Stochastic-style multiplier against sequence divisor —
-    // labels follow seqDivisor live (printStageDivisor uses ModelUtils::
-    // printDivisorShort against the effective divisor). Default slot 6 (Bar)
-    // gives one-bar cells at the NoteTrack-default seqDivisor=12.
-    enum class StageDivisorSlot : uint8_t {
-        Sixteenth = 0,    // ×1     = 1/16 at seqDiv=12
-        EighthT   = 1,    // ×4/3   = 1/8T
-        Eighth    = 2,    // ×2     = 1/8
-        QuarterT  = 3,    // ×8/3   = 1/4T
-        Quarter   = 4,    // ×4     = 1/4
-        Half      = 5,    // ×8     = 1/2
-        Bar       = 6,    // ×16    = 1 bar  ← DEFAULT
-        TwoBar    = 7,    // ×32    = 2 bars
-    };
 
     class Stage {
     public:
@@ -223,20 +208,14 @@ public:
         int gateLength() const { return int(_data2.gateLength); }
         void setGateLength(int v) { _data2.gateLength = GateLength::clamp(clamp(v, 0, 100)); }
 
-        // stageDivisor — slot index 0..7
-        StageDivisorSlot stageDivisor() const { return StageDivisorSlot(int(_data2.stageDivisor)); }
-        void setStageDivisor(StageDivisorSlot v) { _data2.stageDivisor = StageDivisor::clamp(int(v)); }
-
         // skip
         bool skip() const { return bool(_data2.skip); }
         void setSkip(bool v) { _data2.skip = v; }
 
-        // stageLen — ±100 multiplier (encoded width clamps to SignedValue<7>)
-        // stageLen — 0..127 unipolar. Stored value × enumTicks / 64 gives the
-        // effective stage duration (Phaseque STEP_LEN pattern). Default = 64
-        // (= 1×, transparent). 0 = silent stage. 127 ≈ 2× stretch.
-        int stageLen() const { return int(_data3.stageLen); }
-        void setStageLen(int v) { _data3.stageLen = StageLen::clamp(clamp(v, 0, 127)); }
+        // length — FLUX LENG. Stage length as a count of divisor units; stage
+        // duration = length × divisor. 1..127. Default 4 (= one beat at 1/16).
+        int length() const { return int(_data3.length); }
+        void setLength(int v) { _data3.length = Length::clamp(clamp(v, 1, 127)); }
 
         // temporalRepeat / pitchRepeat — per-axis enum, x1/x2/x3/x5.
         RepeatType temporalRepeat() const { return RepeatType(int(_data3.temporalRepeat)); }
@@ -307,17 +286,17 @@ public:
             BitField<uint32_t,  9, AccumulatorStep::Bits>    accumulatorStep;     //  9..13
             BitField<uint32_t, 14, PulseAccumStep::Bits>     pulseAccumStep;      // 14..17
             BitField<uint32_t, 18, GateLength::Bits>         gateLength;          // 18..24
-            BitField<uint32_t, 25, StageDivisor::Bits>       stageDivisor;        // 25..27
+            // bits 25..27 spare (freed by stageDivisor removal, F1)
             BitField<uint32_t, 28, 1>                        skip;                // 28
             BitField<uint32_t, 29, 1>                        accumulatorTrigger;  // 29
             BitField<uint32_t, 30, 1>                        pulseAccumTrigger;   // 30
             // bit 31 spare
         } _data2;
 
-        // word 3 — stageLen + Repeat × 2 + Window × 2 + pulseCount (22 used, 10 spare)
+        // word 3 — length + Repeat × 2 + Window × 2 + pulseCount (22 used, 10 spare)
         union {
             uint32_t raw;
-            BitField<uint32_t,  0, StageLen::Bits>   stageLen;        //  0..6
+            BitField<uint32_t,  0, Length::Bits>     length;          //  0..6
             BitField<uint32_t,  7, Repeat::Bits>     pitchRepeat;     //  7..8
             BitField<uint32_t,  9, Repeat::Bits>     temporalRepeat;  //  9..10
             BitField<uint32_t, 11, Window::Bits>     pitchWindow;     // 11..13
@@ -453,13 +432,10 @@ public:
     void editTraversalPattern(int value, bool) { setTraversalPattern(traversalPattern() + value); }
     void printTraversalPattern(StringBuilder &str) const;
 
-    // Snap to grid — press-to-fire from MACRO P1. Two passes:
-    //  1. globalPhase → nearest 1/16 of cycle.
-    //  2. Each non-skipped stage's stageLen → nearest whole project beat
-    //     (TimeSignature.noteDivisor — 1/4 in /4 signatures, 1/8 in /8).
-    //     Floor at 1 beat — never snap a cell to 0 length. Silent cells
-    //     (stageLen=0) are left alone, they're intentional.
-    // beatTicks in master-PPQN-192 ticks; caller passes engine noteDivisor.
+    // Snap to grid — press-to-fire from MACRO P1. Snaps globalPhase to the
+    // nearest 1/16 of cycle. (Per-stage length is an integer count of divisor
+    // units, so it is already grid-aligned.) beatTicks unused, kept for the
+    // caller signature.
     void snapToGrid(int beatTicks);
 
     // Reset all 5 magnitude macros (nudges + cyclePhaseWarp) to 0.
