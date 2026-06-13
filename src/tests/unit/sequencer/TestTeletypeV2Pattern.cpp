@@ -217,4 +217,30 @@ UNIT_TEST("TeletypeV2Pattern") {
         expectEqual(int(sum), 10, "SHUF preserves sum (permutation)");
         expectTrue(seen[1] && seen[2] && seen[3] && seen[4], "SHUF keeps all elements");
     }
+
+    CASE("per_index_arithmetic") {
+        Fixture f;
+        f.seed(0, {1, 2, 3}, 3);
+        f.run("P.+ 1 10");   // val[1] += 10
+        expectEqual(f.pat(0).val[1], int16_t(12), "P.+ adds at idx");
+        f.run("P.- 2 1");    // val[2] -= 1
+        expectEqual(f.pat(0).val[2], int16_t(2), "P.- subtracts at idx");
+    }
+
+    CASE("per_index_wrap") {
+        Fixture f;
+        f.seed(0, {1, 2, 3}, 3);
+        f.run("P.+W 0 5 0 4");   // wrap(1+5,0,4) = wrap(6,0,4) = 1
+        expectEqual(f.pat(0).val[0], int16_t(1), "P.+W wraps into [0,4]");
+        f.seed(0, {1, 2, 3}, 3);
+        f.run("P.-W 0 3 0 4");   // wrap(1-3,0,4) = wrap(-2,0,4) = 3
+        expectEqual(f.pat(0).val[0], int16_t(3), "P.-W wraps negative");
+    }
+
+    CASE("pn_arithmetic") {
+        Fixture f;
+        f.seed(1, {5, 6, 7}, 3);
+        f.run("PN.+ 1 0 10");  // pattern1 val[0] += 10
+        expectEqual(f.pat(1).val[0], int16_t(15), "PN.+ adds at pattern1 idx0");
+    }
 }

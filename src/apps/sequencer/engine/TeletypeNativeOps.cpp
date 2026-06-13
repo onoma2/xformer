@@ -1387,6 +1387,81 @@ static void opPNShuf(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgra
     if (p) patternShuffle(*p, runtime.rng);
 }
 
+// --- per-index arithmetic with optional wrap (P.+ / P.+W / P.- / P.-W) -----
+
+static int16_t patternWrapVal(int16_t value, int16_t a, int16_t b) {
+    int16_t i = value, c;
+    if (a < b) { c = int16_t(b - a + 1); while (i >= b) i -= c; while (i < a) i += c; }
+    else { c = int16_t(a - b + 1); while (i >= a) i -= c; while (i < b) i += c; }
+    return i;
+}
+
+static void patternArithAt(const TeletypeProgram *program, int16_t pn, int16_t idx,
+                           int16_t delta, bool sub, bool doWrap, int16_t lo, int16_t hi) {
+    TT2Pattern *p = mutablePattern(program, pn);
+    if (!p) return;
+    idx = normaliseIdx(*p, idx);
+    int16_t v = int16_t(sub ? p->val[idx] - delta : p->val[idx] + delta);
+    if (doWrap) v = patternWrapVal(v, lo, hi);
+    p->val[idx] = v;
+}
+
+// Pop the trailing (idx, delta[, lo, hi]) args after the optional leading pn.
+static void patternArithDispatch(const TeletypeProgram *program, int16_t pn, bool sub,
+                                 bool doWrap, int16_t *stack, uint8_t &stackSize,
+                                 TT2EvalError &error) {
+    int16_t idx = 0, delta = 0, lo = 0, hi = 0;
+    if (!popStack(stack, stackSize, idx, error)) return;
+    if (!popStack(stack, stackSize, delta, error)) return;
+    if (doWrap) {
+        if (!popStack(stack, stackSize, lo, error)) return;
+        if (!popStack(stack, stackSize, hi, error)) return;
+    }
+    patternArithAt(program, pn, idx, delta, sub, doWrap, lo, hi);
+}
+
+static void opPAdd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    patternArithDispatch(program, runtime.variables.p_n, false, false, stack, stackSize, error);
+}
+static void opPAddW(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    patternArithDispatch(program, runtime.variables.p_n, false, true, stack, stackSize, error);
+}
+static void opPSub(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    patternArithDispatch(program, runtime.variables.p_n, true, false, stack, stackSize, error);
+}
+static void opPSubW(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    patternArithDispatch(program, runtime.variables.p_n, true, true, stack, stackSize, error);
+}
+
+static void opPNAdd(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t pn = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    patternArithDispatch(program, pn, false, false, stack, stackSize, error);
+}
+static void opPNAddW(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t pn = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    patternArithDispatch(program, pn, false, true, stack, stackSize, error);
+}
+static void opPNSub(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t pn = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    patternArithDispatch(program, pn, true, false, stack, stackSize, error);
+}
+static void opPNSubW(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t pn = 0;
+    if (!popStack(stack, stackSize, pn, error)) return;
+    patternArithDispatch(program, pn, true, true, stack, stackSize, error);
+}
+
 // ---------------------------------------------------------------------------
 // Native op table
 // ---------------------------------------------------------------------------
@@ -1506,6 +1581,14 @@ namespace {
             table[E_OP_PN_ROT]   = opPNRot;
             table[E_OP_P_SHUF]   = opPShuf;
             table[E_OP_PN_SHUF]  = opPNShuf;
+            table[E_OP_P_ADD]    = opPAdd;
+            table[E_OP_PN_ADD]   = opPNAdd;
+            table[E_OP_P_ADDW]   = opPAddW;
+            table[E_OP_PN_ADDW]  = opPNAddW;
+            table[E_OP_P_SUB]    = opPSub;
+            table[E_OP_PN_SUB]   = opPNSub;
+            table[E_OP_P_SUBW]   = opPSubW;
+            table[E_OP_PN_SUBW]  = opPNSubW;
             table[E_OP_CV]       = opCv;
             table[E_OP_TR]       = opTr;
             table[E_OP_M]        = opM;
