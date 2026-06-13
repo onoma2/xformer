@@ -23,35 +23,32 @@ public:
 
     virtual void reset() override {
         init(_output);
+        tt2DelayClear(_tt2Track.runtime());
         _tickCount = 0;
+        _msAccum = 0.f;
+        _metroAccumMs = 0;
         _firstTick = true;
     }
-    virtual void restart() override { _firstTick = true; }
+    virtual void restart() override {
+        _firstTick = true;
+        _metroAccumMs = 0;
+    }
 
-    // Minimal tick model: run the boot/init script once on (re)start, then the
-    // metro script every clockDivisor master ticks. No real metro/trigger
-    // scheduler yet — this is the first live slice. Empty scripts are no-ops.
+    // Run the boot/init script once on (re)start. Periodic work (metro) and
+    // time-based work (delays) run in update(dt) on the real ms clock.
     virtual TickResult tick(uint32_t tick) override {
         (void)tick;
-        bool ran = false;
         if (_firstTick) {
             _firstTick = false;
             runScript(uint8_t(_tt2Track.program().bootScriptIndex));
-            ran = true;
+            return TickResult(CvUpdate | GateUpdate);
         }
-        int div = _tt2Track.program().clockDivisor;
-        if (div < 1) div = 1;
-        if ((_tickCount % uint32_t(div)) == 0) {
-            runScript(uint8_t(TT2_METRO_SCRIPT));
-            ran = true;
-        }
-        ++_tickCount;
-        return ran ? TickResult(CvUpdate | GateUpdate) : NoUpdate;
+        return NoUpdate;
     }
 
     // Real elapsed wall-time refresh (the 0.f recompose call is a no-op).
-    // Drains the ms delay queue, accumulating sub-millisecond remainder so
-    // slow refreshes still advance delays accurately.
+    // Drives the ms delay queue and the metro, accumulating sub-millisecond
+    // remainder so slow refreshes still advance time accurately.
     virtual void update(float dt) override {
         if (dt <= 0.f) {
             return;
@@ -60,7 +57,10 @@ public:
         int whole = int(_msAccum);
         if (whole > 0) {
             _msAccum -= float(whole);
-            tt2AdvanceDelays(_tt2Track.program(), _tt2Track.runtime(), _output, whole);
+            auto &program = _tt2Track.program();
+            auto &runtime = _tt2Track.runtime();
+            tt2AdvanceDelays(program, runtime, _output, whole);
+            tt2AdvanceMetro(program, runtime, _output, whole, _metroAccumMs);
         }
     }
 
@@ -102,6 +102,7 @@ private:
     TT2OutputState _output;
     uint32_t _tickCount = 0;
     float _msAccum = 0.f;
+    int _metroAccumMs = 0;
     bool _firstTick = true;
 };
 

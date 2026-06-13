@@ -105,3 +105,27 @@ inline void tt2AdvanceDelays(const TeletypeProgram &program, TT2Runtime &runtime
         }
     }
 }
+
+// Advance the metro by deltaMs and fire the METRO script every M ms while
+// active. Faithful to upstream: interval = variables.m (>=2ms), gated by
+// variables.m_act; the accumulator resets when inactive (re-enable starts
+// fresh, like the host re-adding the timer). Empty metro script = no-op.
+inline void tt2AdvanceMetro(const TeletypeProgram &program, TT2Runtime &runtime,
+                            TT2OutputState &output, int deltaMs, int &metroAccumMs) {
+    if (!runtime.variables.m_act) {
+        metroAccumMs = 0;
+        return;
+    }
+    if (program.scripts[TT2_METRO_SCRIPT].length == 0) {
+        return;
+    }
+    int interval = runtime.variables.m;
+    if (interval < 2) interval = 2;
+    metroAccumMs += deltaMs;
+    int guard = 0;
+    while (metroAccumMs >= interval && guard < 64) {
+        metroAccumMs -= interval;
+        runScript(program, runtime, output, uint8_t(TT2_METRO_SCRIPT));
+        ++guard;
+    }
+}
