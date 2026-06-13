@@ -848,6 +848,49 @@ static void opSL(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
 }
 
 // ---------------------------------------------------------------------------
+// Pattern ops — P.* (working pattern p_n) and PN.* (explicit pattern arg) over
+// the persisted TeletypeProgram.patterns[4] store. Semantics match patterns.c.
+// ---------------------------------------------------------------------------
+
+static int16_t normalisePn(int16_t pn) {
+    if (pn < 0) return 0;
+    if (pn >= TT2_PATTERN_COUNT) return TT2_PATTERN_COUNT - 1;
+    return pn;
+}
+
+// Patterns are mutable scene state persisted in TeletypeProgram; the evaluator
+// reaches the program through a const pointer (scripts don't change mid-run),
+// so pattern-write ops cast it away. The TT2Track::_program object is non-const.
+static TT2Pattern *mutablePattern(const TeletypeProgram *program, int16_t pn) {
+    if (!program) return nullptr;
+    return &const_cast<TeletypeProgram *>(program)->patterns[normalisePn(pn)];
+}
+
+// Negative idx counts from the back (upstream normalise_idx); clamp to range.
+static int16_t normaliseIdx(const TT2Pattern &p, int16_t idx) {
+    int16_t len = int16_t(p.len);
+    if (idx < 0) {
+        if (idx < -len) idx = 0;
+        else idx = len + idx;
+    }
+    if (idx >= TT2_PATTERN_LENGTH) idx = TT2_PATTERN_LENGTH - 1;
+    if (idx < 0) idx = 0;
+    return idx;
+}
+
+// P.N — working pattern selector.
+static void opPatternN(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                       int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    if (isSet && stackSize >= 1) {
+        int16_t a = 0;
+        if (!popStack(stack, stackSize, a, error)) return;
+        runtime.variables.p_n = normalisePn(a);
+    } else {
+        pushStack(stack, stackSize, runtime.variables.p_n, error);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Native op table
 // ---------------------------------------------------------------------------
 
@@ -933,6 +976,7 @@ namespace {
             table[E_OP_S_POP]    = opSPop;
             table[E_OP_S_CLR]    = opSClr;
             table[E_OP_S_L]      = opSL;
+            table[E_OP_P_N]      = opPatternN;
             table[E_OP_CV]       = opCv;
             table[E_OP_TR]       = opTr;
             table[E_OP_M]        = opM;
