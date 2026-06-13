@@ -197,6 +197,151 @@ static void opSgn(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // ---------------------------------------------------------------------------
+// Logic / range ops (boolean results are 1/0)
+// ---------------------------------------------------------------------------
+
+static void opAnd(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0, b = 0;
+    if (!popBinary(stack, stackSize, a, b, error)) return;
+    pushStack(stack, stackSize, int16_t(a && b), error);
+}
+
+static void opOr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0, b = 0;
+    if (!popBinary(stack, stackSize, a, b, error)) return;
+    pushStack(stack, stackSize, int16_t(a || b), error);
+}
+
+static void opAnd3(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0, b = 0, c = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    if (!popStack(stack, stackSize, b, error)) return;
+    if (!popStack(stack, stackSize, c, error)) return;
+    pushStack(stack, stackSize, int16_t(a && b && c), error);
+}
+
+static void opOr3(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0, b = 0, c = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    if (!popStack(stack, stackSize, b, error)) return;
+    if (!popStack(stack, stackSize, c, error)) return;
+    pushStack(stack, stackSize, int16_t(a || b || c), error);
+}
+
+static void opAnd4(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0, b = 0, c = 0, d = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    if (!popStack(stack, stackSize, b, error)) return;
+    if (!popStack(stack, stackSize, c, error)) return;
+    if (!popStack(stack, stackSize, d, error)) return;
+    pushStack(stack, stackSize, int16_t(a && b && c && d), error);
+}
+
+static void opOr4(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0, b = 0, c = 0, d = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    if (!popStack(stack, stackSize, b, error)) return;
+    if (!popStack(stack, stackSize, c, error)) return;
+    if (!popStack(stack, stackSize, d, error)) return;
+    pushStack(stack, stackSize, int16_t(a || b || c || d), error);
+}
+
+static void opNz(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    pushStack(stack, stackSize, int16_t(a != 0), error);
+}
+
+static void opEz(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    pushStack(stack, stackSize, int16_t(a == 0), error);
+}
+
+// LIM value lo hi -> clamp value to [lo, hi]
+static void opLim(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t i = 0, a = 0, b = 0;
+    if (!popStack(stack, stackSize, i, error)) return;
+    if (!popStack(stack, stackSize, a, error)) return;
+    if (!popStack(stack, stackSize, b, error)) return;
+    pushStack(stack, stackSize, int16_t(i < a ? a : (i > b ? b : i)), error);
+}
+
+// WRAP value lo hi -> wrap value into the [lo, hi] cycle
+static void opWrap(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t i = 0, a = 0, b = 0, c = 0;
+    if (!popStack(stack, stackSize, i, error)) return;
+    if (!popStack(stack, stackSize, a, error)) return;
+    if (!popStack(stack, stackSize, b, error)) return;
+    if (a < b) {
+        c = b - a + 1;
+        while (i >= b) i -= c;
+        while (i < a) i += c;
+    } else {
+        c = a - b + 1;
+        while (i >= a) i -= c;
+        while (i < b) i += c;
+    }
+    pushStack(stack, stackSize, i, error);
+}
+
+static void opAvg(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0, b = 0;
+    if (!popBinary(stack, stackSize, a, b, error)) return;
+    int32_t ret = ((int32_t(a) * 2) + (int32_t(b) * 2)) / 2;
+    if (ret % 2) ret += 1;
+    pushStack(stack, stackSize, int16_t(ret / 2), error);
+}
+
+// INR/OUTR family: lo x hi (upstream arg order)
+static bool popRange(int16_t *stack, uint8_t &stackSize,
+                     int16_t &lo, int16_t &x, int16_t &hi, TT2EvalError &error) {
+    if (!popStack(stack, stackSize, lo, error)) return false;
+    if (!popStack(stack, stackSize, x, error)) return false;
+    if (!popStack(stack, stackSize, hi, error)) return false;
+    return true;
+}
+
+static void opInr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t lo = 0, x = 0, hi = 0;
+    if (!popRange(stack, stackSize, lo, x, hi, error)) return;
+    pushStack(stack, stackSize, int16_t((lo < x) && (x < hi)), error);
+}
+
+static void opOutr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t lo = 0, x = 0, hi = 0;
+    if (!popRange(stack, stackSize, lo, x, hi, error)) return;
+    pushStack(stack, stackSize, int16_t((lo > x) || (x > hi)), error);
+}
+
+static void opInri(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t lo = 0, x = 0, hi = 0;
+    if (!popRange(stack, stackSize, lo, x, hi, error)) return;
+    pushStack(stack, stackSize, int16_t((lo <= x) && (x <= hi)), error);
+}
+
+static void opOutri(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t lo = 0, x = 0, hi = 0;
+    if (!popRange(stack, stackSize, lo, x, hi, error)) return;
+    pushStack(stack, stackSize, int16_t((lo >= x) || (x >= hi)), error);
+}
+
+// ---------------------------------------------------------------------------
 // Output ops
 // ---------------------------------------------------------------------------
 
@@ -373,6 +518,28 @@ namespace {
             table[E_OP_SYM_RIGHT_ANGLED_EQUAL]   = opGte;
             table[E_OP_ABS]      = opAbs;
             table[E_OP_SGN]      = opSgn;
+            table[E_OP_AND]                = opAnd;
+            table[E_OP_SYM_AMPERSAND_x2]   = opAnd;
+            table[E_OP_OR]                 = opOr;
+            table[E_OP_SYM_PIPE_x2]        = opOr;
+            table[E_OP_AND3]               = opAnd3;
+            table[E_OP_SYM_AMPERSAND_x3]   = opAnd3;
+            table[E_OP_OR3]                = opOr3;
+            table[E_OP_SYM_PIPE_x3]        = opOr3;
+            table[E_OP_AND4]               = opAnd4;
+            table[E_OP_SYM_AMPERSAND_x4]   = opAnd4;
+            table[E_OP_OR4]                = opOr4;
+            table[E_OP_SYM_PIPE_x4]        = opOr4;
+            table[E_OP_NZ]       = opNz;
+            table[E_OP_EZ]       = opEz;
+            table[E_OP_LIM]      = opLim;
+            table[E_OP_WRAP]     = opWrap;
+            table[E_OP_WRP]      = opWrap;
+            table[E_OP_AVG]      = opAvg;
+            table[E_OP_INR]      = opInr;
+            table[E_OP_OUTR]     = opOutr;
+            table[E_OP_INRI]     = opInri;
+            table[E_OP_OUTRI]    = opOutri;
             table[E_OP_CV]       = opCv;
             table[E_OP_TR]       = opTr;
             table[E_OP_M]        = opM;

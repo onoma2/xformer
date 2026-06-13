@@ -499,4 +499,99 @@ UNIT_TEST("TeletypeV2NativeOps") {
         expectEqual(int(result.error), int(TT2EvalError::None), "eval ok");
         expectEqual(runtime.variables.m, int16_t(2), "M clamped to 2");
     }
+
+    // -- batch 2: logic / range -----------------------------------------
+
+    CASE("logic_and_or") {
+        int16_t v = 0;
+        expectEqual(int(evalValue("AND 1 1", v)), int(TT2EvalError::None), "AND ok");
+        expectEqual(v, int16_t(1), "AND 1 1 = 1");
+        expectEqual(int(evalValue("AND 1 0", v)), int(TT2EvalError::None), "AND ok");
+        expectEqual(v, int16_t(0), "AND 1 0 = 0");
+        expectEqual(int(evalValue("&& 5 3", v)), int(TT2EvalError::None), "&& ok");
+        expectEqual(v, int16_t(1), "&& 5 3 = 1 (truthy operands)");
+        expectEqual(int(evalValue("OR 0 0", v)), int(TT2EvalError::None), "OR ok");
+        expectEqual(v, int16_t(0), "OR 0 0 = 0");
+        expectEqual(int(evalValue("|| 0 7", v)), int(TT2EvalError::None), "|| ok");
+        expectEqual(v, int16_t(1), "|| 0 7 = 1");
+    }
+
+    CASE("logic_and3_or3_and4_or4") {
+        int16_t v = 0;
+        expectEqual(int(evalValue("AND3 1 1 1", v)), int(TT2EvalError::None), "AND3 ok");
+        expectEqual(v, int16_t(1), "AND3 1 1 1 = 1");
+        expectEqual(int(evalValue("&&& 1 0 1", v)), int(TT2EvalError::None), "&&& ok");
+        expectEqual(v, int16_t(0), "&&& 1 0 1 = 0");
+        expectEqual(int(evalValue("OR3 0 0 0", v)), int(TT2EvalError::None), "OR3 ok");
+        expectEqual(v, int16_t(0), "OR3 0 0 0 = 0");
+        expectEqual(int(evalValue("||| 0 1 0", v)), int(TT2EvalError::None), "||| ok");
+        expectEqual(v, int16_t(1), "||| 0 1 0 = 1");
+        expectEqual(int(evalValue("AND4 1 1 1 1", v)), int(TT2EvalError::None), "AND4 ok");
+        expectEqual(v, int16_t(1), "AND4 all 1 = 1");
+        expectEqual(int(evalValue("&&&& 1 1 0 1", v)), int(TT2EvalError::None), "&&&& ok");
+        expectEqual(v, int16_t(0), "&&&& 1 1 0 1 = 0");
+        expectEqual(int(evalValue("OR4 0 0 0 0", v)), int(TT2EvalError::None), "OR4 ok");
+        expectEqual(v, int16_t(0), "OR4 all 0 = 0");
+        expectEqual(int(evalValue("|||| 0 0 1 0", v)), int(TT2EvalError::None), "|||| ok");
+        expectEqual(v, int16_t(1), "|||| 0 0 1 0 = 1");
+    }
+
+    CASE("nz_ez") {
+        int16_t v = 0;
+        expectEqual(int(evalValue("NZ 5", v)), int(TT2EvalError::None), "NZ ok");
+        expectEqual(v, int16_t(1), "NZ 5 = 1");
+        expectEqual(int(evalValue("NZ 0", v)), int(TT2EvalError::None), "NZ ok");
+        expectEqual(v, int16_t(0), "NZ 0 = 0");
+        expectEqual(int(evalValue("EZ 0", v)), int(TT2EvalError::None), "EZ ok");
+        expectEqual(v, int16_t(1), "EZ 0 = 1");
+        expectEqual(int(evalValue("EZ 5", v)), int(TT2EvalError::None), "EZ ok");
+        expectEqual(v, int16_t(0), "EZ 5 = 0");
+    }
+
+    CASE("lim_clamp") {
+        int16_t v = 0;
+        expectEqual(int(evalValue("LIM 5 0 10", v)), int(TT2EvalError::None), "LIM ok");
+        expectEqual(v, int16_t(5), "LIM 5 0 10 = 5");
+        expectEqual(int(evalValue("LIM -3 0 10", v)), int(TT2EvalError::None), "LIM ok");
+        expectEqual(v, int16_t(0), "LIM -3 0 10 = 0");
+        expectEqual(int(evalValue("LIM 99 0 10", v)), int(TT2EvalError::None), "LIM ok");
+        expectEqual(v, int16_t(10), "LIM 99 0 10 = 10");
+    }
+
+    CASE("wrap_and_wrp") {
+        int16_t v = 0;
+        expectEqual(int(evalValue("WRAP 12 0 10", v)), int(TT2EvalError::None), "WRAP ok");
+        expectEqual(v, int16_t(1), "WRAP 12 0 10 = 1");
+        expectEqual(int(evalValue("WRAP -1 0 10", v)), int(TT2EvalError::None), "WRAP ok");
+        expectEqual(v, int16_t(10), "WRAP -1 0 10 = 10");
+        expectEqual(int(evalValue("WRP 12 0 10", v)), int(TT2EvalError::None), "WRP ok");
+        expectEqual(v, int16_t(1), "WRP aliases WRAP");
+    }
+
+    CASE("avg_round") {
+        int16_t v = 0;
+        expectEqual(int(evalValue("AVG 4 6", v)), int(TT2EvalError::None), "AVG ok");
+        expectEqual(v, int16_t(5), "AVG 4 6 = 5");
+        expectEqual(int(evalValue("AVG 3 4", v)), int(TT2EvalError::None), "AVG ok");
+        expectEqual(v, int16_t(4), "AVG 3 4 = 4 (rounds up)");
+    }
+
+    CASE("range_tests_inr_outr") {
+        int16_t v = 0;
+        // arg order matches upstream: lo x hi
+        expectEqual(int(evalValue("INR 0 5 10", v)), int(TT2EvalError::None), "INR ok");
+        expectEqual(v, int16_t(1), "INR 0 5 10 = 1");
+        expectEqual(int(evalValue("INR 0 10 10", v)), int(TT2EvalError::None), "INR ok");
+        expectEqual(v, int16_t(0), "INR exclusive upper = 0");
+        expectEqual(int(evalValue("INRI 0 10 10", v)), int(TT2EvalError::None), "INRI ok");
+        expectEqual(v, int16_t(1), "INRI inclusive upper = 1");
+        expectEqual(int(evalValue("OUTR 0 5 10", v)), int(TT2EvalError::None), "OUTR ok");
+        expectEqual(v, int16_t(0), "OUTR inside = 0");
+        expectEqual(int(evalValue("OUTR 0 -1 10", v)), int(TT2EvalError::None), "OUTR ok");
+        expectEqual(v, int16_t(1), "OUTR below lo = 1");
+        expectEqual(int(evalValue("OUTRI 0 5 10", v)), int(TT2EvalError::None), "OUTRI ok");
+        expectEqual(v, int16_t(0), "OUTRI strictly inside = 0");
+        expectEqual(int(evalValue("OUTRI 0 0 10", v)), int(TT2EvalError::None), "OUTRI ok");
+        expectEqual(v, int16_t(1), "OUTRI on lo bound = 1 (inclusive outside)");
+    }
 }
