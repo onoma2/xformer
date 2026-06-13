@@ -76,6 +76,13 @@ public:
     void init();
     void update();
 
+    // Engine::update() timing probe (µs, wall clock). Temporary instrumentation
+    // for the -Os timing check — worst-case main-loop processing vs tick budget.
+    uint32_t engineUpdateLastUs() const { return _updateLastUs; }
+    uint32_t engineUpdateMaxUs() const { return _updateMaxUs; }
+    uint32_t engineUpdateMaxTicks() const { return _updateMaxTicks; }
+    void resetEngineUpdateStats() { _updateLastUs = 0; _updateMaxUs = 0; _updateMaxTicks = 0; }
+
     // locking temporarily puts the engine in a state where completely skips all updates
     // lock should only be hold for very short amounts of time
     void lock();
@@ -306,6 +313,12 @@ private:
 
     WallClock _wallClock;
     uint32_t _lastWallUs = 0;
+
+    void updateImpl();
+    uint32_t _updateLastUs = 0;
+    uint32_t _updateMaxUs = 0;
+    uint32_t _updateTicks = 0;
+    uint32_t _updateMaxTicks = 0;
 
     // midi monitoring
     struct {

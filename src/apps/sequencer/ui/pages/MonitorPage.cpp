@@ -106,6 +106,8 @@ MonitorPage::MonitorPage(PageManager &manager, PageContext &context) :
 {}
 
 void MonitorPage::enter() {
+    // Fresh worst-case window each time the page opens (drops the boot spike).
+    _engine.resetEngineUpdateStats();
 }
 
 void MonitorPage::exit() {
@@ -311,6 +313,24 @@ void MonitorPage::drawStats(Canvas &canvas) {
     {
         FixedStringBuilder<16> str("%d", stats.usbMidiRxOverflow);
         drawValue(2, "USBMIDI OVF:", str);
+    }
+
+    {
+        // Worst Engine::update() since page open, paired with how many ticks it
+        // drained — per-tick µs vs the tick budget is the real "keeping up" metric.
+        // update() batches all pending ticks, so a high total over many ticks is
+        // fine; only a high PER-TICK % means the engine is falling behind.
+        uint32_t maxUs = _engine.engineUpdateMaxUs();
+        uint32_t maxTicks = _engine.engineUpdateMaxTicks();
+        float budgetUs = _engine.clock().tickDuration() * 1e6f;
+        if (maxTicks > 0 && budgetUs > 0.f) {
+            int perTickPct = int((maxUs / float(maxTicks)) * 100.f / budgetUs);
+            FixedStringBuilder<24> str("%uus/%ut %d%%", maxUs, maxTicks, perTickPct);
+            drawValue(3, "ENG WORST:", str);
+        } else {
+            FixedStringBuilder<24> str("%uus", maxUs);
+            drawValue(3, "ENG WORST:", str);
+        }
     }
 
 }

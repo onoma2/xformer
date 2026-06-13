@@ -77,7 +77,47 @@ void Project::clear() {
     setSelectedPatternIndex(0);
 
     // load demo project on simulator
-#if PLATFORM_SIM
+    //
+    // STRESS_TIMING_DEMO: temporary -Os timing-probe patch. When 1, a fresh
+    // project (New Project / factory init) boots a heavy 8-track patch on BOTH
+    // hardware and sim, for reading the MonitorPage "ENG WORST" probe under load.
+    // Set back to 0 when the timing experiment is done. Non-destructive — loading
+    // a saved project still overwrites clear().
+#define STRESS_TIMING_DEMO 0
+#if STRESS_TIMING_DEMO
+    // 8 active tracks across the heaviest engines at fast tempo. RAM-safe: only
+    // ONE Stochastic track (two have hardfaulted on boot — see PROJECT.md).
+    setTempo(240.f);
+    setScale(2);
+
+    track(0).setTrackMode(Track::TrackMode::Stochastic);
+
+    track(1).setTrackMode(Track::TrackMode::PhaseFlux);
+    track(1).phaseFluxTrack().setOctave(+1);
+    track(2).setTrackMode(Track::TrackMode::PhaseFlux);
+
+    track(3).setTrackMode(Track::TrackMode::Curve);
+    {
+        auto &c = curveSequence(3, 0);
+        c.setDivisor(12);   // fast sweep — CV churn every few ticks
+        c.setFirstStep(0);
+        c.setLastStep(15);
+        for (int i = 0; i < 16; ++i) {
+            auto &s = c.step(i);
+            s.setShape(3);
+            s.setMin(0);
+            s.setMax(255);
+        }
+    }
+
+    track(4).setTrackMode(Track::TrackMode::Tuesday);
+
+    for (int t = 5; t <= 7; ++t) {
+        track(t).setTrackMode(Track::TrackMode::Note);
+        noteSequence(t, 0).setLastStep(15);
+        noteSequence(t, 0).setGates({ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 });
+    }
+#elif PLATFORM_SIM
     // Track 1: Curve track as CV source for DiscreteMap
     track(0).setTrackMode(Track::TrackMode::Curve);
     auto &curve = curveSequence(0, 0);

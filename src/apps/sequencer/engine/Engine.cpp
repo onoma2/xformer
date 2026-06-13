@@ -64,6 +64,18 @@ void Engine::init() {
 }
 
 void Engine::update() {
+    _updateTicks = 0;
+    uint32_t start = _wallClock.now();
+    updateImpl();
+    uint32_t elapsed = _wallClock.now() - start;
+    _updateLastUs = elapsed;
+    if (elapsed > _updateMaxUs) {
+        _updateMaxUs = elapsed;
+        _updateMaxTicks = _updateTicks;
+    }
+}
+
+void Engine::updateImpl() {
     // locking
     _locked = _requestLock;
     if (_locked) {
@@ -161,6 +173,7 @@ void Engine::update() {
     uint32_t tick;
     while (_clock.checkTick(&tick)) {
         _tick = tick;
+        ++_updateTicks;
 
         // update play state
         updatePlayState(true);
