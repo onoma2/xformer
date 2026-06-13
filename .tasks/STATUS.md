@@ -271,13 +271,13 @@ Tuesday `WobblerV2/Sources/Pendulum.c` — spec after Spring lands.
 
 ---
 
-## 🟡 wallclock-time-architecture — WallClock service ✅ (B) + PhaseFlux/Stochastic onto tickPosition (A, remaining)
-**Status:** B SHIPPED, A remaining (verified 2026-06-13).
-**Where I stopped:** Two gaps. **(B) WallClock service — DONE:** `src/apps/sequencer/engine/WallClock.h` (+ `TestWallClock.cpp`) is the 64-bit µs free-running reference; Engine.cpp computes a wrap-safe `dt` from it and the scattered `os::ticks()` sites moved onto it (modulator `dt`, MidiOutputEngine, CvGateToMidiConverter, TeletypeBridge). The modulator Hz mode is its first consumer. **(A) PhaseFlux + Stochastic onto `tickPosition()` — NOT done:** both still re-derive phase from discrete integer tick while six other engines read the continuous `Clock::tickPosition()`. ER-101 ref `OTHERS/ortagonal/er-101/wallclock.h`.
-**Next action:** Item A — PhaseFlux + Stochastic read `Clock::tickPosition()`; verify timing parity. (Also confirm whether the ER-101 slave-period outlier guard landed with B or is still open.)
+## 🟡 wallclock-time-architecture — WallClock substrate ✅ (B) + tickPosition/MidiCv/slave-guard remaining
+**Status:** B substrate SHIPPED + adopted; A + 2 small B sites remaining (verified 2026-06-13; rewrite TASK.md 2026-06-09).
+**Where I stopped:** Two halves. **(B) wall-time substrate — built & adopted:** `src/apps/sequencer/engine/WallClock.h` (+ `WallTimer`, `TestWallClock.cpp`) is a **32-bit µs wrap-safe** free-running clock (NOT 64-bit — wraps ~71min, harmless `(int32_t)(now-end)` deltas, 4MS-Catalyst precedent). Adopted by Engine `dt` (modulator Free-Hz mode), MidiOutputEngine CC rate-limit, CvGateToMidiConverter, TeletypeBridge. **Remaining on B:** MidiCv voice scheduling not yet migrated onto it; the slave-clock outlier guard not yet folded in. **(A) phase-source unification — NOT started:** PhaseFlux + Stochastic still re-derive phase from discrete integer tick while every other engine reads continuous `Clock::tickPosition()` — move both onto `tickPosition()`.
+**Next action:** finish B's two sites (MidiCv voice onto `WallTimer`, slave-period outlier guard), then A (PhaseFlux + Stochastic onto `tickPosition()`, verify timing parity).
 **Depends on:** nothing. Overlaps performer-improvements Phase 0 (slave-clock filter — same fix, this is its proper home).
 **Branch:** TBD
-**Reference:** `docs/plans/2026-05-29-wallclock-time-architecture-design.md` (validated design). ER-101 source at `OTHERS/ortagonal/er-101/` (`wallclock.h`, `res-er-clock.md`).
+**Reference:** root `TASK.md` (canonical — the 2026-06-09 rewrite: 32-bit, substrate-already-built, smaller remaining scope). `docs/plans/2026-05-29-wallclock-time-architecture-design.md` is the original design (proposed 64-bit — superseded). ER-101 source at `OTHERS/ortagonal/er-101/` (`wallclock.h`, `res-er-clock.md`).
 
 ---
 
