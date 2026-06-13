@@ -119,8 +119,12 @@ Phase 2 sandbox/smoke complete through narrow native SCRIPT calls. Cleanup done.
 
 Next semantic step is narrow delay scheduling.
 
+**Governing contract (reaffirmed 2026-06-13): TT2 = the Teletype language, BEHAVIOUR-IDENTICAL.** Only the architecture changes (native runtime, no bridge, 8 outputs, hardware ops dropped). Every kept op's semantics must match upstream exactly — no native shortcuts. (Already in `docs/teletype_v2.md`: "preserve core Teletype syntax and behavior", "don't rename core ops".)
+
+**Engine wiring — DONE (`44289ed5`, 2026-06-13).** `TrackMode::TeletypeV2` live: `TT2Track` in the Track variant, `TT2TrackEngine` is a real `TrackEngine` subclass (boot-script-on-start + metro-script-every-`clockDivisor` minimal tick), Engine dispatch wired, serialize tag 9 (no version bump). `loadScriptText()` (Ragel→lower→store) + `TestTeletypeV2RealScript` run real script text end-to-end. sim + STM32 release green; 0 new test failures. Full trigger-input + true metro scheduling still pending (this was a minimal vertical slice).
+
 Phase 2b candidates:
-- Delay scheduling (`DEL`, then `DEL.CLR`)
+- **Delay scheduling (`DEL`, then `DEL.CLR`) — NEXT, faithful ms port.** Upstream model (grounded `teletype/src/ops/delay.c` + `teletype.c:362-419`): parallel-array queue (`TT2DelayEntry`/`TT2DelayQueue` already match — `command` + `time`(ms) + origin script/`I`/fparam), `time==0` = empty slot, delay `<1→1` clamp, drain decrements each slot's ms and fires due bodies via a fresh exec frame with origin restored. **`DEL` delay unit = MILLISECONDS** (identical Teletype). Drive the drain from `TT2TrackEngine::update(dt)` — `dt*1000` is real elapsed ms (the `update(0.f)` recompose call is guarded out), mirroring v1 `advanceTime`. Narrow slice = `DEL n: body` one-shot + `DEL.CLR`; `.X/.R/.G/.B` repeat variants follow.
 - `$` / function calls and return values
 - `BREAK` / `KILL`
 - Full trigger input and metro scheduling (wire TT2TrackEngine into `Engine::TrackEngineContainer` and `Engine.cpp` track creation)
