@@ -193,6 +193,10 @@ void TrackPage::setTrack(Track &track) {
         _teletypeTrackListModel.setTrack(track.teletypeTrack(), _project, track.trackIndex());
         newListModel = &_teletypeTrackListModel;
         break;
+    case Track::TrackMode::TeletypeV2:
+        // No TT2 track-config list model yet (I/O grid deferred); TT2 routes its track
+        // view to the script editor. Cover the enum to keep the switch exhaustive.
+        break;
     case Track::TrackMode::Stochastic:
         _stochasticTrackListModel.setTrack(track.stochasticTrack(), _project, &_engine);
         newListModel = &_stochasticTrackListModel;
