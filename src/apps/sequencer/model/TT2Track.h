@@ -43,4 +43,4 @@ private:
     friend class Track;
 };
 
-static_assert(sizeof(TT2Track) == 4552, "TT2Track size drift");
+static_assert(sizeof(TT2Track) == 4600, "TT2Track size drift");

@@ -160,6 +160,22 @@ UNIT_TEST("TeletypeV2Language") {
         expectEqual(int(getv("SCRIPT.POL 3", runtime, output)), 1, "SCRIPT.POL 0 sets all");
     }
 
+    CASE("tr_width_divisor") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        evalText("TR.W 1 50", runtime, output);
+        expectEqual(int(getv("TR.W 1", runtime, output)), 50, "TR.W set/get");
+        evalText("TR.D 1 2", runtime, output);
+        expectEqual(int(getv("TR.D 1", runtime, output)), 2, "TR.D set/get");
+        // divisor 2: first TR.P skipped, second fires
+        evalText("TR.W 1 0", runtime, output);   // disable width so tr_time used
+        evalText("TR.TIME 1 40", runtime, output);
+        evalText("TR.P 1", runtime, output);
+        expectTrue(output.tr[0].pulseRemainingMs == 0, "divisor skips 1st pulse");
+        evalText("TR.P 1", runtime, output);
+        expectTrue(output.tr[0].pulseRemainingMs == 40, "divisor fires 2nd pulse");
+    }
+
     CASE("init_family_resets_state") {
         TT2Runtime runtime = {}; init(runtime);
         TT2OutputState output = {}; init(output);

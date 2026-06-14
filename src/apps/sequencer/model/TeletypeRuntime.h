@@ -59,6 +59,9 @@ struct TT2Variables {
     int16_t tr[TT2_TR_COUNT];
     int16_t tr_pol[TT2_TR_COUNT];
     int16_t tr_time[TT2_TR_COUNT];
+    int16_t tr_width[TT2_TR_COUNT];   // pulse width %, 0 = use tr_time
+    int16_t tr_div[TT2_TR_COUNT];     // pulse divisor (fire every Nth)
+    uint8_t tr_div_count[TT2_TR_COUNT];
     int16_t seed;
     int16_t in_min;
     int16_t in_max;
@@ -192,6 +195,7 @@ struct TT2Runtime {
     uint8_t inputLevel[TT2_TRIGGER_INPUT_COUNT];  // latched trigger levels for STATE
     uint32_t clockMs;                             // engine ms clock for TIME / LAST
     uint32_t scriptLastMs[TT2_SCRIPT_COUNT];      // clockMs at each script's last run
+    uint8_t metroResetReq;                        // M.RESET -> engine zeroes the metro phase
 };
 
 // Variable defaults (shared by init() and the INIT.DATA op). Zeroes the
@@ -224,6 +228,9 @@ inline void tt2InitVariables(TT2Variables &v) {
     for (int i = 0; i < TT2_TR_COUNT; ++i) {
         v.tr_pol[i] = 1;
         v.tr_time[i] = 100;
+        v.tr_width[i] = 0;
+        v.tr_div[i] = 1;
+        v.tr_div_count[i] = 0;
     }
     v.in_min = 0;
     v.in_max = 16383;
@@ -258,7 +265,7 @@ inline void init(TT2Runtime &r) {
 }
 
 // sizeof guards are <= bounds verified on ARM STM32 release builds.
-static_assert(sizeof(TT2Variables) <= 404, "TT2Variables size drift");
+static_assert(sizeof(TT2Variables) <= 440, "TT2Variables size drift");
 static_assert(sizeof(TT2RuntimeCommand) <= 52, "TT2RuntimeCommand size drift");
 static_assert(sizeof(TT2Stack) <= 804, "TT2Stack size drift");
 static_assert(sizeof(TT2DelayEntry) <= 62, "TT2DelayEntry size drift");
@@ -268,7 +275,7 @@ static_assert(sizeof(TT2Metro) <= 14, "TT2Metro size drift");
 static_assert(sizeof(TT2Rng) <= 22, "TT2Rng size drift");
 static_assert(sizeof(TT2ExecFrame) <= 22, "TT2ExecFrame size drift");
 static_assert(sizeof(TT2ExecState) <= 164, "TT2ExecState size drift");
-static_assert(sizeof(TT2Runtime) <= 2160, "TT2Runtime size drift");
+static_assert(sizeof(TT2Runtime) <= 2208, "TT2Runtime size drift");
 
 // Active execution context accessors — resolve through the exec stack.
 // depth must be > 0 (set by runScript or future nested execution).

@@ -949,12 +949,75 @@ static void opTrPulse(TT2Runtime &runtime, TT2OutputState &output,
                       uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_TR_COUNT)) return;
-    int16_t timeMs = runtime.variables.tr_time[idx];
+    auto &v = runtime.variables;
+    // Divisor: fire only every Nth call (TR.D).
+    int div = v.tr_div[idx]; if (div < 1) div = 1;
+    if (div > 1) {
+        uint8_t c = uint8_t(v.tr_div_count[idx] + 1);
+        if (c < div) { v.tr_div_count[idx] = c; return; }
+        v.tr_div_count[idx] = 0;
+    }
+    // Width: if TR.W>0, pulse length = (metro period * div) * width% ; else tr_time.
+    int timeMs = v.tr_time[idx];
+    if (v.tr_width[idx] > 0) {
+        int interval = int(v.m) * div;
+        timeMs = interval * v.tr_width[idx] / 100;
+        if (timeMs < 1) timeMs = 1;
+        if (timeMs > 32767) timeMs = 32767;
+    }
     if (timeMs <= 0) return;
-    uint8_t pol = runtime.variables.tr_pol[idx] ? 1 : 0;
-    runtime.variables.tr[idx] = pol;
-    tt2ArmTrPulse(output.tr[idx], pol, timeMs);
+    uint8_t pol = v.tr_pol[idx] ? 1 : 0;
+    v.tr[idx] = pol;
+    tt2ArmTrPulse(output.tr[idx], pol, int16_t(timeMs));
     output.trDirty |= uint8_t(1 << idx);
+}
+
+// TR.W n pct — pulse width as % of the metro interval (0 = use TR.TIME).
+static void opTrW(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_TR_COUNT)) return;
+    if (isSet && stackSize >= 1) {
+        int16_t pct = 0; if (!popStack(stack, stackSize, pct, error)) return;
+        if (pct < 0) pct = 0;
+        runtime.variables.tr_width[idx] = pct;
+    } else {
+        pushStack(stack, stackSize, runtime.variables.tr_width[idx], error);
+    }
+}
+
+// TR.D n div — pulse divisor (fire every Nth TR.P).
+static void opTrD(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_TR_COUNT)) return;
+    if (isSet && stackSize >= 1) {
+        int16_t d = 0; if (!popStack(stack, stackSize, d, error)) return;
+        if (d < 1) d = 1;
+        runtime.variables.tr_div[idx] = d;
+        runtime.variables.tr_div_count[idx] = 0;
+    } else {
+        pushStack(stack, stackSize, runtime.variables.tr_div[idx], error);
+    }
+}
+
+// M.RESET / M.RESET.A — request the engine zero the metro phase.
+static void opMReset(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                     int16_t *, uint8_t &, bool, TT2EvalError &) {
+    runtime.metroResetReq = 1;
+}
+
+// SYNC count — set every-counters so the next EVERY boundary is `count` away.
+static void opSync(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t count = 0;
+    if (!popStack(stack, stackSize, count, error)) return;
+    for (int s = 0; s < TT2_SCRIPT_COUNT; ++s) {
+        for (int l = 0; l < TT2_COMMANDS_PER_SCRIPT; ++l) {
+            TT2EveryCount &e = runtime.every.every[s][l];
+            if (e.mod > 0) { e.count = int16_t(count % e.mod); if (e.count < 0) e.count += e.mod; }
+        }
+    }
 }
 
 // TR.TOG n — flip the current level. Action op (no value pushed).
@@ -3517,6 +3580,11 @@ namespace {
             table[E_OP_M_ACT_A]            = opMActA;
             table[E_OP_SCRIPT_POL]         = opScriptPol;
             table[E_OP_SYM_DOLLAR_POL]     = opScriptPol;
+            table[E_OP_TR_W]               = opTrW;
+            table[E_OP_TR_D]               = opTrD;
+            table[E_OP_M_RESET]            = opMReset;
+            table[E_OP_M_RESET_A]          = opMReset;
+            table[E_OP_SYNC]               = opSync;
             table[E_OP_R]        = opR;
             table[E_OP_R_MIN]    = opRMin;
             table[E_OP_R_MAX]    = opRMax;
