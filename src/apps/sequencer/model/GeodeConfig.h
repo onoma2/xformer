@@ -48,7 +48,14 @@ public:
     // per-voice tune ratio (dormant first cut; default voice i = (i+1):1)
     int tuneNumerator(int v) const { return _tuneNum[v]; }
     int tuneDenominator(int v) const { return _tuneDen[v]; }
-    void setTune(int v, int num, int den) { _tuneNum[v] = num; _tuneDen[v] = den; }
+    // 0/0 resets to the default ratio (voice v -> (v+1):1), matching
+    // GeodeEngine::setVoiceTune. Storing raw 0/0 would never match the engine's
+    // reset value, so Engine::update would re-push it every tick (churn).
+    void setTune(int v, int num, int den) {
+        if (num == 0 || den == 0) { num = v + 1; den = 1; }
+        _tuneNum[v] = num;
+        _tuneDen[v] = den;
+    }
 
     void clear() {
         _active = false;

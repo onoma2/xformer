@@ -18,7 +18,7 @@ namespace {
 struct GeodeStubHost : TT2Host {
     GeodeConfig geode;
     Modulator mod;
-    int16_t runMacro = 8192;
+    int runOffset = 0;   // mirrors the real host: run lives in modulator(1).offset (-64..63)
     int16_t mix = 0;
     int triggerVoiceCount = 0, lastVoice = -1, lastDivs = 0, lastReps = 0;
     int triggerAllCount = 0, lastAllDivs = 0, lastAllReps = 0;
@@ -56,8 +56,16 @@ struct GeodeStubHost : TT2Host {
     void hostGeodeTriggerAll(int16_t divs, int16_t reps) override {
         ++triggerAllCount; lastAllDivs = divs; lastAllReps = reps;
     }
-    int16_t hostGeodeRun() override { return runMacro; }
-    void hostGeodeSetRun(int16_t m) override { runMacro = m; }
+    // Mirror the real host: store M2 offset (integer), so readback is quantized
+    // to the 128-step offset grid (NOT a lossless macro store).
+    int16_t hostGeodeRun() override {
+        int m = (runOffset + 64) * 128;
+        return int16_t(m > 16383 ? 16383 : m);
+    }
+    void hostGeodeSetRun(int16_t macro) override {
+        if (macro < 0) macro = 0; if (macro > 16383) macro = 16383;
+        runOffset = macro / 128 - 64;
+    }
 };
 
 TT2EvalResult evalText(const char *text, TT2Runtime &rt, TT2OutputState &out) {
@@ -96,14 +104,15 @@ CASE("short aliases hit the same handler") {
     tt2SetActiveHost(nullptr);
 }
 
-CASE("G.RUN run macro (via host), alias G.N") {
+CASE("G.RUN run macro is quantized to the M2 offset grid, alias G.N") {
     GeodeStubHost host; tt2SetActiveHost(&host);
     TT2Runtime rt = {}; init(rt); TT2OutputState out = {}; init(out);
+    // run lives in M2's integer offset, so readback snaps to the 128-step grid:
     evalText("G.RUN 12000", rt, out);
-    expectEqual(int(host.runMacro), 12000, "G.RUN set macro");
-    expectEqual(int(evalText("G.RUN", rt, out).value), 12000, "G.RUN get macro");
+    expectEqual(int(evalText("G.RUN", rt, out).value), 11904, "12000 -> 11904 (quantized)");
+    // a grid-aligned value (multiple of 128) round-trips exactly:
     evalText("G.N 4096", rt, out);
-    expectEqual(int(host.runMacro), 4096, "G.N aliases G.RUN");
+    expectEqual(int(evalText("G.N", rt, out).value), 4096, "G.N alias; 4096 grid-aligned, exact");
     tt2SetActiveHost(nullptr);
 }
 
@@ -146,10 +155,10 @@ CASE("G.V triggers voice (0 = all)") {
 CASE("G.S sets time/tone/run in one line") {
     GeodeStubHost host; tt2SetActiveHost(&host);
     TT2Runtime rt = {}; init(rt); TT2OutputState out = {}; init(out);
-    evalText("G.S 1000 2000 3000", rt, out);
+    evalText("G.S 1000 2000 3072", rt, out);   // 3072 = 24*128, grid-aligned
     expectEqual(host.geode.time(), 1000, "G.S time");
     expectEqual(host.geode.intone(), 2000, "G.S tone");
-    expectEqual(int(host.runMacro), 3000, "G.S run");
+    expectEqual(int(evalText("G.RUN", rt, out).value), 3072, "G.S run (read back via host)");
     tt2SetActiveHost(nullptr);
 }
 
