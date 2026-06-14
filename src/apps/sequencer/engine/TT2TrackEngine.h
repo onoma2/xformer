@@ -131,6 +131,9 @@ public:
     TT2OutputState &output() { return _output; }
     const TT2OutputState &output() const { return _output; }
 
+    // Live trigger-input state (rising-edge sampled), for the editor HUD.
+    bool inputState(uint8_t index) const;
+
     // Convert a raw 0..16383 CV value to Performer float volts (-5V .. +5V).
     static float rawToVolts(int16_t raw) {
         if (raw < 0) raw = 0;
@@ -188,7 +191,6 @@ private:
     // cvInput/gateOutput/trackEngine).
     void updateInputTriggers();
     void sampleInputs();
-    bool inputState(uint8_t index) const;
     float cvSourceVolts(TT2CvInputSource source) const;
     void processMidiMessage(const MidiMessage &message);
 

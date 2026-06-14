@@ -36,6 +36,9 @@ private:
     void setEditBuffer(const char *text);
     void commitLineAndAdvance();
 
+    void drawHud(Canvas &canvas);
+    void drawBipolarBar(Canvas &canvas, int x, int y, int w, int h, int raw, Color fill, Color outline);
+
     int _selectedLine = 0;
     int _cursor = 0;
     int _scriptIndex = 0;

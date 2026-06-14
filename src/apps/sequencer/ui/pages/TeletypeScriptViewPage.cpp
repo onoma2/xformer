@@ -28,6 +28,9 @@ constexpr int kRowStepY = 8;
 constexpr int kEditLineY = 54;
 constexpr int kLabelX = 4;
 constexpr int kTextX = 16;
+constexpr int kHudX = 192;       // live-value HUD region (script text clamps to its left)
+constexpr int kHudColPitch = 8;
+constexpr int kHudColW = 6;
 // Trigger scripts get a function key each; metro/init are reached via [ ] nav.
 constexpr int kTriggerScriptCount = 4;
 } // namespace
@@ -115,7 +118,7 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
         }
     }
 
-    const int maxTextWidth = scriptX - 2 - kTextX;
+    const int maxTextWidth = kHudX - 2 - kTextX;
     for (int i = 0; i < kLineCount; ++i) {
         int y = kRowStartY + i * kRowStepY;
         char lineText[TT2_PRINT_LINE_MAX] = {};
@@ -186,6 +189,71 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
         canvas.setColor(Color::Bright);
         canvas.drawText(cursorX, kEditLineY, cursorStr);
         canvas.setBlendMode(BlendMode::Set);
+    }
+
+    drawHud(canvas);
+}
+
+// Bipolar value bar: raw 0..16383, 8192 = center. Frame + inner level fill.
+void TeletypeScriptViewPage::drawBipolarBar(Canvas &canvas, int x, int y, int w, int h, int raw, Color fill, Color outline) {
+    canvas.setColor(outline);
+    canvas.drawRect(x, y, w, h);
+    int val = raw - 8192;
+    int mag = val < 0 ? -val : val;
+    int half = (h - 2) / 2;
+    int bar = clamp(mag * half / 8192, 0, half);
+    int cy = y + h / 2;
+    if (bar > 0) {
+        canvas.setColor(fill);
+        if (val >= 0) {
+            canvas.fillRect(x + 1, cy - bar, w - 2, bar);
+        } else {
+            canvas.fillRect(x + 1, cy + 1, w - 2, bar);
+        }
+    }
+}
+
+// Live-value HUD: CV(8) bars + TR(8) gate squares + TI(4) input squares +
+// IN/PARAM/BUS bars. Activity readout only — no routing assignment (deferred).
+void TeletypeScriptViewPage::drawHud(Canvas &canvas) {
+    auto &track = _project.selectedTrack().tt2Track();
+    auto &runtime = track.runtime();
+    auto &trackEngine = _engine.selectedTrackEngine().as<TT2TrackEngine>();
+    const auto &output = trackEngine.output();
+
+    // CV row: 8 bipolar bars (live value).
+    for (int i = 0; i < 8; ++i) {
+        int x = kHudX + i * kHudColPitch;
+        int raw = clamp(int(output.cv[i].currentQ >> 8), 0, 16383);
+        drawBipolarBar(canvas, x, 12, kHudColW, 15, raw, Color::MediumBright, Color::Low);
+    }
+    // TR row: 8 gate squares (frame + inner surface lit when high).
+    for (int i = 0; i < 8; ++i) {
+        int x = kHudX + i * kHudColPitch;
+        canvas.setColor(Color::Low);
+        canvas.drawRect(x, 30, kHudColW, kHudColW);
+        if (output.tr[i].level != 0) {
+            canvas.setColor(Color::Bright);
+            canvas.fillRect(x + 1, 31, kHudColW - 2, kHudColW - 2);
+        }
+    }
+    // TI: 4 trigger-input squares, under columns 0-3 (left edge flush with top).
+    for (int i = 0; i < TT2_TRIGGER_INPUT_COUNT; ++i) {
+        int x = kHudX + i * kHudColPitch;
+        canvas.setColor(Color::Low);
+        canvas.drawRect(x, 43, kHudColW, kHudColW);
+        if (trackEngine.inputState(i)) {
+            canvas.setColor(Color::Bright);
+            canvas.fillRect(x + 1, 44, kHudColW - 2, kHudColW - 2);
+        }
+    }
+    // IN / PARAM (bright) + BUS x4 (dim); last BUS edge flush with the top row.
+    drawBipolarBar(canvas, 225, 41, 4, 11, clamp(int(runtime.variables.in), 0, 16383), Color::MediumBright, Color::Low);
+    drawBipolarBar(canvas, 230, 41, 4, 11, clamp(int(runtime.variables.param), 0, 16383), Color::MediumBright, Color::Low);
+    static const int kBusX[4] = { 235, 240, 245, 250 };
+    for (int i = 0; i < 4; ++i) {
+        int raw = clamp(int((_engine.busCv(i) + 5.f) / 10.f * 16383.f), 0, 16383);
+        drawBipolarBar(canvas, kBusX[i], 41, 4, 11, raw, Color::MediumLow, Color::Low);
     }
 }
 
