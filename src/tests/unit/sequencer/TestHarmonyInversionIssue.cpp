@@ -429,13 +429,16 @@ CASE("sequence_level_voicing_storage") {
     expectEqual(seq.harmonyVoicing(), 3, "voicing 3 should be stored");
 }
 
-CASE("per_step_voicing_override_storage") {
+CASE("per_step_voicing_override_dropped") {
+    // Per-step voicing override was dropped (its step bitfield space was
+    // reallocated to accumulatorStepValue). Getter is hardwired to 0
+    // (UseSequence), setter is a no-op — assert it stays dropped.
     NoteSequence seq(0);
 
-    expectEqual(seq.step(0).voicingOverride(), 0, "default voicing override should be 0");
+    expectEqual(seq.step(0).voicingOverride(), 0, "voicing override reads 0 (dropped)");
 
     seq.step(0).setVoicingOverride(2);
-    expectEqual(seq.step(0).voicingOverride(), 2, "voicing override should be stored");
+    expectEqual(seq.step(0).voicingOverride(), 0, "setter is a no-op (feature dropped)");
 }
 
 } // UNIT_TEST("Harmony Inversion Issue Investigation")

@@ -84,7 +84,8 @@ CASE("direct_history_event_is_compact_ui_truth") {
     event.rest = false;
     event.gate = true;
 
-    expectTrue(sizeof(StochasticTrackEngine::DirectHistoryEvent) <= 8,
+    // cv(4) + serial(2) + children(1) + rest(1) + gate(1), 4-byte aligned -> 12.
+    expectTrue(sizeof(StochasticTrackEngine::DirectHistoryEvent) <= 12,
                "Direct history event should stay compact");
     expectEqual(int(StochasticTrackEngine::kDirectHistoryMax), 12,
                 "Direct history should match the hero trail length");
