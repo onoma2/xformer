@@ -2,6 +2,52 @@
 #include "ProjectVersion.h"
 #include "StochasticTypes.h"
 
+#if PLATFORM_SIM
+#include "engine/TT2ScriptLoader.h"
+namespace {
+// Seed a TeletypeV2 track with demo scripts spanning the op surface so the
+// simulator boots an auditable TT2 patch without hand-typing on hardware.
+// Trigger scripts S1-S4 = indices 0-3, metro = 4, init = 5.
+void seedTeletypeV2Demo(TeletypeProgram &p) {
+    loadScriptText(p, 0,                  // S1: classic ops
+        "CV 2 N 7\n"
+        "TR.P 2\n"
+        "IF GT X 8 : CV 3 V 3\n"
+        "EVERY 4 : TR.P 3\n"
+        "Y RRAND 0 10\n"
+        "CV 4 N Y\n");
+    loadScriptText(p, 1,                  // S2: Performer window + BUS (cross-track)
+        "WBPM 130\n"
+        "WR 1\n"
+        "CV 5 BUS 1\n"
+        "WNG 2 0 1\n"
+        "WNN 2 0 7\n");
+    loadScriptText(p, 2,                  // S3: modulator ops
+        "MO.SHAPE 2 3\n"
+        "MO.RATE 2 60\n"
+        "MO.DEPTH 2 100\n"
+        "MO.TRIG 2\n");
+    loadScriptText(p, 3,                  // S4: Geode
+        "G.MODE 1\n"
+        "G.TUNE 1 2\n"
+        "G.V 1 4 2\n"
+        "G.V 0 2 1\n"
+        "G.RUN 64\n");
+    loadScriptText(p, TT2_METRO_SCRIPT,   // M: periodic classic + BUS write
+        "CV 1 RND V 5\n"
+        "TR.P 1\n"
+        "X ADD X 1\n"
+        "BUS 1 N X\n");
+    loadScriptText(p, TT2_INIT_SCRIPT,    // I: boot config (runs once on start)
+        "MO.SHAPE 1 1\n"
+        "MO.RATE 1 40\n"
+        "MO.DEPTH 1 90\n"
+        "M 500\n"
+        "M.ACT 1\n");
+}
+} // namespace
+#endif
+
 Project::Project() :
     _playState(*this),
     _routing(*this)
@@ -118,18 +164,10 @@ void Project::clear() {
         noteSequence(t, 0).setGates({ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 });
     }
 #elif PLATFORM_SIM
-    // Track 1: Curve track as CV source for DiscreteMap
-    track(0).setTrackMode(Track::TrackMode::Curve);
-    auto &curve = curveSequence(0, 0);
-    curve.setDivisor(192);  // Slow sweep
-    curve.setFirstStep(0);
-    curve.setLastStep(0);  // Single step for simple ramp
-
-    // Single curve step sweeping full range
-    auto &cv = curve.step(0);
-    cv.setShape(3);  // Linear
-    cv.setMin(0);    // -5V
-    cv.setMax(255);  // +5V
+    // Track 1: TeletypeV2 showcase - 6 scripts spanning the op surface so the sim
+    // boots an auditable TT2 patch (classic / Performer W. + BUS / MO / Geode).
+    track(0).setTrackMode(Track::TrackMode::TeletypeV2);
+    seedTeletypeV2Demo(track(0).tt2Track().program());
 
     noteSequence(1, 0).setLastStep(15);
     noteSequence(1, 0).setGates({ 0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0 });
