@@ -1,5 +1,7 @@
 #pragma once
 
+#include "MidiConfig.h"
+
 #include <cassert>
 #include <cstdint>
 #include <cstring>
@@ -96,6 +98,7 @@ struct TeletypeProgram {
     TT2Pattern patterns[TT2_PATTERN_COUNT];
     TT2TriggerSource triggerSource[TT2_TRIGGER_INPUT_COUNT];
     TT2CvInputSource cvInputSource[TT2_CV_INPUT_COUNT];
+    MidiSourceConfig midiSource;  // per-track MIDI filter (port + channel); UI deferred
 };
 
 inline void init(TeletypeProgram &p) {
@@ -122,6 +125,7 @@ inline void init(TeletypeProgram &p) {
     p.cvInputSource[int(TT2CvInput::Param)] = TT2CvInputSource::CvIn2;
     p.cvInputSource[int(TT2CvInput::X)]     = TT2CvInputSource::CvIn3;
     p.cvInputSource[int(TT2CvInput::Y)]     = TT2CvInputSource::CvIn4;
+    p.midiSource = MidiSourceConfig();  // proper default (memset cleared it above)
 }
 
 inline TT2Command *scriptCommand(TT2Script &s, uint8_t index) {
@@ -156,4 +160,4 @@ inline int16_t *patternVal(TT2Pattern &pat, uint16_t index) {
 static_assert(sizeof(TT2Command) <= 52, "TT2Command size drift");
 static_assert(sizeof(TT2Pattern) <= 140, "TT2Pattern size drift");
 static_assert(sizeof(TT2Script) <= 304, "TT2Script size drift");
-static_assert(sizeof(TeletypeProgram) <= 2384, "TeletypeProgram size drift");
+static_assert(sizeof(TeletypeProgram) <= 2392, "TeletypeProgram size drift");

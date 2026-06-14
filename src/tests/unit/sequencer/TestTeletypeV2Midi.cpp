@@ -132,6 +132,15 @@ UNIT_TEST("TeletypeV2Midi") {
         expectEqual(int(getv("MI.N", runtime, output)), 0, "empty MI.N 0");
     }
 
+    CASE("midi_config_defaults") {
+        TT2Runtime runtime = {}; init(runtime);
+        expectEqual(int(runtime.midi.on_script), -1, "on_script disabled by default");
+        expectEqual(int(runtime.midi.off_script), -1, "off_script disabled");
+        expectEqual(int(runtime.midi.cc_script), -1, "cc_script disabled");
+        TeletypeProgram program; init(program);
+        expectTrue(program.midiSource.port() == MidiSourceConfig().port(), "midiSource default port");
+    }
+
     CASE("mi_dollar_script_binding") {
         TT2Runtime runtime = {}; init(runtime);
         TT2OutputState output = {}; init(output);
