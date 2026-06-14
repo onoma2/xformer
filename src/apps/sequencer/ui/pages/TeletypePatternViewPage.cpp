@@ -175,6 +175,12 @@ void TeletypePatternViewPage::updateLeds(Leds &leds) {
 }
 
 void TeletypePatternViewPage::keyPress(KeyPressEvent &event) {
+    // Input can arrive at this (pushed) page before draw() closes it on a mode
+    // change; bail before any tt2Track() deref on a non-TT2 track.
+    if (_project.selectedTrack().trackMode() != Track::TrackMode::TeletypeV2) {
+        return;
+    }
+
     const auto &key = event.key();
 
     if (key.pageModifier()) {
@@ -266,11 +272,18 @@ void TeletypePatternViewPage::keyPress(KeyPressEvent &event) {
 }
 
 void TeletypePatternViewPage::encoder(EncoderEvent &event) {
+    if (_project.selectedTrack().trackMode() != Track::TrackMode::TeletypeV2) {
+        return;
+    }
     moveRow(event.value());
     event.consume();
 }
 
 void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
+    if (_project.selectedTrack().trackMode() != Track::TrackMode::TeletypeV2) {
+        return;
+    }
+
     const uint8_t keycode = event.keycode();
 
     // Ctrl+shortcuts

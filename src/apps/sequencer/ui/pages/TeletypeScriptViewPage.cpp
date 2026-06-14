@@ -265,6 +265,12 @@ void TeletypeScriptViewPage::setLiveMode(bool enabled) {
 }
 
 void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
+    // Input can arrive at this (pushed) page before draw() closes it on a mode
+    // change; bail before any tt2Track() deref on a non-TT2 track.
+    if (_project.selectedTrack().trackMode() != Track::TrackMode::TeletypeV2) {
+        return;
+    }
+
     const auto &key = event.key();
 
     if (key.pageModifier()) {
@@ -371,6 +377,9 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
 }
 
 void TeletypeScriptViewPage::encoder(EncoderEvent &event) {
+    if (_project.selectedTrack().trackMode() != Track::TrackMode::TeletypeV2) {
+        return;
+    }
     if (globalKeyState()[Key::Shift]) {
         int next = _selectedLine + event.value();
         if (next < 0) {
@@ -746,6 +755,10 @@ void TeletypeScriptViewPage::setEditBuffer(const char *text) {
 }
 
 void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
+    if (_project.selectedTrack().trackMode() != Track::TrackMode::TeletypeV2) {
+        return;
+    }
+
     const uint8_t keycode = event.keycode();
 
     // F1-F5: run scripts or metro

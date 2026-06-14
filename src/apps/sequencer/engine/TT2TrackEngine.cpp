@@ -120,6 +120,31 @@ void TT2TrackEngine::sampleInputs() {
     }
 }
 
+// --- UI live-exec / trigger (host-scoped + engine-locked) ---
+
+TT2EvalResult TT2TrackEngine::runLiveCommand(const TT2Command &cmd) {
+    _engine.lock();
+    TT2EvalResult result;
+    {
+        ScopedHost host(this);
+        result = evaluateCommand(cmd, _tt2Track.runtime(), _output, &_tt2Track.program());
+    }
+    _engine.unlock();
+    return result;
+}
+
+void TT2TrackEngine::triggerScript(int scriptIndex) {
+    if (scriptIndex < 0 || scriptIndex >= TT2_SCRIPT_COUNT) {
+        return;
+    }
+    _engine.lock();
+    {
+        ScopedHost host(this);
+        runScript(uint8_t(scriptIndex));
+    }
+    _engine.unlock();
+}
+
 // --- TT2Host: live engine / cross-track access for W*/BUS/RT ops ---
 
 int16_t TT2TrackEngine::hostTempo() {

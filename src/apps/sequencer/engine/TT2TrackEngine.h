@@ -120,24 +120,13 @@ public:
         return ::runScript(_tt2Track.program(), _tt2Track.runtime(), _output, scriptIndex);
     }
 
-    // UI live-exec: run one already-parsed/lowered command against this track's
-    // program/runtime/output with this engine installed as the scoped host, so
-    // host ops (W*/BUS/MO/G) resolve. Synchronous on the UI thread, mirroring
-    // the legacy live path. The caller reads the result (value/stackSize).
-    TT2EvalResult runLiveCommand(const TT2Command &cmd) {
-        ScopedHost host(this);
-        return evaluateCommand(cmd, _tt2Track.runtime(), _output, &_tt2Track.program());
-    }
-
-    // UI script trigger: fire a whole script by index with the host active.
-    // Name-parity with the legacy engine; same synchronous UI-thread semantics.
-    void triggerScript(int scriptIndex) {
-        if (scriptIndex < 0 || scriptIndex >= TT2_SCRIPT_COUNT) {
-            return;
-        }
-        ScopedHost host(this);
-        runScript(uint8_t(scriptIndex));
-    }
+    // UI live-exec / trigger entry points. Each installs this engine as the
+    // scoped host (so W*/BUS/MO/G resolve) AND holds Engine::lock() for the
+    // duration — the UI thread mutates runtime/output that engine update() also
+    // touches. Synchronous on the UI thread, mirroring the legacy live path.
+    // Defined in the .cpp (need the full Engine definition to lock).
+    TT2EvalResult runLiveCommand(const TT2Command &cmd);
+    void triggerScript(int scriptIndex);
 
     TT2OutputState &output() { return _output; }
     const TT2OutputState &output() const { return _output; }
