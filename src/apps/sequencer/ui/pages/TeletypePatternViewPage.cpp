@@ -5,16 +5,14 @@
 #include "ui/LedPainter.h"
 #include "ui/MatrixMap.h"
 
+#include "model/TT2Track.h"
+
 #include "core/math/Math.h"
 #include "core/utils/StringBuilder.h"
 
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
-
-extern "C" {
-#include "state.h"
-}
 
 namespace {
 constexpr int kRowCount = 8;
@@ -46,7 +44,7 @@ void TeletypePatternViewPage::enter() {
 }
 
 void TeletypePatternViewPage::draw(Canvas &canvas) {
-    if (_project.selectedTrack().trackMode() != Track::TrackMode::Teletype) {
+    if (_project.selectedTrack().trackMode() != Track::TrackMode::TeletypeV2) {
         close();
         return;
     }
@@ -56,22 +54,19 @@ void TeletypePatternViewPage::draw(Canvas &canvas) {
     canvas.setFont(Font::Tele);
     canvas.setBlendMode(BlendMode::Set);
 
-    auto &track = _project.selectedTrack().teletypeTrack();
-    scene_state_t &state = track.state();
-    FixedStringBuilder<4> slotLabel("P%d", track.activePatternSlot() + 1);
-    canvas.setColor(Color::Medium);
-    canvas.drawText(Width - 2 - canvas.textWidth(slotLabel), 7, slotLabel);
+    auto &track = _project.selectedTrack().tt2Track();
+    auto &program = track.program();
+    auto &runtime = track.runtime();
 
-    int16_t *varPtr = &state.variables.a;
+    int16_t *varPtr = &runtime.variables.a;
     const char *varNames[] = { "A", "B", "C", "D", "X", "Y", "Z", "T" };
     const int varIndices[] = { 0, 2, 4, 6, 1, 3, 5, 7 };
     const int varsValueRight = kVarsX + 18;
     const int varsDotX = varsValueRight + 2;
     const int varsLabelX = varsValueRight + 6;
-    scene_turtle_t *turtle = ss_turtle_get(&state);
-    const bool turtleShown = turtle_get_shown(turtle);
-    const uint8_t turtleX = turtle_get_x(turtle);
-    const uint8_t turtleY = turtle_get_y(turtle);
+    const bool turtleShown = runtime.turtle.shown != 0;
+    const int turtleX = int(runtime.turtle.position.x);
+    const int turtleY = int(runtime.turtle.position.y);
 
     for (int rowIndex = 0; rowIndex < kRowCount; ++rowIndex) {
         int row = _offset + rowIndex;
@@ -87,9 +82,10 @@ void TeletypePatternViewPage::draw(Canvas &canvas) {
 
         // Pattern values
         for (int col = 0; col < kColumnCount; ++col) {
+            const TT2Pattern &pat = program.patterns[col];
             char valueText[12];
-            int16_t value = ss_get_pattern_val(&state, col, row);
-            int16_t len = ss_get_pattern_len(&state, col);
+            int16_t value = pat.val[row];
+            int16_t len = int16_t(pat.len);
             if (_editingNumber && col == _patternIndex && row == _row) {
                 std::snprintf(valueText, sizeof(valueText), "%d", int(_editBuffer));
             } else {
@@ -105,8 +101,8 @@ void TeletypePatternViewPage::draw(Canvas &canvas) {
             canvas.drawText(x, y + kTextYOffset, valueText);
 
             // Loop range indicator (dotted)
-            int16_t start = ss_get_pattern_start(&state, col);
-            int16_t end = ss_get_pattern_end(&state, col);
+            int16_t start = pat.start;
+            int16_t end = pat.end;
             if (row >= start && row <= end) {
                 int glyphX = kGridX + col * kColumnWidth + kColumnWidth - 2;
                 canvas.setColor(valueColor);
@@ -114,7 +110,7 @@ void TeletypePatternViewPage::draw(Canvas &canvas) {
             }
 
             // Playhead marker
-            int16_t idx = ss_get_pattern_idx(&state, col);
+            int16_t idx = pat.idx;
             if (row == idx) {
                 int headX = rightX;
                 canvas.setColor(Color::Bright);
@@ -287,7 +283,7 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
             event.consume();
             return;
         case KeyboardEvent::KeyEnd:
-            _row = PATTERN_LENGTH - 1;
+            _row = TT2_PATTERN_LENGTH - 1;
             ensureRowVisible();
             _editingNumber = false;
             event.consume();
@@ -295,12 +291,11 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
         case 0x06: // C
             // Copy current cell value
             {
-                auto &track = _project.selectedTrack().teletypeTrack();
-                scene_state_t &state = track.state();
+                auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
                 if (_editingNumber) {
                     _valueCopyBuffer = _editBuffer;
                 } else {
-                    _valueCopyBuffer = ss_get_pattern_val(&state, _patternIndex, _row);
+                    _valueCopyBuffer = pat.val[_row];
                 }
                 showMessage("VALUE COPIED");
             }
@@ -309,11 +304,9 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
         case 0x19: // V
             // Paste value
             {
-                auto &track = _project.selectedTrack().teletypeTrack();
-                scene_state_t &state = track.state();
+                auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
                 _engine.lock();
-                ss_set_pattern_val(&state, _patternIndex, _row, _valueCopyBuffer);
-                syncPattern();
+                pat.val[_row] = _valueCopyBuffer;
                 _engine.unlock();
                 _editingNumber = false;
             }
@@ -322,9 +315,8 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
         case 0x1B: // X
             // Cut: copy + delete
             {
-                auto &track = _project.selectedTrack().teletypeTrack();
-                scene_state_t &state = track.state();
-                _valueCopyBuffer = ss_get_pattern_val(&state, _patternIndex, _row);
+                auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
+                _valueCopyBuffer = pat.val[_row];
                 deleteRow();
                 showMessage("VALUE CUT");
             }
@@ -351,7 +343,7 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
     if (keycode == KeyboardEvent::KeyDown) {
         if (event.alt()) {
             // Alt+Down: page down
-            _row = std::min(_row + 8, PATTERN_LENGTH - 1);
+            _row = std::min(_row + 8, TT2_PATTERN_LENGTH - 1);
             ensureRowVisible();
         } else {
             moveRow(1);
@@ -388,7 +380,7 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
         } else {
             commitEdit();
             // Move down after commit
-            if (_row < PATTERN_LENGTH - 1) {
+            if (_row < TT2_PATTERN_LENGTH - 1) {
                 _row++;
                 ensureRowVisible();
             }
@@ -420,12 +412,9 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
 
     // Space: toggle between 0 and 1
     if (keycode == KeyboardEvent::KeySpace) {
-        auto &track = _project.selectedTrack().teletypeTrack();
-        scene_state_t &state = track.state();
+        auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
         _engine.lock();
-        int16_t val = ss_get_pattern_val(&state, _patternIndex, _row);
-        ss_set_pattern_val(&state, _patternIndex, _row, val ? 0 : 1);
-        syncPattern();
+        pat.val[_row] = pat.val[_row] ? 0 : 1;
         _engine.unlock();
         _editingNumber = false;
         event.consume();
@@ -441,24 +430,20 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
 
     // [ and ]: decrement/increment value by 1
     if (event.ch() == '[') {
-        auto &track = _project.selectedTrack().teletypeTrack();
-        scene_state_t &state = track.state();
+        auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
         _engine.lock();
-        int16_t val = ss_get_pattern_val(&state, _patternIndex, _row);
-        ss_set_pattern_val(&state, _patternIndex, _row, val == INT16_MIN ? INT16_MAX : val - 1);
-        syncPattern();
+        int16_t val = pat.val[_row];
+        pat.val[_row] = val == INT16_MIN ? INT16_MAX : val - 1;
         _engine.unlock();
         _editingNumber = false;
         event.consume();
         return;
     }
     if (event.ch() == ']') {
-        auto &track = _project.selectedTrack().teletypeTrack();
-        scene_state_t &state = track.state();
+        auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
         _engine.lock();
-        int16_t val = ss_get_pattern_val(&state, _patternIndex, _row);
-        ss_set_pattern_val(&state, _patternIndex, _row, val == INT16_MAX ? INT16_MIN : val + 1);
-        syncPattern();
+        int16_t val = pat.val[_row];
+        pat.val[_row] = val == INT16_MAX ? INT16_MIN : val + 1;
         _engine.unlock();
         _editingNumber = false;
         event.consume();
@@ -490,7 +475,7 @@ void TeletypePatternViewPage::moveRow(int delta) {
     if (delta == 0) {
         return;
     }
-    _row = clamp(_row + delta, 0, PATTERN_LENGTH - 1);
+    _row = clamp(_row + delta, 0, TT2_PATTERN_LENGTH - 1);
     ensureRowVisible();
     _editingNumber = false;
 }
@@ -501,34 +486,28 @@ void TeletypePatternViewPage::ensureRowVisible() {
     } else if (_row >= _offset + kRowCount) {
         _offset = _row - (kRowCount - 1);
     }
-    _offset = clamp(_offset, 0, PATTERN_LENGTH - kRowCount);
+    _offset = clamp(_offset, 0, TT2_PATTERN_LENGTH - kRowCount);
 }
 
 void TeletypePatternViewPage::commitEdit() {
     if (!_editingNumber) {
         return;
     }
-    auto &track = _project.selectedTrack().teletypeTrack();
-    scene_state_t &state = track.state();
+    auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
     int16_t value = clamp<int32_t>(_editBuffer, INT16_MIN, INT16_MAX);
     _engine.lock();
-    ss_set_pattern_val(&state, _patternIndex, _row, value);
-    uint16_t len = ss_get_pattern_len(&state, _patternIndex);
-    if (_row >= len && len < PATTERN_LENGTH) {
-        ss_set_pattern_len(&state, _patternIndex, _row + 1);
+    pat.val[_row] = value;
+    if (_row >= int(pat.len) && pat.len < TT2_PATTERN_LENGTH) {
+        pat.len = uint16_t(_row + 1);
     }
-    syncPattern();
     _engine.unlock();
     _editingNumber = false;
 }
 
 void TeletypePatternViewPage::backspaceDigit() {
     if (!_editingNumber) {
-        auto &track = _project.selectedTrack().teletypeTrack();
-        scene_state_t &state = track.state();
-        _engine.lock();
-        _editBuffer = ss_get_pattern_val(&state, _patternIndex, _row);
-        _engine.unlock();
+        auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
+        _editBuffer = pat.val[_row];
         _editingNumber = true;
     }
     _editBuffer /= 10;
@@ -546,56 +525,50 @@ void TeletypePatternViewPage::insertDigit(int digit) {
 }
 
 void TeletypePatternViewPage::insertRow() {
-    auto &track = _project.selectedTrack().teletypeTrack();
-    scene_state_t &state = track.state();
-    const int16_t idx = _row;
+    auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
+    const int idx = _row;
 
     _engine.lock();
-    const int16_t len = ss_get_pattern_len(&state, _patternIndex);
-    const int16_t value = ss_get_pattern_val(&state, _patternIndex, idx);
-    const int16_t maxIndex = std::min<int16_t>(len, PATTERN_LENGTH - 1);
+    const int len = int(pat.len);
+    const int16_t value = pat.val[idx];
+    const int maxIndex = std::min<int>(len, TT2_PATTERN_LENGTH - 1);
 
     if (maxIndex >= idx) {
-        for (int16_t i = maxIndex; i > idx; --i) {
-            int16_t v = ss_get_pattern_val(&state, _patternIndex, i - 1);
-            ss_set_pattern_val(&state, _patternIndex, i, v);
+        for (int i = maxIndex; i > idx; --i) {
+            pat.val[i] = pat.val[i - 1];
         }
-        if (len < PATTERN_LENGTH - 1) {
-            ss_set_pattern_len(&state, _patternIndex, len + 1);
+        if (len < TT2_PATTERN_LENGTH - 1) {
+            pat.len = uint16_t(len + 1);
         }
-    } else if (idx >= len && idx < PATTERN_LENGTH) {
-        ss_set_pattern_len(&state, _patternIndex, idx + 1);
+    } else if (idx >= len && idx < TT2_PATTERN_LENGTH) {
+        pat.len = uint16_t(idx + 1);
     }
 
-    ss_set_pattern_val(&state, _patternIndex, idx, value);
-    syncPattern();
+    pat.val[idx] = value;
     _engine.unlock();
     _editingNumber = false;
 }
 
 void TeletypePatternViewPage::deleteRow() {
-    auto &track = _project.selectedTrack().teletypeTrack();
-    scene_state_t &state = track.state();
-    const int16_t idx = _row;
+    auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
+    const int idx = _row;
 
     _engine.lock();
-    const int16_t len = ss_get_pattern_len(&state, _patternIndex);
+    const int len = int(pat.len);
     if (len <= 0) {
         _engine.unlock();
         return;
     }
-    int16_t newLen = len;
+    int newLen = len;
     if (idx < len) {
-        for (int16_t i = idx; i < len - 1; ++i) {
-            int16_t v = ss_get_pattern_val(&state, _patternIndex, i + 1);
-            ss_set_pattern_val(&state, _patternIndex, i, v);
+        for (int i = idx; i < len - 1; ++i) {
+            pat.val[i] = pat.val[i + 1];
         }
         newLen = len - 1;
-        ss_set_pattern_len(&state, _patternIndex, newLen);
+        pat.len = uint16_t(newLen);
     }
-    syncPattern();
     _engine.unlock();
-    int maxRow = std::max<int>(static_cast<int>(newLen) - 1, 0);
+    int maxRow = std::max<int>(newLen - 1, 0);
     _row = clamp(_row, 0, maxRow);
     ensureRowVisible();
     _editingNumber = false;
@@ -606,56 +579,38 @@ void TeletypePatternViewPage::negateValue() {
         _editBuffer = -_editBuffer;
         return;
     }
-    auto &track = _project.selectedTrack().teletypeTrack();
-    scene_state_t &state = track.state();
-    _engine.lock();
-    _editBuffer = -ss_get_pattern_val(&state, _patternIndex, _row);
-    _engine.unlock();
+    auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
+    _editBuffer = -pat.val[_row];
     _editingNumber = true;
 }
 
 void TeletypePatternViewPage::toggleTurtle() {
-    auto &track = _project.selectedTrack().teletypeTrack();
-    scene_state_t &state = track.state();
+    auto &runtime = _project.selectedTrack().tt2Track().runtime();
     _engine.lock();
-    scene_turtle_t *turtle = ss_turtle_get(&state);
-    turtle_set_shown(turtle, !turtle_get_shown(turtle));
+    runtime.turtle.shown = runtime.turtle.shown ? 0 : 1;
     _engine.unlock();
 }
 
 void TeletypePatternViewPage::setLength() {
-    auto &track = _project.selectedTrack().teletypeTrack();
-    scene_state_t &state = track.state();
+    auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
     _engine.lock();
-    ss_set_pattern_len(&state, _patternIndex, _row + 1);
-    syncPattern();
+    pat.len = uint16_t(clamp(_row + 1, 0, TT2_PATTERN_LENGTH));
     _engine.unlock();
     _editingNumber = false;
 }
 
 void TeletypePatternViewPage::setStart() {
-    auto &track = _project.selectedTrack().teletypeTrack();
-    scene_state_t &state = track.state();
+    auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
     _engine.lock();
-    ss_set_pattern_start(&state, _patternIndex, _row);
-    syncPattern();
+    pat.start = int16_t(_row);
     _engine.unlock();
     _editingNumber = false;
 }
 
 void TeletypePatternViewPage::setEnd() {
-    auto &track = _project.selectedTrack().teletypeTrack();
-    scene_state_t &state = track.state();
+    auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
     _engine.lock();
-    ss_set_pattern_end(&state, _patternIndex, _row);
-    syncPattern();
+    pat.end = int16_t(_row);
     _engine.unlock();
     _editingNumber = false;
-}
-
-void TeletypePatternViewPage::syncPattern() {
-    auto &track = _project.selectedTrack().teletypeTrack();
-    scene_state_t &state = track.state();
-    track.setTeletypePattern(_patternIndex, state.patterns[_patternIndex]);
-    track.captureActiveClip();
 }

@@ -27,7 +27,6 @@ private:
     void setLength();
     void setStart();
     void setEnd();
-    void syncPattern();
 
     int _patternIndex = 0;
     int _row = 0;   // absolute row 0..63
