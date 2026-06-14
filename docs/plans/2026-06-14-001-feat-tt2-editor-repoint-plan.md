@@ -12,28 +12,32 @@ depth: standard
 
 ## Summary
 
-Give `TrackMode::TeletypeV2` an on-device editor by **reusing the existing,
-working Teletype edit pages** (`TeletypeScriptViewPage`, `TeletypePatternViewPage`
-— line editing, live mode, pattern editing all already work) rather than rebuilding
-them. The pages today bind to the original Teletype's `scene_state_t` C-API; this
-plan adds a **native TT2 data layer** beneath them and makes them **TrackMode-aware**
-so the same UI drives either backend.
+Give `TrackMode::TeletypeV2` an on-device editor by repointing the existing Teletype
+edit pages (`TeletypeScriptViewPage`, `TeletypePatternViewPage`) to the **native TT2
+data layer** — **single backend, native-only**. The pages bind `scene_state_t` today;
+this plan replaces that editing path with the native one and **retires legacy Teletype
+as an editable/selectable track mode**, ending the dual-track-type situation. The bridge
+engine + C VM are kept *only* as the parity harness's reference, then deleted once parity
+is locked.
 
-**Decided architecture (do not re-litigate):**
-- **Option B** — keep the Teletype **Ragel lexer** (`parse()`) for text input (trusted dialect spec, already ships); display via the **native `TT2Command → text` printer** — **shipped** as `TT2Printer` + the generated `TT2OpNames` registry (plan 007). No `tele_command_t` round-trip, no `print_command`, no `tele_ops[]`. Names are **generated from `match_token.rl`**, not a hand-written table (see Key Decisions).
-- **Transitional coexist** — orig Teletype (`scene_state_t`) and TT2 (native) backends live side-by-side behind a TrackMode branch in the pages, so both can be edited/run on one device for comparison. The orig backend + orig Teletype track mode are torn out in a **scheduled follow-up** once parity is confirmed (native-only end state).
-- **Behavioral parity harness** — run identical script text through the orig C VM and the TT2 native runner, diff CV/gate output tick-by-tick. The rigorous, repeatable equivalence check; survives every future op change.
+**Decided architecture (2026-06-15 — native-only, parity-gated teardown):**
+- **Option B lexer** — keep the Teletype **Ragel lexer** (`parse()`) for text input; display via the **native `TT2Command → text` printer** (`TT2Printer` + generated `TT2OpNames`, plan 007 — shipped). No `tele_command_t` round-trip, no `print_command`, no `tele_ops[]`.
+- **Native-only, not coexist** — the editor pages drive TT2 **only** (single path, no `if(TT2){…}else{orig}` branches). `TrackMode::Teletype` is removed as a selectable/editable mode. One live Teletype track type.
+- **Parity-gated teardown** — `TeletypeTrackEngine` + `scene_state_t` C VM stay compiled **solely** as the `TestTeletypeV2Parity` reference until **tick-level parity is locked**, then the whole bridge is deleted. (You can't diff against an engine you've already removed.)
+- **Fallback:** tag `tt1-working-breakpoint` (`b2b64191`) marks the last commit with TT1 fully working/selectable — the pre-teardown reference.
 
 ---
 
 ## Scope Boundaries
 
-**In scope:** native printer + names table; native per-line script edit API on `TeletypeProgram`; TrackMode-aware rebind of the two pages (incl. live mode → native runner for TT2 tracks); TopPage routing + Pages registry for TeletypeV2; the parity harness.
+**In scope:** native per-line script edit API (shipped); **TT2-only** repoint of the two pages; TopPage/TrackPage routing for TeletypeV2 (shipped); remove `Teletype` from selectable modes; **tick-level parity gate**; **bridge deletion** once parity locked.
 
 ### Deferred to Follow-Up Work
-- **Teardown unit** — once parity is confirmed, delete the orig `scene_state_t` backend branches and retire `TrackMode::Teletype`, collapsing the pages to native-only. The coexist branch is a temporary scaffold with a scheduled death.
-- **I/O routing grid** — TT2 has no I/O-routing data model (orig uses `TeletypeTrack::PatternSlot` mappings). The TT2 path omits the I/O grid until that model exists.
+- **I/O routing grid** — TT2 has no I/O-routing data model yet; the editor omits the I/O grid until that model exists.
 - **File save/load** — `FileManager` Teletype script/track overloads for TT2.
+
+### Outside scope
+- No dual-backend coexist path (decision reversed 2026-06-15).
 
 ---
 
@@ -112,24 +116,26 @@ needed.
 - Invalid text → returns parse error, leaves the script unchanged.
 - Edit at/over the command cap is a safe no-op (no overflow).
 
-### U3. Rebind TeletypeScriptViewPage — TrackMode-aware (orig | TT2)
+### U3. Repoint TeletypeScriptViewPage to TT2 (native-only, single path)
 
-**Goal:** The script view/edit/live page drives a TT2 track when selected, orig otherwise.
+**Goal:** The script view/edit/live page is the **native TT2 script editor** — one
+backend, no dual branch.
 **Dependencies:** U2 (U1 shipped via plan 007).
 **Files:** `src/apps/sequencer/ui/pages/TeletypeScriptViewPage.cpp` / `.h`.
-**Approach:** At each data touch, branch on `selectedTrack().trackMode()`: orig path unchanged (`scene_state_t`); TT2 path uses `tt2Track().program()` + the **`TT2Printer`** (`tt2PrintScript`/`tt2PrintCommand`, display) + U2 edit API (commit). Live mode: TT2 branch parses → lowers → runs one command via the native evaluator against the track's `TT2Runtime`/`TT2OutputState` (vs orig `process_command`). I/O grid: TT2 branch hides/omits it (deferred). Keep all navigation/edit-buffer/key-handling UI logic shared. **Stale-page guard:** the TrackMode branch must resolve before any type-specific accessor runs — a TT2 track must never reach `scene_state_t` calls and vice versa (mirrors the PROJECT.md stale-page protection).
-**Execution note:** Characterize first — capture the orig page's current behavior (it has no unit tests) before threading branches, so the orig path is provably unchanged.
-**Patterns to follow:** the page's own existing structure; the TT2 engine's `runScript`/`evaluateCommand` for live exec.
-**Test scenarios:** `Test expectation: none (UI page)` — verified via sim render + the parity harness (U6) + on-device. The testable logic lives in U1/U2. Manual: select a TT2 track → script lines render via the native printer; edit a line → parses, lowers, persists, re-renders; live-fire a line → native runner drives CV/gate; orig Teletype track still edits exactly as before.
+**Approach:** **Replace** the `scene_state_t` editing/display/live sites (~10: `ss_get_script_command`/`_len`, `print_command`, `ss_overwrite/insert/delete`, `ss_*_comment`, `process_command`) with the native path — no `if(TT2){…}else{orig}` branch, since TT2 is the only Teletype type: display = `tt2PrintScript`/`tt2PrintCommand` over `tt2Track().program()`; commit = U2 `set/insert/deleteScriptCommand`; live = parse → lower → `evaluateCommand` against the track's `TT2Runtime`/`TT2OutputState`. Comments have no TT2 equivalent (stripped at parse) → drop the comment affordance. I/O grid omitted (deferred). Keep navigation/edit-buffer/key-handling UI logic.
+**Execution note:** **sim/on-device verification.** This is interactive OLED UI with no unit-testable surface (the testable logic is U1/U2, shipped). Each repointed site is verified by rendering/editing/live-firing a TT2 track on the simulator; a headless build only proves it compiles/links.
+**Patterns to follow:** the page's own structure; `runScript`/`evaluateCommand` for live exec.
+**Test scenarios:** `Test expectation: none (UI page)` — sim render + on-device. Manual: select a TT2 track → lines render via the native printer; edit → parse/lower/persist/re-render; live-fire → native runner drives CV/gate.
 
-### U4. Rebind TeletypePatternViewPage — TrackMode-aware
+### U4. Repoint TeletypePatternViewPage to TT2 (native-only, single path)
 
-**Goal:** Pattern view/edit drives `program.patterns[]` for TT2, `scene_state_t` for orig.
+**Goal:** Pattern view/edit drives `program.patterns[]` natively — single backend.
 **Dependencies:** U2.
 **Files:** `src/apps/sequencer/ui/pages/TeletypePatternViewPage.cpp` / `.h`.
-**Approach:** Same TrackMode branch on pattern get/set/len; TT2 path reads/writes `program.patterns[col]` directly.
-**Execution note:** Characterize the orig pattern page behavior before branching.
-**Test scenarios:** `Test expectation: none (UI page)` — verified via sim + on-device. Manual: TT2 track pattern values display and edit against `program.patterns[]`; orig unchanged.
+**Approach:** Replace the `scene_state_t` pattern get/set/len sites with direct
+`program.patterns[col]` access (add any model accessors needed). No TrackMode branch.
+**Execution note:** sim/on-device verification (interactive UI).
+**Test scenarios:** `Test expectation: none (UI page)` — sim + on-device. Manual: TT2 pattern values display and edit against `program.patterns[]`.
 
 ### U5. TopPage routing + Pages registry for TeletypeV2
 
@@ -165,6 +171,36 @@ dismissed.
 - Identical output for: arithmetic/logic (`A ADD 1 2; CV 1 A`), pitch (`CV 1 N 12`), a metro/every script, a pattern read (`CV 1 P 0`), an IF/PROB line.
 - Divergence is reported with the tick + channel, not a silent pass.
 - Seeded RNG ops (TOSS/P.RND) — compare only deterministic scripts, or seed both identically; document which scripts are excluded.
+
+### U7. Remove `Teletype` as a selectable / editable track mode
+
+**Goal:** One live Teletype track type (TT2). Legacy `Teletype` is no longer offered.
+**Dependencies:** U3, U4 (TT2 editor must work before removing the old mode).
+**Files:** `TrackModeListModel` / wherever the selectable `TrackMode` list is built; any
+UI that lists/labels `TrackMode::Teletype`. **Not** the engine yet.
+**Approach:** Drop `Teletype` from the selectable-mode list/labels so it can't be chosen.
+Keep the `TrackMode::Teletype` enum value, `TeletypeTrackEngine`, and the `scene_state_t`
+C VM **compiled** — they remain solely as the `TestTeletypeV2Parity` reference until U8.
+No-migration: existing projects with a Teletype track are not converted (dev files break).
+**Test scenarios:** `Test expectation: none (UI)` — sim: `Teletype` absent from mode
+select; `TeletypeV2` present and editable. `TestTeletypeV2Parity` still builds + passes
+(the C VM is still linked).
+
+### U8. Delete the bridge — parity-gated (the teardown)
+
+**Goal:** Remove the legacy engine entirely once the native runner is proven equivalent.
+**Dependencies:** **U6 tick-level parity locked** (hard gate), U7.
+**Files:** delete `TeletypeTrackEngine.*`, `TeletypeBridge.*`, the `scene_state_t` VM
+usage, `TrackMode::Teletype` enum + all its `switch` cases, `TeletypeTrackListModel`, the
+orig page bindings; drop the now-unused C-VM sources from the build. The Ragel
+lexer/`parse()` + op tables stay (the native dialect uses them).
+**Approach:** Mechanical removal after parity is locked. The parity harness is retired in
+the same step (its reference engine is gone) — its job is done once parity is confirmed.
+Re-tag/branch from `tt1-working-breakpoint` is the fallback if anything regresses.
+**Execution note:** **Do not start U8 until U6 tick-level parity passes.** This is the
+irreversible step; the breakpoint tag is the safety net.
+**Test scenarios:** full `TestTeletypeV2*` + STM32 release green after removal; no
+`scene_state_t`/`TeletypeTrackEngine` symbols remain; flash drops by the removed bridge.
 
 ---
 
