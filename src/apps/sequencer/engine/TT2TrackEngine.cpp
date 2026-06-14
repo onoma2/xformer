@@ -2,6 +2,27 @@
 
 #include "Engine.h"
 #include "CvInput.h"
+#include "NoteTrackEngine.h"
+
+#include "model/NoteSequence.h"
+
+#include <cmath>
+
+// Active host for native ops (TT2Host.h). Set/cleared via ScopedHost around
+// script execution; null outside it.
+namespace { TT2Host *g_tt2ActiveHost = nullptr; }
+TT2Host *tt2ActiveHost() { return g_tt2ActiveHost; }
+void tt2SetActiveHost(TT2Host *host) { g_tt2ActiveHost = host; }
+
+// Resolve a Note track's active sequence for cross-track W* ops.
+static NoteSequence *tt2NoteSequence(Model &model, int trackIndex) {
+    if (trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT) return nullptr;
+    Track &track = model.project().track(trackIndex);
+    if (track.trackMode() != Track::TrackMode::Note) return nullptr;
+    int patternIndex = model.project().playState().trackState(trackIndex).pattern();
+    if (patternIndex < 0 || patternIndex >= CONFIG_PATTERN_COUNT) return nullptr;
+    return &track.noteTrack().sequence(patternIndex);
+}
 
 // Resolve one trigger input's configured source to a boolean gate level.
 // Mirrors TeletypeTrackEngine::inputState: CvIn (threshold > 1V), GateOut
@@ -96,4 +117,102 @@ void TT2TrackEngine::sampleInputs() {
             *target[k] = voltsToRaw(cvSourceVolts(src));
         }
     }
+}
+
+// --- TT2Host: live engine / cross-track access for W*/BUS/RT ops ---
+
+int16_t TT2TrackEngine::hostTempo() {
+    return int16_t(std::lround(_engine.tempo()));
+}
+void TT2TrackEngine::hostSetTempo(int16_t bpm) {
+    int b = bpm; if (b < 1) b = 1; if (b > 1000) b = 1000;
+    _engine.setTempo(float(b));
+}
+int16_t TT2TrackEngine::hostTransportRunning() {
+    return _engine.clockRunning() ? 1 : 0;
+}
+void TT2TrackEngine::hostSetTransportRunning(int16_t state) {
+    if (state == 1) { if (!_engine.clockRunning()) _engine.clockStart(); }
+    else if (state == 0) { if (_engine.clockRunning()) _engine.clockReset(); }
+    else { if (_engine.clockRunning()) _engine.clockStop(); }
+}
+int16_t TT2TrackEngine::hostBarFraction(uint8_t bars) {
+    float frac;
+    if (bars <= 1) {
+        frac = _engine.measureFraction();
+    } else {
+        uint32_t span = _engine.measureDivisor() * uint32_t(bars);
+        frac = span ? float(_engine.tick() % span) / float(span) : 0.f;
+    }
+    int r = int(frac * 16383.f);
+    if (r < 0) r = 0; if (r > 16383) r = 16383;
+    return int16_t(r);
+}
+int16_t TT2TrackEngine::hostWms(uint8_t mult) {
+    float bpm = _engine.tempo();
+    if (bpm <= 0.f) return 0;
+    double ms = (60000.0 / bpm / 4.0) * mult;
+    long r = std::lround(ms); if (r < 1) r = 1; if (r > 32767) r = 32767;
+    return int16_t(r);
+}
+int16_t TT2TrackEngine::hostWtu(uint8_t div, uint8_t mult) {
+    float bpm = _engine.tempo();
+    if (bpm <= 0.f) return 0;
+    if (div == 0) div = 1;
+    double ms = (60000.0 / bpm / double(div)) * mult;
+    long r = std::lround(ms); if (r < 1) r = 1; if (r > 32767) r = 32767;
+    return int16_t(r);
+}
+int16_t TT2TrackEngine::hostTrackPattern(uint8_t track) {
+    if (track >= CONFIG_TRACK_COUNT) return 0;
+    return int16_t(_engine.trackEngine(track).pattern());
+}
+void TT2TrackEngine::hostSetTrackPattern(uint8_t track, uint8_t pattern) {
+    if (track >= CONFIG_TRACK_COUNT || pattern >= CONFIG_PATTERN_COUNT) return;
+    _engine.selectTrackPattern(track, pattern);
+}
+int16_t TT2TrackEngine::hostNoteGateGet(uint8_t track, uint8_t step) {
+    const NoteSequence *seq = tt2NoteSequence(_engine.model(), track);
+    if (!seq || step >= CONFIG_STEP_COUNT) return 0;
+    return seq->step(step).gate() ? 1 : 0;
+}
+void TT2TrackEngine::hostNoteGateSet(uint8_t track, uint8_t step, int16_t v) {
+    NoteSequence *seq = tt2NoteSequence(_engine.model(), track);
+    if (!seq || step >= CONFIG_STEP_COUNT) return;
+    seq->step(step).setGate(v != 0);
+}
+int16_t TT2TrackEngine::hostNoteNoteGet(uint8_t track, uint8_t step) {
+    const NoteSequence *seq = tt2NoteSequence(_engine.model(), track);
+    if (!seq || step >= CONFIG_STEP_COUNT) return 0;
+    return int16_t(seq->step(step).note() - NoteSequence::Note::Min);
+}
+void TT2TrackEngine::hostNoteNoteSet(uint8_t track, uint8_t step, int16_t v) {
+    NoteSequence *seq = tt2NoteSequence(_engine.model(), track);
+    if (!seq || step >= CONFIG_STEP_COUNT) return;
+    seq->step(step).setNote(v + NoteSequence::Note::Min);
+}
+int16_t TT2TrackEngine::hostNoteGateHere(uint8_t track) {
+    if (track >= CONFIG_TRACK_COUNT) return 0;
+    const TrackEngine &te = _engine.trackEngine(track);
+    if (te.trackMode() != Track::TrackMode::Note) return 0;
+    int step = te.as<NoteTrackEngine>().currentStep();
+    return hostNoteGateGet(track, uint8_t(step));
+}
+int16_t TT2TrackEngine::hostNoteNoteHere(uint8_t track) {
+    if (track >= CONFIG_TRACK_COUNT) return 0;
+    const TrackEngine &te = _engine.trackEngine(track);
+    if (te.trackMode() != Track::TrackMode::Note) return 0;
+    int step = te.as<NoteTrackEngine>().currentStep();
+    return hostNoteNoteGet(track, uint8_t(step));
+}
+int16_t TT2TrackEngine::hostRoutingSource(uint8_t index) {
+    int r = int(_engine.routingEngine().routeSource(index) * 16383.f);
+    if (r < 0) r = 0; if (r > 16383) r = 16383;
+    return int16_t(r);
+}
+int16_t TT2TrackEngine::hostBusCv(uint8_t index) {
+    return voltsToRaw(_engine.busCv(index));
+}
+void TT2TrackEngine::hostSetBusCv(uint8_t index, int16_t raw) {
+    _engine.setBusCv(index, rawToVolts(raw), Engine::BusWriterTeletype);
 }

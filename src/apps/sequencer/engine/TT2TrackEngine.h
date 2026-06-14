@@ -3,6 +3,7 @@
 #include "TrackEngine.h"
 
 #include "TT2Runner.h"
+#include "TT2Host.h"
 #include "TeletypeOutputState.h"
 
 #include "model/Track.h"
@@ -22,7 +23,7 @@ inline uint8_t tt2RisingEdges(const bool *now, bool *prev, int count) {
     return fired;
 }
 
-class TT2TrackEngine final : public TrackEngine {
+class TT2TrackEngine final : public TrackEngine, public TT2Host {
 public:
     TT2TrackEngine(Engine &engine, const Model &model, Track &track) :
         TrackEngine(engine, model, track),
@@ -52,6 +53,7 @@ public:
         (void)tick;
         if (_firstTick) {
             _firstTick = false;
+            ScopedHost host(this);
             runScript(uint8_t(_tt2Track.program().bootScriptIndex));
             return TickResult(CvUpdate | GateUpdate);
         }
@@ -62,6 +64,7 @@ public:
     // Drives the ms delay queue and the metro, accumulating sub-millisecond
     // remainder so slow refreshes still advance time accurately.
     virtual void update(float dt) override {
+        ScopedHost host(this);
         // Sample trigger inputs + CV-mapped inputs every refresh (async, not clocked).
         updateInputTriggers();
         sampleInputs();
@@ -130,7 +133,36 @@ public:
         return int16_t((volts + 5.f) / 10.f * 16383.f + 0.5f);
     }
 
+    // TT2Host — live engine / cross-track access for W*/BUS/RT ops (TT2Host.h).
+    // All defined in TT2TrackEngine.cpp (need the full Engine definition).
+    int16_t hostTempo() override;
+    void hostSetTempo(int16_t bpm) override;
+    int16_t hostTransportRunning() override;
+    void hostSetTransportRunning(int16_t state) override;
+    int16_t hostBarFraction(uint8_t bars) override;
+    int16_t hostWms(uint8_t mult) override;
+    int16_t hostWtu(uint8_t div, uint8_t mult) override;
+    int16_t hostTrackPattern(uint8_t track) override;
+    void hostSetTrackPattern(uint8_t track, uint8_t pattern) override;
+    int16_t hostNoteGateGet(uint8_t track, uint8_t step) override;
+    void hostNoteGateSet(uint8_t track, uint8_t step, int16_t v) override;
+    int16_t hostNoteNoteGet(uint8_t track, uint8_t step) override;
+    void hostNoteNoteSet(uint8_t track, uint8_t step, int16_t v) override;
+    int16_t hostNoteGateHere(uint8_t track) override;
+    int16_t hostNoteNoteHere(uint8_t track) override;
+    int16_t hostRoutingSource(uint8_t index) override;
+    int16_t hostBusCv(uint8_t index) override;
+    void hostSetBusCv(uint8_t index, int16_t raw) override;
+
 private:
+    // Sets this engine as the active TT2Host for the duration of script
+    // execution, restoring the previous host on scope exit.
+    struct ScopedHost {
+        TT2Host *prev;
+        explicit ScopedHost(TT2Host *h) : prev(tt2ActiveHost()) { tt2SetActiveHost(h); }
+        ~ScopedHost() { tt2SetActiveHost(prev); }
+    };
+
     // Defined in TT2TrackEngine.cpp (needs the full Engine definition to read
     // cvInput/gateOutput/trackEngine).
     void updateInputTriggers();

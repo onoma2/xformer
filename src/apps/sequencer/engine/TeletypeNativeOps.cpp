@@ -1,5 +1,6 @@
 #include "TT2Evaluator.h"
 #include "TT2Runner.h"
+#include "TT2Host.h"
 
 // Pure helpers/tables from the linked teletype C lib (no scene_state_t / bridge
 // VM — these are stateless utilities + const data, safe to share and survive
@@ -1795,6 +1796,136 @@ static void opInit(TT2Runtime &r, TT2OutputState &o, const TeletypeProgram *prog
 }
 
 // ---------------------------------------------------------------------------
+// Transport / cross-track / bus ops (W*, RT, BUS) — via the active TT2Host.
+// Null host (editor / tests) -> read 0, write no-op.
+// ---------------------------------------------------------------------------
+
+// BPM a — ms-per-step for a given BPM (pure formula, upstream op_BPM).
+static void opBpm(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0; if (!popStack(stack, stackSize, a, error)) return;
+    if (a < 2) a = 2; if (a > 1000) a = 1000;
+    uint32_t ret = ((uint32_t(1u << 31) / ((uint32_t(a) << 20) / 60)) * 1000) >> 10;
+    ret = ret / 2 + (ret & 1);
+    pushStack(stack, stackSize, int16_t(ret), error);
+}
+
+static void opWbpm(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    TT2Host *h = tt2ActiveHost();
+    pushStack(stack, stackSize, h ? h->hostTempo() : 0, error);
+}
+static void opWbpmS(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+    if (TT2Host *h = tt2ActiveHost()) h->hostSetTempo(v);
+}
+static void opWms(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t mult = 0; if (!popStack(stack, stackSize, mult, error)) return;
+    TT2Host *h = tt2ActiveHost();
+    pushStack(stack, stackSize, h ? h->hostWms(uint8_t(mult)) : 0, error);
+}
+static void opWtu(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t div = 0, mult = 0;
+    if (!popStack(stack, stackSize, div, error)) return;
+    if (!popStack(stack, stackSize, mult, error)) return;
+    TT2Host *h = tt2ActiveHost();
+    pushStack(stack, stackSize, h ? h->hostWtu(uint8_t(div), uint8_t(mult)) : 0, error);
+}
+static void opBar(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t bars = 0; if (!popStack(stack, stackSize, bars, error)) return;
+    TT2Host *h = tt2ActiveHost();
+    pushStack(stack, stackSize, h ? h->hostBarFraction(uint8_t(bars < 1 ? 1 : bars)) : 0, error);
+}
+static void opWp(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t t = 0; if (!popStack(stack, stackSize, t, error)) return;
+    TT2Host *h = tt2ActiveHost();
+    pushStack(stack, stackSize, h ? h->hostTrackPattern(uint8_t(t - 1)) : 0, error);
+}
+static void opWpSet(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t t = 0, p = 0;
+    if (!popStack(stack, stackSize, t, error)) return;
+    if (!popStack(stack, stackSize, p, error)) return;
+    if (TT2Host *h = tt2ActiveHost()) h->hostSetTrackPattern(uint8_t(t - 1), uint8_t(p));
+}
+static void opWr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    TT2Host *h = tt2ActiveHost();
+    pushStack(stack, stackSize, h ? h->hostTransportRunning() : 0, error);
+}
+static void opWrAct(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    if (isSet && stackSize >= 1) {
+        int16_t s = 0; if (!popStack(stack, stackSize, s, error)) return;
+        if (TT2Host *h = tt2ActiveHost()) h->hostSetTransportRunning(s);
+    } else {
+        TT2Host *h = tt2ActiveHost();
+        pushStack(stack, stackSize, h ? h->hostTransportRunning() : 0, error);
+    }
+}
+static void opWng(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    int16_t t = 0, s = 0;
+    if (!popStack(stack, stackSize, t, error)) return;
+    if (!popStack(stack, stackSize, s, error)) return;
+    TT2Host *h = tt2ActiveHost();
+    if (isSet && stackSize >= 1) {
+        int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+        if (h) h->hostNoteGateSet(uint8_t(t - 1), uint8_t(s), v);
+    } else {
+        pushStack(stack, stackSize, h ? h->hostNoteGateGet(uint8_t(t - 1), uint8_t(s)) : 0, error);
+    }
+}
+static void opWnn(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    int16_t t = 0, s = 0;
+    if (!popStack(stack, stackSize, t, error)) return;
+    if (!popStack(stack, stackSize, s, error)) return;
+    TT2Host *h = tt2ActiveHost();
+    if (isSet && stackSize >= 1) {
+        int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+        if (h) h->hostNoteNoteSet(uint8_t(t - 1), uint8_t(s), v);
+    } else {
+        pushStack(stack, stackSize, h ? h->hostNoteNoteGet(uint8_t(t - 1), uint8_t(s)) : 0, error);
+    }
+}
+static void opWngH(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t t = 0; if (!popStack(stack, stackSize, t, error)) return;
+    TT2Host *h = tt2ActiveHost();
+    pushStack(stack, stackSize, h ? h->hostNoteGateHere(uint8_t(t - 1)) : 0, error);
+}
+static void opWnnH(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t t = 0; if (!popStack(stack, stackSize, t, error)) return;
+    TT2Host *h = tt2ActiveHost();
+    pushStack(stack, stackSize, h ? h->hostNoteNoteHere(uint8_t(t - 1)) : 0, error);
+}
+static void opRt(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t i = 0; if (!popStack(stack, stackSize, i, error)) return;
+    TT2Host *h = tt2ActiveHost();
+    pushStack(stack, stackSize, h ? h->hostRoutingSource(uint8_t(i - 1)) : 0, error);
+}
+static void opBus(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, 4)) return;  // 1-based -> 0-based, 4 lanes
+    TT2Host *h = tt2ActiveHost();
+    if (isSet && stackSize >= 1) {
+        int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+        if (h) h->hostSetBusCv(uint8_t(idx), normaliseCvValue(v));
+    } else {
+        pushStack(stack, stackSize, h ? h->hostBusCv(uint8_t(idx)) : 0, error);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Misc engine ops (TIF, M!, CV.GET/CV.SET, M.A/M.ACT.A, SCRIPT.POL)
 // ---------------------------------------------------------------------------
 
@@ -3585,6 +3716,22 @@ namespace {
             table[E_OP_M_RESET]            = opMReset;
             table[E_OP_M_RESET_A]          = opMReset;
             table[E_OP_SYNC]               = opSync;
+            table[E_OP_BPM]                = opBpm;
+            table[E_OP_WBPM]               = opWbpm;
+            table[E_OP_WBPM_S]             = opWbpmS;
+            table[E_OP_WMS]                = opWms;
+            table[E_OP_WTU]                = opWtu;
+            table[E_OP_BAR]                = opBar;
+            table[E_OP_WP]                 = opWp;
+            table[E_OP_WP_SET]             = opWpSet;
+            table[E_OP_WR]                 = opWr;
+            table[E_OP_WR_ACT]             = opWrAct;
+            table[E_OP_WNG]                = opWng;
+            table[E_OP_WNN]                = opWnn;
+            table[E_OP_WNG_H]              = opWngH;
+            table[E_OP_WNN_H]              = opWnnH;
+            table[E_OP_RT]                 = opRt;
+            table[E_OP_BUS]                = opBus;
             table[E_OP_R]        = opR;
             table[E_OP_R_MIN]    = opRMin;
             table[E_OP_R_MAX]    = opRMax;

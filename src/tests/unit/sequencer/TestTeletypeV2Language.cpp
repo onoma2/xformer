@@ -140,6 +140,18 @@ UNIT_TEST("TeletypeV2Language") {
         }
     }
 
+    CASE("host_ops_null_safe") {
+        // No active TT2Host (no engine) -> reads return 0, writes are no-ops.
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        expectEqual(int(getv("WBPM", runtime, output)), 0, "WBPM no host -> 0");
+        expectEqual(int(getv("WR", runtime, output)), 0, "WR no host -> 0");
+        expectEqual(int(getv("BUS 1", runtime, output)), 0, "BUS no host -> 0");
+        expectEqual(int(getv("WNG 1 0", runtime, output)), 0, "WNG no host -> 0");
+        expectEqual(int(getv("RT 1", runtime, output)), 0, "RT no host -> 0");
+        evalText("W.ACT 1", runtime, output);  // no-op, must not crash
+    }
+
     CASE("misc_engine_ops") {
         TT2Runtime runtime = {}; init(runtime);
         TT2OutputState output = {}; init(output);

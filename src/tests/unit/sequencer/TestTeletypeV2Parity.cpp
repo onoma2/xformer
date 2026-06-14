@@ -83,6 +83,7 @@ UNIT_TEST("TeletypeV2Parity") {
         "QT.S 1638 0 0", "QT.S 2000 0 1", "QT.CS 1638 0 0 1 3",
         // P4 pure
         "TIF 1 5 9", "TIF 0 5 9", "TIF 7 100 200",
+        "BPM 120", "BPM 60", "BPM 240",
         // NOTE: N.B/N.BX/QT.B/QT.BX (scale-bank get-degree path) implemented but
         // not yet bridge-parity-verified — degree-walk semantics need a follow-up.
     };
