@@ -1654,6 +1654,84 @@ TT2_SEED_SLOT_OP(opDrunkSeed, Drunk)
 TT2_SEED_SLOT_OP(opPSeed, Pattern)
 
 // ---------------------------------------------------------------------------
+// INIT family — reset native state to defaults.
+// ---------------------------------------------------------------------------
+
+static void tt2ResetCvCh(TT2Runtime &r, TT2OutputState &o, int i) {
+    r.variables.cv[i] = 0; r.variables.cv_off[i] = 0; r.variables.cv_slew[i] = 1;
+    tt2SeedCvSlew(o.cv[i], 0, 0);
+}
+static void tt2ResetTrCh(TT2Runtime &r, TT2OutputState &o, int i) {
+    r.variables.tr[i] = 0; r.variables.tr_pol[i] = 1; r.variables.tr_time[i] = 100;
+    o.tr[i].level = 0; o.tr[i].restLevel = 0; o.tr[i].pulseRemainingMs = 0;
+}
+static void tt2InitPatternN(const TeletypeProgram *program, int pn) {
+    if (!program || pn < 0 || pn >= TT2_PATTERN_COUNT) return;
+    TT2Pattern *p = &const_cast<TeletypeProgram *>(program)->patterns[pn];
+    p->idx = 0; p->len = 0; p->wrap = 1; p->start = 0; p->end = TT2_PATTERN_LENGTH - 1;
+    for (int i = 0; i < TT2_PATTERN_LENGTH; ++i) p->val[i] = 0;
+}
+
+static void opInitCv(TT2Runtime &r, TT2OutputState &o, const TeletypeProgram *,
+                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+    int i = v - 1; if (i >= 0 && i < TT2_OUTPUT_CV_COUNT) tt2ResetCvCh(r, o, i);
+}
+static void opInitCvAll(TT2Runtime &r, TT2OutputState &o, const TeletypeProgram *,
+                        int16_t *, uint8_t &, bool, TT2EvalError &) {
+    for (int i = 0; i < TT2_OUTPUT_CV_COUNT; ++i) tt2ResetCvCh(r, o, i);
+}
+static void opInitTr(TT2Runtime &r, TT2OutputState &o, const TeletypeProgram *,
+                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+    int i = v - 1; if (i >= 0 && i < TT2_OUTPUT_TR_COUNT) tt2ResetTrCh(r, o, i);
+}
+static void opInitTrAll(TT2Runtime &r, TT2OutputState &o, const TeletypeProgram *,
+                        int16_t *, uint8_t &, bool, TT2EvalError &) {
+    for (int i = 0; i < TT2_OUTPUT_TR_COUNT; ++i) tt2ResetTrCh(r, o, i);
+}
+static void opInitP(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+    tt2InitPatternN(program, v);  // 0-based, upstream
+}
+static void opInitPAll(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                       int16_t *, uint8_t &, bool, TT2EvalError &) {
+    for (int i = 0; i < TT2_PATTERN_COUNT; ++i) tt2InitPatternN(program, i);
+}
+static void tt2ClearScriptN(const TeletypeProgram *program, int idx) {
+    if (!program || idx < 0 || idx >= TT2_SCRIPT_COUNT) return;
+    TT2Script &s = const_cast<TeletypeProgram *>(program)->scripts[idx];
+    s.length = 0;
+    for (int c = 0; c < TT2_COMMANDS_PER_SCRIPT; ++c) s.commands[c].length = 0;
+}
+static void opInitScript(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                         int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+    tt2ClearScriptN(program, v - 1);
+}
+static void opInitScriptAll(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+                            int16_t *, uint8_t &, bool, TT2EvalError &) {
+    for (int i = 0; i < TT2_SCRIPT_COUNT; ++i) tt2ClearScriptN(program, i);
+}
+static void opInitData(TT2Runtime &r, TT2OutputState &, const TeletypeProgram *,
+                       int16_t *, uint8_t &, bool, TT2EvalError &) {
+    tt2InitVariables(r.variables);
+}
+static void opInitTime(TT2Runtime &r, TT2OutputState &, const TeletypeProgram *,
+                       int16_t *, uint8_t &, bool, TT2EvalError &) {
+    tt2DelayClear(r);
+    r.variables.time = int64_t(r.clockMs);  // TIME reads 0 right after
+    for (int i = 0; i < TT2_SCRIPT_COUNT; ++i) r.scriptLastMs[i] = r.clockMs;  // LAST -> 0
+}
+static void opInit(TT2Runtime &r, TT2OutputState &o, const TeletypeProgram *program,
+                   int16_t *, uint8_t &, bool, TT2EvalError &) {
+    init(r);
+    init(o);
+    for (int i = 0; i < TT2_PATTERN_COUNT; ++i) tt2InitPatternN(program, i);
+}
+
+// ---------------------------------------------------------------------------
 // Engine input ops
 // ---------------------------------------------------------------------------
 
@@ -3343,6 +3421,17 @@ namespace {
             table[E_OP_SYM_DRUNK_SD] = opDrunkSeed;
             table[E_OP_P_SEED]      = opPSeed;
             table[E_OP_SYM_P_SD]    = opPSeed;
+            table[E_OP_INIT]            = opInit;
+            table[E_OP_INIT_CV]         = opInitCv;
+            table[E_OP_INIT_CV_ALL]     = opInitCvAll;
+            table[E_OP_INIT_TR]         = opInitTr;
+            table[E_OP_INIT_TR_ALL]     = opInitTrAll;
+            table[E_OP_INIT_P]          = opInitP;
+            table[E_OP_INIT_P_ALL]      = opInitPAll;
+            table[E_OP_INIT_SCRIPT]     = opInitScript;
+            table[E_OP_INIT_SCRIPT_ALL] = opInitScriptAll;
+            table[E_OP_INIT_DATA]       = opInitData;
+            table[E_OP_INIT_TIME]       = opInitTime;
             table[E_OP_R]        = opR;
             table[E_OP_R_MIN]    = opRMin;
             table[E_OP_R_MAX]    = opRMax;

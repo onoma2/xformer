@@ -194,52 +194,56 @@ struct TT2Runtime {
     uint32_t scriptLastMs[TT2_SCRIPT_COUNT];      // clockMs at each script's last run
 };
 
+// Variable defaults (shared by init() and the INIT.DATA op). Zeroes the
+// variables block first, then applies the kept Teletype core defaults.
+inline void tt2InitVariables(TT2Variables &v) {
+    memset(&v, 0, sizeof(TT2Variables));
+    v.a = 1;
+    v.b = 2;
+    v.c = 3;
+    v.d = 4;
+    for (int i = 0; i < TT2_CV_COUNT; ++i) {
+        v.cv_slew[i] = 1;
+    }
+    v.drunk_min = 0;
+    v.drunk_max = 255;
+    v.m = 1000;
+    v.m_act = 1;
+    v.o_inc = 1;
+    v.o_min = 0;
+    v.o_max = 63;
+    v.o_wrap = 1;
+    v.q_n = 1;
+    v.q_grow = 0;
+    v.r_min = 0;
+    v.r_max = 16383;
+    for (int i = 0; i < TT2_TRIGGER_INPUTS; ++i) {
+        v.script_pol[i] = 1;
+    }
+    v.time_act = 1;
+    for (int i = 0; i < TT2_TR_COUNT; ++i) {
+        v.tr_pol[i] = 1;
+        v.tr_time[i] = 100;
+    }
+    v.in_min = 0;
+    v.in_max = 16383;
+    v.param_min = 0;
+    v.param_max = 16383;
+    for (int i = 0; i < TT2_NB_SCALES; ++i) {
+        v.n_scale_bits[i] = 0x0AB5;  // bit_reverse(0b101011010101, 12)
+        v.n_scale_root[i] = 0;
+    }
+}
+
 inline void init(TT2Runtime &r) {
     memset(&r, 0, sizeof(TT2Runtime));
 
-    // Deterministic defaults matching kept Teletype core semantics.
-    r.variables.a = 1;
-    r.variables.b = 2;
-    r.variables.c = 3;
-    r.variables.d = 4;
-    for (int i = 0; i < TT2_CV_COUNT; ++i) {
-        r.variables.cv_slew[i] = 1;
-    }
-    r.variables.drunk_min = 0;
-    r.variables.drunk_max = 255;
-    r.variables.m = 1000;
-    r.variables.m_act = 1;
-    r.variables.o_inc = 1;
-    r.variables.o_min = 0;
-    r.variables.o_max = 63;
-    r.variables.o_wrap = 1;
-    r.variables.q_n = 1;
-    r.variables.q_grow = 0;
-    r.variables.r_min = 0;
-    r.variables.r_max = 16383;
-    for (int i = 0; i < TT2_TRIGGER_INPUTS; ++i) {
-        r.variables.script_pol[i] = 1;
-    }
-    r.variables.time_act = 1;
-    for (int i = 0; i < TT2_TR_COUNT; ++i) {
-        r.variables.tr_pol[i] = 1;
-        r.variables.tr_time[i] = 100;
-    }
-    r.variables.in_min = 0;
-    r.variables.in_max = 16383;
-    r.variables.param_min = 0;
-    r.variables.param_max = 16383;
+    tt2InitVariables(r.variables);
 
     // RNG seeding: each slot gets a distinct non-zero starting state
     // so that different slots produce independent sequences.
     for (int i = 0; i < TT2_RNG_COUNT; ++i) {
         r.rng.state[i] = 0x12345678u + static_cast<uint32_t>(i) * 0x9e3779b9u;
-    }
-
-    // Scale defaults matching upstream ss_init().
-    for (int i = 0; i < TT2_NB_SCALES; ++i) {
-        r.variables.n_scale_bits[i] = 0x0AB5;  // bit_reverse(0b101011010101, 12)
-        r.variables.n_scale_root[i] = 0;
     }
 
     // Turtle defaults matching upstream turtle_init().

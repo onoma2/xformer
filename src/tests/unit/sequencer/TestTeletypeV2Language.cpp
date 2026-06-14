@@ -13,17 +13,19 @@ extern "C" {
 
 namespace {
 
-TT2EvalResult evalText(const char *text, TT2Runtime &runtime, TT2OutputState &output) {
+TT2EvalResult evalText(const char *text, TT2Runtime &runtime, TT2OutputState &output,
+                       const TeletypeProgram *program = nullptr) {
     tele_command_t src = {};
     char errMsg[TELE_ERROR_MSG_LENGTH] = {};
     parse(text, &src, errMsg);
     TT2Command cmd = {};
     lowerCommand(src, cmd);
-    return evaluateCommand(cmd, runtime, output);
+    return evaluateCommand(cmd, runtime, output, program);
 }
 
-int16_t getv(const char *text, TT2Runtime &runtime, TT2OutputState &output) {
-    return evalText(text, runtime, output).value;
+int16_t getv(const char *text, TT2Runtime &runtime, TT2OutputState &output,
+             const TeletypeProgram *program = nullptr) {
+    return evalText(text, runtime, output, program).value;
 }
 
 } // namespace
@@ -136,6 +138,39 @@ UNIT_TEST("TeletypeV2Language") {
             int16_t v = getv("R", runtime, output);
             expectTrue(v >= 20 && v <= 25, "R in [R.MIN,R.MAX]");
         }
+    }
+
+    CASE("init_family_resets_state") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        TeletypeProgram program; init(program);
+        // CV reset
+        evalText("CV.OFF 1 500", runtime, output);
+        evalText("CV 1 9000", runtime, output);
+        evalText("INIT.CV 1", runtime, output);
+        expectEqual(runtime.variables.cv[0], int16_t(0), "INIT.CV clears cv");
+        expectEqual(runtime.variables.cv_off[0], int16_t(0), "INIT.CV clears offset");
+        expectEqual(runtime.variables.cv_slew[0], int16_t(1), "INIT.CV resets slew=1");
+        // TR reset
+        evalText("TR.TIME 1 50", runtime, output);
+        evalText("INIT.TR 1", runtime, output);
+        expectEqual(runtime.variables.tr_time[0], int16_t(100), "INIT.TR resets time=100");
+        // pattern reset
+        evalText("P 5 99", runtime, output, &program);
+        evalText("INIT.P 0", runtime, output, &program);
+        expectEqual(int(program.patterns[0].val[5]), 0, "INIT.P clears pattern");
+        // data reset
+        evalText("A 77", runtime, output);
+        evalText("INIT.DATA", runtime, output);
+        expectEqual(runtime.variables.a, int16_t(1), "INIT.DATA restores A default");
+        // script clear
+        program.scripts[1].length = 3;
+        evalText("INIT.SCRIPT 2", runtime, output, &program);
+        expectEqual(int(program.scripts[1].length), 0, "INIT.SCRIPT clears script");
+        // time reset
+        runtime.clockMs = 1000;
+        evalText("INIT.TIME", runtime, output);
+        expectEqual(int(getv("TIME", runtime, output)), 0, "INIT.TIME zeroes elapsed");
     }
 
     CASE("scale_bank_nb_roundtrip") {
