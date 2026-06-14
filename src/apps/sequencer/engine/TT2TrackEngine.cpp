@@ -3,6 +3,7 @@
 #include "Engine.h"
 #include "CvInput.h"
 #include "NoteTrackEngine.h"
+#include "MidiUtils.h"
 
 #include "model/NoteSequence.h"
 
@@ -215,4 +216,39 @@ int16_t TT2TrackEngine::hostBusCv(uint8_t index) {
 }
 void TT2TrackEngine::hostSetBusCv(uint8_t index, int16_t raw) {
     _engine.setBusCv(index, rawToVolts(raw), Engine::BusWriterTeletype);
+}
+
+// --- MIDI: filter by the track source, populate the buffer, fire the script ---
+
+bool TT2TrackEngine::receiveMidi(MidiPort port, const MidiMessage &message) {
+    if (!MidiUtils::matchSource(port, message, _tt2Track.program().midiSource)) {
+        return false;  // not our source — let other tracks process it
+    }
+    processMidiMessage(message);
+    return true;  // consume on match
+}
+
+void TT2TrackEngine::processMidiMessage(const MidiMessage &message) {
+    auto &runtime = _tt2Track.runtime();
+    TT2Midi &m = runtime.midi;
+    tt2MidiClear(m);
+
+    int fireScript = -1;
+    if (message.isNoteOn() && message.velocity() > 0) {
+        tt2MidiNoteOn(m, message.channel(), message.note(), message.velocity());
+        fireScript = m.on_script;
+    } else if (message.isNoteOff() || (message.isNoteOn() && message.velocity() == 0)) {
+        tt2MidiNoteOff(m, message.channel(), message.note());
+        fireScript = m.off_script;
+    } else if (message.isControlChange()) {
+        tt2MidiCc(m, message.channel(), message.controlNumber(), message.controlValue());
+        fireScript = m.cc_script;
+    } else {
+        return;  // not a tracked event type
+    }
+
+    if (fireScript >= 0 && fireScript < TT2_SCRIPT_COUNT) {
+        ScopedHost host(this);
+        runScript(uint8_t(fireScript));
+    }
 }

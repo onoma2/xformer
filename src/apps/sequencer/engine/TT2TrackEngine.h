@@ -95,6 +95,10 @@ public:
 
     virtual bool activity() const override { return _output.cvDirty != 0 || _output.trDirty != 0; }
 
+    // Incoming MIDI: filter by the track's MidiSourceConfig, populate the
+    // runtime MIDI buffer (MI.* reads), and fire the configured script.
+    virtual bool receiveMidi(MidiPort port, const MidiMessage &message) override;
+
     virtual bool gateOutput(int index) const override {
         if (mute() || index < 0 || index >= TT2_OUTPUT_TR_COUNT) {
             return false;
@@ -169,6 +173,7 @@ private:
     void sampleInputs();
     bool inputState(uint8_t index) const;
     float cvSourceVolts(TT2CvInputSource source) const;
+    void processMidiMessage(const MidiMessage &message);
 
     TT2Track &_tt2Track;
     TT2OutputState _output;
