@@ -1142,6 +1142,128 @@ static void opScript(TT2Runtime &runtime, TT2OutputState &output,
     }
 }
 
+// Function-call ops — $F/$F1/$F2 call a whole script, $L/$S a single line,
+// passing params (read via I1/I2) and returning FR. Native pop order is
+// left-to-right, so token roles mirror upstream's reversed cs_pop order.
+
+static void opF(TT2Runtime &runtime, TT2OutputState &output,
+                const TeletypeProgram *program, int16_t *stack,
+                uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t script = 0;
+    if (!popStack(stack, stackSize, script, error)) return;
+    if (!program) { error = TT2EvalError::NoTrack; return; }
+    pushStack(stack, stackSize, tt2RunFunction(*program, runtime, output, uint8_t(script - 1), 0, 0), error);
+}
+
+static void opF1(TT2Runtime &runtime, TT2OutputState &output,
+                 const TeletypeProgram *program, int16_t *stack,
+                 uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t param1 = 0, script = 0;
+    if (!popStack(stack, stackSize, param1, error)) return;
+    if (!popStack(stack, stackSize, script, error)) return;
+    if (!program) { error = TT2EvalError::NoTrack; return; }
+    pushStack(stack, stackSize, tt2RunFunction(*program, runtime, output, uint8_t(script - 1), param1, 0), error);
+}
+
+static void opF2(TT2Runtime &runtime, TT2OutputState &output,
+                 const TeletypeProgram *program, int16_t *stack,
+                 uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t param2 = 0, param1 = 0, script = 0;
+    if (!popStack(stack, stackSize, param2, error)) return;
+    if (!popStack(stack, stackSize, param1, error)) return;
+    if (!popStack(stack, stackSize, script, error)) return;
+    if (!program) { error = TT2EvalError::NoTrack; return; }
+    pushStack(stack, stackSize, tt2RunFunction(*program, runtime, output, uint8_t(script - 1), param1, param2), error);
+}
+
+static void opL(TT2Runtime &runtime, TT2OutputState &output,
+                const TeletypeProgram *program, int16_t *stack,
+                uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t line = 0, script = 0;
+    if (!popStack(stack, stackSize, line, error)) return;
+    if (!popStack(stack, stackSize, script, error)) return;
+    if (!program) { error = TT2EvalError::NoTrack; return; }
+    pushStack(stack, stackSize, tt2RunFunctionLine(*program, runtime, output, uint8_t(script - 1), uint8_t(line - 1), 0, 0), error);
+}
+
+static void opL1(TT2Runtime &runtime, TT2OutputState &output,
+                 const TeletypeProgram *program, int16_t *stack,
+                 uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t param1 = 0, line = 0, script = 0;
+    if (!popStack(stack, stackSize, param1, error)) return;
+    if (!popStack(stack, stackSize, line, error)) return;
+    if (!popStack(stack, stackSize, script, error)) return;
+    if (!program) { error = TT2EvalError::NoTrack; return; }
+    pushStack(stack, stackSize, tt2RunFunctionLine(*program, runtime, output, uint8_t(script - 1), uint8_t(line - 1), param1, 0), error);
+}
+
+static void opL2(TT2Runtime &runtime, TT2OutputState &output,
+                 const TeletypeProgram *program, int16_t *stack,
+                 uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t param2 = 0, param1 = 0, line = 0, script = 0;
+    if (!popStack(stack, stackSize, param2, error)) return;
+    if (!popStack(stack, stackSize, param1, error)) return;
+    if (!popStack(stack, stackSize, line, error)) return;
+    if (!popStack(stack, stackSize, script, error)) return;
+    if (!program) { error = TT2EvalError::NoTrack; return; }
+    pushStack(stack, stackSize, tt2RunFunctionLine(*program, runtime, output, uint8_t(script - 1), uint8_t(line - 1), param1, param2), error);
+}
+
+static void opS(TT2Runtime &runtime, TT2OutputState &output,
+                const TeletypeProgram *program, int16_t *stack,
+                uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t line = 0;
+    if (!popStack(stack, stackSize, line, error)) return;
+    if (!program) { error = TT2EvalError::NoTrack; return; }
+    pushStack(stack, stackSize, tt2RunFunctionLine(*program, runtime, output, tt2ActiveScriptNumber(runtime), uint8_t(line - 1), 0, 0), error);
+}
+
+static void opS1(TT2Runtime &runtime, TT2OutputState &output,
+                 const TeletypeProgram *program, int16_t *stack,
+                 uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t param1 = 0, line = 0;
+    if (!popStack(stack, stackSize, param1, error)) return;
+    if (!popStack(stack, stackSize, line, error)) return;
+    if (!program) { error = TT2EvalError::NoTrack; return; }
+    pushStack(stack, stackSize, tt2RunFunctionLine(*program, runtime, output, tt2ActiveScriptNumber(runtime), uint8_t(line - 1), param1, 0), error);
+}
+
+static void opS2(TT2Runtime &runtime, TT2OutputState &output,
+                 const TeletypeProgram *program, int16_t *stack,
+                 uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t param2 = 0, param1 = 0, line = 0;
+    if (!popStack(stack, stackSize, param2, error)) return;
+    if (!popStack(stack, stackSize, param1, error)) return;
+    if (!popStack(stack, stackSize, line, error)) return;
+    if (!program) { error = TT2EvalError::NoTrack; return; }
+    pushStack(stack, stackSize, tt2RunFunctionLine(*program, runtime, output, tt2ActiveScriptNumber(runtime), uint8_t(line - 1), param1, param2), error);
+}
+
+// I1 / I2 — read the active function call's input params.
+static void opI1(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    pushStack(stack, stackSize, tt2ActiveFrame(runtime).fparam1, error);
+}
+
+static void opI2(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    pushStack(stack, stackSize, tt2ActiveFrame(runtime).fparam2, error);
+}
+
+// FR — get/set the active function's return value.
+static void opFr(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
+    TT2ExecFrame &frame = tt2ActiveFrame(runtime);
+    if (isSetPosition && stackSize >= 1) {
+        int16_t val = 0;
+        if (!popStack(stack, stackSize, val, error)) return;
+        frame.fresult = val;
+        frame.fresult_set = 1;
+    } else {
+        pushStack(stack, stackSize, frame.fresult, error);
+    }
+}
+
 // DEL.CLR — clear the delay queue (faithful subset: TT2 has no TR pulse
 // timers / persistent op stack to also flush).
 static void opDelClr(TT2Runtime &runtime, TT2OutputState &,
@@ -2529,6 +2651,19 @@ namespace {
             table[E_OP_M]        = opM;
             table[E_OP_M_ACT]    = opMAct;
             table[E_OP_SCRIPT]   = opScript;
+            table[E_OP_SYM_DOLLAR]    = opScript;
+            table[E_OP_SYM_DOLLAR_F]  = opF;
+            table[E_OP_SYM_DOLLAR_F1] = opF1;
+            table[E_OP_SYM_DOLLAR_F2] = opF2;
+            table[E_OP_SYM_DOLLAR_L]  = opL;
+            table[E_OP_SYM_DOLLAR_L1] = opL1;
+            table[E_OP_SYM_DOLLAR_L2] = opL2;
+            table[E_OP_SYM_DOLLAR_S]  = opS;
+            table[E_OP_SYM_DOLLAR_S1] = opS1;
+            table[E_OP_SYM_DOLLAR_S2] = opS2;
+            table[E_OP_I1]       = opI1;
+            table[E_OP_I2]       = opI2;
+            table[E_OP_FR]       = opFr;
             table[E_OP_DEL_CLR]  = opDelClr;
             table[E_OP_BREAK]    = opBreak;
             table[E_OP_BRK]      = opBreak;

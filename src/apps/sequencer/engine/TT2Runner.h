@@ -54,6 +54,65 @@ inline TT2EvalResult runScript(const TeletypeProgram &program,
     return {TT2EvalError::None, 0, 0, 0};
 }
 
+// Run a script as a function: push a frame carrying the input params, execute
+// all lines, return the frame's fresult (0 if the body never set FR). Mirrors
+// upstream execute_function (es_push_fparams -> run -> fresult).
+inline int16_t tt2RunFunction(const TeletypeProgram &program, TT2Runtime &runtime,
+                              TT2OutputState &output, uint8_t scriptIndex,
+                              int16_t param1, int16_t param2) {
+    if (scriptIndex >= TT2_SCRIPT_COUNT) return 0;
+    const TT2Script &script = program.scripts[scriptIndex];
+    if (script.length > TT2_COMMANDS_PER_SCRIPT) return 0;
+    if (runtime.exec.depth >= TT2_EXEC_DEPTH) { runtime.exec.overflow = 1; return 0; }
+
+    TT2ExecFrame &frame = runtime.exec.frames[runtime.exec.depth];
+    memset(&frame, 0, sizeof(TT2ExecFrame));
+    frame.script_number = scriptIndex;
+    frame.fparam1 = param1;
+    frame.fparam2 = param2;
+    runtime.scriptLastMs[scriptIndex] = runtime.clockMs;
+    runtime.exec.depth++;
+
+    for (uint8_t line = 0; line < script.length; ++line) {
+        const TT2Command &cmd = script.commands[line];
+        if (cmd.length == 0) continue;
+        frame.line_number = line;
+        TT2EvalResult result = evaluateCommand(cmd, runtime, output, &program);
+        if (result.error != TT2EvalError::None) break;
+    }
+
+    int16_t fresult = frame.fresult_set ? frame.fresult : 0;
+    runtime.exec.depth--;
+    return fresult;
+}
+
+// Run a single line of a script as a function (upstream execute_function_line).
+inline int16_t tt2RunFunctionLine(const TeletypeProgram &program, TT2Runtime &runtime,
+                                  TT2OutputState &output, uint8_t scriptIndex,
+                                  uint8_t line, int16_t param1, int16_t param2) {
+    if (scriptIndex >= TT2_SCRIPT_COUNT) return 0;
+    const TT2Script &script = program.scripts[scriptIndex];
+    if (line >= script.length) return 0;
+    if (runtime.exec.depth >= TT2_EXEC_DEPTH) { runtime.exec.overflow = 1; return 0; }
+
+    TT2ExecFrame &frame = runtime.exec.frames[runtime.exec.depth];
+    memset(&frame, 0, sizeof(TT2ExecFrame));
+    frame.script_number = scriptIndex;
+    frame.fparam1 = param1;
+    frame.fparam2 = param2;
+    frame.line_number = line;
+    runtime.exec.depth++;
+
+    const TT2Command &cmd = script.commands[line];
+    if (cmd.length != 0) {
+        evaluateCommand(cmd, runtime, output, &program);
+    }
+
+    int16_t fresult = frame.fresult_set ? frame.fresult : 0;
+    runtime.exec.depth--;
+    return fresult;
+}
+
 // Advance the delay queue by deltaMs (real elapsed milliseconds). Each live
 // slot's remaining time is decremented; due bodies fire via the evaluator with
 // the caller's origin context restored. Faithful to upstream tele_tick():

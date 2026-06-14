@@ -280,6 +280,11 @@ inline uint8_t &tt2ActiveScriptNumber(TT2Runtime &runtime) {
                                 ? runtime.exec.depth - 1 : 0].script_number;
 }
 
+// Active execution frame — for function params (I1/I2) and result (FR).
+inline TT2ExecFrame &tt2ActiveFrame(TT2Runtime &runtime) {
+    return runtime.exec.frames[runtime.exec.depth > 0 ? runtime.exec.depth - 1 : 0];
+}
+
 inline uint8_t &tt2ActiveLineNumber(TT2Runtime &runtime) {
     return runtime.exec.frames[runtime.exec.depth > 0
                                ? runtime.exec.depth - 1 : 0].line_number;
