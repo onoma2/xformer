@@ -145,32 +145,32 @@ backend, no dual branch.
 **Approach:** Add `case Track::TrackMode::TeletypeV2:` to `TopPage`'s `setTrackView`/`setSequenceView`/`setSequenceEditPage` **and** to `TrackPage`'s trackMode switch, mirroring the `Teletype` cases (route to the same `teletypeScriptView`/track page). No new page objects if existing instances are reused. This is the enum-handling gap that currently leaves a TeletypeV2 track with no editor route.
 **Test scenarios:** `Test expectation: none (UI routing)` — verified on sim/device: a TeletypeV2 track reaches the script + pattern pages via the same keys as orig Teletype; no fall-through to a blank page.
 
-### U6. Behavioral parity harness (orig C VM vs TT2 native runner) — ✅ largely shipped
+### U6. Parity harness (orig C VM vs TT2 native runner) — ✅ shipped (the gate)
 
-**Status: op-level done; tick-level still owed (it's the bridge-deletion gate).** The
-existing `TestTeletypeV2Parity` runs the deterministic op surface through both the legacy
-C VM and the native runner, asserting equal **return values** (it caught reversed bitwise
-operands + a TT1 `QT` bug). But it **excludes** RNG/stateful/**engine** ops — so it proves
-*computation* parity, **not** that the native engine reproduces the legacy **output over
-time** (CV slew/offset, TR pulse/polarity, metro/delay timing, trigger firing — the actual
-voltages and gate edges).
+**Status: done — two layers, the correct equivalence bar.**
+- **Op-value parity** (`TestTeletypeV2Parity`, prior) — deterministic op surface through
+  both VMs, equal return values (caught reversed bitwise operands + a TT1 `QT` bug).
+- **Output-value parity** (`TestTeletypeV2OutputParity`, this unit) — identical command
+  text through both VMs, asserting **CV/gate target values match** over the shared 1–4
+  output range: `ss.variables.cv[i]/tr[i]` vs `out.cv[i].targetRaw / out.tr[i].level`.
 
-Tick-level CV/gate parity covers exactly that uncovered layer, and it is the
-**confidence gate for bridge deletion** (Phase 5: tear out the legacy engine "once parity
-is confirmed" — confirmed *by this*). It is **not needed for the editor to function**
-(display/edit/route/run don't depend on it), so it does not block U2–U5. But it is **not
-optional** for retiring the bridge — that step needs the tick-level harness (or an
-explicit on-device audition sign-off) first. Deferred to the bridge-deletion effort, not
-dismissed.
+**Tick-shaped identity was rejected as the wrong bar.** The original ambition was a
+tick-by-tick CV/gate diff, but TT2's output shaping (slew curve, TR pulse timing) is a
+**native reimplementation, intentionally not legacy-identical** — an engine-level tick
+diff would (a) need a full `Engine` for both backends and (b) **fail on those intended
+shaping differences**. So the gate is: op-value + output-value parity (both engines
+*compute* the same outputs) **plus** TT2's shaping verified against its own spec
+(`TestTeletypeV2OutputShaping`, existing) **plus** on-device audition. That set is the
+**bridge-deletion confidence gate** for U8 — it does not require a legacy tick clone.
 
-**Dependencies:** none (runtime-only; can land independently).
-**Files:** `src/tests/unit/sequencer/TestTeletypeV2Parity.cpp` (new), `src/tests/unit/sequencer/CMakeLists.txt`.
-**Approach:** For a set of representative scripts, feed identical text to both: orig path (parse → run via the orig Teletype engine/`process_command`) and TT2 path (`loadScriptText` → `runScript`). Step N ticks; compare CV (raw) + gate output per tick. Report first divergence. Resolve at execution time how to construct the orig engine in a test (it may need an `Engine` context the TT2 runner doesn't) — if the orig engine is too heavy to host in a unit test, drive both at the script/op level instead and compare the output state.
-**Execution note:** Implement test-first — the harness IS the test.
-**Test scenarios:**
-- Identical output for: arithmetic/logic (`A ADD 1 2; CV 1 A`), pitch (`CV 1 N 12`), a metro/every script, a pattern read (`CV 1 P 0`), an IF/PROB line.
-- Divergence is reported with the tick + channel, not a silent pass.
-- Seeded RNG ops (TOSS/P.RND) — compare only deterministic scripts, or seed both identically; document which scripts are excluded.
+Harness boundary found in execution: legacy = **4 CV / 4 TR** (`CV_COUNT`/`TR_COUNT`);
+TT2 extends to **8** (Performer) — a deliberate feature, so parity is asserted only over
+the shared 1–4 range. The full-Engine construction the tick approach needed is feasible
+in tests (Harmony tests do it) but was not the right tool here.
+
+**Files:** `src/tests/unit/sequencer/TestTeletypeV2OutputParity.cpp`,
+`src/tests/unit/sequencer/TestTeletypeV2Parity.cpp`, `…/CMakeLists.txt`.
+**Verification:** both harnesses green; they run headless against the C VM (no Engine).
 
 ### U7. Remove `Teletype` as a selectable / editable track mode
 
@@ -189,7 +189,10 @@ select; `TeletypeV2` present and editable. `TestTeletypeV2Parity` still builds +
 ### U8. Delete the bridge — parity-gated (the teardown)
 
 **Goal:** Remove the legacy engine entirely once the native runner is proven equivalent.
-**Dependencies:** **U6 tick-level parity locked** (hard gate), U7.
+**Dependencies:** **U6 parity gate satisfied** (op-value + output-value parity green +
+TT2 shaping spec + on-device audition sign-off), U7. Note: deleting the bridge also
+removes the C VM the parity harnesses diff against, so they retire with it — run them
+green one last time immediately before deletion.
 **Files:** delete `TeletypeTrackEngine.*`, `TeletypeBridge.*`, the `scene_state_t` VM
 usage, `TrackMode::Teletype` enum + all its `switch` cases, `TeletypeTrackListModel`, the
 orig page bindings; drop the now-unused C-VM sources from the build. The Ragel
