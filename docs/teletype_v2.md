@@ -18,7 +18,7 @@ The goal is a native Performer scripting language derived from Teletype:
 
 ## Current State (2026-06-14)
 
-`TrackMode::TeletypeV2` runs as a native `TT2TrackEngine`: parse (Ragel) → lower → native ops → `TT2OutputState`. No `scene_state_t`, no `tele_*` bridge, no C VM in the runtime. The legacy bridge engine (`TrackMode::Teletype`) still coexists and is the eventual deletion target (Action Plan Phase 5), gated on the native path reaching editor + scheduler parity.
+`TrackMode::TeletypeV2` runs as a native `TT2TrackEngine`: parse (Ragel) → lower → native ops → `TT2OutputState`. No `scene_state_t`, no `tele_*` bridge, no C VM in the runtime. The legacy bridge engine (`TrackMode::Teletype`) still coexists and is the **source of truth** for op coverage + the eventual deletion target (Action Plan Phase 5), gated on the native path reaching editor + bridge-parity (see the bridge-parity gaps below; modules/scenes deferred).
 
 ### Done — native, tested, STM32-green
 - **Control/timing language (MODs):** IF / ELIF / ELSE, PROB, EVERY / SKIP, L, BREAK / BRK, SCRIPT, KILL, S (stack push), the full DEL family; ms-based metro.
@@ -33,17 +33,36 @@ The goal is a native Performer scripting language derived from Teletype:
 - **Turtle (`@` ops):** fixed-point walker over pattern memory (x = pattern 0-3, y = index 0-63), verbatim port of `turtle.c` — move/step/fence/wrap/bump/bounce/speed/dir/script/show.
 - **Parity harness (`TestTeletypeV2Parity`):** evaluates a deterministic op set (math/comparison/logic/range/pitch/scale/bitwise/shift) through both the legacy C VM and the native runner, asserting equal results. Caught reversed bitwise operands (corrected to value-first: `BSET x i`, `RSH x n`). One documented divergence: the C VM's `QT` returns 0 when it should round up to `(c+1)*step` (a TT1 bug) — native `QT` is correct, so `QT` is excluded from the parity set. RNG/stateful ops are out of scope (the two RNGs can't agree bit-for-bit).
 
-### Remaining — engine mechanics
-All engine mechanics and the full language surface (control/timing, ops, pitch, randomness, bitwise, functions, turtle) are native and tested. The only remaining TT2 work is the **editor** (below) — no op/engine gaps remain.
+### Remaining — bridge-parity gaps (source of truth = the current `TeletypeTrack` bridge)
+
+The bridge — not upstream Teletype — is the coverage target. Audit of its wired `tele_*` callbacks (`TeletypeBridge.cpp` + `TeletypeTrackEngine.cpp`) shows these are **real, working features** the native runner does not yet cover:
+
+- **MIDI (essential):** `receiveMidi` filters by a per-track MIDI source (port+channel), feeds `state.midi`, drives the `MI.*` query family, and fires scripts on MIDI events. Native TT2 has none of this.
+- **BUS:** the 4-lane CV-router hub (`BUS` get/set) — bridge-real, native missing.
+- **W\* family + `RT`:** transport + cross-track reads/writes (`WBPM`/`WMS`/`WTU`/`BAR`/`WP`/`WP.SET`/`WR`/`WR.ACT`/`WNG`(`.H`)/`WNN`(`.H`)/`RT`) — reads other Performer tracks' notes/gates. Bridge-real, native missing.
+- **`TR.W` / `TR.D`** width/divisor pulse variants; **metro variants** `M.A`/`M.ACT.A`/`M.RESET`(`.A`)/`M!`; **`CV.GET`/`CV.SET`** + CV interpolate — all bridge-real, native missing.
+- **Hardware-independent tail still unported:** scale-bitmask (`N.S`/`N.C`/`N.CS`/`N.B`/`N.BX`, `QT.S`/`QT.CS`/`QT.B`/`QT.BX` — needs one bitmask-scale helper), euclid/drum (`ER`/`NR`/`DR.T`/`DR.P`/`DR.V`), `EXP`, `CHAOS`(`.R`/`.ALG`), seeds (`SEED`/`*.SEED`/`*.SD`), `INIT.*`, `JI`, `RND`/`RRND`, `SYNC`/`SCRIPT.POL`/`TIF`, `Q.RND`/`Q.2P`/`Q.P2`, comparison symbols.
+
+### Deferred — separate efforts (not standalone ports)
+
+- **Native modules — Envelopes `E.*`, LFO `LFO.*`, Geode `G.*`.** These are full sub-engines in the bridge and real features, but they fold into the upcoming **modulator rework**, not a standalone TT2 port.
+- **Scenes (`SCENE`/`SCENE.G`/`SCENE.P`).** Stubbed in the bridge today (`tele_scene` no-op) but **may return** — not dropped.
+- **Calibration** (`CV.CAL`/`IN.CAL.*`/`PARAM.CAL.*`) — bridge no-op (`tele_cv_cal`/`tele_save_calibration` empty).
 
 ### Remaining — editor (plan written)
 Repoint the editing UI to TeletypeV2, reusing the working pages. `tele2_ops[]` native op registry + `TT2Command→text` printer (no `tele_ops[]`/`print_command` round-trip), per-line edit, rebind the script + pattern pages TrackMode-aware (live mode → native runner), TopPage routing, a behavioral parity harness (orig C VM vs native runner). Plan: `docs/plans/2026-06-14-001-feat-tt2-editor-repoint-plan.md`. Defers the I/O grid (needs the trigger-input / I/O-routing model above) + file save/load.
 
-### SKIP — confirmed out (no Performer hardware)
-Scenes/`SCENE`, i2c/Telex, grid/Arc, Ansible/WW/Meadow/Earthsea/ORCA, Just Friends/ER-301/Disting/`W/`, Crow, MIDI-query families.
+### Stubbed in the bridge → parity by omission (safe to skip)
+
+The bridge no-ops these on Performer, so the native runner omitting them loses nothing versus the source of truth:
+
+- **i2c** (`tele_ii_tx`/`tele_ii_rx` empty) and therefore **all external-device families**: Telex `TO.*`/`TI.*`, Ansible/Kria/Levels/Cycles/Arp, White Whale, Meadowphysics, Earthsea, ORCA, Just Friends, ER-301 `SC.*`, Disting EX, Crow, I2C2MIDI, Matrixarchate, `W/` audio.
+- **Grid** (`grid_key_press`/`device_flip` empty) and **live-submode** (`set_live_submode` empty): grid ops, `LIVE.*`.
+
+(Earlier this section claimed "no Performer hardware" and wrongly swept MIDI + the native modules + scenes into it — corrected above: MIDI is real/essential, modules are real-but-deferred, scenes may return.)
 
 ### Recommended order
-Engine mechanics ✅, language tail ✅, turtle ✅ — all done. Remaining: the **editor** (repoint the editing UI to the native runner), then **bridge deletion** (Phase 5). The native dialect is now feature-complete at the op/engine level; the editor is what makes it auditionable on hardware.
+Engine mechanics ✅, language tail ✅, turtle ✅ — done. The native runner is **not** yet a superset of the bridge: the bridge-parity gaps above (MIDI essential, BUS, W\*/`RT`, `TR.W`/`TR.D`, metro variants, `CV.GET`/`CV.SET`, and the unported hw-independent tail) must close before the bridge can be deleted, and the **editor** must land for on-device audition. Native modules (E/LFO/Geode) ride with the modulator rework; scenes stay on the table. Bridge deletion (Phase 5) is gated on parity minus the deferred buckets.
 
 ## Non-Goals
 
@@ -291,7 +310,7 @@ Keep these names and preserve 1-4 behavior. Extend them to 1-8 and remove bridge
 
 These are not part of the hardware-independent pasted-script contract. Drop them from v2 unless they are later redesigned as explicit Performer-native features.
 
-- Parser-visible scene/hardware surface: `INIT.SCENE`, `SCENE`, `SCENE.G`, `SCENE.P`, `LIVE.GRID`, `LIVE.G`.
+- Grid surface: `LIVE.GRID`, `LIVE.G` (grid no-op in the bridge). **Scene ops (`SCENE`/`SCENE.G`/`SCENE.P`/`INIT.SCENE`) are NOT dropped** — deferred, may return (see Current State).
 - Raw ii/I2C family: `IIA`, `IIS*`, `IIQ*`, `IIB*`.
 - External device families present in source: Ansible/Kria/Meadow/Levels/Cycles/Arp, White Whale, Meadowphysics, Earthsea, Just Friends, Telex `TO.*` / `TI.*`, Crow, ER-301 `SC.*`, Disting EX, ORCA, I2C2MIDI, Grid, Fader, Matrixarchate, W/ audio module families (`W/`, `W/S`, `W/D`, `W/T`).
 
@@ -368,7 +387,7 @@ Useful suggestions that still apply:
 
 ## Action Plan
 
-**Status (2026-06-14) — see Current State for the live roadmap.** Phase 0 (dialect definition) ✅, Phase 1 (native data model) ✅, Phase 2 (native core interpreter) ✅ **and well beyond** (the full op surface + control-flow MODs + patterns are native and tested). Phase 3 (native output semantics) ✅ — instant `CV`/`TR` plus slew / pulse / offset / polarity (the "output shaping" engine) are native and tested. Phase 4 (native modules: envelopes/LFO/Geode) **not started** (lower priority). Phase 5 (delete bridge) **pending**, gated on native editor + scheduler (trigger/input) parity. The phase definitions below stay as the architectural frame; the prioritized remaining work lives in Current State.
+**Status (2026-06-14) — see Current State for the live roadmap.** Phase 0 (dialect definition) ✅, Phase 1 (native data model) ✅, Phase 2 (native core interpreter) ✅ **and well beyond** (the full op surface + control-flow MODs + patterns are native and tested). Phase 3 (native output semantics) ✅ — instant `CV`/`TR` plus slew / pulse / offset / polarity (the "output shaping" engine) are native and tested. Phase 4 (native modules: envelopes/LFO/Geode) **deferred to the modulator rework** — these are real, working features in the bridge, not ported standalone. Phase 5 (delete bridge) **pending**, gated on native editor + bridge-parity (MIDI, BUS, W\*/`RT`, `TR.W`/`TR.D`, metro variants, `CV.GET`/`CV.SET`, the unported hw-independent tail) minus the deferred buckets (modules, scenes, calibration). The phase definitions below stay as the architectural frame; the prioritized remaining work lives in Current State.
 
 ### Phase 0: Dialect Definition
 
