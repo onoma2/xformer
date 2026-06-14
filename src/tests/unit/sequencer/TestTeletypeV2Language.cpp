@@ -140,6 +140,26 @@ UNIT_TEST("TeletypeV2Language") {
         }
     }
 
+    CASE("misc_engine_ops") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        // CV.GET / CV.SET (snap, no slew)
+        evalText("CV.SET 1 8000", runtime, output);
+        expectEqual(runtime.variables.cv[0], int16_t(8000), "CV.SET stores value");
+        expectEqual(int(getv("CV.GET 1", runtime, output)), 8000, "CV.GET reads it");
+        expectTrue(output.cv[0].remainingMs == 0, "CV.SET snaps (no slew)");
+        // M! / M.A / M.ACT.A
+        evalText("M.A 500", runtime, output);
+        expectEqual(int(getv("M!", runtime, output)), 500, "M! reads metro period");
+        evalText("M.ACT.A 0", runtime, output);
+        expectEqual(int(runtime.variables.m_act), 0, "M.ACT.A 0 deactivates");
+        // SCRIPT.POL
+        evalText("SCRIPT.POL 1 2", runtime, output);
+        expectEqual(int(getv("SCRIPT.POL 1", runtime, output)), 2, "SCRIPT.POL set/get");
+        evalText("SCRIPT.POL 0 1", runtime, output);  // all
+        expectEqual(int(getv("SCRIPT.POL 3", runtime, output)), 1, "SCRIPT.POL 0 sets all");
+    }
+
     CASE("init_family_resets_state") {
         TT2Runtime runtime = {}; init(runtime);
         TT2OutputState output = {}; init(output);

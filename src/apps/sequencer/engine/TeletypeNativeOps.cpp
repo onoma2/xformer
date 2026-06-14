@@ -1732,6 +1732,83 @@ static void opInit(TT2Runtime &r, TT2OutputState &o, const TeletypeProgram *prog
 }
 
 // ---------------------------------------------------------------------------
+// Misc engine ops (TIF, M!, CV.GET/CV.SET, M.A/M.ACT.A, SCRIPT.POL)
+// ---------------------------------------------------------------------------
+
+// TIF cond a b — ternary select (pure).
+static void opTif(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t cond = 0, a = 0, b = 0;
+    if (!popStack(stack, stackSize, cond, error)) return;
+    if (!popStack(stack, stackSize, a, error)) return;
+    if (!popStack(stack, stackSize, b, error)) return;
+    pushStack(stack, stackSize, cond ? a : b, error);
+}
+
+// M! — read the metro period.
+static void opMBang(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    pushStack(stack, stackSize, runtime.variables.m, error);
+}
+
+// CV.GET n — read the channel's current value.
+static void opCvGet(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_CV_COUNT)) return;
+    pushStack(stack, stackSize, runtime.variables.cv[idx], error);
+}
+
+// CV.SET n v — set CV directly with NO slew (snap), offset applied.
+static void opCvSet(TT2Runtime &runtime, TT2OutputState &output, const TeletypeProgram *,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_CV_COUNT)) return;
+    int16_t val = 0;
+    if (!popStack(stack, stackSize, val, error)) return;
+    val = normaliseCvValue(val);
+    runtime.variables.cv[idx] = val;
+    int16_t target = normaliseCvValue(int16_t(val + runtime.variables.cv_off[idx]));
+    tt2SeedCvSlew(output.cv[idx], target, 0);  // slew 0 -> snap
+    output.cvDirty |= uint8_t(1 << idx);
+}
+
+// M.A m — set metro period (single-track "all" == this track).
+static void opMA(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t m = 0;
+    if (!popStack(stack, stackSize, m, error)) return;
+    if (m < 2) m = 2;
+    runtime.variables.m = m;
+}
+
+// M.ACT.A state — set metro active (single-track "all").
+static void opMActA(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t s = 0;
+    if (!popStack(stack, stackSize, s, error)) return;
+    runtime.variables.m_act = (s > 0) ? 1 : 0;
+}
+
+// SCRIPT.POL / $.POL — per-trigger-input script polarity (a==0 sets all).
+static void opScriptPol(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                        int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    if (isSet && stackSize >= 2) {
+        int16_t a = 0, pol = 0;
+        if (!popStack(stack, stackSize, a, error)) return;
+        if (!popStack(stack, stackSize, pol, error)) return;
+        if (pol < 0 || pol > 3) return;
+        if (a == 0) { for (int i = 0; i < TT2_TRIGGER_INPUTS; ++i) runtime.variables.script_pol[i] = uint8_t(pol); }
+        else { int s = a - 1; if (s >= 0 && s < TT2_TRIGGER_INPUTS) runtime.variables.script_pol[s] = uint8_t(pol); }
+    } else {
+        int16_t a = 0;
+        if (!popStack(stack, stackSize, a, error)) return;
+        int s = a - 1;
+        pushStack(stack, stackSize, (s >= 0 && s < TT2_TRIGGER_INPUTS) ? int16_t(runtime.variables.script_pol[s]) : 0, error);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Engine input ops
 // ---------------------------------------------------------------------------
 
@@ -3432,6 +3509,14 @@ namespace {
             table[E_OP_INIT_SCRIPT_ALL] = opInitScriptAll;
             table[E_OP_INIT_DATA]       = opInitData;
             table[E_OP_INIT_TIME]       = opInitTime;
+            table[E_OP_TIF]                = opTif;
+            table[E_OP_M_SYM_EXCLAMATION]  = opMBang;
+            table[E_OP_CV_GET]             = opCvGet;
+            table[E_OP_CV_SET]             = opCvSet;
+            table[E_OP_M_A]                = opMA;
+            table[E_OP_M_ACT_A]            = opMActA;
+            table[E_OP_SCRIPT_POL]         = opScriptPol;
+            table[E_OP_SYM_DOLLAR_POL]     = opScriptPol;
             table[E_OP_R]        = opR;
             table[E_OP_R_MIN]    = opRMin;
             table[E_OP_R_MAX]    = opRMax;

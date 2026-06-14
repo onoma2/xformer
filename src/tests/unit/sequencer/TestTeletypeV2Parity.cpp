@@ -81,6 +81,8 @@ UNIT_TEST("TeletypeV2Parity") {
         "N.C 0 0 1", "N.C 0 1 2", "N.C 24 2 3",
         "N.CS 0 0 1 1", "N.CS 12 1 3 2",
         "QT.S 1638 0 0", "QT.S 2000 0 1", "QT.CS 1638 0 0 1 3",
+        // P4 pure
+        "TIF 1 5 9", "TIF 0 5 9", "TIF 7 100 200",
         // NOTE: N.B/N.BX/QT.B/QT.BX (scale-bank get-degree path) implemented but
         // not yet bridge-parity-verified — degree-walk semantics need a follow-up.
     };
