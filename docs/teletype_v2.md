@@ -44,9 +44,18 @@ The bridge — not upstream Teletype — was the coverage target. **All six port
 - **P5 ✅** `BUS` + `W*`/`RT` via the new **`TT2Host`** interface (`TT2TrackEngine` implements it, registers active around script exec via `ScopedHost`, keeping the op layer off `Engine.h`): `WBPM`/`WBPM.S`/`WMS`/`WTU`/`BAR`/`WP`/`WP.SET`/`WR`/`W.ACT`/`WNG`/`WNN`/`WNG.H`/`WNN.H`/`RT`/`BUS`; `BPM` (pure, parity-verified).
 - **P6 ✅** **MIDI** — `TT2Midi` runtime buffer; `TT2TrackEngine::receiveMidi`/`processMidiMessage` (filter by per-track `MidiSourceConfig` → populate → fire `MI.$`-bound script); the native `MI.*` query family (last-event/indexed-by-`I`/counts/channels/`MI.$`/`MI.CLKD`; `MI.CLKR` no-op, MIDI-clock derivation deferred).
 
+### Modulator + Geode control ✅ — native `MO.*` / `G.*` over the real engines
+
+`TrackMode::TeletypeV2` controls the **real** modulator slots and Geode engine via thin BUS-style accessor ops (not a redefinition; the modulator UI stays the control surface). Plan: `docs/plans/2026-06-14-006-feat-tt2-mod-geode-ops-plan.md`.
+- **`Modulator::Param` dictionary** — one canonical address table (shape=0 … 15 fields), shared by engine, ops, and (eventually) UI; a façade over the existing field accessors.
+- **`MO.*`** — `MO n` reads a slot's output; `MO.P n addr [v]` reads/writes any field by address; `MO.SHAPE/RATE/DEPTH/MODE/OFF` + `MO.TRIG` are fixed-addr sugar (short aliases `MO.S/R/D/M/O/T`). Last-writer-wins with the knob; native units. Drives `Project::modulator(n)` via `TT2Host`.
+- **`G.*`** — native handlers over the existing tokens: `G.TIME/TONE/RAMP/CURV/MODE` globals, `G.RUN` (fixed run macro on M2, quantized to offset's 128 steps), `G.TUNE`, `G.V` (voice 0=all, full gate-fire sequence), `G.VAL` (mix), `G.S` compound. `G.O`/`G.BAR`/`G.R` have no live `GeodeConfig` field → `UnsupportedOp`.
+
 ### Deferred — separate efforts (not standalone ports)
 
-- **Native modules — Envelopes `E.*`, LFO `LFO.*`, Geode `G.*`.** These are full sub-engines in the bridge and real features, but they fold into the upcoming **modulator rework**, not a standalone TT2 port.
+- **Legacy Envelopes `E.*` / LFO `LFO.*`.** Bridge sub-engines, superseded by the generic `MO.*` modulator control above (no native per-shape `E.*`/`LFO.*`); they die with the bridge.
+- **`ModulatorPage` dictionary realignment** — make the UI reference `Modulator::Param` (needs a physical-slot→addr adapter + ui-preview). The shared address already holds in the model; this is cosmetic-internal follow-up.
+- **The modulator engine rework** (`.tasks/modulator-enhancements.md`) — independent UI-driven track; the ops adapt to whatever it lands.
 - **Scenes (`SCENE`/`SCENE.G`/`SCENE.P`).** Stubbed in the bridge today (`tele_scene` no-op) but **may return** — not dropped.
 - **Calibration** (`CV.CAL`/`IN.CAL.*`/`PARAM.CAL.*`) — bridge no-op (`tele_cv_cal`/`tele_save_calibration` empty).
 
@@ -63,7 +72,7 @@ The bridge no-ops these on Performer, so the native runner omitting them loses n
 (Earlier this section claimed "no Performer hardware" and wrongly swept MIDI + the native modules + scenes into it — corrected above: MIDI is real/essential, modules are real-but-deferred, scenes may return.)
 
 ### Recommended order
-Engine mechanics ✅, language tail ✅, turtle ✅, **bridge-parity porting ✅ (P1–P6 done)**. The native runner now covers the bridge's usable op surface. Remaining: the **editor** (repoint the editing UI to the native runner — the on-device audition gate), then **bridge deletion** (Phase 5), gated only on the editor + the deferred buckets (native modules → modulator rework; scenes; calibration).
+Engine mechanics ✅, language tail ✅, turtle ✅, **bridge-parity porting ✅ (P1–P6 done)**, **native modulator + Geode control ✅ (`MO.*`/`G.*`)**. The native runner now covers the bridge's usable op surface. Remaining: the **editor** (repoint the editing UI to the native runner — the on-device audition gate), then **bridge deletion** (Phase 5), gated only on the editor + the deferred buckets (legacy E/LFO die with the bridge; `ModulatorPage` dictionary realignment; scenes; calibration).
 
 ## Non-Goals
 
