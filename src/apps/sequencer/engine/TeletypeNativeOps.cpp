@@ -1184,33 +1184,32 @@ static void opBitNot(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     pushStack(stack, stackSize, int16_t(~a), error);
 }
 
-// BSET/BGET/BCLR/BTOG bit index = leftmost arg, value = rightmost (parity with
-// upstream pop order).
+// BSET/BGET/BCLR/BTOG value = leftmost arg, bit index = rightmost (BSET x i).
 static void opBset(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
-    int16_t b = 0, v = 0;
-    if (!popBinary(stack, stackSize, b, v, error)) return;
+    int16_t v = 0, b = 0;
+    if (!popBinary(stack, stackSize, v, b, error)) return;
     pushStack(stack, stackSize, int16_t(v | (1 << b)), error);
 }
 
 static void opBget(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
-    int16_t b = 0, v = 0;
-    if (!popBinary(stack, stackSize, b, v, error)) return;
+    int16_t v = 0, b = 0;
+    if (!popBinary(stack, stackSize, v, b, error)) return;
     pushStack(stack, stackSize, int16_t((v >> b) & 1), error);
 }
 
 static void opBclr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
-    int16_t b = 0, v = 0;
-    if (!popBinary(stack, stackSize, b, v, error)) return;
+    int16_t v = 0, b = 0;
+    if (!popBinary(stack, stackSize, v, b, error)) return;
     pushStack(stack, stackSize, int16_t(v & ~(1 << b)), error);
 }
 
 static void opBtog(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
-    int16_t b = 0, v = 0;
-    if (!popBinary(stack, stackSize, b, v, error)) return;
+    int16_t v = 0, b = 0;
+    if (!popBinary(stack, stackSize, v, b, error)) return;
     int16_t r = ((v >> b) & 1) ? int16_t(v & ~(1 << b)) : int16_t(v | (1 << b));
     pushStack(stack, stackSize, r, error);
 }
@@ -1230,18 +1229,18 @@ static void opBrev(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     pushStack(stack, stackSize, tt2BitReverse(a, 16), error);
 }
 
-// RSH/LSH shift = leftmost arg, value = rightmost; negative shift flips direction.
+// RSH/LSH value = leftmost arg, shift = rightmost (RSH x n); negative flips.
 static void opRsh(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
-    int16_t n = 0, x = 0;
-    if (!popBinary(stack, stackSize, n, x, error)) return;
+    int16_t x = 0, n = 0;
+    if (!popBinary(stack, stackSize, x, n, error)) return;
     pushStack(stack, stackSize, int16_t(n > 0 ? (x >> n) : (x << -n)), error);
 }
 
 static void opLsh(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
-    int16_t n = 0, x = 0;
-    if (!popBinary(stack, stackSize, n, x, error)) return;
+    int16_t x = 0, n = 0;
+    if (!popBinary(stack, stackSize, x, n, error)) return;
     pushStack(stack, stackSize, int16_t(n > 0 ? (x << n) : (x >> -n)), error);
 }
 
@@ -1250,8 +1249,8 @@ static uint16_t tt2Lrot(uint16_t x, uint8_t n) { return uint16_t((x << n) | (x >
 
 static void opRrot(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
-    int16_t n = 0, x = 0;
-    if (!popBinary(stack, stackSize, n, x, error)) return;
+    int16_t x = 0, n = 0;
+    if (!popBinary(stack, stackSize, x, n, error)) return;
     n %= 16;
     uint16_t u = uint16_t(x);
     u = n > 0 ? tt2Rrot(u, uint8_t(n)) : tt2Lrot(u, uint8_t(-n));
@@ -1260,8 +1259,8 @@ static void opRrot(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 
 static void opLrot(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
-    int16_t n = 0, x = 0;
-    if (!popBinary(stack, stackSize, n, x, error)) return;
+    int16_t x = 0, n = 0;
+    if (!popBinary(stack, stackSize, x, n, error)) return;
     n %= 16;
     uint16_t u = uint16_t(x);
     u = n > 0 ? tt2Lrot(u, uint8_t(n)) : tt2Rrot(u, uint8_t(-n));

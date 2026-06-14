@@ -45,12 +45,13 @@ UNIT_TEST("TeletypeV2Bitwise") {
     CASE("bit_set_get_clear_tog") {
         TT2Runtime runtime = {}; init(runtime);
         TT2OutputState output = {}; init(output);
-        expectEqual(int(getv("BSET 0 8", runtime, output)), 9, "set bit");
-        expectEqual(int(getv("BGET 0 9", runtime, output)), 1, "get bit set");
-        expectEqual(int(getv("BGET 1 9", runtime, output)), 0, "get bit clear");
-        expectEqual(int(getv("BCLR 0 9", runtime, output)), 8, "clear bit");
-        expectEqual(int(getv("BTOG 0 9", runtime, output)), 8, "toggle set->clear");
-        expectEqual(int(getv("BTOG 1 9", runtime, output)), 11, "toggle clear->set");
+        // BSET x i — value first, bit index second.
+        expectEqual(int(getv("BSET 8 0", runtime, output)), 9, "set bit 0 of 8");
+        expectEqual(int(getv("BGET 9 0", runtime, output)), 1, "get bit 0 set");
+        expectEqual(int(getv("BGET 9 1", runtime, output)), 0, "get bit 1 clear");
+        expectEqual(int(getv("BCLR 9 0", runtime, output)), 8, "clear bit 0");
+        expectEqual(int(getv("BTOG 9 0", runtime, output)), 8, "toggle set->clear");
+        expectEqual(int(getv("BTOG 9 1", runtime, output)), 11, "toggle clear->set");
     }
 
     CASE("bit_reverse") {
@@ -62,9 +63,10 @@ UNIT_TEST("TeletypeV2Bitwise") {
     CASE("shifts") {
         TT2Runtime runtime = {}; init(runtime);
         TT2OutputState output = {}; init(output);
-        expectEqual(int(getv("RSH 1 8", runtime, output)), 4, "RSH by 1");
-        expectEqual(int(getv("LSH 1 8", runtime, output)), 16, "LSH by 1");
-        expectEqual(int(getv("RSH -1 8", runtime, output)), 16, "RSH by -1 = LSH");
+        // RSH x n — value first, shift second.
+        expectEqual(int(getv("RSH 8 1", runtime, output)), 4, "RSH by 1");
+        expectEqual(int(getv("LSH 8 1", runtime, output)), 16, "LSH by 1");
+        expectEqual(int(getv("RSH 8 -1", runtime, output)), 16, "RSH by -1 = LSH");
     }
 
     CASE("rotates") {
