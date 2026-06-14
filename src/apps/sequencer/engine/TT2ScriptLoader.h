@@ -53,3 +53,66 @@ inline int loadScriptText(TeletypeProgram &program, int scriptIndex, const char 
     script.length = uint8_t(line);
     return line;
 }
+
+// --- Per-line edit primitives for the editor (parse -> lower -> store) ---------
+// A blank/whitespace line lowers to a zero-length command (the runner skips it,
+// the printer renders it empty). Parse failures leave the program unchanged.
+
+namespace tt2detail {
+inline bool isBlank(const char *text) {
+    if (!text) return true;
+    for (const char *q = text; *q; ++q) {
+        if (*q != ' ' && *q != '\t') return false;
+    }
+    return true;
+}
+// Parse+lower into `dst`; blank text -> zero-length command. False on parse error.
+inline bool parseLine(const char *text, TT2Command &dst) {
+    dst = TT2Command{};
+    if (tt2detail::isBlank(text)) return true;
+    tele_command_t cmd = {};
+    char err[TELE_ERROR_MSG_LENGTH];
+    if (parse(text, &cmd, err) != E_OK) return false;
+    return lowerCommand(cmd, dst);
+}
+} // namespace tt2detail
+
+// Overwrite script `s` line `line` with `text`. Grows length to include `line`.
+// Returns false (program unchanged) on bad indices or parse error.
+inline bool setScriptCommand(TeletypeProgram &program, int s, int line, const char *text) {
+    if (s < 0 || s >= TT2_SCRIPT_COUNT) return false;
+    if (line < 0 || line >= TT2_COMMANDS_PER_SCRIPT) return false;
+    TT2Command tmp;
+    if (!tt2detail::parseLine(text, tmp)) return false;
+    TT2Script &script = program.scripts[s];
+    script.commands[line] = tmp;
+    if (line >= script.length) script.length = uint8_t(line + 1);
+    return true;
+}
+
+// Insert `text` at `line`, shifting lines down; if the script is full the last
+// line is dropped. `line` must be within [0, length]. False on error (unchanged).
+inline bool insertScriptCommand(TeletypeProgram &program, int s, int line, const char *text) {
+    if (s < 0 || s >= TT2_SCRIPT_COUNT) return false;
+    TT2Script &script = program.scripts[s];
+    if (line < 0 || line > script.length || line >= TT2_COMMANDS_PER_SCRIPT) return false;
+    TT2Command tmp;
+    if (!tt2detail::parseLine(text, tmp)) return false;  // parse before mutating
+    int top = (script.length < TT2_COMMANDS_PER_SCRIPT) ? script.length
+                                                        : TT2_COMMANDS_PER_SCRIPT - 1;
+    for (int i = top; i > line; --i) script.commands[i] = script.commands[i - 1];
+    script.commands[line] = tmp;
+    if (script.length < TT2_COMMANDS_PER_SCRIPT) script.length++;
+    return true;
+}
+
+// Delete `line`, shifting lines up; drops length. False if line out of range.
+inline bool deleteScriptCommand(TeletypeProgram &program, int s, int line) {
+    if (s < 0 || s >= TT2_SCRIPT_COUNT) return false;
+    TT2Script &script = program.scripts[s];
+    if (line < 0 || line >= script.length) return false;
+    for (int i = line; i + 1 < script.length; ++i) script.commands[i] = script.commands[i + 1];
+    script.length--;
+    script.commands[script.length] = TT2Command{};
+    return true;
+}
