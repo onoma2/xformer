@@ -20,9 +20,6 @@ private:
     void handleStepKey(int step, bool shift);
     void loadEditBuffer(int line);
     void setScriptIndex(int scriptIndex);
-    void contextShow(bool doubleClick = false) override;
-    void contextAction(int index);
-    bool contextActionEnabled(int index) const;
     void insertText(const char *text, bool addSpace);
     void removeLastInsert(int count);
     void insertChar(char c);
@@ -33,23 +30,11 @@ private:
     void copyLine();
     void pasteLine();
     void duplicateLine();
-    void commentLine();
     void deleteLine();
-    void saveScript();
-    void loadScript();
-    void saveScriptToSlot(int slot);
-    void loadScriptFromSlot(int slot);
-    void saveTrack();
-    void loadTrack();
-    void saveTrackToSlot(int slot);
-    void loadTrackFromSlot(int slot);
     void pushHistory(const char *line);
     void recallHistory(int direction);
     void setEditBuffer(const char *text);
     void commitLineAndAdvance();
-
-    void drawIoGrid(Canvas &canvas);
-    void drawBipolarBar(Canvas &canvas, int x, int y, uint16_t value, Color fillColor, Color outlineColor);
 
     int _selectedLine = 0;
     int _cursor = 0;
