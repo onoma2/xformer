@@ -20,7 +20,7 @@ plan adds a **native TT2 data layer** beneath them and makes them **TrackMode-aw
 so the same UI drives either backend.
 
 **Decided architecture (do not re-litigate):**
-- **Option B** — keep the Teletype **Ragel lexer** (`parse()`) for text input (trusted dialect spec, already ships); display via a **native `TT2Command → text` printer** (walks `TT2Command` tags/values + a **names-only** op-id→name table; **no** `tele_command_t` round-trip, **no** `print_command`, and crucially **not** `tele_ops[]` — see Key Decisions).
+- **Option B** — keep the Teletype **Ragel lexer** (`parse()`) for text input (trusted dialect spec, already ships); display via the **native `TT2Command → text` printer** — **shipped** as `TT2Printer` + the generated `TT2OpNames` registry (plan 007). No `tele_command_t` round-trip, no `print_command`, no `tele_ops[]`. Names are **generated from `match_token.rl`**, not a hand-written table (see Key Decisions).
 - **Transitional coexist** — orig Teletype (`scene_state_t`) and TT2 (native) backends live side-by-side behind a TrackMode branch in the pages, so both can be edited/run on one device for comparison. The orig backend + orig Teletype track mode are torn out in a **scheduled follow-up** once parity is confirmed (native-only end state).
 - **Behavioral parity harness** — run identical script text through the orig C VM and the TT2 native runner, diff CV/gate output tick-by-tick. The rigorous, repeatable equivalence check; survives every future op change.
 
@@ -39,7 +39,7 @@ so the same UI drives either backend.
 
 ## Key Technical Decisions
 
-- **Native `tele2_ops[]` op registry — NOT `tele_ops[]`, NOT a parallel names-only array.** `print_command` reads `tele_ops[id]->name`, but `tele_ops[]` carries function pointers into the C op implementations — referencing it would relink the foreign C op code (and `scene_state_t` deps) TT2 dropped, bloating flash. A separate names-only `const char*[]` would avoid that but duplicate the existing function-pointer `tt2NativeOpTable` (two arrays per id, hand-synced). Instead, build **`tele2_ops[]`** — TT2's own native registry, one entry per `E_OP` id holding `{ name, handler }`, replacing the bare `tt2NativeOpTable`. Single source of truth: printer reads `.name`, evaluator dispatches `.handler`. Native, no C-op relink. Names are hand-written alongside each registration (`{ "ADD", opAdd }`), self-documenting; one canonical name per id (aliases like `+` are distinct ids). Arity stays implicit for now (per-handler `stackSize` checks) — a `tele2_ops[].arity` field is a noted **future** cleanup, out of scope here.
+- **Native names registry — generated, NOT `tele_ops[]`, NOT a hand-written merge (SHIPPED, decision revised).** `print_command` reads `tele_ops[id]->name`, but `tele_ops[]` carries function pointers into the C op implementations — referencing it relinks the foreign C op code TT2 dropped. 001 originally proposed merging into `tele2_ops[]{name,handler}` (hand-written names, replacing `tt2NativeOpTable`). **Revised on the way to shipping (plan 007):** the name side is **generated from `match_token.rl`** (`TT2OpNames`: `tt2OpName`/`tt2ModName`), the handler side stays `tt2NativeOpTable` (untouched). This avoids both the C-op relink *and* hand-sync drift — names are derived from the same grammar Ragel compiles, so they can't disagree with the lexer. No merge, no dispatch restructure. The hand-written `{name,handler}` array is **not** built. (Arity stays implicit / per-handler `stackSize` checks; a future cleanup if ever needed.)
 - **Per-line edit is cheap and native.** Edit a line = `parse(text)` (Ragel) → `lowerCommand` → store at `program.scripts[s].commands[line]`. TT2 already has `parse` + `lowerCommand`; only thin set/insert/delete helpers on `TeletypeProgram` are new. No `tele_command_t` persists past the lower step.
 - **Live mode reroutes to the native runner.** Orig live exec is `process_command(scene_state_t)`; the TT2 path parses → lowers → runs one command via the native evaluator (`evaluateCommand`) / `runScript`, against the track's `TT2Runtime`/`TT2OutputState`.
 - **Coexist via a TrackMode branch, not an abstraction layer.** Inline `if (trackMode == TeletypeV2) { native } else { orig }` at each data touch — trivially deletable at teardown. No adapter interface (avoids premature abstraction; the dual path is temporary).
@@ -76,19 +76,28 @@ This illustrates the intended approach and is directional guidance for review, n
 
 ## Implementation Units
 
-### U1. Native `tele2_ops[]` op registry + TT2Command→text printer
+### U1. Native op-name registry + TT2Command→text printer — ✅ SHIPPED (plan 007)
 
-**Goal:** Consolidate the op table into a native `{ name, handler }` registry, and render a `TT2Command` to its source-text line from it — the display keystone.
-**Dependencies:** none.
-**Files:** `src/apps/sequencer/engine/TeletypeNativeOps.cpp` (restructure the op table → `tele2_ops[]`), `src/apps/sequencer/engine/TT2Evaluator.h` (dispatch via `tele2_ops[value].handler` instead of `tt2NativeOpTable[value]`), a printer in `TT2ScriptLoader.h` or new `TT2CommandPrinter.h`, `src/tests/unit/sequencer/TestTeletypeV2Printer.cpp` (new), `src/tests/unit/sequencer/CMakeLists.txt`.
-**Approach:** Define a `Tele2Op { const char *name; TT2OpFunc handler; }` array sized `E_OP__LENGTH`; migrate the existing `table[E_OP_X] = opX;` registrations to `{ "X", opX }` entries (canonical name per id; nullptr name/handler for unimplemented ids). Repoint the evaluator's dispatch to `tele2_ops[value].handler`. The printer walks `tag[]`/`value[]`: NUMBER/XNUMBER/BNUMBER/RNUMBER → int/hex/bin/rbin; OP → `tele2_ops[value].name`; SEP/PRE_SEP → `;`/`:`. Must NOT reference `tele_ops[]` (Key Decisions). May split into "registry migration" + "printer" commits during execution if cleaner.
-**Patterns to follow:** the current `OpTableBuilder` in `TeletypeNativeOps.cpp` (what's being restructured); `print_command` in `teletype/src/command.c` for token-walk + number-formatting *shape only* (do not call it); `lowerCommand` in `src/apps/sequencer/model/TeletypeProgram.h` for the tag/value layout.
-**Test scenarios:**
-- Round-trip: `text → parse → lowerCommand → print` equals the normalized text, for: a bare op (`CV 1 5`), nested ops (`CV 1 ADD 100 5`), a mod-prefixed line (`IF X: TR 1 1`), symbols (`+ 1 2`, `>= 4 5`), negative numbers (`N -12`), a multi-segment line (`A 1; B 2`).
-- Pitch/pattern ops render with correct names (`P 0`, `P.NEXT`, `N 0`).
-- Empty command (`length==0`) → empty string.
-- Op id with no name entry → does not crash (renders a placeholder), proving the table is bounds-safe.
-- **Registry-migration regression guard:** the full existing `TestTeletypeV2*` suite stays green after the `tt2NativeOpTable` → `tele2_ops[]` dispatch restructure — every wired op behaves identically (the migration changes the table's shape, not any handler).
+**Status: done** via `docs/plans/2026-06-14-007-feat-tt2-native-printer-plan.md`
+(`TT2OpNames` registry + `TT2Printer`). The display keystone exists; U3 consumes it.
+
+**Design note — the `tele2_ops[]` merge was reversed (superseded).** 001 proposed
+merging names into the handler table (`tele2_ops[]{name,handler}` replacing
+`tt2NativeOpTable`, names hand-written per registration). Shipped instead:
+- **Names** — `TT2OpNames` (`tt2OpName`/`tt2ModName`), **generated** from
+  `teletype/src/match_token.rl` (the kept Ragel grammar). Names can't drift from the
+  lexer and aren't hand-synced.
+- **Handlers** — `tt2NativeOpTable` **unchanged** (no restructure, no migration
+  regression risk).
+- **Printer** — `tt2PrintCommand`/`tt2PrintScript` (`TT2Printer.h`), bounded
+  `cap→bool`, native dec/hex/bin/rev-bin, **no `tele_ops[]`/`print_command`**.
+
+Two single-source structures (names from the grammar, handlers from registration) beat
+one hand-written merged array; the merge bought nothing the generator doesn't. Round-trip
+idempotence, alias canonicalization, truncation, and full op/mod coverage are tested
+(`TestTT2OpNames`, `TestTT2Printer`); existing `TestTeletypeV2*` stayed green (no handler
+restructure). The `Tele2Op{name,handler}` array and the dispatch repoint are **not**
+needed.
 
 ### U2. Native per-line script edit API + pattern accessors on TeletypeProgram
 
@@ -106,9 +115,9 @@ This illustrates the intended approach and is directional guidance for review, n
 ### U3. Rebind TeletypeScriptViewPage — TrackMode-aware (orig | TT2)
 
 **Goal:** The script view/edit/live page drives a TT2 track when selected, orig otherwise.
-**Dependencies:** U1, U2.
+**Dependencies:** U2 (U1 shipped via plan 007).
 **Files:** `src/apps/sequencer/ui/pages/TeletypeScriptViewPage.cpp` / `.h`.
-**Approach:** At each data touch, branch on `selectedTrack().trackMode()`: orig path unchanged (`scene_state_t`); TT2 path uses `tt2Track().program()` + U1 printer (display) + U2 edit API (commit). Live mode: TT2 branch parses → lowers → runs one command via the native evaluator against the track's `TT2Runtime`/`TT2OutputState` (vs orig `process_command`). I/O grid: TT2 branch hides/omits it (deferred). Keep all navigation/edit-buffer/key-handling UI logic shared.
+**Approach:** At each data touch, branch on `selectedTrack().trackMode()`: orig path unchanged (`scene_state_t`); TT2 path uses `tt2Track().program()` + the **`TT2Printer`** (`tt2PrintScript`/`tt2PrintCommand`, display) + U2 edit API (commit). Live mode: TT2 branch parses → lowers → runs one command via the native evaluator against the track's `TT2Runtime`/`TT2OutputState` (vs orig `process_command`). I/O grid: TT2 branch hides/omits it (deferred). Keep all navigation/edit-buffer/key-handling UI logic shared. **Stale-page guard:** the TrackMode branch must resolve before any type-specific accessor runs — a TT2 track must never reach `scene_state_t` calls and vice versa (mirrors the PROJECT.md stale-page protection).
 **Execution note:** Characterize first — capture the orig page's current behavior (it has no unit tests) before threading branches, so the orig path is provably unchanged.
 **Patterns to follow:** the page's own existing structure; the TT2 engine's `runScript`/`evaluateCommand` for live exec.
 **Test scenarios:** `Test expectation: none (UI page)` — verified via sim render + the parity harness (U6) + on-device. The testable logic lives in U1/U2. Manual: select a TT2 track → script lines render via the native printer; edit a line → parses, lowers, persists, re-renders; live-fire a line → native runner drives CV/gate; orig Teletype track still edits exactly as before.
@@ -126,13 +135,28 @@ This illustrates the intended approach and is directional guidance for review, n
 
 **Goal:** Selecting/navigating a TeletypeV2 track opens the (now dual) pages.
 **Dependencies:** U3, U4.
-**Files:** `src/apps/sequencer/ui/pages/TopPage.cpp`, `src/apps/sequencer/ui/Pages.h` (only if a new page instance is needed — likely not, since pages are reused).
-**Approach:** Add `case Track::TrackMode::TeletypeV2:` to `setTrackView`, `setSequenceView`, `setSequenceEditPage` mirroring the `Teletype` cases (route to the same `teletypeScriptView` / track page). No new page objects if the existing instances are reused.
+**Files:** `src/apps/sequencer/ui/pages/TopPage.cpp`, `src/apps/sequencer/ui/pages/TrackPage.cpp` (the `switch (track.trackMode())` that today lacks a TeletypeV2 case — see the build warning at `TrackPage.cpp:167`), `src/apps/sequencer/ui/Pages.h` (only if a new page instance is needed — likely not, pages are reused).
+**Approach:** Add `case Track::TrackMode::TeletypeV2:` to `TopPage`'s `setTrackView`/`setSequenceView`/`setSequenceEditPage` **and** to `TrackPage`'s trackMode switch, mirroring the `Teletype` cases (route to the same `teletypeScriptView`/track page). No new page objects if existing instances are reused. This is the enum-handling gap that currently leaves a TeletypeV2 track with no editor route.
 **Test scenarios:** `Test expectation: none (UI routing)` — verified on sim/device: a TeletypeV2 track reaches the script + pattern pages via the same keys as orig Teletype; no fall-through to a blank page.
 
-### U6. Behavioral parity harness (orig C VM vs TT2 native runner)
+### U6. Behavioral parity harness (orig C VM vs TT2 native runner) — ✅ largely shipped
 
-**Goal:** Exact, repeatable proof that a script produces the same CV/gate under both engines.
+**Status: op-level done; tick-level still owed (it's the bridge-deletion gate).** The
+existing `TestTeletypeV2Parity` runs the deterministic op surface through both the legacy
+C VM and the native runner, asserting equal **return values** (it caught reversed bitwise
+operands + a TT1 `QT` bug). But it **excludes** RNG/stateful/**engine** ops — so it proves
+*computation* parity, **not** that the native engine reproduces the legacy **output over
+time** (CV slew/offset, TR pulse/polarity, metro/delay timing, trigger firing — the actual
+voltages and gate edges).
+
+Tick-level CV/gate parity covers exactly that uncovered layer, and it is the
+**confidence gate for bridge deletion** (Phase 5: tear out the legacy engine "once parity
+is confirmed" — confirmed *by this*). It is **not needed for the editor to function**
+(display/edit/route/run don't depend on it), so it does not block U2–U5. But it is **not
+optional** for retiring the bridge — that step needs the tick-level harness (or an
+explicit on-device audition sign-off) first. Deferred to the bridge-deletion effort, not
+dismissed.
+
 **Dependencies:** none (runtime-only; can land independently).
 **Files:** `src/tests/unit/sequencer/TestTeletypeV2Parity.cpp` (new), `src/tests/unit/sequencer/CMakeLists.txt`.
 **Approach:** For a set of representative scripts, feed identical text to both: orig path (parse → run via the orig Teletype engine/`process_command`) and TT2 path (`loadScriptText` → `runScript`). Step N ticks; compare CV (raw) + gate output per tick. Report first divergence. Resolve at execution time how to construct the orig engine in a test (it may need an `Engine` context the TT2 runner doesn't) — if the orig engine is too heavy to host in a unit test, drive both at the script/op level instead and compare the output state.
