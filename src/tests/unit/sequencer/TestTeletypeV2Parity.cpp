@@ -72,6 +72,10 @@ UNIT_TEST("TeletypeV2Parity") {
         "JI 3 2", "JI 5 4", "JI 1 1", "JI 7 4", "JI 9 8",
         ">< 0 5 10", "<> 0 5 10", ">=< 0 5 10", "<=> 0 5 10", "! 0", "! 5",
         "<<< 1 1", ">>> 1 1", "&&& 1 1 0", "||| 0 0 1", "&&&& 1 1 1 0", "|||| 0 0 0 1",
+        // P2 euclid / drum (deterministic; reuse linked C helpers)
+        "ER 4 16 0", "ER 4 16 1", "ER 3 8 2", "ER 5 13 7",
+        "NR 0 0 1 0", "NR 5 1 3 7",
+        "DR.T 0 0 0 16 0", "DR.P 1 0 0", "DR.P 1 0 3", "DR.V 0 0",
     };
 
     CASE("deterministic_op_parity") {

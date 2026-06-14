@@ -1,6 +1,27 @@
 #include "TT2Evaluator.h"
 #include "TT2Runner.h"
 
+// Pure helpers/tables from the linked teletype C lib (no scene_state_t / bridge
+// VM — these are stateless utilities + const data, safe to share and survive
+// Phase-5 bridge deletion).
+extern "C" {
+    int euclidean(int fill, int len, int step);
+    int tresillo(int bank, int pattern1, int pattern2, int len, int step);
+    int drum(int bank, int pattern, int step);
+    int velocity(int pattern, int step);
+    void chaos_set_val(int16_t);
+    int16_t chaos_get_val(void);
+    void chaos_set_r(int16_t);
+    int16_t chaos_get_r(void);
+    void chaos_set_alg(int16_t);
+    int16_t chaos_get_alg(void);
+    extern const uint16_t table_nr[32];
+    extern const uint8_t table_n_s[9][7];
+    extern const uint8_t table_n_c[13][4];
+    extern const uint8_t table_n_cs[9][7];
+    extern const uint16_t table_n_b[20];
+}
+
 // ---------------------------------------------------------------------------
 // Helper: pop a 1-based output index and convert to 0-based.
 // Returns true on success, sets error on failure.
@@ -1322,6 +1343,114 @@ static void opLrot(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     u = n > 0 ? tt2Lrot(u, uint8_t(n)) : tt2Rrot(u, uint8_t(-n));
     pushStack(stack, stackSize, int16_t(u), error);
 }
+
+// ---------------------------------------------------------------------------
+// Euclid / drum / chaos / seeds (reuse linked pure C helpers)
+// ---------------------------------------------------------------------------
+
+// ER fill len step — Euclidean rhythm bit. (native pops leftmost first)
+static void opEr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t fill = 0, len = 0, step = 0;
+    if (!popStack(stack, stackSize, fill, error)) return;
+    if (!popStack(stack, stackSize, len, error)) return;
+    if (!popStack(stack, stackSize, step, error)) return;
+    pushStack(stack, stackSize, int16_t(euclidean(fill, len, step)), error);
+}
+
+// NR prime mask factor step — numeric-rhythm bit (table_nr + factor/mask twiddle).
+static void opNr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t prime = 0, mask = 0, factor = 0, step = 0;
+    if (!popStack(stack, stackSize, prime, error)) return;
+    if (!popStack(stack, stackSize, mask, error)) return;
+    if (!popStack(stack, stackSize, factor, error)) return;
+    if (!popStack(stack, stackSize, step, error)) return;
+    prime %= 32; if (prime < 0) prime += 32;
+    mask %= 4; if (mask < 0) mask += 4;
+    factor %= 17; if (factor < 0) factor += 17;
+    step %= 16; if (step < 0) step += 16;
+    uint16_t rhythm = table_nr[prime];
+    if (mask == 1) rhythm &= 0x0F0F;
+    else if (mask == 2) rhythm &= 0xF003;
+    else if (mask == 3) rhythm &= 0x1F0;
+    uint32_t modified = uint32_t(rhythm) * uint32_t(factor);
+    uint16_t fin = uint16_t((modified & 0xFFFF) | (modified >> 16));
+    pushStack(stack, stackSize, int16_t((fin >> (15 - step)) & 1), error);
+}
+
+// DR.T bank p1 p2 len step — tresillo bit.
+static void opDrT(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t bank = 0, p1 = 0, p2 = 0, len = 0, step = 0;
+    if (!popStack(stack, stackSize, bank, error)) return;
+    if (!popStack(stack, stackSize, p1, error)) return;
+    if (!popStack(stack, stackSize, p2, error)) return;
+    if (!popStack(stack, stackSize, len, error)) return;
+    if (!popStack(stack, stackSize, step, error)) return;
+    pushStack(stack, stackSize, int16_t(tresillo(bank, p1, p2, len, step)), error);
+}
+
+// DR.P bank pattern step — drum-bank bit.
+static void opDrP(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t bank = 0, pattern = 0, step = 0;
+    if (!popStack(stack, stackSize, bank, error)) return;
+    if (!popStack(stack, stackSize, pattern, error)) return;
+    if (!popStack(stack, stackSize, step, error)) return;
+    pushStack(stack, stackSize, int16_t(drum(bank, pattern, step)), error);
+}
+
+// DR.V pattern step — drum velocity.
+static void opDrV(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t pattern = 0, step = 0;
+    if (!popStack(stack, stackSize, pattern, error)) return;
+    if (!popStack(stack, stackSize, step, error)) return;
+    pushStack(stack, stackSize, int16_t(velocity(pattern, step)), error);
+}
+
+// CHAOS / CHAOS.R / CHAOS.ALG — process-global chaos generator (upstream).
+static void opChaos(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    if (isSet && stackSize >= 1) { int16_t v=0; if(!popStack(stack,stackSize,v,error))return; chaos_set_val(v); }
+    else pushStack(stack, stackSize, chaos_get_val(), error);
+}
+static void opChaosR(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                     int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    if (isSet && stackSize >= 1) { int16_t v=0; if(!popStack(stack,stackSize,v,error))return; chaos_set_r(v); }
+    else pushStack(stack, stackSize, chaos_get_r(), error);
+}
+static void opChaosAlg(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                       int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    if (isSet && stackSize >= 1) { int16_t v=0; if(!popStack(stack,stackSize,v,error))return; chaos_set_alg(v); }
+    else pushStack(stack, stackSize, chaos_get_alg(), error);
+}
+
+// SEED — global reseed of all rng slots; *.SEED/*.SD reseed one slot.
+static void opSeed(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    if (isSet && stackSize >= 1) {
+        int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+        runtime.variables.seed = v;
+        for (int i = 0; i < TT2_RNG_COUNT; ++i) runtime.rng.state[i] = uint32_t(uint16_t(v));
+    } else {
+        pushStack(stack, stackSize, runtime.variables.seed, error);
+    }
+}
+
+#define TT2_SEED_SLOT_OP(fn, SLOT)                                             \
+    static void fn(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *, \
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) { \
+        uint32_t &s = runtime.rng.state[uint8_t(TT2RngSlot::SLOT)];            \
+        if (isSet && stackSize >= 1) { int16_t v=0; if(!popStack(stack,stackSize,v,error))return; s = uint32_t(uint16_t(v)); } \
+        else pushStack(stack, stackSize, int16_t(s & 0x7fff), error);          \
+    }
+TT2_SEED_SLOT_OP(opRandSeed, Rand)
+TT2_SEED_SLOT_OP(opTossSeed, Toss)
+TT2_SEED_SLOT_OP(opProbSeed, Prob)
+TT2_SEED_SLOT_OP(opDrunkSeed, Drunk)
+TT2_SEED_SLOT_OP(opPSeed, Pattern)
 
 // ---------------------------------------------------------------------------
 // Engine input ops
@@ -2984,6 +3113,26 @@ namespace {
             table[E_OP_SYM_PIPE_x3]                         = opOr3;    // |||
             table[E_OP_SYM_AMPERSAND_x4]                    = opAnd4;   // &&&&
             table[E_OP_SYM_PIPE_x4]                         = opOr4;    // ||||
+            table[E_OP_ER]        = opEr;
+            table[E_OP_NR]        = opNr;
+            table[E_OP_DR_T]      = opDrT;
+            table[E_OP_DR_P]      = opDrP;
+            table[E_OP_DR_V]      = opDrV;
+            table[E_OP_CHAOS]     = opChaos;
+            table[E_OP_CHAOS_R]   = opChaosR;
+            table[E_OP_CHAOS_ALG] = opChaosAlg;
+            table[E_OP_SEED]        = opSeed;
+            table[E_OP_RAND_SEED]   = opRandSeed;
+            table[E_OP_SYM_RAND_SD] = opRandSeed;
+            table[E_OP_SYM_R_SD]    = opRandSeed;
+            table[E_OP_TOSS_SEED]   = opTossSeed;
+            table[E_OP_SYM_TOSS_SD] = opTossSeed;
+            table[E_OP_PROB_SEED]   = opProbSeed;
+            table[E_OP_SYM_PROB_SD] = opProbSeed;
+            table[E_OP_DRUNK_SEED]  = opDrunkSeed;
+            table[E_OP_SYM_DRUNK_SD] = opDrunkSeed;
+            table[E_OP_P_SEED]      = opPSeed;
+            table[E_OP_SYM_P_SD]    = opPSeed;
             table[E_OP_R]        = opR;
             table[E_OP_R_MIN]    = opRMin;
             table[E_OP_R_MAX]    = opRMax;

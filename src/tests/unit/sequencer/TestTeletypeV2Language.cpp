@@ -138,6 +138,28 @@ UNIT_TEST("TeletypeV2Language") {
         }
     }
 
+    CASE("chaos_get_set") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        evalText("CHAOS.ALG 1", runtime, output);
+        expectEqual(int(getv("CHAOS.ALG", runtime, output)), 1, "alg set/get");
+        evalText("CHAOS.R 5000", runtime, output);
+        expectEqual(int(getv("CHAOS.R", runtime, output)), 5000, "r set/get");
+        evalText("CHAOS 100", runtime, output);
+        getv("CHAOS", runtime, output);  // advances; just confirm no crash
+    }
+
+    CASE("seeds_set_get") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        evalText("SEED 42", runtime, output);
+        expectEqual(int(getv("SEED", runtime, output)), 42, "global seed");
+        evalText("RAND.SEED 7", runtime, output);
+        expectEqual(int(getv("RAND.SEED", runtime, output)), 7, "rand slot seed");
+        // R.SD aliases RAND.SEED slot
+        expectEqual(int(getv("R.SD", runtime, output)), 7, "R.SD alias reads rand slot");
+    }
+
     CASE("toss_is_binary") {
         TT2Runtime runtime = {}; init(runtime);
         TT2OutputState output = {}; init(output);
