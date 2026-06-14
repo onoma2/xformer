@@ -29,27 +29,20 @@ The goal is a native Performer scripting language derived from Teletype:
 - **Engine inputs:** six CV-mapped sources (`TT2CvInputSource`, defaulted CvIn1-4) feed `IN`/`PARAM` (scaled) and the working variables `X`/`Y`/`Z`/`T`; sampled each refresh in `update(dt)`. Ops `IN`/`IN.SCALE`/`PARAM`/`PARAM.SCALE`, plus `STATE` (latched trigger level) and `MUTE` (gates trigger firing). UI for the source routing rides with the deferred editor I/O grid.
 - **Build:** release switched to `-Os` (reclaimed ~352 KB flash; ~350 KB headroom); op breadth no longer flash-bound.
 
-### Remaining — engine mechanics
-All three engine mechanics (trigger-input firing, output shaping, IN/PARAM + engine inputs) are now done. What's left is **language-tail breadth** (below) and the **editor** — no engine-mechanic gaps remain.
+- **Language tail:** variable ops (`O`/`DRUNK`/`FLIP`/`TIME`/`LAST` + `C`/`D`/`Y`/`Z`/`T`/`J`/`K` and the `O.`/`DRUNK.`/`R.` companions; `TIME`/`LAST` driven by a runtime ms clock), randomness (`RAND`/`RRAND`/`R`/`TOSS`), pitch tail (`SCALE`/`SCL`/`SCALE0`/`QT`, `VN`/`VV`/`HZ`, `P.SCALE`/`PN.SCALE`), bitwise/shift (`| & ~ ^ XOR`, `BSET`/`BGET`/`BCLR`/`BTOG`/`BREV`, `RSH`/`LSH`/`RROT`/`LROT`), function calls (`$`/`$F`/`$F1`/`$F2`, `$L`/`$S` line calls, `I1`/`I2`, `FR`).
+- **Turtle (`@` ops):** fixed-point walker over pattern memory (x = pattern 0-3, y = index 0-63), verbatim port of `turtle.c` — move/step/fence/wrap/bump/bounce/speed/dir/script/show.
 
-### Remaining — language tail (PARTIAL — wire ops onto existing state)
-- Variable ops: `O` / `DRUNK` / `FLIP` / `TIME` / `LAST` (read-side mutation/tick source) + plain `A`–`Z`/`J`/`K` getters-setters. `LAST` also needs a per-script last-run timestamp array.
-- Function calls: `$F`/`$L`/`$S`, `FR`, `I.1`/`I.2` — exec frames already carry `fparam`/`fresult`.
-- Pitch tail: `VN`/`VV`/`HZ`, `SCALE`/`QT` (+ `P.SCALE`, deferred from the pattern batch — needs a scale-quantize helper).
-- Randomness ops: `RAND`/`RRAND`/`TOSS` + seeds (rng slots exist).
-- Bitwise/shift: `|` `&` `~` `^` `XOR`, `BSET`/`BGET`/`BCLR`/`BTOG`/`BREV`, `RSH`/`LSH`/`RROT`/`LROT`.
+### Remaining — engine mechanics
+All engine mechanics and the full language surface (control/timing, ops, pitch, randomness, bitwise, functions, turtle) are native and tested. The only remaining TT2 work is the **editor** (below) — no op/engine gaps remain.
 
 ### Remaining — editor (plan written)
 Repoint the editing UI to TeletypeV2, reusing the working pages. `tele2_ops[]` native op registry + `TT2Command→text` printer (no `tele_ops[]`/`print_command` round-trip), per-line edit, rebind the script + pattern pages TrackMode-aware (live mode → native runner), TopPage routing, a behavioral parity harness (orig C VM vs native runner). Plan: `docs/plans/2026-06-14-001-feat-tt2-editor-repoint-plan.md`. Defers the I/O grid (needs the trigger-input / I/O-routing model above) + file save/load.
-
-### PORT — grid-independent
-- **Turtle (`@` ops)** — walks *pattern memory*, not the monome grid; the `TT2Turtle` struct already exists in the runtime. Portable to gridless Performer.
 
 ### SKIP — confirmed out (no Performer hardware)
 Scenes/`SCENE`, i2c/Telex, grid/Arc, Ansible/WW/Meadow/Earthsea/ORCA, Just Friends/ER-301/Disting/`W/`, Crow, MIDI-query families.
 
 ### Recommended order
-**Engine mechanics first** (trigger-in ✅ → output-shaping ✅ → IN/PARAM ✅ — all done), *then* editor, *then* the language tail + turtle as breadth, *then* bridge deletion (Phase 5). Rationale: a script you can edit but that can't fire on a gate or slew a CV isn't auditionable as an instrument — the engine mechanics gate the hardware audition more than the editor does.
+Engine mechanics ✅, language tail ✅, turtle ✅ — all done. Remaining: the **editor** (repoint the editing UI to the native runner), then **bridge deletion** (Phase 5). The native dialect is now feature-complete at the op/engine level; the editor is what makes it auditionable on hardware.
 
 ## Non-Goals
 

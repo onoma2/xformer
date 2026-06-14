@@ -894,6 +894,265 @@ static void opTrTog(TT2Runtime &runtime, TT2OutputState &output,
 }
 
 // ---------------------------------------------------------------------------
+// Turtle (@ ops) — fixed-point walker over pattern memory. Verbatim port of
+// teletype/src/turtle.c: x selects the pattern (0-3), y the index (0-63);
+// Q9 fixed-point positions. (Grid-independent: pattern memory is the field.)
+// ---------------------------------------------------------------------------
+
+static constexpr int TT2Q_BITS = 9;
+static constexpr int32_t TT2Q_1 = 1 << TT2Q_BITS;
+static constexpr int32_t TT2Q_05 = 1 << (TT2Q_BITS - 1);
+static inline int32_t tt2ToQ(int32_t x) { return x << TT2Q_BITS; }
+static inline int32_t tt2ToI(int32_t x) { return (x >> TT2Q_BITS) & 0xFFFF; }
+
+struct TT2QFence { int32_t x1, y1, x2, y2; };
+
+static TT2QFence tt2NormalizeFence(const TT2TurtleFence &in, TT2TurtleMode mode) {
+    TT2QFence o;
+    if (mode == TT2TurtleMode::Wrap) {
+        o.x1 = tt2ToQ(in.x1); o.x2 = tt2ToQ(in.x2 + 1);
+        o.y1 = tt2ToQ(in.y1); o.y2 = tt2ToQ(in.y2 + 1);
+    } else {
+        o.x1 = tt2ToQ(in.x1) + (TT2Q_1 >> 1); o.x2 = tt2ToQ(in.x2 + 1) - (TT2Q_1 >> 1);
+        o.y1 = tt2ToQ(in.y1) + (TT2Q_1 >> 1); o.y2 = tt2ToQ(in.y2 + 1) - (TT2Q_1 >> 1);
+    }
+    return o;
+}
+
+static void tt2TurtleResolve(const TT2TurtlePosition &src, TT2TurtlePosition &dst) {
+    dst.x = tt2ToI(src.x);
+    dst.y = tt2ToI(src.y);
+}
+
+static void tt2TurtleCheckStep(TT2Turtle &t) {
+    TT2TurtlePosition here; tt2TurtleResolve(t.position, here);
+    if (here.x != t.last.x || here.y != t.last.y) { t.last = here; t.stepped = 1; }
+}
+
+static void tt2TurtleSetHeading(TT2Turtle &t, int16_t h) {
+    while (h < 0) h += 360;
+    t.heading = uint16_t(h % 360);
+}
+
+static void tt2TurtleNormalizePos(TT2Turtle &t, TT2TurtleMode mode) {
+    TT2QFence f = tt2NormalizeFence(t.fence, mode);
+    int32_t fxl = f.x2 - f.x1, fyl = f.y2 - f.y1;
+    int32_t &x = t.position.x, &y = t.position.y;
+    if (mode == TT2TurtleMode::Wrap) {
+        if (fxl > TT2Q_1 && x < f.x1) x = f.x2 + ((x - f.x1) % fxl);
+        else if (fxl > TT2Q_1 && x > f.x2) x = f.x1 + ((x - f.x1) % fxl);
+        if (fyl > TT2Q_1 && y < f.y1) y = f.y2 + ((y - f.y1) % fyl);
+        else if (fyl > TT2Q_1 && y > f.y2) y = f.y1 + ((y - f.y1) % fyl);
+    } else if (mode == TT2TurtleMode::Bounce) {
+        TT2TurtlePosition last, here; tt2TurtleResolve(t.position, last);
+        while (x > f.x2 || x < f.x1) {
+            if (x > f.x2) { if (t.stepping) tt2TurtleSetHeading(t, int16_t(360 - t.heading)); x = f.x2 - (x - f.x2); }
+            else if (x < f.x1) { if (t.stepping) tt2TurtleSetHeading(t, int16_t(360 - t.heading)); x = f.x1 + (f.x1 - x); }
+            tt2TurtleResolve(t.position, here); if (here.x == last.x) break; last = here;
+        }
+        while (y > f.y2 || y < f.y1) {
+            if (y >= f.y2) { if (t.stepping) tt2TurtleSetHeading(t, int16_t(180 - t.heading)); y = f.y2 - (y - f.y2); }
+            else if (y < f.y1) { if (t.stepping) tt2TurtleSetHeading(t, int16_t(180 - t.heading)); y = f.y1 + (f.y1 - y); }
+            tt2TurtleResolve(t.position, here); if (here.y == last.y) break; last = here;
+        }
+        if (x == f.x2) x -= 1;
+        if (y == f.y2) y -= 1;
+    }
+    int32_t maxx = f.x2 - 1, maxy = f.y2 - 1;
+    x = x < f.x1 ? f.x1 : (x > maxx ? maxx : x);
+    y = y < f.y1 ? f.y1 : (y > maxy ? maxy : y);
+    tt2TurtleCheckStep(t);
+}
+
+static uint8_t tt2TurtleGetX(TT2Turtle &t) { TT2TurtlePosition p; tt2TurtleResolve(t.position, p); return uint8_t(p.x); }
+static uint8_t tt2TurtleGetY(TT2Turtle &t) { TT2TurtlePosition p; tt2TurtleResolve(t.position, p); return uint8_t(p.y); }
+
+static void tt2TurtleSetX(TT2Turtle &t, int16_t x) { t.position.x = tt2ToQ(x) + TT2Q_05; tt2TurtleNormalizePos(t, TT2TurtleMode::Bump); }
+static void tt2TurtleSetY(TT2Turtle &t, int16_t y) { t.position.y = tt2ToQ(y) + TT2Q_05; tt2TurtleNormalizePos(t, TT2TurtleMode::Bump); }
+
+static void tt2TurtleMove(TT2Turtle &t, int16_t x, int16_t y) {
+    t.position.y += tt2ToQ(y);
+    t.position.x += tt2ToQ(x);
+    tt2TurtleNormalizePos(t, t.mode);
+}
+
+// Third-order sine approximation (Q12 out, 2^15 units/circle). Verbatim upstream.
+static inline int32_t tt2Sin(int32_t x) {
+    static const int qN = 13, qP = 15, qR = 11, qS = 17;
+    x = x << (30 - qN);
+    if ((x ^ (x << 1)) < 0) x = (1 << 31) - x;
+    x = x >> (30 - qN);
+    return x * ((3 << qP) - (x * x >> qR)) >> qS;
+}
+
+static void tt2TurtleStep(TT2Turtle &t) {
+    int32_t dx = 0, dy = 0;
+    int32_t h1 = t.heading, h2 = t.heading;
+    h1 = ((h1 % 360) << 15) / 360;
+    h2 = (((h2 + 360 - 90) % 360) << 15) / 360;
+    int32_t dxQ12 = (t.speed * tt2Sin(h1)) / 100;
+    int32_t dyQ12 = (t.speed * tt2Sin(h2)) / 100;
+    dx = dxQ12 < 0 ? (((dxQ12 >> (11 - TT2Q_BITS)) - 1) >> 1) : (((dxQ12 >> (11 - TT2Q_BITS)) + 1) >> 1);
+    dy = dyQ12 < 0 ? (((dyQ12 >> (11 - TT2Q_BITS)) - 1) >> 1) : (((dyQ12 >> (11 - TT2Q_BITS)) + 1) >> 1);
+    t.position.x += dx;
+    t.position.y += dy;
+    t.stepping = 1;
+    tt2TurtleNormalizePos(t, t.mode);
+    t.stepping = 0;
+}
+
+static void tt2TurtleCorrectFence(TT2Turtle &t) {
+    auto clampU8 = [](int v, int lo, int hi) { return uint8_t(v < lo ? lo : (v > hi ? hi : v)); };
+    t.fence.x1 = clampU8(t.fence.x1, 0, 3);
+    t.fence.x2 = clampU8(t.fence.x2, 0, 3);
+    t.fence.y1 = clampU8(t.fence.y1, 0, 63);
+    t.fence.y2 = clampU8(t.fence.y2, 0, 63);
+    if (t.fence.x1 > t.fence.x2) { uint8_t s = t.fence.x2; t.fence.x2 = t.fence.x1; t.fence.x1 = s; }
+    if (t.fence.y1 > t.fence.y2) { uint8_t s = t.fence.y2; t.fence.y2 = t.fence.y1; t.fence.y1 = s; }
+    tt2TurtleNormalizePos(t, TT2TurtleMode::Bump);
+}
+
+static void tt2TurtleSetFence(TT2Turtle &t, int16_t x1, int16_t y1, int16_t x2, int16_t y2) {
+    auto clampU8 = [](int v, int lo, int hi) { return uint8_t(v < lo ? lo : (v > hi ? hi : v)); };
+    t.fence.x1 = clampU8(x1, 0, 3);
+    t.fence.x2 = clampU8(x2, 0, 3);
+    t.fence.y1 = clampU8(y1, 0, 63);
+    t.fence.y2 = clampU8(y2, 0, 63);
+    tt2TurtleCorrectFence(t);
+}
+
+static void tt2TurtleSetMode(TT2Turtle &t, TT2TurtleMode m) { t.mode = m; tt2TurtleNormalizePos(t, m); }
+
+static int16_t tt2TurtleGetVal(const TeletypeProgram *program, TT2Turtle &t) {
+    if (!program) return 0;
+    TT2TurtlePosition p; tt2TurtleResolve(t.position, p);
+    if (p.x > 3 || p.x < 0 || p.y > 63 || p.y < 0) return 0;
+    return program->patterns[p.x].val[p.y];
+}
+
+static void tt2TurtleSetVal(const TeletypeProgram *program, TT2Turtle &t, int16_t v) {
+    if (!program) return;
+    TT2TurtlePosition p; tt2TurtleResolve(t.position, p);
+    if (p.x > 3 || p.x < 0 || p.y > 63 || p.y < 0) return;
+    const_cast<TeletypeProgram *>(program)->patterns[p.x].val[p.y] = v;
+}
+
+// --- @ op handlers ---
+
+static void opTurtle(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                     int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    if (isSet && stackSize >= 1) {
+        int16_t v = 0;
+        if (!popStack(stack, stackSize, v, error)) return;
+        tt2TurtleSetVal(program, runtime.turtle, v);
+    } else {
+        pushStack(stack, stackSize, tt2TurtleGetVal(program, runtime.turtle), error);
+    }
+}
+
+static void opTurtleX(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                      int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    if (isSet && stackSize >= 1) {
+        int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+        tt2TurtleSetX(runtime.turtle, v);
+    } else pushStack(stack, stackSize, tt2TurtleGetX(runtime.turtle), error);
+}
+
+static void opTurtleY(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                      int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    if (isSet && stackSize >= 1) {
+        int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+        tt2TurtleSetY(runtime.turtle, v);
+    } else pushStack(stack, stackSize, tt2TurtleGetY(runtime.turtle), error);
+}
+
+static void opTurtleMove(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                         int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0, b = 0;  // tokens: native pops left->right; upstream x=last, y=first
+    if (!popStack(stack, stackSize, a, error)) return;
+    if (!popStack(stack, stackSize, b, error)) return;
+    tt2TurtleMove(runtime.turtle, b, a);
+}
+
+static void opTurtleF(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                      int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0, b = 0, c = 0, d = 0;  // x1=d,y1=c,x2=b,y2=a (reversed pop order)
+    if (!popStack(stack, stackSize, a, error)) return;
+    if (!popStack(stack, stackSize, b, error)) return;
+    if (!popStack(stack, stackSize, c, error)) return;
+    if (!popStack(stack, stackSize, d, error)) return;
+    tt2TurtleSetFence(runtime.turtle, d, c, b, a);
+}
+
+#define TT2_TURTLE_FENCE_OP(fn, member)                                        \
+    static void fn(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *, \
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) { \
+        if (isSet && stackSize >= 1) {                                         \
+            int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return; \
+            runtime.turtle.fence.member = uint8_t(v > 0 ? v : 0);             \
+            tt2TurtleCorrectFence(runtime.turtle);                            \
+        } else pushStack(stack, stackSize, runtime.turtle.fence.member, error); \
+    }
+TT2_TURTLE_FENCE_OP(opTurtleFx1, x1)
+TT2_TURTLE_FENCE_OP(opTurtleFy1, y1)
+TT2_TURTLE_FENCE_OP(opTurtleFx2, x2)
+TT2_TURTLE_FENCE_OP(opTurtleFy2, y2)
+
+static void opTurtleSpeed(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                          int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    if (isSet && stackSize >= 1) {
+        int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+        runtime.turtle.speed = v;
+    } else pushStack(stack, stackSize, runtime.turtle.speed, error);
+}
+
+static void opTurtleDir(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                        int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    if (isSet && stackSize >= 1) {
+        int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+        tt2TurtleSetHeading(runtime.turtle, v);
+    } else pushStack(stack, stackSize, int16_t(runtime.turtle.heading), error);
+}
+
+static void opTurtleStep(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                         int16_t *, uint8_t &, bool, TT2EvalError &) {
+    tt2TurtleStep(runtime.turtle);
+}
+
+#define TT2_TURTLE_MODE_OP(fn, MODE)                                           \
+    static void fn(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *, \
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) { \
+        if (isSet && stackSize >= 1) {                                         \
+            int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return; \
+            if (v) tt2TurtleSetMode(runtime.turtle, TT2TurtleMode::MODE);     \
+        } else pushStack(stack, stackSize, int16_t(runtime.turtle.mode == TT2TurtleMode::MODE ? 1 : 0), error); \
+    }
+TT2_TURTLE_MODE_OP(opTurtleBump, Bump)
+TT2_TURTLE_MODE_OP(opTurtleWrap, Wrap)
+TT2_TURTLE_MODE_OP(opTurtleBounce, Bounce)
+
+static void opTurtleScript(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                           int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    if (isSet && stackSize >= 1) {
+        int16_t sn = 0; if (!popStack(stack, stackSize, sn, error)) return;
+        sn -= 1;
+        runtime.turtle.scriptNumber = (sn < 0 || sn >= TT2_SCRIPT_COUNT) ? uint8_t(TT2_SCRIPT_COUNT) : uint8_t(sn);
+        runtime.turtle.stepped = 0;
+    } else {
+        uint8_t s = runtime.turtle.scriptNumber;
+        pushStack(stack, stackSize, int16_t(s >= TT2_SCRIPT_COUNT ? 0 : s + 1), error);
+    }
+}
+
+static void opTurtleShow(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                         int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    if (isSet && stackSize >= 1) {
+        int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+        runtime.turtle.shown = (v != 0) ? 1 : 0;
+    } else pushStack(stack, stackSize, int16_t(runtime.turtle.shown ? 1 : 0), error);
+}
+
+// ---------------------------------------------------------------------------
 // Bitwise / shift ops
 // ---------------------------------------------------------------------------
 
@@ -2495,6 +2754,23 @@ namespace {
             table[E_OP_LSH]      = opLsh;
             table[E_OP_RROT]     = opRrot;
             table[E_OP_LROT]     = opLrot;
+            table[E_OP_TURTLE]       = opTurtle;
+            table[E_OP_TURTLE_X]     = opTurtleX;
+            table[E_OP_TURTLE_Y]     = opTurtleY;
+            table[E_OP_TURTLE_MOVE]  = opTurtleMove;
+            table[E_OP_TURTLE_F]     = opTurtleF;
+            table[E_OP_TURTLE_FX1]   = opTurtleFx1;
+            table[E_OP_TURTLE_FY1]   = opTurtleFy1;
+            table[E_OP_TURTLE_FX2]   = opTurtleFx2;
+            table[E_OP_TURTLE_FY2]   = opTurtleFy2;
+            table[E_OP_TURTLE_SPEED] = opTurtleSpeed;
+            table[E_OP_TURTLE_DIR]   = opTurtleDir;
+            table[E_OP_TURTLE_STEP]  = opTurtleStep;
+            table[E_OP_TURTLE_BUMP]  = opTurtleBump;
+            table[E_OP_TURTLE_WRAP]  = opTurtleWrap;
+            table[E_OP_TURTLE_BOUNCE] = opTurtleBounce;
+            table[E_OP_TURTLE_SCRIPT] = opTurtleScript;
+            table[E_OP_TURTLE_SHOW]  = opTurtleShow;
             table[E_OP_AND]                = opAnd;
             table[E_OP_SYM_AMPERSAND_x2]   = opAnd;
             table[E_OP_OR]                 = opOr;
