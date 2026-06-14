@@ -33,15 +33,18 @@ The goal is a native Performer scripting language derived from Teletype:
 - **Turtle (`@` ops):** fixed-point walker over pattern memory (x = pattern 0-3, y = index 0-63), verbatim port of `turtle.c` — move/step/fence/wrap/bump/bounce/speed/dir/script/show.
 - **Parity harness (`TestTeletypeV2Parity`):** evaluates a deterministic op set (math/comparison/logic/range/pitch/scale/bitwise/shift) through both the legacy C VM and the native runner, asserting equal results. Caught reversed bitwise operands (corrected to value-first: `BSET x i`, `RSH x n`). One documented divergence: the C VM's `QT` returns 0 when it should round up to `(c+1)*step` (a TT1 bug) — native `QT` is correct, so `QT` is excluded from the parity set. RNG/stateful ops are out of scope (the two RNGs can't agree bit-for-bit).
 
-### Remaining — bridge-parity gaps (source of truth = the current `TeletypeTrack` bridge)
+### Bridge-parity porting (source of truth = the current `TeletypeTrack` bridge)
 
-The bridge — not upstream Teletype — is the coverage target. Audit of its wired `tele_*` callbacks (`TeletypeBridge.cpp` + `TeletypeTrackEngine.cpp`) shows these are **real, working features** the native runner does not yet cover:
+The bridge — not upstream Teletype — is the coverage target. The hardware-independent + runtime-state ops are now **ported and parity-verified** against the bridge C VM (via `TestTeletypeV2Parity`):
 
-- **MIDI (essential):** `receiveMidi` filters by a per-track MIDI source (port+channel), feeds `state.midi`, drives the `MI.*` query family, and fires scripts on MIDI events. Native TT2 has none of this.
-- **BUS:** the 4-lane CV-router hub (`BUS` get/set) — bridge-real, native missing.
-- **W\* family + `RT`:** transport + cross-track reads/writes (`WBPM`/`WMS`/`WTU`/`BAR`/`WP`/`WP.SET`/`WR`/`WR.ACT`/`WNG`(`.H`)/`WNN`(`.H`)/`RT`) — reads other Performer tracks' notes/gates. Bridge-real, native missing.
-- **`TR.W` / `TR.D`** width/divisor pulse variants; **metro variants** `M.A`/`M.ACT.A`/`M.RESET`(`.A`)/`M!`; **`CV.GET`/`CV.SET`** + CV interpolate — all bridge-real, native missing.
-- **Hardware-independent tail still unported:** scale-bitmask (`N.S`/`N.C`/`N.CS`/`N.B`/`N.BX`, `QT.S`/`QT.CS`/`QT.B`/`QT.BX` — needs one bitmask-scale helper), euclid/drum (`ER`/`NR`/`DR.T`/`DR.P`/`DR.V`), `EXP`, `CHAOS`(`.R`/`.ALG`), seeds (`SEED`/`*.SEED`/`*.SD`), `INIT.*`, `JI`, `RND`/`RRND`, `SYNC`/`SCRIPT.POL`/`TIF`, `Q.RND`/`Q.2P`/`Q.P2`, comparison symbols.
+- **P1 ✅** `RND`/`RRND`, `EXP`, `JI`, comparison/logic/shift symbols (`><`/`<>`/`>=<`/`<=>`/`!`/`<<<`/`>>>`/`&&&`/`|||`/`&&&&`/`||||`).
+- **P2 ✅** euclid/drum (`ER`/`NR`/`DR.T`/`DR.P`/`DR.V`, reuse linked C helpers), `CHAOS`(`.R`/`.ALG`), seeds (`SEED`/`*.SEED`/`*.SD`), scale-bitmask (`N.S`/`N.C`/`N.CS` + `QT.S`/`QT.CS` parity-verified; `N.B`/`N.BX`/`QT.B`/`QT.BX` bounds-safe, degree-walk parity is a follow-up).
+- **P3 ✅** `INIT.*` family.
+- **P4 ✅** `TIF`, `M!`, `CV.GET`/`CV.SET`, `M.A`/`M.ACT.A`/`M.RESET`(`.A`)/`SYNC`, `SCRIPT.POL`/`$.POL`, `TR.W`/`TR.D` (per-TR width/divisor).
+
+**Remaining — need engine access from the op layer (a host mechanism, not pure op-porting):**
+- **P5 — BUS + W\*/`RT`:** the CV-router hub + transport/tempo (`WBPM`/`WMS`/`WTU`/`BAR`/`WR`) + cross-track step read/write (`WP`/`WNG`/`WNN`/`RT`). These read live engine + other-track state, so the native ops need a scoped host accessor (the bridge uses `g_activeEngine`) plus porting the accessor methods into `TT2TrackEngine`.
+- **P6 — MIDI (essential):** per-track MIDI source in the model, `TT2TrackEngine::receiveMidi` feeding a runtime MIDI buffer, the `MI.*` query family, and MIDI-triggered script firing.
 
 ### Deferred — separate efforts (not standalone ports)
 
