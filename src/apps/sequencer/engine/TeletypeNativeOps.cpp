@@ -1926,6 +1926,103 @@ static void opBus(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // ---------------------------------------------------------------------------
+// MIDI query ops (MI.*) — read the runtime MIDI buffer. Indexed ops read the
+// active frame's I loop var (1-based), matching upstream teletype/src/ops/midi.c.
+// ---------------------------------------------------------------------------
+
+static int16_t tt2MiIndex(TT2Runtime &runtime) { return tt2ActiveFrame(runtime).i; }
+
+#define TT2_MI_LAST_OP(fn, expr)                                               \
+    static void fn(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *, \
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) { \
+        const TT2Midi &m = runtime.midi; (void)m;                              \
+        pushStack(stack, stackSize, int16_t(expr), error);                     \
+    }
+TT2_MI_LAST_OP(opMiLe,   m.last_event_type)
+TT2_MI_LAST_OP(opMiLn,   m.last_note)
+TT2_MI_LAST_OP(opMiLo,   m.last_note)
+TT2_MI_LAST_OP(opMiLnv,  tt2EtAt(m.last_note))
+TT2_MI_LAST_OP(opMiLv,   m.last_velocity)
+TT2_MI_LAST_OP(opMiLvv,  m.last_velocity * 129)
+TT2_MI_LAST_OP(opMiLc,   m.last_controller)
+TT2_MI_LAST_OP(opMiLcc,  m.last_cc)
+TT2_MI_LAST_OP(opMiLccv, m.last_cc * 129)
+TT2_MI_LAST_OP(opMiLch,  m.last_channel + 1)
+TT2_MI_LAST_OP(opMiNl,   m.on_count)
+TT2_MI_LAST_OP(opMiOl,   m.off_count)
+TT2_MI_LAST_OP(opMiCl,   m.cc_count)
+
+// Indexed (read I); 0 when I is out of [1, count].
+#define TT2_MI_IDX_OP(fn, count, expr)                                         \
+    static void fn(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *, \
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) { \
+        const TT2Midi &m = runtime.midi; (void)m;                              \
+        int16_t i = tt2MiIndex(runtime);                                       \
+        int16_t r = (i < 1 || i > m.count) ? 0 : int16_t(expr);                \
+        pushStack(stack, stackSize, r, error);                                 \
+    }
+TT2_MI_IDX_OP(opMiN,   on_count, m.note_on[i - 1])
+TT2_MI_IDX_OP(opMiNv,  on_count, tt2EtAt(m.note_on[i - 1]))
+TT2_MI_IDX_OP(opMiV,   on_count, m.note_vel[i - 1])
+TT2_MI_IDX_OP(opMiVv,  on_count, m.note_vel[i - 1] * 129)
+TT2_MI_IDX_OP(opMiNch, on_count, m.on_channel[i - 1] + 1)
+TT2_MI_IDX_OP(opMiO,   off_count, m.note_off[i - 1])
+TT2_MI_IDX_OP(opMiOch, off_count, m.off_channel[i - 1] + 1)
+TT2_MI_IDX_OP(opMiC,   cc_count, m.cn[i - 1])
+TT2_MI_IDX_OP(opMiCc,  cc_count, m.cc[i - 1])
+TT2_MI_IDX_OP(opMiCcv, cc_count, m.cc[i - 1] * 129)
+TT2_MI_IDX_OP(opMiCch, cc_count, m.cc_channel[i - 1] + 1)
+
+// MI.$ event [script] — get/set the per-event fire-script binding.
+static void opMiDollar(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                       int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    TT2Midi &m = runtime.midi;
+    if (isSet && stackSize >= 2) {
+        int16_t event = 0, script = 0;
+        if (!popStack(stack, stackSize, event, error)) return;
+        if (!popStack(stack, stackSize, script, error)) return;
+        script -= 1;
+        if (script < 0 || script > TT2_INIT_SCRIPT) script = -1;
+        switch (event) {
+            case 0: m.on_script = int8_t(script); m.off_script = int8_t(script); m.cc_script = int8_t(script);
+                    m.on_count = m.off_count = m.cc_count = 0; break;
+            case 1: m.on_script = int8_t(script); m.on_count = 0; break;
+            case 2: m.off_script = int8_t(script); m.off_count = 0; break;
+            case 3: m.cc_script = int8_t(script); m.cc_count = 0; break;
+            default: break;
+        }
+    } else {
+        int16_t event = 0;
+        if (!popStack(stack, stackSize, event, error)) return;
+        int16_t script = -1;
+        switch (event) {
+            case 0: script = m.on_script;
+                    if (m.on_script != m.off_script || m.on_script != m.cc_script) script = -1;
+                    break;
+            case 1: script = m.on_script; break;
+            case 2: script = m.off_script; break;
+            case 3: script = m.cc_script; break;
+            default: break;
+        }
+        pushStack(stack, stackSize, int16_t(script == -1 ? -1 : script + 1), error);
+    }
+}
+
+// MI.CLKD — MIDI clock divisor (1..24); MI.CLKR — reset (no-op, TT2 has no MIDI clock counter yet).
+static void opMiClkd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                     int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    if (isSet && stackSize >= 1) {
+        int16_t d = 0; if (!popStack(stack, stackSize, d, error)) return;
+        if (d < 1 || d > 24) return;
+        runtime.midi.clock_div = uint8_t(d);
+    } else {
+        pushStack(stack, stackSize, int16_t(runtime.midi.clock_div), error);
+    }
+}
+static void opMiClkr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                     int16_t *, uint8_t &, bool, TT2EvalError &) { /* no-op */ }
+
+// ---------------------------------------------------------------------------
 // Misc engine ops (TIF, M!, CV.GET/CV.SET, M.A/M.ACT.A, SCRIPT.POL)
 // ---------------------------------------------------------------------------
 
@@ -3732,6 +3829,33 @@ namespace {
             table[E_OP_WNN_H]              = opWnnH;
             table[E_OP_RT]                 = opRt;
             table[E_OP_BUS]                = opBus;
+            table[E_OP_MI_SYM_DOLLAR]      = opMiDollar;
+            table[E_OP_MI_LE]   = opMiLe;
+            table[E_OP_MI_LN]   = opMiLn;
+            table[E_OP_MI_LNV]  = opMiLnv;
+            table[E_OP_MI_LV]   = opMiLv;
+            table[E_OP_MI_LVV]  = opMiLvv;
+            table[E_OP_MI_LO]   = opMiLo;
+            table[E_OP_MI_LC]   = opMiLc;
+            table[E_OP_MI_LCC]  = opMiLcc;
+            table[E_OP_MI_LCCV] = opMiLccv;
+            table[E_OP_MI_LCH]  = opMiLch;
+            table[E_OP_MI_NL]   = opMiNl;
+            table[E_OP_MI_N]    = opMiN;
+            table[E_OP_MI_NV]   = opMiNv;
+            table[E_OP_MI_V]    = opMiV;
+            table[E_OP_MI_VV]   = opMiVv;
+            table[E_OP_MI_NCH]  = opMiNch;
+            table[E_OP_MI_OL]   = opMiOl;
+            table[E_OP_MI_O]    = opMiO;
+            table[E_OP_MI_OCH]  = opMiOch;
+            table[E_OP_MI_CL]   = opMiCl;
+            table[E_OP_MI_C]    = opMiC;
+            table[E_OP_MI_CC]   = opMiCc;
+            table[E_OP_MI_CCV]  = opMiCcv;
+            table[E_OP_MI_CCH]  = opMiCch;
+            table[E_OP_MI_CLKD] = opMiClkd;
+            table[E_OP_MI_CLKR] = opMiClkr;
             table[E_OP_R]        = opR;
             table[E_OP_R_MIN]    = opRMin;
             table[E_OP_R_MAX]    = opRMax;

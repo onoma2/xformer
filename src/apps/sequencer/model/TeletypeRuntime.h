@@ -183,6 +183,64 @@ struct TT2ExecState {
     uint8_t overflow;
 };
 
+static constexpr int TT2_MIDI_EVENTS = 10;
+
+// Native MIDI event buffer (mirrors upstream scene_midi_t). Populated by
+// TT2TrackEngine::processMidiMessage, read by the MI.* ops. Per-event fire-script
+// selectors (on/off/cc, -1 = disabled) live here like upstream scene_midi.
+struct TT2Midi {
+    uint8_t last_event_type;  // 0 off, 1 on, 2 cc
+    uint8_t last_channel;
+    uint8_t last_note;
+    uint8_t last_velocity;
+    uint8_t last_controller;
+    uint8_t last_cc;
+    uint8_t on_count;
+    uint8_t on_channel[TT2_MIDI_EVENTS];
+    uint8_t note_on[TT2_MIDI_EVENTS];
+    uint8_t note_vel[TT2_MIDI_EVENTS];
+    uint8_t off_count;
+    uint8_t note_off[TT2_MIDI_EVENTS];
+    uint8_t off_channel[TT2_MIDI_EVENTS];
+    uint8_t cc_count;
+    uint8_t cc_channel[TT2_MIDI_EVENTS];
+    uint8_t cn[TT2_MIDI_EVENTS];
+    uint8_t cc[TT2_MIDI_EVENTS];
+    uint8_t clock_div;
+    int8_t on_script;
+    int8_t off_script;
+    int8_t cc_script;
+};
+
+// Clear event counts + last-event fields for a fresh message (upstream
+// clearMidiMonitoring). Leaves fire-script selectors / clock_div intact.
+inline void tt2MidiClear(TT2Midi &m) {
+    m.last_event_type = 0;
+    m.last_channel = m.last_note = m.last_velocity = m.last_controller = m.last_cc = 0;
+    m.on_count = m.off_count = m.cc_count = 0;
+}
+inline void tt2MidiNoteOn(TT2Midi &m, uint8_t ch, uint8_t note, uint8_t vel) {
+    if (m.on_count < TT2_MIDI_EVENTS) {
+        m.note_on[m.on_count] = note; m.note_vel[m.on_count] = vel; m.on_channel[m.on_count] = ch;
+        m.on_count++;
+    }
+    m.last_event_type = 1; m.last_channel = ch; m.last_note = note; m.last_velocity = vel;
+}
+inline void tt2MidiNoteOff(TT2Midi &m, uint8_t ch, uint8_t note) {
+    if (m.off_count < TT2_MIDI_EVENTS) {
+        m.note_off[m.off_count] = note; m.off_channel[m.off_count] = ch;
+        m.off_count++;
+    }
+    m.last_event_type = 0; m.last_channel = ch; m.last_note = note; m.last_velocity = 0;
+}
+inline void tt2MidiCc(TT2Midi &m, uint8_t ch, uint8_t controller, uint8_t value) {
+    if (m.cc_count < TT2_MIDI_EVENTS) {
+        m.cn[m.cc_count] = controller; m.cc[m.cc_count] = value; m.cc_channel[m.cc_count] = ch;
+        m.cc_count++;
+    }
+    m.last_event_type = 2; m.last_channel = ch; m.last_controller = controller; m.last_cc = value;
+}
+
 struct TT2Runtime {
     TT2Variables variables;
     TT2Stack stack;
@@ -196,6 +254,7 @@ struct TT2Runtime {
     uint32_t clockMs;                             // engine ms clock for TIME / LAST
     uint32_t scriptLastMs[TT2_SCRIPT_COUNT];      // clockMs at each script's last run
     uint8_t metroResetReq;                        // M.RESET -> engine zeroes the metro phase
+    TT2Midi midi;                                 // MIDI event buffer for MI.* ops
 };
 
 // Variable defaults (shared by init() and the INIT.DATA op). Zeroes the
@@ -247,6 +306,11 @@ inline void init(TT2Runtime &r) {
 
     tt2InitVariables(r.variables);
 
+    // MIDI fire-script selectors default to -1 (disabled), like upstream.
+    r.midi.on_script = -1;
+    r.midi.off_script = -1;
+    r.midi.cc_script = -1;
+
     // RNG seeding: each slot gets a distinct non-zero starting state
     // so that different slots produce independent sequences.
     for (int i = 0; i < TT2_RNG_COUNT; ++i) {
@@ -275,7 +339,7 @@ static_assert(sizeof(TT2Metro) <= 14, "TT2Metro size drift");
 static_assert(sizeof(TT2Rng) <= 22, "TT2Rng size drift");
 static_assert(sizeof(TT2ExecFrame) <= 22, "TT2ExecFrame size drift");
 static_assert(sizeof(TT2ExecState) <= 164, "TT2ExecState size drift");
-static_assert(sizeof(TT2Runtime) <= 2208, "TT2Runtime size drift");
+static_assert(sizeof(TT2Runtime) <= 2296, "TT2Runtime size drift");
 
 // Active execution context accessors — resolve through the exec stack.
 // depth must be > 0 (set by runScript or future nested execution).
