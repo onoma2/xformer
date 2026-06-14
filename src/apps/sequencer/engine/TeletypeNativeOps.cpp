@@ -2016,6 +2016,68 @@ static void opGS(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // ---------------------------------------------------------------------------
+// Modulator ops (MO.*) — drive the global modulator slots via the param
+// dictionary on the active host. Slot index 1-based (1..8); bare MO reads the
+// slot's current output. MO.P addresses any field; named verbs are fixed-addr
+// sugar. gateSource (MO.P addr 14) takes a raw Routing::Source ordinal — an
+// advanced, unvalidated write (no UI curation/self-filter).
+// ---------------------------------------------------------------------------
+
+static void opMo(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, CONFIG_MODULATOR_COUNT)) return;
+    TT2Host *h = tt2ActiveHost();
+    pushStack(stack, stackSize, h ? h->hostModulatorOutput(uint8_t(idx)) : 0, error);
+}
+
+static void opMoP(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, CONFIG_MODULATOR_COUNT)) return;
+    int16_t addr = 0;
+    if (!popStack(stack, stackSize, addr, error)) return;
+    TT2Host *h = tt2ActiveHost();
+    if (isSet && stackSize >= 1) {
+        int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+        if (h) h->hostModulator(uint8_t(idx)).paramSet(addr, v);
+    } else {
+        pushStack(stack, stackSize,
+                  h ? int16_t(h->hostModulator(uint8_t(idx)).paramGet(addr)) : 0, error);
+    }
+}
+
+#define TT2_MO_FIELD_OP(fn, paramName)                                         \
+    static void fn(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,    \
+                   int16_t *stack, uint8_t &stackSize, bool isSet,             \
+                   TT2EvalError &error) {                                      \
+        int16_t idx = 0;                                                       \
+        if (!popOutputIndex(stack, stackSize, idx, error, CONFIG_MODULATOR_COUNT)) return; \
+        const int addr = int(Modulator::Param::paramName);                     \
+        TT2Host *h = tt2ActiveHost();                                          \
+        if (isSet && stackSize >= 1) {                                        \
+            int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return; \
+            if (h) h->hostModulator(uint8_t(idx)).paramSet(addr, v);          \
+        } else {                                                              \
+            pushStack(stack, stackSize,                                       \
+                      h ? int16_t(h->hostModulator(uint8_t(idx)).paramGet(addr)) : 0, error); \
+        }                                                                     \
+    }
+TT2_MO_FIELD_OP(opMoShape, Shape)
+TT2_MO_FIELD_OP(opMoRate, Rate)
+TT2_MO_FIELD_OP(opMoDepth, Depth)
+TT2_MO_FIELD_OP(opMoMode, Mode)
+TT2_MO_FIELD_OP(opMoOff, Offset)
+
+static void opMoTrig(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, CONFIG_MODULATOR_COUNT)) return;
+    TT2Host *h = tt2ActiveHost();
+    if (h) h->hostModulatorTrigger(uint8_t(idx));
+}
+
+// ---------------------------------------------------------------------------
 // MIDI query ops (MI.*) — read the runtime MIDI buffer. Indexed ops read the
 // active frame's I loop var (1-based), matching upstream teletype/src/ops/midi.c.
 // ---------------------------------------------------------------------------
@@ -3930,6 +3992,15 @@ namespace {
             table[E_OP_G_TUNE] = opGTune;
             table[E_OP_G_V]    = opGV;
             table[E_OP_G_S]    = opGS;
+            // Modulator (MO.*) — canonical + short aliases share one handler.
+            table[E_OP_MO]       = opMo;
+            table[E_OP_MO_P]     = opMoP;
+            table[E_OP_MO_SHAPE] = opMoShape;  table[E_OP_MO_S] = opMoShape;
+            table[E_OP_MO_RATE]  = opMoRate;   table[E_OP_MO_R] = opMoRate;
+            table[E_OP_MO_DEPTH] = opMoDepth;  table[E_OP_MO_D] = opMoDepth;
+            table[E_OP_MO_MODE]  = opMoMode;   table[E_OP_MO_M] = opMoMode;
+            table[E_OP_MO_OFF]   = opMoOff;    table[E_OP_MO_O] = opMoOff;
+            table[E_OP_MO_TRIG]  = opMoTrig;   table[E_OP_MO_T] = opMoTrig;
             // E_OP_G_O / E_OP_G_BAR / E_OP_G_B / E_OP_G_R left nullptr ->
             // UnsupportedOp (no live GeodeConfig field; see Geode ops comment).
             table[E_OP_MI_SYM_DOLLAR]      = opMiDollar;
