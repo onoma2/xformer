@@ -138,6 +138,20 @@ UNIT_TEST("TeletypeV2Language") {
         }
     }
 
+    CASE("scale_bank_nb_roundtrip") {
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        // N.B scale_bits root -> stores into slot 0; QT.B quantizes into it.
+        evalText("N.B 2773 0", runtime, output);   // major scale mask, root 0
+        expectEqual(runtime.variables.n_scale_bits[0], int16_t(2773), "N.B set bits");
+        expectEqual(runtime.variables.n_scale_root[0], int16_t(0), "N.B set root");
+        int16_t q = getv("QT.B 1638", runtime, output);  // ~1 semitone -> nearest scale note
+        expectTrue(q >= 0 && q <= 16383, "QT.B quantizes in range");
+        // N.BX writes a chosen slot.
+        evalText("N.BX 2 1387 0", runtime, output);
+        expectEqual(runtime.variables.n_scale_bits[2], int16_t(1387), "N.BX set slot 2");
+    }
+
     CASE("chaos_get_set") {
         TT2Runtime runtime = {}; init(runtime);
         TT2OutputState output = {}; init(output);

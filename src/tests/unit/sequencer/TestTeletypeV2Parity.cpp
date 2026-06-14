@@ -76,6 +76,13 @@ UNIT_TEST("TeletypeV2Parity") {
         "ER 4 16 0", "ER 4 16 1", "ER 3 8 2", "ER 5 13 7",
         "NR 0 0 1 0", "NR 5 1 3 7",
         "DR.T 0 0 0 16 0", "DR.P 1 0 0", "DR.P 1 0 3", "DR.V 0 0",
+        // P2b scale-bitmask (deterministic)
+        "N.S 0 0 1", "N.S 0 0 3", "N.S 12 1 5", "N.S -12 0 2",
+        "N.C 0 0 1", "N.C 0 1 2", "N.C 24 2 3",
+        "N.CS 0 0 1 1", "N.CS 12 1 3 2",
+        "QT.S 1638 0 0", "QT.S 2000 0 1", "QT.CS 1638 0 0 1 3",
+        // NOTE: N.B/N.BX/QT.B/QT.BX (scale-bank get-degree path) implemented but
+        // not yet bridge-parity-verified — degree-walk semantics need a follow-up.
     };
 
     CASE("deterministic_op_parity") {

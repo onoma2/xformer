@@ -1345,6 +1345,207 @@ static void opLrot(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // ---------------------------------------------------------------------------
+// Scale-bitmask ops (N.S/N.C/N.CS/N.B/N.BX, QT.S/QT.CS/QT.B/QT.BX).
+// Helpers reimplemented from upstream maths.c using tt2EtTable (= table_n) +
+// the linked const scale tables.
+// ---------------------------------------------------------------------------
+
+static int16_t tt2EtAt(int idx) {  // table_n lookup, clamped to the 128-entry ET table
+    if (idx < 0) idx = 0; else if (idx > 127) idx = 127;
+    return tt2EtTable[idx];
+}
+
+static int16_t tt2ScaleNsToBitmask(int16_t s) {
+    s %= 9; if (s < 0) s += 9;
+    int16_t bits = 0;
+    for (int i = 0; i < 7; ++i) bits |= int16_t(1 << table_n_s[s][i]);
+    return bits;
+}
+
+static int16_t tt2ChordNsToBitmask(int16_t s, int16_t degree, int16_t voices) {
+    s %= 9; if (s < 0) s += 9;
+    degree %= 7; if (degree < 0) degree += 7;
+    voices = tt2Normalise(1, 7, 0, voices);
+    int16_t bits = 0;
+    for (int i = 1; i <= voices; ++i) { bits |= int16_t(1 << table_n_s[s][degree]); degree = (degree + 2) % 7; }
+    return bits;
+}
+
+static int16_t tt2DegreeInBitmaskScale(int16_t scaleBits, int16_t transpose, int16_t degree) {
+    int note = 0;
+    if (degree > 0) {
+        for (int i = 0; i < 128; ++i) { if ((scaleBits >> (i % 12)) & 1) { degree--; if (!degree) break; } note++; }
+    } else {
+        degree--;
+        for (int i = 0; i < 128; ++i) { if ((scaleBits >> (11 - (i % 12))) & 1) { degree++; if (!degree) break; } note--; }
+        note--;
+    }
+    note += transpose;
+    return note > 0 ? tt2EtAt(note) : int16_t(-tt2EtAt(-note));
+}
+
+static int16_t tt2QuantizeToBitmaskScale(int16_t scaleBits, int16_t transpose, int16_t vIn) {
+    if (scaleBits == 0) return vIn;
+    vIn = tt2Normalise(int16_t(-tt2EtTable[127]), tt2EtTable[127], 0, vIn);
+    int16_t signOffset = (vIn < 0) ? 18022 : 0;
+    vIn = int16_t(vIn + signOffset);
+    int16_t oct = int16_t(vIn / tt2EtTable[12]);
+    if (vIn <= 18021 && vIn >= 18018) oct = 10;
+    int16_t semis = int16_t(vIn % tt2EtTable[12]);
+    transpose = int16_t(transpose % tt2EtTable[12]);
+    int16_t distNearest = INT16_MAX, noteNearest = INT16_MAX;
+    for (int16_t i = 0; i < 12; ++i) {
+        if (scaleBits & (1 << i)) {
+            for (int16_t j = -2; j <= 2; ++j) {
+                int16_t tryNote = int16_t(tt2EtTable[i] + transpose + (j * tt2EtTable[12]));
+                int16_t tryDist = int16_t(tryNote - semis); if (tryDist < 0) tryDist = int16_t(-tryDist);
+                if (tryDist < distNearest) { distNearest = tryDist; noteNearest = tryNote; }
+            }
+        }
+    }
+    return int16_t((noteNearest + tt2EtAt(oct * 12)) - signOffset);
+}
+
+// N.S root scale degree
+static void opNS(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t root = 0, scale = 0, degree = 0;
+    if (!popStack(stack, stackSize, root, error)) return;
+    if (!popStack(stack, stackSize, scale, error)) return;
+    if (!popStack(stack, stackSize, degree, error)) return;
+    scale %= 9; if (scale < 0) scale += 9;
+    degree = int16_t((degree - 1) % 7); if (degree < 0) degree += 7;
+    int16_t transpose = table_n_s[scale][degree];
+    if (root < 0) { if (root < -127) root = -127; pushStack(stack, stackSize, int16_t(-tt2EtAt(-root + transpose)), error); }
+    else { if (root > 127) root = 127; pushStack(stack, stackSize, tt2EtAt(root + transpose), error); }
+}
+
+// N.C root chord component
+static void opNC(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t root = 0, chord = 0, comp = 0;
+    if (!popStack(stack, stackSize, root, error)) return;
+    if (!popStack(stack, stackSize, chord, error)) return;
+    if (!popStack(stack, stackSize, comp, error)) return;
+    chord %= 13; if (chord < 0) chord += 13;
+    comp %= 4; if (comp < 0) comp += 4;
+    int16_t transpose = table_n_c[chord][comp];
+    if (root < 0) { if (root < -127) root = -127; pushStack(stack, stackSize, int16_t(-tt2EtAt(-root + transpose)), error); }
+    else { if (root > 127) root = 127; pushStack(stack, stackSize, tt2EtAt(root + transpose), error); }
+}
+
+// N.CS root scale scl_deg ch_deg
+static void opNCS(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t root = 0, scale = 0, sclDeg = 0, chDeg = 0;
+    if (!popStack(stack, stackSize, root, error)) return;
+    if (!popStack(stack, stackSize, scale, error)) return;
+    if (!popStack(stack, stackSize, sclDeg, error)) return;
+    if (!popStack(stack, stackSize, chDeg, error)) return;
+    scale %= 9; if (scale < 0) scale += 9;
+    sclDeg = int16_t((sclDeg - 1) % 7); if (sclDeg < 0) sclDeg += 7;
+    int16_t sclTrans = table_n_s[scale][sclDeg];
+    chDeg %= 4; if (chDeg < 0) chDeg += 4;
+    int16_t chTrans = table_n_c[table_n_cs[scale][sclDeg]][chDeg];
+    if (root < 0) { if (root < -127) root = -127; pushStack(stack, stackSize, int16_t(-tt2EtAt(-root + sclTrans + chTrans)), error); }
+    else { if (root > 127) root = 127; pushStack(stack, stackSize, tt2EtAt(root + sclTrans + chTrans), error); }
+}
+
+static int16_t tt2NbScaleBitsFromArg(int16_t scaleBits) {
+    if (scaleBits < 1) {
+        if (scaleBits > -20) return tt2BitReverse(int16_t(table_n_b[-scaleBits]), 12);
+        return tt2BitReverse(int16_t(table_n_b[0]), 12);
+    }
+    return int16_t(scaleBits & 0xFFF);
+}
+
+// N.B degree (get) / N.B scale_bits root (set, slot 0)
+static void opNB(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    if (isSet && stackSize >= 2) {
+        int16_t scaleBits = 0, root = 0;
+        if (!popStack(stack, stackSize, scaleBits, error)) return;
+        if (!popStack(stack, stackSize, root, error)) return;
+        v.n_scale_root[0] = root;
+        v.n_scale_bits[0] = tt2NbScaleBitsFromArg(scaleBits);
+    } else {
+        int16_t degree = 0;
+        if (!popStack(stack, stackSize, degree, error)) return;
+        pushStack(stack, stackSize, tt2DegreeInBitmaskScale(v.n_scale_bits[0], v.n_scale_root[0], degree), error);
+    }
+}
+
+// N.BX scale_nb degree (get) / N.BX scale_nb scale_bits root (set)
+static void opNBX(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    if (isSet && stackSize >= 3) {
+        int16_t nb = 0, scaleBits = 0, root = 0;
+        if (!popStack(stack, stackSize, nb, error)) return;
+        if (!popStack(stack, stackSize, scaleBits, error)) return;
+        if (!popStack(stack, stackSize, root, error)) return;
+        nb %= 8; if (nb < 0) nb = 0; if (nb > TT2_NB_SCALES - 1) nb = TT2_NB_SCALES - 1;
+        v.n_scale_root[nb] = root;
+        v.n_scale_bits[nb] = tt2NbScaleBitsFromArg(scaleBits);
+    } else {
+        int16_t nb = 0, degree = 0;
+        if (!popStack(stack, stackSize, nb, error)) return;
+        if (!popStack(stack, stackSize, degree, error)) return;
+        if (nb < 0) nb = 0; if (nb > TT2_NB_SCALES - 1) nb = TT2_NB_SCALES - 1;
+        pushStack(stack, stackSize, tt2DegreeInBitmaskScale(v.n_scale_bits[nb], v.n_scale_root[nb], degree), error);
+    }
+}
+
+// QT.S v_in transpose scale
+static void opQtS(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t vIn = 0, transpose = 0, scale = 0;
+    if (!popStack(stack, stackSize, vIn, error)) return;
+    if (!popStack(stack, stackSize, transpose, error)) return;
+    if (!popStack(stack, stackSize, scale, error)) return;
+    scale %= 9; if (scale < 0) scale += 9;
+    pushStack(stack, stackSize, tt2QuantizeToBitmaskScale(tt2ScaleNsToBitmask(scale), transpose, vIn), error);
+}
+
+// QT.CS v_in transpose scale degree voices
+static void opQtCS(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t vIn = 0, transpose = 0, scale = 0, degree = 0, voices = 0;
+    if (!popStack(stack, stackSize, vIn, error)) return;
+    if (!popStack(stack, stackSize, transpose, error)) return;
+    if (!popStack(stack, stackSize, scale, error)) return;
+    if (!popStack(stack, stackSize, degree, error)) return;
+    if (!popStack(stack, stackSize, voices, error)) return;
+    scale %= 9; if (scale < 0) scale += 9;
+    degree -= 1;
+    voices = tt2Normalise(1, 7, 0, voices);
+    pushStack(stack, stackSize, tt2QuantizeToBitmaskScale(tt2ChordNsToBitmask(scale, degree, voices), transpose, vIn), error);
+}
+
+// QT.B v_in (uses scale slot 0)
+static void opQtB(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t vIn = 0;
+    if (!popStack(stack, stackSize, vIn, error)) return;
+    int16_t mask = runtime.variables.n_scale_bits[0];
+    int16_t transpose = noteNumberToVolts(runtime.variables.n_scale_root[0]);
+    pushStack(stack, stackSize, tt2QuantizeToBitmaskScale(mask, transpose, vIn), error);
+}
+
+// QT.BX v_in scale_nb
+static void opQtBX(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t vIn = 0, nb = 0;
+    if (!popStack(stack, stackSize, vIn, error)) return;
+    if (!popStack(stack, stackSize, nb, error)) return;
+    if (nb < 0) nb = 0; if (nb > TT2_NB_SCALES - 1) nb = TT2_NB_SCALES - 1;
+    int16_t mask = runtime.variables.n_scale_bits[nb];
+    int16_t transpose = noteNumberToVolts(runtime.variables.n_scale_root[nb]);
+    pushStack(stack, stackSize, tt2QuantizeToBitmaskScale(mask, transpose, vIn), error);
+}
+
+// ---------------------------------------------------------------------------
 // Euclid / drum / chaos / seeds (reuse linked pure C helpers)
 // ---------------------------------------------------------------------------
 
@@ -2924,6 +3125,15 @@ namespace {
             table[E_OP_HZ]       = opHz;
             table[E_OP_P_SCALE]  = opPScale;
             table[E_OP_PN_SCALE] = opPNScale;
+            table[E_OP_N_S]      = opNS;
+            table[E_OP_N_C]      = opNC;
+            table[E_OP_N_CS]     = opNCS;
+            table[E_OP_N_B]      = opNB;
+            table[E_OP_N_BX]     = opNBX;
+            table[E_OP_QT_S]     = opQtS;
+            table[E_OP_QT_CS]    = opQtCS;
+            table[E_OP_QT_B]     = opQtB;
+            table[E_OP_QT_BX]    = opQtBX;
             table[E_OP_BIT_OR]   = opBitOr;
             table[E_OP_BIT_AND]  = opBitAnd;
             table[E_OP_BIT_XOR]  = opBitXor;
