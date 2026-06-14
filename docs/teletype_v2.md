@@ -31,6 +31,7 @@ The goal is a native Performer scripting language derived from Teletype:
 
 - **Language tail:** variable ops (`O`/`DRUNK`/`FLIP`/`TIME`/`LAST` + `C`/`D`/`Y`/`Z`/`T`/`J`/`K` and the `O.`/`DRUNK.`/`R.` companions; `TIME`/`LAST` driven by a runtime ms clock), randomness (`RAND`/`RRAND`/`R`/`TOSS`), pitch tail (`SCALE`/`SCL`/`SCALE0`/`QT`, `VN`/`VV`/`HZ`, `P.SCALE`/`PN.SCALE`), bitwise/shift (`| & ~ ^ XOR`, `BSET`/`BGET`/`BCLR`/`BTOG`/`BREV`, `RSH`/`LSH`/`RROT`/`LROT`), function calls (`$`/`$F`/`$F1`/`$F2`, `$L`/`$S` line calls, `I1`/`I2`, `FR`).
 - **Turtle (`@` ops):** fixed-point walker over pattern memory (x = pattern 0-3, y = index 0-63), verbatim port of `turtle.c` — move/step/fence/wrap/bump/bounce/speed/dir/script/show.
+- **Parity harness (`TestTeletypeV2Parity`):** evaluates a deterministic op set (math/comparison/logic/range/pitch/scale/bitwise/shift) through both the legacy C VM and the native runner, asserting equal results. Caught reversed bitwise operands (corrected to value-first: `BSET x i`, `RSH x n`). One documented divergence: the C VM's `QT` returns 0 when it should round up to `(c+1)*step` (a TT1 bug) — native `QT` is correct, so `QT` is excluded from the parity set. RNG/stateful ops are out of scope (the two RNGs can't agree bit-for-bit).
 
 ### Remaining — engine mechanics
 All engine mechanics and the full language surface (control/timing, ops, pitch, randomness, bitwise, functions, turtle) are native and tested. The only remaining TT2 work is the **editor** (below) — no op/engine gaps remain.
