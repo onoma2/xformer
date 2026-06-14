@@ -9,39 +9,44 @@ namespace {
 // simulator boots an auditable TT2 patch without hand-typing on hardware.
 // Trigger scripts S1-S4 = indices 0-3, metro = 4, init = 5.
 void seedTeletypeV2Demo(TeletypeProgram &p) {
-    loadScriptText(p, 0,                  // S1: classic ops
-        "CV 2 N 7\n"
-        "TR.P 2\n"
-        "IF GT X 8 : CV 3 V 3\n"
-        "EVERY 4 : TR.P 3\n"
-        "Y RRAND 0 10\n"
-        "CV 4 N Y\n");
+    // Deterministic by design: no RND, so every op's effect is self-evident on
+    // the HUD / modulator page. The metro drives Mod 1 so it animates live.
+    loadScriptText(p, 0,                  // S1: classic ops (fixed chord + IF/EVERY)
+        "CV 2 N 0\n"
+        "CV 3 N ADD 4 0\n"
+        "CV 4 N MUL 2 6\n"
+        "IF EQ 1 1 : TR.P 2\n"
+        "EVERY 2 : TR.P 3\n");
     loadScriptText(p, 1,                  // S2: Performer window + BUS (cross-track)
-        "WBPM 130\n"
+        "WBPM 120\n"
         "WR 1\n"
+        "BUS 1 V 2\n"
         "CV 5 BUS 1\n"
         "WNG 2 0 1\n"
         "WNN 2 0 7\n");
-    loadScriptText(p, 2,                  // S3: modulator ops
-        "MO.SHAPE 2 3\n"
-        "MO.RATE 2 60\n"
-        "MO.DEPTH 2 100\n"
+    loadScriptText(p, 2,                  // S3: modulator one-shot (manual trigger)
+        "MO.SHAPE 2 0\n"
+        "MO.RATE 2 80\n"
+        "MO.DEPTH 2 127\n"
         "MO.TRIG 2\n");
     loadScriptText(p, 3,                  // S4: Geode
         "G.MODE 1\n"
         "G.TUNE 1 2\n"
         "G.V 1 4 2\n"
-        "G.V 0 2 1\n"
+        "G.V 2 4 2\n"
         "G.RUN 64\n");
-    loadScriptText(p, TT2_METRO_SCRIPT,   // M: periodic classic + BUS write
-        "CV 1 RND V 5\n"
-        "TR.P 1\n"
+    loadScriptText(p, TT2_METRO_SCRIPT,   // M: deterministic counter drives Mod 1
         "X ADD X 1\n"
-        "BUS 1 N X\n");
+        "X MOD X 8\n"
+        "MO.RATE 1 MUL X 16\n"
+        "MO.DEPTH 1 MUL X 12\n"
+        "CV 1 N MUL X 2\n"
+        "TR.P 1\n");
     loadScriptText(p, TT2_INIT_SCRIPT,    // I: boot config (runs once on start)
+        "X 0\n"
         "MO.SHAPE 1 1\n"
-        "MO.RATE 1 40\n"
-        "MO.DEPTH 1 90\n"
+        "MO.RATE 1 30\n"
+        "MO.DEPTH 1 50\n"
         "M 500\n"
         "M.ACT 1\n");
 }
