@@ -157,6 +157,15 @@ public:
     int16_t hostRoutingSource(uint8_t index) override;
     int16_t hostBusCv(uint8_t index) override;
     void hostSetBusCv(uint8_t index, int16_t raw) override;
+    Modulator &hostModulator(uint8_t idx) override;
+    int16_t hostModulatorOutput(uint8_t idx) override;
+    void hostModulatorTrigger(uint8_t idx) override;
+    GeodeConfig &hostGeodeConfig() override;
+    int16_t hostGeodeMix() override;
+    void hostGeodeTriggerVoice(uint8_t v, int16_t divs, int16_t repeats) override;
+    void hostGeodeTriggerAll(int16_t divs, int16_t repeats) override;
+    int16_t hostGeodeRun() override;
+    void hostGeodeSetRun(int16_t macro) override;
 
 private:
     // Sets this engine as the active TT2Host for the duration of script

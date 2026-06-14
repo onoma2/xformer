@@ -218,6 +218,70 @@ void TT2TrackEngine::hostSetBusCv(uint8_t index, int16_t raw) {
     _engine.setBusCv(index, rawToVolts(raw), Engine::BusWriterTeletype);
 }
 
+// --- Modulator slots (MO.*) ---
+
+Modulator &TT2TrackEngine::hostModulator(uint8_t idx) {
+    if (idx >= CONFIG_MODULATOR_COUNT) idx = CONFIG_MODULATOR_COUNT - 1;
+    return _engine.model().project().modulator(idx);
+}
+int16_t TT2TrackEngine::hostModulatorOutput(uint8_t idx) {
+    return int16_t(_engine.modulatorEngine().currentValue(idx));
+}
+void TT2TrackEngine::hostModulatorTrigger(uint8_t idx) {
+    _engine.modulatorEngine().triggerManual(idx);
+}
+
+// --- Geode engine (G.*) ---
+
+GeodeConfig &TT2TrackEngine::hostGeodeConfig() {
+    return _engine.model().project().geode();
+}
+int16_t TT2TrackEngine::hostGeodeMix() {
+    int v = int(_engine.geodeEngine().mixLevel() * 16383.f + 0.5f);
+    if (v < 0) v = 0; if (v > 16383) v = 16383;
+    return int16_t(v);
+}
+
+// Mirror the live gate-fire sequence (Engine.cpp Geode driver): trigger sets up
+// the burst, then setVoicePhase+markVoiceTriggered+triggerImmediate fire the
+// first envelope now (update() alone won't, since the gate resets phase).
+void TT2TrackEngine::hostGeodeTriggerVoice(uint8_t v, int16_t divs, int16_t repeats) {
+    if (v >= GeodeEngine::VoiceCount) return;
+    auto &geode = _engine.model().project().geode();
+    auto &ge = _engine.geodeEngine();
+    float run = (_engine.modulatorEngine().currentValue(1) - 64) / 64.f;
+    ge.triggerVoice(v, divs, repeats);
+    ge.setVoicePhase(v, 0.f);
+    ge.markVoiceTriggered(v);
+    ge.triggerImmediate(v, geode.timeNorm(), (geode.intone() - 8192) / 8192.f,
+                        run, uint8_t(geode.mode()));
+}
+void TT2TrackEngine::hostGeodeTriggerAll(int16_t divs, int16_t repeats) {
+    auto &geode = _engine.model().project().geode();
+    auto &ge = _engine.geodeEngine();
+    float run = (_engine.modulatorEngine().currentValue(1) - 64) / 64.f;
+    ge.triggerAllVoices(divs, repeats);
+    for (int i = 0; i < GeodeEngine::VoiceCount; ++i) {
+        ge.setVoicePhase(i, 0.f);
+        ge.markVoiceTriggered(i);
+    }
+    ge.triggerImmediateAll(geode.timeNorm(), (geode.intone() - 8192) / 8192.f,
+                           run, uint8_t(geode.mode()));
+}
+
+// Run macro 0..16383 (8192 = noon) maps to M2's offset (-64..+63 -> output bias).
+// Geode-enable parks M2 at depth 0, so this sets a fixed run by default; M2 depth
+// (if set) sweeps run around this center.
+int16_t TT2TrackEngine::hostGeodeRun() {
+    int macro = (_engine.model().project().modulator(1).offset() + 64) * 128;
+    if (macro < 0) macro = 0; if (macro > 16383) macro = 16383;
+    return int16_t(macro);
+}
+void TT2TrackEngine::hostGeodeSetRun(int16_t macro) {
+    if (macro < 0) macro = 0; if (macro > 16383) macro = 16383;
+    _engine.model().project().modulator(1).setOffset(macro / 128 - 64);
+}
+
 // --- MIDI: filter by the track source, populate the buffer, fire the script ---
 
 bool TT2TrackEngine::receiveMidi(MidiPort port, const MidiMessage &message) {

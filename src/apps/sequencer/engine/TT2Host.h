@@ -1,5 +1,8 @@
 #pragma once
 
+#include "model/Modulator.h"
+#include "model/GeodeConfig.h"
+
 #include <cstdint>
 
 // Host accessor for native TT2 ops that need live engine / cross-track state
@@ -35,6 +38,19 @@ struct TT2Host {
     virtual int16_t hostRoutingSource(uint8_t index) = 0;  // 0..16383
     virtual int16_t hostBusCv(uint8_t index) = 0;          // raw 0..16383
     virtual void hostSetBusCv(uint8_t index, int16_t raw) = 0;
+
+    // modulator slots (MO.*) — direct field access via the shared param dictionary
+    virtual Modulator &hostModulator(uint8_t idx) = 0;     // 0-based slot
+    virtual int16_t hostModulatorOutput(uint8_t idx) = 0;  // current output 0..127
+    virtual void hostModulatorTrigger(uint8_t idx) = 0;
+
+    // Geode engine (G.*) — global config + voice triggers + M2 run macro
+    virtual GeodeConfig &hostGeodeConfig() = 0;
+    virtual int16_t hostGeodeMix() = 0;                    // mix level, raw 0..16383
+    virtual void hostGeodeTriggerVoice(uint8_t v, int16_t divs, int16_t repeats) = 0;
+    virtual void hostGeodeTriggerAll(int16_t divs, int16_t repeats) = 0;
+    virtual int16_t hostGeodeRun() = 0;                    // run macro 0..16383, 8192=noon
+    virtual void hostGeodeSetRun(int16_t macro) = 0;
 };
 
 // Active host during script execution (set/cleared by TT2TrackEngine). Null

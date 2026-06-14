@@ -207,6 +207,9 @@ public:
     const ModulatorEngine &modulatorEngine() const { return _modulatorEngine; }
           ModulatorEngine &modulatorEngine()       { return _modulatorEngine; }
 
+    const GeodeEngine &geodeEngine() const { return _geodeEngine; }
+          GeodeEngine &geodeEngine()       { return _geodeEngine; }
+
     const MidiOutputEngine &midiOutputEngine() const { return _midiOutputEngine; }
           MidiOutputEngine &midiOutputEngine()       { return _midiOutputEngine; }
 
