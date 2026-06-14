@@ -29,6 +29,7 @@ register_sequencer_test(TestCurveWavefolderRouting TestCurveWavefolderRouting.cp
 register_sequencer_test(TestScale TestScale.cpp)
 register_sequencer_test(TestGeodeConfig TestGeodeConfig.cpp)
 register_sequencer_test(TestGeodeEngineFire TestGeodeEngineFire.cpp)
+register_sequencer_test(TestTT2OpNames TestTT2OpNames.cpp)
 register_sequencer_test(TestAccumulator TestAccumulator.cpp)
 register_sequencer_test(TestAccumulatorConfig TestAccumulatorConfig.cpp)
 register_sequencer_test(TestAccumulatorOps TestAccumulatorOps.cpp)
