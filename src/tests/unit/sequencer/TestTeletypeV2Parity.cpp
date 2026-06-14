@@ -66,7 +66,12 @@ UNIT_TEST("TeletypeV2Parity") {
         // bitwise / shift
         "| 12 10", "& 12 10", "^ 12 10", "~ 5", "~ 0",
         "BSET 0 8", "BGET 0 9", "BGET 1 9", "BCLR 0 9", "BTOG 0 9",
-        "BREV 1", "RSH 1 8", "LSH 1 8", "RSH -1 8", "LROT 1 1", "RROT 1 1",
+        "BREV 1", "RSH 8 1", "LSH 8 1", "RSH 8 -1", "LROT 1 1", "RROT 1 1",
+        // P1 ported ops (deterministic)
+        "EXP 0", "EXP 8000", "EXP 16383", "EXP -8000",
+        "JI 3 2", "JI 5 4", "JI 1 1", "JI 7 4", "JI 9 8",
+        ">< 0 5 10", "<> 0 5 10", ">=< 0 5 10", "<=> 0 5 10", "! 0", "! 5",
+        "<<< 1 1", ">>> 1 1", "&&& 1 1 0", "||| 0 0 1", "&&&& 1 1 1 0", "|||| 0 0 0 1",
     };
 
     CASE("deterministic_op_parity") {

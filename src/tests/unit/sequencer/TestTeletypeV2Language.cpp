@@ -116,6 +116,10 @@ UNIT_TEST("TeletypeV2Language") {
         for (int i = 0; i < 20; ++i) {
             int16_t v = getv("RAND 10", runtime, output);
             expectTrue(v >= 0 && v <= 10, "RAND 10 in [0,10]");
+            int16_t a = getv("RND 10", runtime, output);   // alias
+            expectTrue(a >= 0 && a <= 10, "RND alias in [0,10]");
+            int16_t b = getv("RRND 5 8", runtime, output); // alias
+            expectTrue(b >= 5 && b <= 8, "RRND alias in [5,8]");
         }
     }
 

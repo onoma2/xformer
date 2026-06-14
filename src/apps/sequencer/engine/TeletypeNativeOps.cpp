@@ -603,6 +603,62 @@ static void opHz(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     pushStack(stack, stackSize, hz, error);
 }
 
+// table_exp[256]: exponential curve. Verbatim teletype/src/table.c.
+static const int16_t tt2ExpTable[256] = {
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,3,3,4,4,
+    5,5,6,6,7,8,9,10,11,12,13,14,16,17,19,20,22,24,26,28,30,32,
+    35,38,40,43,46,49,53,56,60,64,68,72,77,82,86,92,97,103,108,114,121,127,
+    134,141,149,156,164,172,181,190,199,209,219,229,239,250,262,273,285,298,311,324,338,352,
+    366,381,397,413,429,446,464,482,500,519,538,559,579,600,622,644,667,691,715,740,765,791,
+    818,845,873,902,931,961,992,1024,1056,1090,1123,1158,1194,1230,1267,1305,1344,1383,1424,1465,1508,1551,
+    1595,1640,1686,1733,1781,1830,1880,1931,1983,2036,2090,2146,2202,2259,2318,2377,2438,2500,2563,2627,2693,2760,
+    2827,2897,2967,3039,3112,3186,3262,3339,3417,3497,3578,3660,3744,3829,3916,4005,4094,4185,4278,4373,4468,4566,
+    4665,4765,4868,4971,5077,5184,5293,5403,5516,5630,5745,5863,5982,6104,6227,6351,6478,6607,6737,6870,7004,7140,
+    7279,7419,7561,7706,7852,8000,8151,8304,8459,8616,8775,8936,9100,9266,9434,9604,9777,9952,10129,10309,10491,10675,
+    10862,11051,11243,11437,11634,11833,12035,12240,12447,12656,12869,13083,13301,13521,13744,13970,14199,14430,14664,14901,15141,15384,
+    15629,15878,16129
+};
+
+// EXP x — exponential curve lookup (x>>6 indexes the table; signed-mirrored).
+static void opExp(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    if (a > 16383) a = 16383; else if (a < -16383) a = -16383;
+    a = int16_t(a >> 6);
+    if (a < 0) pushStack(stack, stackSize, int16_t(-tt2ExpTable[-a]), error);
+    else pushStack(stack, stackSize, tt2ExpTable[a], error);
+}
+
+// JI n d — just-intonation interval (prime-factor n/d into cents-ish value).
+// Verbatim upstream algorithm.
+static void opJi(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    static const uint8_t prime[6] = { 2, 3, 5, 7, 11, 13 };
+    static const int16_t jiConst[6] = { 6554, 10388, 15218, 18399, 22673, 24253 };
+    int16_t n = 0, d = 0;
+    if (!popStack(stack, stackSize, n, error)) return;   // leftmost
+    if (!popStack(stack, stackSize, d, error)) return;   // rightmost
+    n = int16_t(n < 0 ? -n : n);
+    d = int16_t(d < 0 ? -d : d);
+    if (n == 0 || d == 0) { pushStack(stack, stackSize, 0, error); return; }
+    int32_t result = 0;
+    for (uint8_t p = 0; p <= 6; ++p) {
+        if (n == 1) break;
+        if (p == 6) { pushStack(stack, stackSize, 0, error); return; }
+        int32_t q = n / prime[p];
+        while (n == q * prime[p]) { result += jiConst[p]; n = int16_t(q); q = n / prime[p]; }
+    }
+    for (uint8_t p = 0; p <= 6; ++p) {
+        if (d == 1) break;
+        if (p == 6) { pushStack(stack, stackSize, 0, error); return; }
+        int32_t q = d / prime[p];
+        while (d == q * prime[p]) { result -= jiConst[p]; d = int16_t(q); q = d / prime[p]; }
+    }
+    result = (result + 2) >> 2;
+    pushStack(stack, stackSize, int16_t(result), error);
+}
+
 // ---------------------------------------------------------------------------
 // Logic / range ops (boolean results are 1/0)
 // ---------------------------------------------------------------------------
@@ -2913,6 +2969,21 @@ namespace {
             table[E_OP_LAST]     = opLast;
             table[E_OP_RAND]     = opRand;
             table[E_OP_RRAND]    = opRrand;
+            table[E_OP_RND]      = opRand;   // alias of RAND
+            table[E_OP_RRND]     = opRrand;  // alias of RRAND
+            table[E_OP_EXP]      = opExp;
+            table[E_OP_JI]       = opJi;
+            table[E_OP_SYM_RIGHT_ANGLED_LEFT_ANGLED]        = opInr;    // ><
+            table[E_OP_SYM_LEFT_ANGLED_RIGHT_ANGLED]        = opOutr;   // <>
+            table[E_OP_SYM_RIGHT_ANGLED_EQUAL_LEFT_ANGLED]  = opInri;   // >=<
+            table[E_OP_SYM_LEFT_ANGLED_EQUAL_RIGHT_ANGLED]  = opOutri;  // <=>
+            table[E_OP_SYM_EXCLAMATION]                     = opEz;     // !
+            table[E_OP_SYM_LEFT_ANGLED_x3]                  = opLrot;   // <<<
+            table[E_OP_SYM_RIGHT_ANGLED_x3]                 = opRrot;   // >>>
+            table[E_OP_SYM_AMPERSAND_x3]                    = opAnd3;   // &&&
+            table[E_OP_SYM_PIPE_x3]                         = opOr3;    // |||
+            table[E_OP_SYM_AMPERSAND_x4]                    = opAnd4;   // &&&&
+            table[E_OP_SYM_PIPE_x4]                         = opOr4;    // ||||
             table[E_OP_R]        = opR;
             table[E_OP_R_MIN]    = opRMin;
             table[E_OP_R_MAX]    = opRMax;
