@@ -73,6 +73,9 @@ void fmtRbin(uint16_t value, char *buf) {
 bool tt2PrintCommand(const TT2Command &cmd, char *out, size_t cap) {
     if (cap == 0) return false;
     out[0] = '\0';
+    // tag[]/value[] are fixed TT2_COMMAND_MAX_LENGTH slots; reject a length that
+    // would read past them (malformed project / future bank blob / bad caller).
+    if (cmd.length > TT2_COMMAND_MAX_LENGTH) return false;
     size_t pos = 0;
     char num[20];
     for (uint8_t i = 0; i < cmd.length; ++i) {

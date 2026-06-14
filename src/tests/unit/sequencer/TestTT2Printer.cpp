@@ -109,6 +109,21 @@ CASE("script line model: length lines, newline-joined, index==line") {
     expectTrue(buf[0] == '\0', "empty script -> empty output");
 }
 
+CASE("command length overflow is rejected (no OOB read)") {
+    TT2Command c = {};
+    toCmd("ADD 1 2", c);
+    c.length = 99;   // malformed: past the fixed 16-slot arrays
+    char buf[TT2_PRINT_LINE_MAX];
+    expectFalse(tt2PrintCommand(c, buf, sizeof buf), "over-length command rejected");
+    expectTrue(buf[0] == '\0', "output empty/terminated on reject");
+
+    // and via tt2PrintScript, which calls tt2PrintCommand per line
+    TT2Script s = {};
+    s.commands[0] = c;
+    s.length = 1;
+    expectFalse(tt2PrintScript(s, buf, sizeof buf), "over-length line rejected in script");
+}
+
 CASE("script truncation stops at the last whole line") {
     TT2Script s = {};
     toCmd("ADD 1 2", s.commands[0]);
