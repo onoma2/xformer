@@ -194,6 +194,7 @@ set(sources
     ../../../teletype/src/ops/maths.c
     ../../../teletype/src/ops/metronome.c
     ../../../teletype/src/ops/midi.c
+    ../../../teletype/src/ops/modulator.c
     ../../../teletype/src/ops/op.c
     ../../../teletype/src/ops/patterns.c
     ../../../teletype/src/ops/queue.c

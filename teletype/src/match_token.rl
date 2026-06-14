@@ -272,6 +272,22 @@
         "G.L"         => { MATCH_OP(E_OP_G_L); };
         "G.S"         => { MATCH_OP(E_OP_G_S); };
 
+        # modulator (Performer, MO.*)
+        "MO"          => { MATCH_OP(E_OP_MO); };
+        "MO.P"        => { MATCH_OP(E_OP_MO_P); };
+        "MO.SHAPE"    => { MATCH_OP(E_OP_MO_SHAPE); };
+        "MO.RATE"     => { MATCH_OP(E_OP_MO_RATE); };
+        "MO.DEPTH"    => { MATCH_OP(E_OP_MO_DEPTH); };
+        "MO.MODE"     => { MATCH_OP(E_OP_MO_MODE); };
+        "MO.OFF"      => { MATCH_OP(E_OP_MO_OFF); };
+        "MO.TRIG"     => { MATCH_OP(E_OP_MO_TRIG); };
+        "MO.S"        => { MATCH_OP(E_OP_MO_S); };
+        "MO.R"        => { MATCH_OP(E_OP_MO_R); };
+        "MO.D"        => { MATCH_OP(E_OP_MO_D); };
+        "MO.M"        => { MATCH_OP(E_OP_MO_M); };
+        "MO.O"        => { MATCH_OP(E_OP_MO_O); };
+        "MO.T"        => { MATCH_OP(E_OP_MO_T); };
+
         # maths
         "ADD"         => { MATCH_OP(E_OP_ADD); };
         "SUB"         => { MATCH_OP(E_OP_SUB); };

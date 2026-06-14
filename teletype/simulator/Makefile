@@ -9,6 +9,7 @@ OBJ = tt.o ../src/teletype.o ../src/command.o ../src/helpers.o ../src/drum_helpe
 	../src/ops/delay.o ../src/ops/earthsea.o ../src/ops/hardware.o \
 	../src/ops/justfriends.o ../src/ops/meadowphysics.o ../src/ops/turtle.o \
 	../src/ops/metronome.o ../src/ops/maths.o ../src/ops/orca.o \
+	../src/ops/modulator.o \
 	../src/ops/patterns.o ../src/ops/queue.o ../src/ops/stack.o \
 	../src/ops/telex.o ../src/ops/variables.o  ../src/ops/whitewhale.o \
 	../src/ops/init.o ../src/ops/grid_ops.o ../src/ops/er301.o \

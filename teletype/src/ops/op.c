@@ -10,6 +10,7 @@
 #include "ops/maths.h"
 #include "ops/metronome.h"
 #include "ops/midi.h"
+#include "ops/modulator.h"
 #include "ops/patterns.h"
 #include "ops/queue.h"
 #include "ops/seed.h"
@@ -127,7 +128,12 @@ const tele_op_t *const tele_ops[E_OP__LENGTH] = {
     &op_MI_LC, &op_MI_LCC, &op_MI_LCCV, &op_MI_NL, &op_MI_N, &op_MI_NV,
     &op_MI_V, &op_MI_VV, &op_MI_OL, &op_MI_O, &op_MI_CL, &op_MI_C, &op_MI_CC,
     &op_MI_CCV, &op_MI_LCH, &op_MI_NCH, &op_MI_OCH, &op_MI_CCH, &op_MI_LE,
-    &op_MI_CLKD, &op_MI_CLKR
+    &op_MI_CLKD, &op_MI_CLKR,
+
+    // modulator (Performer, MO.*)
+    &op_MO, &op_MO_P, &op_MO_SHAPE, &op_MO_RATE, &op_MO_DEPTH, &op_MO_MODE,
+    &op_MO_OFF, &op_MO_TRIG, &op_MO_S, &op_MO_R, &op_MO_D, &op_MO_M,
+    &op_MO_O, &op_MO_T
 };
 
 /////////////////////////////////////////////////////////////////
