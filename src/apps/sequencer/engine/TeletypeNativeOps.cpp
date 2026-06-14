@@ -894,6 +894,122 @@ static void opTrTog(TT2Runtime &runtime, TT2OutputState &output,
 }
 
 // ---------------------------------------------------------------------------
+// Bitwise / shift ops
+// ---------------------------------------------------------------------------
+
+static void opBitOr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0, b = 0;
+    if (!popBinary(stack, stackSize, a, b, error)) return;
+    pushStack(stack, stackSize, int16_t(a | b), error);
+}
+
+static void opBitAnd(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0, b = 0;
+    if (!popBinary(stack, stackSize, a, b, error)) return;
+    pushStack(stack, stackSize, int16_t(a & b), error);
+}
+
+static void opBitXor(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0, b = 0;
+    if (!popBinary(stack, stackSize, a, b, error)) return;
+    pushStack(stack, stackSize, int16_t(a ^ b), error);
+}
+
+static void opBitNot(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    pushStack(stack, stackSize, int16_t(~a), error);
+}
+
+// BSET/BGET/BCLR/BTOG bit index = leftmost arg, value = rightmost (parity with
+// upstream pop order).
+static void opBset(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t b = 0, v = 0;
+    if (!popBinary(stack, stackSize, b, v, error)) return;
+    pushStack(stack, stackSize, int16_t(v | (1 << b)), error);
+}
+
+static void opBget(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t b = 0, v = 0;
+    if (!popBinary(stack, stackSize, b, v, error)) return;
+    pushStack(stack, stackSize, int16_t((v >> b) & 1), error);
+}
+
+static void opBclr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t b = 0, v = 0;
+    if (!popBinary(stack, stackSize, b, v, error)) return;
+    pushStack(stack, stackSize, int16_t(v & ~(1 << b)), error);
+}
+
+static void opBtog(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t b = 0, v = 0;
+    if (!popBinary(stack, stackSize, b, v, error)) return;
+    int16_t r = ((v >> b) & 1) ? int16_t(v & ~(1 << b)) : int16_t(v | (1 << b));
+    pushStack(stack, stackSize, r, error);
+}
+
+static int16_t tt2BitReverse(int16_t v, int bits) {
+    int16_t reversed = 0;
+    for (int i = 0; i < bits; ++i) {
+        if (v & (1 << i)) reversed |= int16_t(1 << ((bits - 1) - i));
+    }
+    return reversed;
+}
+
+static void opBrev(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t a = 0;
+    if (!popStack(stack, stackSize, a, error)) return;
+    pushStack(stack, stackSize, tt2BitReverse(a, 16), error);
+}
+
+// RSH/LSH shift = leftmost arg, value = rightmost; negative shift flips direction.
+static void opRsh(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t n = 0, x = 0;
+    if (!popBinary(stack, stackSize, n, x, error)) return;
+    pushStack(stack, stackSize, int16_t(n > 0 ? (x >> n) : (x << -n)), error);
+}
+
+static void opLsh(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t n = 0, x = 0;
+    if (!popBinary(stack, stackSize, n, x, error)) return;
+    pushStack(stack, stackSize, int16_t(n > 0 ? (x << n) : (x >> -n)), error);
+}
+
+static uint16_t tt2Rrot(uint16_t x, uint8_t n) { return uint16_t((x >> n) | (x << (16 - n))); }
+static uint16_t tt2Lrot(uint16_t x, uint8_t n) { return uint16_t((x << n) | (x >> (16 - n))); }
+
+static void opRrot(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t n = 0, x = 0;
+    if (!popBinary(stack, stackSize, n, x, error)) return;
+    n %= 16;
+    uint16_t u = uint16_t(x);
+    u = n > 0 ? tt2Rrot(u, uint8_t(n)) : tt2Lrot(u, uint8_t(-n));
+    pushStack(stack, stackSize, int16_t(u), error);
+}
+
+static void opLrot(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t n = 0, x = 0;
+    if (!popBinary(stack, stackSize, n, x, error)) return;
+    n %= 16;
+    uint16_t u = uint16_t(x);
+    u = n > 0 ? tt2Lrot(u, uint8_t(n)) : tt2Rrot(u, uint8_t(-n));
+    pushStack(stack, stackSize, int16_t(u), error);
+}
+
+// ---------------------------------------------------------------------------
 // Engine input ops
 // ---------------------------------------------------------------------------
 
@@ -2243,6 +2359,20 @@ namespace {
             table[E_OP_HZ]       = opHz;
             table[E_OP_P_SCALE]  = opPScale;
             table[E_OP_PN_SCALE] = opPNScale;
+            table[E_OP_BIT_OR]   = opBitOr;
+            table[E_OP_BIT_AND]  = opBitAnd;
+            table[E_OP_BIT_XOR]  = opBitXor;
+            table[E_OP_BIT_NOT]  = opBitNot;
+            table[E_OP_XOR]      = opNe;
+            table[E_OP_BSET]     = opBset;
+            table[E_OP_BGET]     = opBget;
+            table[E_OP_BCLR]     = opBclr;
+            table[E_OP_BTOG]     = opBtog;
+            table[E_OP_BREV]     = opBrev;
+            table[E_OP_RSH]      = opRsh;
+            table[E_OP_LSH]      = opLsh;
+            table[E_OP_RROT]     = opRrot;
+            table[E_OP_LROT]     = opLrot;
             table[E_OP_AND]                = opAnd;
             table[E_OP_SYM_AMPERSAND_x2]   = opAnd;
             table[E_OP_OR]                 = opOr;
