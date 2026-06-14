@@ -1926,6 +1926,96 @@ static void opBus(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // ---------------------------------------------------------------------------
+// Geode ops (G.*) — drive the live GeodeConfig/GeodeEngine via the active host.
+// Run = M2 output (G.RUN), voices land in M3-M8. G.O/G.BAR/G.R have no live
+// equivalent and stay unregistered (UnsupportedOp): run via MO 2, bars from the
+// transport, voice CV routing via the modulator routing matrix.
+// ---------------------------------------------------------------------------
+
+#define TT2_GEODE_GLOBAL_OP(fn, getter, setter)                                \
+    static void fn(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,    \
+                   int16_t *stack, uint8_t &stackSize, bool isSet,             \
+                   TT2EvalError &error) {                                      \
+        TT2Host *h = tt2ActiveHost();                                          \
+        if (isSet && stackSize >= 1) {                                        \
+            int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return; \
+            if (h) h->hostGeodeConfig().setter(v);                            \
+        } else {                                                              \
+            pushStack(stack, stackSize,                                       \
+                      h ? int16_t(h->hostGeodeConfig().getter()) : 0, error); \
+        }                                                                     \
+    }
+TT2_GEODE_GLOBAL_OP(opGTime, time, setTime)
+TT2_GEODE_GLOBAL_OP(opGTone, intone, setIntone)
+TT2_GEODE_GLOBAL_OP(opGRamp, ramp, setRamp)
+TT2_GEODE_GLOBAL_OP(opGCurv, curve, setCurve)
+TT2_GEODE_GLOBAL_OP(opGMode, mode, setMode)
+
+static void opGRun(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    TT2Host *h = tt2ActiveHost();
+    if (isSet && stackSize >= 1) {
+        int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+        if (h) h->hostGeodeSetRun(v);
+    } else {
+        pushStack(stack, stackSize, h ? h->hostGeodeRun() : 0, error);
+    }
+}
+
+static void opGVal(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    TT2Host *h = tt2ActiveHost();
+    pushStack(stack, stackSize, h ? h->hostGeodeMix() : 0, error);
+}
+
+// G.TUNE v num den (v=0 -> all voices). pops leftmost-first = doc order.
+static void opGTune(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t v = 0, num = 0, den = 0;
+    if (!popStack(stack, stackSize, v, error)) return;
+    if (!popStack(stack, stackSize, num, error)) return;
+    if (!popStack(stack, stackSize, den, error)) return;
+    TT2Host *h = tt2ActiveHost();
+    if (!h) return;
+    GeodeConfig &g = h->hostGeodeConfig();
+    if (v == 0) {
+        for (int i = 0; i < GeodeConfig::VoiceCount; ++i) g.setTune(i, num, den);
+    } else if (v >= 1 && v <= GeodeConfig::VoiceCount) {
+        g.setTune(v - 1, num, den);
+    }
+}
+
+// G.V v divs reps (v=0 -> all voices). Host mirrors the live gate-fire sequence.
+static void opGV(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t v = 0, divs = 0, reps = 0;
+    if (!popStack(stack, stackSize, v, error)) return;
+    if (!popStack(stack, stackSize, divs, error)) return;
+    if (!popStack(stack, stackSize, reps, error)) return;
+    TT2Host *h = tt2ActiveHost();
+    if (!h) return;
+    if (v == 0) {
+        h->hostGeodeTriggerAll(divs, reps);
+    } else if (v >= 1 && v <= GeodeConfig::VoiceCount) {
+        h->hostGeodeTriggerVoice(uint8_t(v - 1), divs, reps);
+    }
+}
+
+// G.S t i n -> set TIME, TONE(intone), RUN in one line (no trigger).
+static void opGS(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t t = 0, i = 0, n = 0;
+    if (!popStack(stack, stackSize, t, error)) return;
+    if (!popStack(stack, stackSize, i, error)) return;
+    if (!popStack(stack, stackSize, n, error)) return;
+    TT2Host *h = tt2ActiveHost();
+    if (!h) return;
+    h->hostGeodeConfig().setTime(t);
+    h->hostGeodeConfig().setIntone(i);
+    h->hostGeodeSetRun(n);
+}
+
+// ---------------------------------------------------------------------------
 // MIDI query ops (MI.*) — read the runtime MIDI buffer. Indexed ops read the
 // active frame's I loop var (1-based), matching upstream teletype/src/ops/midi.c.
 // ---------------------------------------------------------------------------
@@ -3829,6 +3919,19 @@ namespace {
             table[E_OP_WNN_H]              = opWnnH;
             table[E_OP_RT]                 = opRt;
             table[E_OP_BUS]                = opBus;
+            // Geode (G.*) — canonical + short aliases share one handler.
+            table[E_OP_G_TIME] = opGTime;  table[E_OP_G_T]  = opGTime;
+            table[E_OP_G_TONE] = opGTone;  table[E_OP_G_I]  = opGTone;
+            table[E_OP_G_RAMP] = opGRamp;  table[E_OP_G_RA] = opGRamp;
+            table[E_OP_G_CURV] = opGCurv;  table[E_OP_G_C]  = opGCurv;
+            table[E_OP_G_MODE] = opGMode;  table[E_OP_G_M]  = opGMode;
+            table[E_OP_G_RUN]  = opGRun;   table[E_OP_G_N]  = opGRun;
+            table[E_OP_G_VAL]  = opGVal;   table[E_OP_G_L]  = opGVal;
+            table[E_OP_G_TUNE] = opGTune;
+            table[E_OP_G_V]    = opGV;
+            table[E_OP_G_S]    = opGS;
+            // E_OP_G_O / E_OP_G_BAR / E_OP_G_B / E_OP_G_R left nullptr ->
+            // UnsupportedOp (no live GeodeConfig field; see Geode ops comment).
             table[E_OP_MI_SYM_DOLLAR]      = opMiDollar;
             table[E_OP_MI_LE]   = opMiLe;
             table[E_OP_MI_LN]   = opMiLn;
