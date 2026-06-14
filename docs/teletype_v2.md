@@ -33,18 +33,16 @@ The goal is a native Performer scripting language derived from Teletype:
 - **Turtle (`@` ops):** fixed-point walker over pattern memory (x = pattern 0-3, y = index 0-63), verbatim port of `turtle.c` — move/step/fence/wrap/bump/bounce/speed/dir/script/show.
 - **Parity harness (`TestTeletypeV2Parity`):** evaluates a deterministic op set (math/comparison/logic/range/pitch/scale/bitwise/shift) through both the legacy C VM and the native runner, asserting equal results. Caught reversed bitwise operands (corrected to value-first: `BSET x i`, `RSH x n`). One documented divergence: the C VM's `QT` returns 0 when it should round up to `(c+1)*step` (a TT1 bug) — native `QT` is correct, so `QT` is excluded from the parity set. RNG/stateful ops are out of scope (the two RNGs can't agree bit-for-bit).
 
-### Bridge-parity porting (source of truth = the current `TeletypeTrack` bridge)
+### Bridge-parity porting ✅ COMPLETE (source of truth = the current `TeletypeTrack` bridge)
 
-The bridge — not upstream Teletype — is the coverage target. The hardware-independent + runtime-state ops are now **ported and parity-verified** against the bridge C VM (via `TestTeletypeV2Parity`):
+The bridge — not upstream Teletype — was the coverage target. **All six porting batches are done**; the native runner now covers the bridge's usable op surface. Deterministic ops are parity-verified against the bridge C VM (`TestTeletypeV2Parity`); stateful/engine/MIDI ops are unit-tested + on-device.
 
 - **P1 ✅** `RND`/`RRND`, `EXP`, `JI`, comparison/logic/shift symbols (`><`/`<>`/`>=<`/`<=>`/`!`/`<<<`/`>>>`/`&&&`/`|||`/`&&&&`/`||||`).
 - **P2 ✅** euclid/drum (`ER`/`NR`/`DR.T`/`DR.P`/`DR.V`, reuse linked C helpers), `CHAOS`(`.R`/`.ALG`), seeds (`SEED`/`*.SEED`/`*.SD`), scale-bitmask (`N.S`/`N.C`/`N.CS` + `QT.S`/`QT.CS` parity-verified; `N.B`/`N.BX`/`QT.B`/`QT.BX` bounds-safe, degree-walk parity is a follow-up).
 - **P3 ✅** `INIT.*` family.
 - **P4 ✅** `TIF`, `M!`, `CV.GET`/`CV.SET`, `M.A`/`M.ACT.A`/`M.RESET`(`.A`)/`SYNC`, `SCRIPT.POL`/`$.POL`, `TR.W`/`TR.D` (per-TR width/divisor).
-
-**Remaining — need engine access from the op layer (a host mechanism, not pure op-porting):**
-- **P5 — BUS + W\*/`RT`:** the CV-router hub + transport/tempo (`WBPM`/`WMS`/`WTU`/`BAR`/`WR`) + cross-track step read/write (`WP`/`WNG`/`WNN`/`RT`). These read live engine + other-track state, so the native ops need a scoped host accessor (the bridge uses `g_activeEngine`) plus porting the accessor methods into `TT2TrackEngine`.
-- **P6 — MIDI (essential):** per-track MIDI source in the model, `TT2TrackEngine::receiveMidi` feeding a runtime MIDI buffer, the `MI.*` query family, and MIDI-triggered script firing.
+- **P5 ✅** `BUS` + `W*`/`RT` via the new **`TT2Host`** interface (`TT2TrackEngine` implements it, registers active around script exec via `ScopedHost`, keeping the op layer off `Engine.h`): `WBPM`/`WBPM.S`/`WMS`/`WTU`/`BAR`/`WP`/`WP.SET`/`WR`/`W.ACT`/`WNG`/`WNN`/`WNG.H`/`WNN.H`/`RT`/`BUS`; `BPM` (pure, parity-verified).
+- **P6 ✅** **MIDI** — `TT2Midi` runtime buffer; `TT2TrackEngine::receiveMidi`/`processMidiMessage` (filter by per-track `MidiSourceConfig` → populate → fire `MI.$`-bound script); the native `MI.*` query family (last-event/indexed-by-`I`/counts/channels/`MI.$`/`MI.CLKD`; `MI.CLKR` no-op, MIDI-clock derivation deferred).
 
 ### Deferred — separate efforts (not standalone ports)
 
@@ -65,7 +63,7 @@ The bridge no-ops these on Performer, so the native runner omitting them loses n
 (Earlier this section claimed "no Performer hardware" and wrongly swept MIDI + the native modules + scenes into it — corrected above: MIDI is real/essential, modules are real-but-deferred, scenes may return.)
 
 ### Recommended order
-Engine mechanics ✅, language tail ✅, turtle ✅ — done. The native runner is **not** yet a superset of the bridge: the bridge-parity gaps above (MIDI essential, BUS, W\*/`RT`, `TR.W`/`TR.D`, metro variants, `CV.GET`/`CV.SET`, and the unported hw-independent tail) must close before the bridge can be deleted, and the **editor** must land for on-device audition. Native modules (E/LFO/Geode) ride with the modulator rework; scenes stay on the table. Bridge deletion (Phase 5) is gated on parity minus the deferred buckets.
+Engine mechanics ✅, language tail ✅, turtle ✅, **bridge-parity porting ✅ (P1–P6 done)**. The native runner now covers the bridge's usable op surface. Remaining: the **editor** (repoint the editing UI to the native runner — the on-device audition gate), then **bridge deletion** (Phase 5), gated only on the editor + the deferred buckets (native modules → modulator rework; scenes; calibration).
 
 ## Non-Goals
 
@@ -390,7 +388,7 @@ Useful suggestions that still apply:
 
 ## Action Plan
 
-**Status (2026-06-14) — see Current State for the live roadmap.** Phase 0 (dialect definition) ✅, Phase 1 (native data model) ✅, Phase 2 (native core interpreter) ✅ **and well beyond** (the full op surface + control-flow MODs + patterns are native and tested). Phase 3 (native output semantics) ✅ — instant `CV`/`TR` plus slew / pulse / offset / polarity (the "output shaping" engine) are native and tested. Phase 4 (native modules: envelopes/LFO/Geode) **deferred to the modulator rework** — these are real, working features in the bridge, not ported standalone. Phase 5 (delete bridge) **pending**, gated on native editor + bridge-parity (MIDI, BUS, W\*/`RT`, `TR.W`/`TR.D`, metro variants, `CV.GET`/`CV.SET`, the unported hw-independent tail) minus the deferred buckets (modules, scenes, calibration). The phase definitions below stay as the architectural frame; the prioritized remaining work lives in Current State.
+**Status (2026-06-14) — see Current State for the live roadmap.** Phase 0 (dialect definition) ✅, Phase 1 (native data model) ✅, Phase 2 (native core interpreter) ✅ **and well beyond** (the full op surface + control-flow MODs + patterns are native and tested). Phase 3 (native output semantics) ✅ — instant `CV`/`TR` plus slew / pulse / offset / polarity (the "output shaping" engine) are native and tested. Phase 4 (native modules: envelopes/LFO/Geode) **deferred to the modulator rework** — these are real, working features in the bridge, not ported standalone. Bridge-parity porting ✅ — P1–P6 done (MIDI, BUS, W\*/`RT`, scale-bitmask, euclid/drum, INIT, seeds, chaos, the symbol/alias tail) all native. Phase 5 (delete bridge) **pending**, gated only on the native editor + the deferred buckets (modules → modulator rework, scenes, calibration). The phase definitions below stay as the architectural frame; the prioritized remaining work lives in Current State.
 
 ### Phase 0: Dialect Definition
 
