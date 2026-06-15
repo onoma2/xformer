@@ -30,6 +30,7 @@ private:
     void copyLine();
     void pasteLine();
     void duplicateLine();
+    void commentLine();
     void deleteLine();
     void pushHistory(const char *line);
     void recallHistory(int direction);

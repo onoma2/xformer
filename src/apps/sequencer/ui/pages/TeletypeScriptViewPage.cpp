@@ -144,6 +144,8 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
             } else {
                 canvas.setColor(Color::Medium);
             }
+        } else if (i < len && program.scripts[scriptIndex].commands[i].commented) {
+            canvas.setColor(Color::Low);
         } else {
             canvas.setColor(i == _selectedLine ? Color::Bright : Color::Medium);
         }
@@ -297,7 +299,7 @@ void TeletypeScriptViewPage::updateLeds(Leds &leds) {
             true,   // Step 8: Copy (yellow)
             false,  // Step 9: Paste (green)
             true,   // Step 10: Duplicate (yellow)
-            false,  // Step 11: unused
+            true,   // Step 11: Comment (red)
             true,   // Step 12: Delete (red)
             false,  // Step 13
             false,  // Step 14
@@ -357,6 +359,9 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
                 event.consume();
             } else if (key.step() == 10) {
                 duplicateLine();
+                event.consume();
+            } else if (key.step() == 11) {
+                commentLine();
                 event.consume();
             } else if (key.step() == 12) {
                 deleteLine();
@@ -760,6 +765,21 @@ void TeletypeScriptViewPage::duplicateLine() {
     loadEditBuffer(_selectedLine);
 }
 
+void TeletypeScriptViewPage::commentLine() {
+    if (_liveMode) {
+        return;
+    }
+    auto &program = _project.selectedTrack().tt2Track().program();
+    TT2Script &script = program.scripts[_scriptIndex];
+    if (_selectedLine >= script.length) {
+        return;
+    }
+    _engine.lock();
+    uint8_t &c = script.commands[_selectedLine].commented;
+    c = c ? 0 : 1;
+    _engine.unlock();
+}
+
 void TeletypeScriptViewPage::deleteLine() {
     if (_liveMode) {
         return;
@@ -859,6 +879,11 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
         }
         if (keycode == KeyboardEvent::KeyF5) {
             setScriptIndex(TT2_METRO_SCRIPT);
+            event.consume();
+            return;
+        }
+        if (keycode == 0x38) {  // HID_SLASH — toggle line comment
+            commentLine();
             event.consume();
             return;
         }

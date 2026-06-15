@@ -35,6 +35,7 @@ static_assert(TT2_INIT_SCRIPT < TT2_SCRIPT_COUNT, "init script index must be val
 
 struct TT2Command {
     uint8_t length;
+    uint8_t commented;   // line disabled in place: runner skips it, editor toggles it
     uint8_t tag[TT2_COMMAND_MAX_LENGTH];
     int16_t value[TT2_COMMAND_MAX_LENGTH];
 };
@@ -140,6 +141,7 @@ inline bool lowerCommand(const tele_command_t &src, TT2Command &dst) {
         return false;
     }
     dst.length = src.length;
+    dst.commented = src.comment ? 1 : 0;
     for (uint8_t i = 0; i < src.length; ++i) {
         dst.tag[i] = src.tag[i];
         dst.value[i] = src.value[i];

@@ -67,4 +67,17 @@ CASE("parse_error_reports") {
     expectEqual(n, -1, "bad token -> parse error");
 }
 
+CASE("commented_line_is_skipped") {
+    Fixture f;
+    loadScriptText(f.program, 0, "CV 1 V 1\nCV 2 V 2\n");
+    f.program.scripts[0].commands[0].commented = 1;   // disable line 1
+    runScript(f.program, f.runtime, f.output, 0);
+    expectEqual(int(f.output.cv[0].targetRaw), 0, "commented CV 1 did not fire");
+    expectTrue(f.output.cv[1].targetRaw != 0, "CV 2 still fired");
+    // Un-comment and it fires.
+    f.program.scripts[0].commands[0].commented = 0;
+    runScript(f.program, f.runtime, f.output, 0);
+    expectTrue(f.output.cv[0].targetRaw != 0, "uncommented CV 1 fires");
+}
+
 } // UNIT_TEST("TeletypeV2RealScript")

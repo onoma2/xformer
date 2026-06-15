@@ -38,8 +38,8 @@ inline TT2EvalResult runScript(const TeletypeProgram &program,
 
     for (uint8_t line = 0; line < script.length; ++line) {
         const TT2Command &cmd = script.commands[line];
-        if (cmd.length == 0) {
-            continue; // blank line is a no-op
+        if (cmd.length == 0 || cmd.commented) {
+            continue; // blank line or commented-out line is a no-op
         }
 
         frame.line_number = line;
@@ -75,7 +75,7 @@ inline int16_t tt2RunFunction(const TeletypeProgram &program, TT2Runtime &runtim
 
     for (uint8_t line = 0; line < script.length; ++line) {
         const TT2Command &cmd = script.commands[line];
-        if (cmd.length == 0) continue;
+        if (cmd.length == 0 || cmd.commented) continue;
         frame.line_number = line;
         TT2EvalResult result = evaluateCommand(cmd, runtime, output, &program);
         if (result.error != TT2EvalError::None) break;
@@ -104,7 +104,7 @@ inline int16_t tt2RunFunctionLine(const TeletypeProgram &program, TT2Runtime &ru
     runtime.exec.depth++;
 
     const TT2Command &cmd = script.commands[line];
-    if (cmd.length != 0) {
+    if (cmd.length != 0 && !cmd.commented) {
         evaluateCommand(cmd, runtime, output, &program);
     }
 
@@ -153,6 +153,7 @@ inline void tt2AdvanceDelays(const TeletypeProgram &program, TT2Runtime &runtime
 
             TT2Command cmd;
             cmd.length = body.length;
+            cmd.commented = 0;
             for (int k = 0; k < TT2_COMMAND_MAX_LENGTH; ++k) {
                 cmd.tag[k] = body.tag[k];
                 cmd.value[k] = body.value[k];
