@@ -3,6 +3,7 @@
 #include "Config.h"
 #include "MidiUtils.h"
 #include "GateRotation.h"
+#include "Tt2OutputMix.h"
 
 #include "core/Debug.h"
 #include "core/midi/MidiMessage.h"
@@ -657,6 +658,15 @@ void Engine::updateTrackOutputs() {
     const auto &gateOutputTracks = _project.gateOutputTracks();
     const auto &cvOutputTracks = _project.cvOutputTracks();
 
+    // TT2 tracks emit to jacks only via the auto-index layer below; they are
+    // excluded from the legacy Layout source path and the rotation pools.
+    bool isTt2[CONFIG_TRACK_COUNT];
+    bool anyTt2 = false;
+    for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
+        isTt2[t] = _project.track(t).trackMode() == Track::TrackMode::TeletypeV2;
+        anyTt2 = anyTt2 || isTt2[t];
+    }
+
     int trackGateIndex[CONFIG_TRACK_COUNT];
     int trackCvIndex[CONFIG_TRACK_COUNT];
     int cvOutputTrackIndex[CONFIG_CHANNEL_COUNT];
@@ -698,6 +708,7 @@ void Engine::updateTrackOutputs() {
     for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
         int trackIndex = cvOutputTracks[i];
         if (trackIndex < CONFIG_TRACK_COUNT &&
+            !isTt2[trackIndex] &&
             (cvRotateMask & (1 << trackIndex))) {
             cvPool[cvPoolSize++] = i;
         }
@@ -749,14 +760,30 @@ void Engine::updateTrackOutputs() {
         if (_cvOutputOverride) {
             continue;
         }
+        // Legacy base (modulator-offset applied): a TT2-assigned jack resolves to 0
+        // here, then receives its TT2 value through the auto-index layer below.
+        float cvBase = 0.f;
+        bool writeJack = anyTt2;
         if (cvOutputTrack < CONFIG_TRACK_COUNT) {
-            int cvSlot = cvOutputTrackSlot[cvSourceOutputIndex];
-            _cvOutput.setChannel(i, applyModulatorOffset(i, _trackEngines[cvOutputTrack]->cvOutput(cvSlot)));
+            if (!isTt2[cvOutputTrack]) {
+                int cvSlot = cvOutputTrackSlot[cvSourceOutputIndex];
+                cvBase = _trackEngines[cvOutputTrack]->cvOutput(cvSlot);
+            }
+            writeJack = true;
         } else if (cvOutputTrack == CONFIG_TRACK_COUNT) {
             int lane = cvOutputCvRouteLane[cvSourceOutputIndex];
             if (lane >= 0 && lane < int(_cvRouteOutputs.size())) {
-                _cvOutput.setChannel(i, applyModulatorOffset(i, _cvRouteOutputs[lane]));
+                cvBase = _cvRouteOutputs[lane];
+                writeJack = true;
             }
+        }
+        if (writeJack) {
+            float v = applyModulatorOffset(i, cvBase);
+            float cvAtJack[CONFIG_TRACK_COUNT];
+            for (int t = 0; t < CONFIG_TRACK_COUNT; ++t)
+                cvAtJack[t] = isTt2[t] ? _trackEngines[t]->cvOutput(i) : 0.f;
+            v = clamp(v + Tt2OutputMix::sumCv(cvAtJack, isTt2, CONFIG_TRACK_COUNT), -5.f, 5.f);
+            _cvOutput.setChannel(i, v);
         }
     }
 }
