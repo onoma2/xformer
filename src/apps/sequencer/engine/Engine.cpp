@@ -693,6 +693,7 @@ void Engine::updateTrackOutputs() {
     for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
         int trackIndex = gateOutputTracks[i];
         if (trackIndex < CONFIG_TRACK_COUNT &&
+            !isTt2[trackIndex] &&
             (gateRotateMask & (1 << trackIndex))) {
             gatePool[gatePoolSize++] = i;
         }
@@ -741,7 +742,15 @@ void Engine::updateTrackOutputs() {
 
         int gateOutputTrack = gateOutputTracks[gateSourceOutputIndex];
         if (!_gateOutputOverride && gateOutputTrack < CONFIG_TRACK_COUNT) {
-            _gateOutput.setGate(i, _trackEngines[gateOutputTrack]->gateOutput(trackGateIndex[gateOutputTrack]++));
+            // Legacy gate skips a TT2 source (resolves false); TT2 reaches the jack
+            // only via the OR layer below, fixed to physical gate jack index.
+            bool g = isTt2[gateOutputTrack] ? false
+                : _trackEngines[gateOutputTrack]->gateOutput(trackGateIndex[gateOutputTrack]++);
+            bool gateAtJack[CONFIG_TRACK_COUNT];
+            for (int t = 0; t < CONFIG_TRACK_COUNT; ++t)
+                gateAtJack[t] = isTt2[t] ? _trackEngines[t]->gateOutput(i) : false;
+            g = g || Tt2OutputMix::anyGate(gateAtJack, isTt2, CONFIG_TRACK_COUNT);
+            _gateOutput.setGate(i, g);
         }
 
         // CV Output
