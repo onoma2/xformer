@@ -24,24 +24,23 @@ void seedTeletypeV2Demo(TeletypeProgram &p) {
         "CV 5 BUS 1\n"
         "WNG 2 0 1\n"
         "WNN 2 0 7\n");
-    loadScriptText(p, 2,                  // S3: modulator one-shot (manual trigger)
-        "MO.SHAPE 2 0\n"
-        "MO.RATE 2 80\n"
-        "MO.DEPTH 2 127\n"
-        "MO.TRIG 2\n");
+    loadScriptText(p, 2,                  // S3: 8th-pair additive routing (metro-fired)
+        "MO.DEPTH 1 MUL X 12\n"           // relocated from metro (keeps Mod 1 depth live)
+        "CV 8 N MUL X 2\n"                // TT2 CV sums onto physical CV jack 8
+        "TR.P 8\n");                      // TT2 gate ORs onto physical gate jack 8
     loadScriptText(p, 3,                  // S4: Geode
         "G.MODE 1\n"
         "G.TUNE 1 2\n"
         "G.V 1 4 2\n"
         "G.V 2 4 2\n"
         "G.RUN 64\n");
-    loadScriptText(p, TT2_METRO_SCRIPT,   // M: deterministic counter drives Mod 1
+    loadScriptText(p, TT2_METRO_SCRIPT,   // M: counter drives Mod 1 + jack 1, fires S3 for jack 8
         "X ADD X 1\n"
         "X MOD X 8\n"
         "MO.RATE 1 MUL X 16\n"
-        "MO.DEPTH 1 MUL X 12\n"
         "CV 1 N MUL X 2\n"
-        "TR.P 1\n");
+        "TR.P 1\n"
+        "SCRIPT 3\n");
     loadScriptText(p, TT2_INIT_SCRIPT,    // I: boot config (runs once on start)
         "X 0\n"
         "MO.SHAPE 1 1\n"
