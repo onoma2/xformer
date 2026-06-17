@@ -11,7 +11,7 @@ extern "C" {
 #include "command.h"
 }
 
-static constexpr int TT2_SCRIPT_COUNT        = 6;
+static constexpr int TT2_SCRIPT_COUNT        = 10;   // 8 numbered + Metro + Init
 static constexpr int TT2_COMMANDS_PER_SCRIPT = 6;
 static constexpr int TT2_COMMAND_MAX_LENGTH  = 16;
 static constexpr int TT2_PATTERN_COUNT       = 4;
@@ -19,8 +19,8 @@ static constexpr int TT2_PATTERN_LENGTH      = 64;
 
 static constexpr int TT2_TRIGGER_SCRIPT_0 = 0;
 static constexpr int TT2_TRIGGER_SCRIPT_3 = 3;
-static constexpr int TT2_METRO_SCRIPT     = 4;
-static constexpr int TT2_INIT_SCRIPT      = 5;
+static constexpr int TT2_METRO_SCRIPT     = 8;
+static constexpr int TT2_INIT_SCRIPT      = 9;
 
 enum class TT2TimeBase : uint8_t {
     Ms,
@@ -55,7 +55,7 @@ struct TT2Script {
     TT2Command commands[TT2_COMMANDS_PER_SCRIPT];
 };
 
-static constexpr int TT2_TRIGGER_INPUT_COUNT = 4;
+static constexpr int TT2_TRIGGER_INPUT_COUNT = 8;   // 8 trigger inputs -> scripts 1-8
 
 // Per trigger-input source. Mirrors TeletypeTrack::TriggerInputSource so the
 // (deferred) editor I/O grid edits the same shape. Engine reads it to decide
@@ -174,4 +174,4 @@ inline int16_t *patternVal(TT2Pattern &pat, uint16_t index) {
 static_assert(sizeof(TT2Command) <= 52, "TT2Command size drift");
 static_assert(sizeof(TT2Pattern) <= 140, "TT2Pattern size drift");
 static_assert(sizeof(TT2Script) <= 304, "TT2Script size drift");
-static_assert(sizeof(TeletypeProgram) <= 2440, "TeletypeProgram size drift");
+static_assert(sizeof(TeletypeProgram) <= 3640, "TeletypeProgram size drift");

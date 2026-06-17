@@ -1475,5 +1475,13 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
         expectEqual(int(result.error), int(TT2EvalError::ExecDepthOverflow), "overflow");
         expectEqual(int(runtime.exec.overflow), 1, "overflow flagged");
     }
+
+    CASE("hw_parity_script_layout") {
+        // Full teletype: 8 numbered + Metro + Init = 10 editable scripts.
+        expectEqual(TT2_SCRIPT_COUNT, 10, "10 editable scripts");
+        expectEqual(TT2_METRO_SCRIPT, 8, "metro at index 8");
+        expectEqual(TT2_INIT_SCRIPT, 9, "init at index 9");
+        expectEqual(TT2_TRIGGER_INPUT_COUNT, 8, "8 trigger inputs");
+    }
 }
 

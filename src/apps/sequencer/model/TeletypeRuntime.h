@@ -331,17 +331,17 @@ inline void init(TT2Runtime &r) {
 }
 
 // sizeof guards are <= bounds verified on ARM STM32 release builds.
-static_assert(sizeof(TT2Variables) <= 472, "TT2Variables size drift");
+static_assert(sizeof(TT2Variables) <= 496, "TT2Variables size drift");
 static_assert(sizeof(TT2RuntimeCommand) <= 52, "TT2RuntimeCommand size drift");
 static_assert(sizeof(TT2Stack) <= 804, "TT2Stack size drift");
 static_assert(sizeof(TT2DelayEntry) <= 62, "TT2DelayEntry size drift");
 static_assert(sizeof(TT2DelayQueue) <= 484, "TT2DelayQueue size drift");
-static_assert(sizeof(TT2EveryState) <= 218, "TT2EveryState size drift");
+static_assert(sizeof(TT2EveryState) <= 372, "TT2EveryState size drift");
 static_assert(sizeof(TT2Metro) <= 14, "TT2Metro size drift");
 static_assert(sizeof(TT2Rng) <= 22, "TT2Rng size drift");
 static_assert(sizeof(TT2ExecFrame) <= 22, "TT2ExecFrame size drift");
 static_assert(sizeof(TT2ExecState) <= 164, "TT2ExecState size drift");
-static_assert(sizeof(TT2Runtime) <= 2328, "TT2Runtime size drift");
+static_assert(sizeof(TT2Runtime) <= 5900, "TT2Runtime size drift");
 
 // Active execution context accessors — resolve through the exec stack.
 // depth must be > 0 (set by runScript or future nested execution).
