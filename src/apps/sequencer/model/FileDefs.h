@@ -10,6 +10,7 @@ enum class FileType : uint8_t {
     UserScale   = 1,
     TeletypeScript = 2,
     TeletypeTrack = 3,
+    TeletypeV2Program = 4,
     Settings    = 255
 };
 

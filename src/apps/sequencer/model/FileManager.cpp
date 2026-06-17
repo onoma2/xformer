@@ -1,6 +1,9 @@
 #include "FileManager.h"
 #include "ProjectVersion.h"
 #include "TeletypeTrack.h"
+#include "TT2Track.h"
+
+#include "engine/TT2SceneSerializer.h"
 
 #include "core/utils/StringBuilder.h"
 #include "core/fs/FileSystem.h"
@@ -38,6 +41,7 @@ FileTypeInfo fileTypeInfos[] = {
     { "SCALES", "SCA" },
     { "TELS", "TXT" },
     { "TELT", "TXT" },
+    { "TT2", "TXT" },
 };
 
 static void slotPath(StringBuilder &str, FileType type, int slot) {
@@ -355,6 +359,64 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, int slot) {
     return readFile(FileType::TeletypeTrack, slot, [&] (const char *path) {
         return readTeletypeTrack(track, path);
     });
+}
+
+namespace {
+// Single staging program for atomic TT2 scene load — parked in SRAM, not on the
+// file-task stack (the explicit fix for the TT1 file-stack mess). Swapped into
+// the live track only on a clean parse.
+TeletypeProgram tt2StagingProgram;
+
+void tt2FileWrite(void *ctx, const char *data, size_t len) {
+    static_cast<fs::FileWriter *>(ctx)->write(data, len);
+}
+int tt2FileRead(void *ctx) {
+    char ch = '\0';
+    return static_cast<fs::FileReader *>(ctx)->read(&ch, 1) == fs::OK
+        ? int(static_cast<unsigned char>(ch)) : -1;
+}
+}
+
+fs::Error FileManager::writeTt2Program(const TT2Track &track, const char *name, int slot) {
+    return writeFile(FileType::TeletypeV2Program, slot, [&] (const char *path) {
+        return writeTt2Program(track, name, path);
+    });
+}
+
+fs::Error FileManager::readTt2Program(TT2Track &track, int slot) {
+    return readFile(FileType::TeletypeV2Program, slot, [&] (const char *path) {
+        return readTt2Program(track, path);
+    });
+}
+
+fs::Error FileManager::writeTt2Program(const TT2Track &track, const char *name, const char *path) {
+    fs::FileWriter fileWriter(path);
+    if (fileWriter.error() != fs::OK) {
+        return fileWriter.error();
+    }
+    // Leading NAME line for the slot browser; the deserializer ignores any
+    // leading non-#-section lines.
+    const char *safeName = (name && name[0]) ? name : "TT2";
+    FixedStringBuilder<64> nameLine("NAME %s\n", safeName);
+    fileWriter.write(static_cast<const char *>(nameLine), std::strlen(nameLine));
+    tt2SerializeScene(track.program(), tt2FileWrite, &fileWriter);
+    return fileWriter.finish();
+}
+
+fs::Error FileManager::readTt2Program(TT2Track &track, const char *path) {
+    fs::FileReader fileReader(path);
+    if (fileReader.error() != fs::OK) {
+        return fileReader.error();
+    }
+    bool ok = tt2DeserializeScene(tt2StagingProgram, tt2FileRead, &fileReader);
+    fs::Error error = fileReader.finish();
+    if (error == fs::OK && !ok) {
+        error = fs::INVALID_DATA;
+    }
+    if (error == fs::OK) {
+        track.program() = tt2StagingProgram;  // atomic swap on clean parse
+    }
+    return error;
 }
 
 fs::Error FileManager::writeProject(const Project &project, const char *path) {
@@ -1217,6 +1279,28 @@ void FileManager::slotInfo(FileType type, int slot, SlotInfo &info) {
 
             if (info.name[0] == '\0') {
                 std::strncpy(info.name, name, sizeof(info.name));
+            }
+            info.name[sizeof(info.name) - 1] = '\0';
+            info.used = true;
+        } else if (type == FileType::TeletypeV2Program) {
+            FixedStringBuilder<9> fallback("T2%03d", slot + 1);
+            info.name[0] = '\0';
+
+            char line[64] = {};
+            if (readFirstLine(path, line, sizeof(line))) {
+                trimRight(line);
+                const char *text = skipSpace(line);
+                if (std::strncmp(text, "NAME ", 5) == 0) {
+                    text = skipSpace(text + 5);
+                    if (*text) {
+                        std::strncpy(info.name, text, sizeof(info.name) - 1);
+                        info.name[sizeof(info.name) - 1] = '\0';
+                    }
+                }
+            }
+
+            if (info.name[0] == '\0') {
+                std::strncpy(info.name, fallback, sizeof(info.name));
             }
             info.name[sizeof(info.name) - 1] = '\0';
             info.used = true;
