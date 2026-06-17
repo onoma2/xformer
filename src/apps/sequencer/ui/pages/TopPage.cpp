@@ -232,8 +232,8 @@ void TopPage::setTrackView(TrackView view) {
         setMainPage(pages.track);
         break;
     case Track::TrackMode::TeletypeV2:
-        // No TT2 track-config list model yet (I/O grid deferred) — open the script editor.
-        setMainPage(pages.teletypeScriptView);
+        // Page+S2 (Track) — TT2 I/O config page (script/pattern live on Sequence).
+        setMainPage(pages.tt2IoConfig);
         break;
     case Track::TrackMode::Stochastic:
         // Page+S2 (Track) — Stochastic's analog of the generic track list-model.

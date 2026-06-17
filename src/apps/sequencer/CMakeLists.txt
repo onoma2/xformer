@@ -162,6 +162,7 @@ set(sources
     ui/pages/TeletypeEditPage.cpp
     ui/pages/TeletypePatternViewPage.cpp
     ui/pages/TeletypeScriptViewPage.cpp
+    ui/pages/TT2IoConfigPage.cpp
     ui/pages/UserScalePage.cpp
     # ui/models
     ui/model/AccumulatorListModel.h
