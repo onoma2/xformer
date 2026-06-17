@@ -82,4 +82,28 @@ UNIT_TEST("TeletypeV2Function") {
         TT2OutputState output = {}; init(output);
         expectEqual(int(evalProg("$F 2", runtime, output, program)), 0, "no FR -> 0");
     }
+
+    CASE("hw_parity_SCRIPT_reaches_metro_and_init") {
+        // Full teletype: SCRIPT 1..8 = numbered, SCRIPT 9 = Metro, SCRIPT 10 = Init.
+        TeletypeProgram program; init(program);
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        writeLine(program.scripts[7], 0, "A 8");                 // numbered 8 (idx 7)
+        program.scripts[7].length = 1;
+        writeLine(program.scripts[TT2_METRO_SCRIPT], 0, "B 9");  // Metro (idx 8) <- SCRIPT 9
+        program.scripts[TT2_METRO_SCRIPT].length = 1;
+        writeLine(program.scripts[TT2_INIT_SCRIPT], 0, "X 10");  // Init  (idx 9) <- SCRIPT 10
+        program.scripts[TT2_INIT_SCRIPT].length = 1;
+        auto runCmd = [&](const char *text) {
+            tele_command_t src = {}; char err[TELE_ERROR_MSG_LENGTH] = {};
+            parse(text, &src, err);
+            TT2Command cmd = {}; lowerCommand(src, cmd);
+            return evaluateCommand(cmd, runtime, output, &program);
+        };
+        runCmd("SCRIPT 8");   expectEqual(int(runtime.variables.a), 8,  "SCRIPT 8 -> numbered 8");
+        runCmd("SCRIPT 9");   expectEqual(int(runtime.variables.b), 9,  "SCRIPT 9 -> Metro");
+        runCmd("SCRIPT 10");  expectEqual(int(runtime.variables.x), 10, "SCRIPT 10 -> Init");
+        auto r = runCmd("SCRIPT 11");
+        expectTrue(r.error == TT2EvalError::OutOfRange, "SCRIPT 11 rejected (only 10 editable)");
+    }
 }

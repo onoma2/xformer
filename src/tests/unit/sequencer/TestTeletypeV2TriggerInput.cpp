@@ -38,4 +38,16 @@ UNIT_TEST("TeletypeV2TriggerInput") {
         expectEqual(int(p.triggerSource[2]), int(TT2TriggerSource::CvIn3), "TI2 -> CvIn3");
         expectEqual(int(p.triggerSource[3]), int(TT2TriggerSource::CvIn4), "TI3 -> CvIn4");
     }
+
+    CASE("eight_inputs_fire_scripts_0_to_7") {
+        // Original-teletype parity: 8 trigger inputs -> scripts 0..7. The engine
+        // loop fires triggerScript(i) for each set bit i, so an 8-wide rising
+        // edge mask covers all numbered scripts.
+        expectEqual(TT2_TRIGGER_INPUT_COUNT, 8, "8 trigger inputs");
+        bool prev[TT2_TRIGGER_INPUT_COUNT] = {};
+        bool now[8] = { true, true, true, true, true, true, true, true };
+        expectEqual(int(tt2RisingEdges(now, prev, 8)), 0xFF, "all 8 rise -> bits 0..7");
+        bool held[8] = { true, true, true, true, true, true, true, true };
+        expectEqual(int(tt2RisingEdges(held, prev, 8)), 0x00, "held high does not refire");
+    }
 }
