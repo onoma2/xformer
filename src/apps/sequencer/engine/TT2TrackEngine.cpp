@@ -59,7 +59,7 @@ bool TT2TrackEngine::inputState(uint8_t index) const {
 }
 
 // Sample the trigger inputs and fire the matching script on each rising edge.
-// TI i -> script i (0-3); the metro (4) and init (5) scripts are reserved and
+// TI i -> script i (0-7); the metro (8) and init (9) scripts are reserved and
 // never trigger-driven. A muted input (variables.mutes bit) still tracks its
 // edge (no backlog on unmute) but does not fire. Latches the live level for STATE.
 void TT2TrackEngine::updateInputTriggers() {
