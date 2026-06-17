@@ -2202,6 +2202,21 @@ static void opLfoC(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     }
 }
 
+// PRINT / PRT — 16-slot dashboard value store in the runtime (ephemeral, like
+// the TT1-track g_dashboardValues). PRINT n x writes slot n (1-based), PRINT n
+// reads it. Pure runtime state — no host. PRT is an alias.
+static void opPrint(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, TT2_PRINT_SLOT_COUNT)) return;
+    if (isSet && stackSize >= 1) {
+        int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+        runtime.variables.dashboard[idx] = v;
+    } else {
+        pushStack(stack, stackSize, runtime.variables.dashboard[idx], error);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // MIDI query ops (MI.*) — read the runtime MIDI buffer. Indexed ops read the
 // active frame's I loop var (1-based), matching upstream teletype/src/ops/midi.c.
@@ -4137,6 +4152,9 @@ namespace {
             table[E_OP_LFO_C] = opLfoC;
             table[E_OP_LFO_A] = opLfoA;
             table[E_OP_LFO_O] = opLfoO;
+            // PRINT/PRT dashboard value store (runtime).
+            table[E_OP_PRINT] = opPrint;
+            table[E_OP_PRT]   = opPrint;
             // E_OP_G_O / E_OP_G_BAR / E_OP_G_B / E_OP_G_R left nullptr ->
             // UnsupportedOp (no live GeodeConfig field; see Geode ops comment).
             table[E_OP_MI_SYM_DOLLAR]      = opMiDollar;

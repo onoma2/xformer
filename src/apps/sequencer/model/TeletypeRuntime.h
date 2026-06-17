@@ -16,6 +16,7 @@ static constexpr int TT2_Q_LENGTH         = 64;
 static constexpr int TT2_EXEC_DEPTH       = 8;
 static constexpr int TT2_NB_SCALES        = 16;
 static constexpr int TT2_TRIGGER_INPUTS   = 8;
+static constexpr int TT2_PRINT_SLOT_COUNT = 16;  // PRINT/PRT dashboard slots
 
 struct TT2RuntimeCommand {
     uint8_t length;
@@ -30,6 +31,7 @@ struct TT2Variables {
     int16_t cv[TT2_CV_COUNT];
     int16_t cv_off[TT2_CV_COUNT];
     int16_t cv_slew[TT2_CV_COUNT];
+    int16_t dashboard[TT2_PRINT_SLOT_COUNT];  // PRINT/PRT value store (ephemeral)
     int16_t drunk;
     int16_t drunk_max;
     int16_t drunk_min;
@@ -329,7 +331,7 @@ inline void init(TT2Runtime &r) {
 }
 
 // sizeof guards are <= bounds verified on ARM STM32 release builds.
-static_assert(sizeof(TT2Variables) <= 440, "TT2Variables size drift");
+static_assert(sizeof(TT2Variables) <= 472, "TT2Variables size drift");
 static_assert(sizeof(TT2RuntimeCommand) <= 52, "TT2RuntimeCommand size drift");
 static_assert(sizeof(TT2Stack) <= 804, "TT2Stack size drift");
 static_assert(sizeof(TT2DelayEntry) <= 62, "TT2DelayEntry size drift");
@@ -339,7 +341,7 @@ static_assert(sizeof(TT2Metro) <= 14, "TT2Metro size drift");
 static_assert(sizeof(TT2Rng) <= 22, "TT2Rng size drift");
 static_assert(sizeof(TT2ExecFrame) <= 22, "TT2ExecFrame size drift");
 static_assert(sizeof(TT2ExecState) <= 164, "TT2ExecState size drift");
-static_assert(sizeof(TT2Runtime) <= 2296, "TT2Runtime size drift");
+static_assert(sizeof(TT2Runtime) <= 2328, "TT2Runtime size drift");
 
 // Active execution context accessors — resolve through the exec stack.
 // depth must be > 0 (set by runScript or future nested execution).
