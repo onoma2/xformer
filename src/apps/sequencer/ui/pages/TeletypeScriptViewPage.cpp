@@ -904,6 +904,21 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
     }
 
     if (event.ctrl()) {
+        // Ctrl+F1-F8: mute/unmute trigger script; Ctrl+F9: stop/start metro
+        if (keycode >= KeyboardEvent::KeyF1 && keycode <= KeyboardEvent::KeyF8) {
+            if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::TeletypeV2) {
+                _engine.selectedTrackEngine().as<TT2TrackEngine>().toggleScriptMute(keycode - KeyboardEvent::KeyF1);
+            }
+            event.consume();
+            return;
+        }
+        if (keycode == KeyboardEvent::KeyF9) {
+            if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::TeletypeV2) {
+                _engine.selectedTrackEngine().as<TT2TrackEngine>().toggleMetroActive();
+            }
+            event.consume();
+            return;
+        }
         // Ctrl+shortcuts
         switch (keycode) {
         case KeyboardEvent::KeyHome:

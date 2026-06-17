@@ -145,6 +145,22 @@ void TT2TrackEngine::triggerScript(int scriptIndex) {
     _engine.unlock();
 }
 
+void TT2TrackEngine::toggleScriptMute(int scriptIndex) {
+    if (scriptIndex < 0 || scriptIndex >= TT2_TRIGGER_INPUTS) {
+        return;
+    }
+    _engine.lock();
+    _tt2Track.runtime().variables.mutes ^= uint8_t(1 << scriptIndex);
+    _engine.unlock();
+}
+
+void TT2TrackEngine::toggleMetroActive() {
+    _engine.lock();
+    auto &mAct = _tt2Track.runtime().variables.m_act;
+    mAct = mAct ? 0 : 1;
+    _engine.unlock();
+}
+
 // --- TT2Host: live engine / cross-track access for W*/BUS/RT ops ---
 
 int16_t TT2TrackEngine::hostTempo() {
