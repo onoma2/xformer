@@ -367,6 +367,15 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
                 deleteLine();
                 event.consume();
             }
+        } else if (key.isFunction()) {
+            int fn = key.function();
+            if (fn >= 0 && fn < 4) {            // page+F1..F4 -> S5..S8 (indices 4..7)
+                setScriptIndex(4 + fn);
+                event.consume();
+            } else if (fn == 4) {               // page+F5 -> Init
+                setScriptIndex(TT2_INIT_SCRIPT);
+                event.consume();
+            }
         }
         return;
     }
