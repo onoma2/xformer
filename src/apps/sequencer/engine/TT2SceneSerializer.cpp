@@ -4,6 +4,7 @@
 #include "TT2ScriptLoader.h"   // setScriptCommand, parseLine (pulls Types.h first)
 
 #include "model/Types.h"
+#include "model/Scale.h"
 
 #include <cstring>
 #include <cstdio>
@@ -196,10 +197,20 @@ bool tt2DeserializeScene(TeletypeProgram &p, Tt2SceneRead rd, void *c) {
                     if (parseInts(line, v, 4) < 4) {
                         ok = false;
                     } else {
-                        p.cvOutputRange[coIdx] = Types::VoltageRange(v[0]);
-                        p.cvOutputQuantizeScale[coIdx] = int8_t(v[1]);
-                        p.cvOutputOffset[coIdx] = int16_t(v[2]);
-                        p.cvOutputRootNote[coIdx] = int8_t(v[3]);
+                        // Clamp persisted shaping to valid ranges — a hand-edited or
+                        // corrupt scene must not feed out-of-bounds indices into the
+                        // live output path (voltageRangeInfo / Scale::get).
+                        long range = v[0];
+                        if (range < 0 || range >= long(Types::VoltageRange::Last)) {
+                            range = long(Types::VoltageRange::Bipolar5V);
+                        }
+                        long scale = v[1] < -1 ? -1 : (v[1] >= Scale::Count ? Scale::Count - 1 : v[1]);
+                        long offset = v[2] < -500 ? -500 : (v[2] > 500 ? 500 : v[2]);
+                        long root = v[3] < -1 ? -1 : (v[3] > 11 ? 11 : v[3]);
+                        p.cvOutputRange[coIdx] = Types::VoltageRange(range);
+                        p.cvOutputQuantizeScale[coIdx] = int8_t(scale);
+                        p.cvOutputOffset[coIdx] = int16_t(offset);
+                        p.cvOutputRootNote[coIdx] = int8_t(root);
                     }
                     ++coIdx;
                 }

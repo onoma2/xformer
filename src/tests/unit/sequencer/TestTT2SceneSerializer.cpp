@@ -2,6 +2,7 @@
 
 #include "engine/TT2SceneSerializer.h"
 #include "engine/TT2ScriptLoader.h"   // loadScriptText, init(program) (pulls Types.h first)
+#include "model/Scale.h"
 
 #include <string>
 
@@ -117,6 +118,20 @@ UNIT_TEST("TT2SceneSerializer") {
         std::string bad = "#CO\nnot numbers here\n";
         TeletypeProgram b;
         expectTrue(!deserialize(bad, b), "malformed numeric row -> false");
+    }
+
+    CASE("co_out_of_range_values_clamped") {
+        // Hand-edited/corrupt #CO must not produce an out-of-bounds VoltageRange
+        // or quantize index that the live output path would dereference.
+        std::string bad =
+            "#1\nA 1\n"
+            "#CO\n255 99 9999 100\n";
+        TeletypeProgram b;
+        expectTrue(deserialize(bad, b), "loads (clamped, not rejected)");
+        expectTrue(int(b.cvOutputRange[0]) < int(Types::VoltageRange::Last), "range clamped in bounds");
+        expectTrue(int(b.cvOutputQuantizeScale[0]) < Scale::Count, "scale clamped in bounds");
+        expectTrue(int(b.cvOutputOffset[0]) <= 500, "offset clamped");
+        expectTrue(int(b.cvOutputRootNote[0]) <= 11, "root clamped");
     }
 
     CASE("empty_program_round_trips") {

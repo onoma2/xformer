@@ -16,6 +16,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
+#include <new>
 
 extern "C" {
 #include "teletype.h"
@@ -364,8 +365,9 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, int slot) {
 namespace {
 // TT1 track-load and TT2 scene-load never run together on the single file task,
 // so they share one scratch region (no net .bss growth from TT2 staging — the
-// TT1 clip buffers already cover a full TeletypeProgram). TT2 parses into
-// .tt2 and swaps into the live track only on a clean parse (atomic).
+// TT1 clip buffers already cover a full TeletypeProgram). Each load path
+// placement-news its own union member on entry to make it the active member;
+// TT2 parses into .tt2 and swaps into the live track only on a clean parse.
 struct Tt1LoadScratch {
     TeletypeTrack::PatternSlot activeClip;
     TeletypeTrack::PatternSlot activeClipBackup;
@@ -430,9 +432,15 @@ fs::Error FileManager::readTt2Program(TT2Track &track, const char *path) {
     if (fileReader.error() != fs::OK) {
         return fileReader.error();
     }
-    TeletypeProgram &staging = gTeletypeLoadScratch.tt2;
+    // Activate the tt2 member of the shared scratch union before use.
+    TeletypeProgram &staging = *new (&gTeletypeLoadScratch.tt2) TeletypeProgram();
     bool ok = tt2DeserializeScene(staging, tt2FileRead, &fileReader);
     fs::Error error = fileReader.finish();
+    // The streaming read intentionally drains to EOF; clean EOF is success, not
+    // a failure. Preserve any real I/O error (and parse failure) instead.
+    if (error == fs::END_OF_FILE) {
+        error = fs::OK;
+    }
     if (error == fs::OK && !ok) {
         error = fs::INVALID_DATA;
     }
@@ -824,6 +832,10 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
     if (fileReader.error() != fs::OK) {
         return fileReader.error();
     }
+
+    // Activate the tt1 member of the shared scratch union (the ttActiveClip/etc.
+    // aliases reference into it). TT2 scene-load activates tt2 instead.
+    new (&gTeletypeLoadScratch.tt1) Tt1LoadScratch();
 
     // Snapshot active clip and shared S1-S3 for rollback.
     // Do NOT call track.clear() — we must preserve inactive clip and active clip index.
