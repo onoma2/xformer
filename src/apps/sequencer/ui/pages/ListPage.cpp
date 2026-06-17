@@ -325,14 +325,7 @@ void ListPage::keyboard(KeyboardEvent &event) {
 }
 
 void ListPage::editSelectedRow(int value, bool shift) {
-    const bool isTeletype = _project.selectedTrack().trackMode() == Track::TrackMode::Teletype;
-    if (isTeletype) {
-        _engine.lock();
-    }
     _listModel->edit(_selectedRow, 1, value, shift);
-    if (isTeletype) {
-        _engine.unlock();
-    }
 }
 
 void ListPage::setSelectedRow(int selectedRow) {

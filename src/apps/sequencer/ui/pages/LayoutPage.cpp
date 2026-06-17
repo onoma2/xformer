@@ -68,41 +68,6 @@ void LayoutPage::setMode(Mode mode) {
     _mode = mode;
 }
 
-void LayoutPage::startTeletypeOutputAssignments(const std::array<int, CONFIG_TRACK_COUNT> &tracks, int count) {
-    _pendingTeletypeTracks = tracks;
-    _pendingTeletypeCount = count;
-    _pendingTeletypeIndex = 0;
-    promptNextTeletypeOutputAssignment();
-}
-
-void LayoutPage::promptNextTeletypeOutputAssignment() {
-    if (_pendingTeletypeIndex >= _pendingTeletypeCount) {
-        showMessage("LAYOUT CHANGED");
-        return;
-    }
-
-    int trackIndex = _pendingTeletypeTracks[_pendingTeletypeIndex];
-    int startOut = trackIndex + 1;
-    int endOut = std::min(trackIndex + 4, CONFIG_CHANNEL_COUNT);
-    _teletypePromptText.reset();
-    _teletypePromptText("T%d T9Type ASSIGN %d-%d?", trackIndex + 1, startOut, endOut);
-    _manager.pages().confirmation.show(_teletypePromptText, [this, trackIndex] (bool result) {
-        if (result) {
-            assignOutputsForTeletypeTrack(trackIndex);
-        }
-        ++_pendingTeletypeIndex;
-        promptNextTeletypeOutputAssignment();
-    });
-}
-
-void LayoutPage::assignOutputsForTeletypeTrack(int trackIndex) {
-    int endIndex = std::min(trackIndex + 3, CONFIG_CHANNEL_COUNT - 1);
-    for (int outputIndex = trackIndex; outputIndex <= endIndex; ++outputIndex) {
-        _project.setGateOutputTrack(outputIndex, trackIndex);
-        _project.setCvOutputTrack(outputIndex, trackIndex);
-    }
-}
-
 void LayoutPage::commitLayout() {
     if (_mode == Mode::TrackMode && !_trackModeListModel.sameAsProject(_project)) {
         _manager.pages().confirmation.show("ARE YOU SURE?", [this] (bool result) {
@@ -110,26 +75,9 @@ void LayoutPage::commitLayout() {
                 setEdit(false);
                 // we are about to change track engines -> lock the engine to avoid inconsistent state
                 _engine.lock();
-                Track::TrackMode oldModes[CONFIG_TRACK_COUNT];
-                std::array<int, CONFIG_TRACK_COUNT> teletypeTracks{};
-                int teletypeCount = 0;
-                for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
-                    oldModes[trackIndex] = _project.track(trackIndex).trackMode();
-                }
                 _trackModeListModel.toProject(_project);
-                for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
-                    Track::TrackMode newMode = _project.track(trackIndex).trackMode();
-                    if (oldModes[trackIndex] != newMode && newMode == Track::TrackMode::Teletype) {
-                        _project.track(trackIndex).teletypeTrack().requestBootScriptRun();
-                        teletypeTracks[teletypeCount++] = trackIndex;
-                    }
-                }
                 _engine.unlock();
-                if (teletypeCount > 0) {
-                    startTeletypeOutputAssignments(teletypeTracks, teletypeCount);
-                } else {
-                    showMessage("LAYOUT CHANGED");
-                }
+                showMessage("LAYOUT CHANGED");
             }
         });
     }

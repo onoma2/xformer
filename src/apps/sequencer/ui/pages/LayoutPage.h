@@ -38,17 +38,10 @@ private:
     }
 
     void setMode(Mode mode);
-    void startTeletypeOutputAssignments(const std::array<int, CONFIG_TRACK_COUNT> &tracks, int count);
-    void promptNextTeletypeOutputAssignment();
-    void assignOutputsForTeletypeTrack(int trackIndex);
     void commitLayout();
 
     Mode _mode = Mode::TrackMode;
     TrackModeListModel _trackModeListModel;
     GateOutputListModel _gateOutputListModel;
     CvOutputListModel _cvOutputListModel;
-    FixedStringBuilder<32> _teletypePromptText;
-    std::array<int, CONFIG_TRACK_COUNT> _pendingTeletypeTracks{};
-    int _pendingTeletypeCount = 0;
-    int _pendingTeletypeIndex = 0;
 };

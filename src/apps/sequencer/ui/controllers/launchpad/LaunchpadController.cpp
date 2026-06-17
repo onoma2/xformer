@@ -326,8 +326,6 @@ void LaunchpadController::sequenceUpdateNavigation() {
         _sequence.navigation.bottom = (range.min - 7) / 8;
         break;
     }
-    case Track::TrackMode::Teletype:
-        break;
     default:
         break;
     }
@@ -355,8 +353,6 @@ void LaunchpadController::sequenceSetLayer(int row, int col) {
         }
         break;
     }
-    case Track::TrackMode::Teletype:
-        break;
     default:
         break;
     }
@@ -369,8 +365,6 @@ void LaunchpadController::sequenceSetFirstStep(int step) {
         break;
     case Track::TrackMode::Curve:
         _project.selectedCurveSequence().setFirstStep(step);
-        break;
-    case Track::TrackMode::Teletype:
         break;
     default:
         break;
@@ -385,8 +379,6 @@ void LaunchpadController::sequenceSetLastStep(int step) {
     case Track::TrackMode::Curve:
         _project.selectedCurveSequence().setLastStep(step);
         break;
-    case Track::TrackMode::Teletype:
-        break;
     default:
         break;
     }
@@ -400,8 +392,6 @@ void LaunchpadController::sequenceSetRunMode(int mode) {
     case Track::TrackMode::Curve:
         _project.selectedCurveSequence().setRunMode(Types::RunMode(mode));
         break;
-    case Track::TrackMode::Teletype:
-        break;
     default:
         break;
     }
@@ -411,8 +401,6 @@ void LaunchpadController::sequenceToggleStep(int row, int col) {
     switch (_project.selectedTrack().trackMode()) {
     case Track::TrackMode::Note:
         sequenceToggleNoteStep(row, col);
-        break;
-    case Track::TrackMode::Teletype:
         break;
     default:
         break;
@@ -442,8 +430,6 @@ void LaunchpadController::sequenceEditStep(int row, int col) {
         break;
     case Track::TrackMode::Curve:
         sequenceEditCurveStep(row, col);
-        break;
-    case Track::TrackMode::Teletype:
         break;
     default:
         break;
@@ -501,8 +487,6 @@ void LaunchpadController::sequenceDrawLayer() {
             setGridLed(item.row, item.col, selected ? colorYellow() : colorGreen());
         }
         break;
-    case Track::TrackMode::Teletype:
-        break;
     default:
         break;
     }
@@ -520,8 +504,6 @@ void LaunchpadController::sequenceDrawStepRange(int highlight) {
         drawRange(sequence.firstStep(), sequence.lastStep(), highlight == 0 ? sequence.firstStep() : sequence.lastStep());
         break;
     }
-    case Track::TrackMode::Teletype:
-        break;
     default:
         break;
     }
@@ -537,8 +519,6 @@ void LaunchpadController::sequenceDrawRunMode() {
         drawEnum(_project.selectedCurveSequence().runMode());
         break;
     }
-    case Track::TrackMode::Teletype:
-        break;
     default:
         break;
     }
@@ -551,8 +531,6 @@ void LaunchpadController::sequenceDrawSequence() {
         break;
     case Track::TrackMode::Curve:
         sequenceDrawCurveSequence();
-        break;
-    case Track::TrackMode::Teletype:
         break;
     default:
         break;
@@ -649,8 +627,6 @@ void LaunchpadController::patternDraw() {
                     if (track.curveTrack().sequence(patternIndex).isEdited()) {
                         setGridLed(row, trackIndex, colorRed(1));
                     }
-                    break;
-                case Track::TrackMode::Teletype:
                     break;
                 default:
                     break;

@@ -139,12 +139,6 @@ void TopPage::keyPress(KeyPressEvent &event) {
         }
     }
 
-    if (key.pageModifier() && key.isTrack() && key.track() == 6) {
-        _engine.panicTeletype();
-        showMessage("TT PANIC");
-        event.consume();
-    }
-
     if (key.isPlay()) {
         if (key.pageModifier()) {
             _engine.toggleRecording();
@@ -228,7 +222,6 @@ void TopPage::setTrackView(TrackView view) {
     case Track::TrackMode::Curve:
     case Track::TrackMode::MidiCv:
     case Track::TrackMode::Tuesday:
-    case Track::TrackMode::Teletype:
         setMainPage(pages.track);
         break;
     case Track::TrackMode::TeletypeV2:
@@ -321,7 +314,6 @@ void TopPage::setSequenceView(SequenceView view) {
             break;
         }
         break;
-    case Track::TrackMode::Teletype:
     case Track::TrackMode::TeletypeV2:
         setMainPage(pages.teletypeScriptView);
         break;
@@ -359,7 +351,6 @@ void TopPage::setSequenceEditPage() {
     case Track::TrackMode::Indexed:
         setMainPage(pages.indexedSequenceEdit);
         break;
-    case Track::TrackMode::Teletype:
     case Track::TrackMode::TeletypeV2:
         setMainPage(pages.teletypeScriptView);
         break;

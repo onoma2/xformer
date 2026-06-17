@@ -160,7 +160,6 @@ set(sources
     ui/pages/TextInputPage.cpp
     ui/pages/TopPage.cpp
     ui/pages/TrackPage.cpp
-    ui/pages/TeletypeEditPage.cpp
     ui/pages/TeletypePatternViewPage.cpp
     ui/pages/TeletypeScriptViewPage.cpp
     ui/pages/TT2IoConfigPage.cpp
@@ -172,7 +171,6 @@ set(sources
     ui/model/IndexedTrackListModel.h
     ui/model/NoteSequenceListModel.cpp
     ui/model/StochasticPerformanceListModel.cpp
-    ui/model/TeletypeTrackListModel.h
     # ui/painters
     ui/painters/SequencePainter.cpp
     ui/painters/SongPainter.cpp
