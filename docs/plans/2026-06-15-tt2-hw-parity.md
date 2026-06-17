@@ -12,9 +12,9 @@ depth: standard
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Bring a single TT2 program to full original-teletype script parity — **10 editable scripts** (8 numbered + Metro + Init) and a **64-deep delay queue** — verified to still fit one track slot.
+**Goal:** Bring a single TT2 program to full original-teletype script parity — **10 editable scripts** (8 numbered + Metro + Init), **8 trigger inputs → scripts 1–8**, and a **64-deep delay queue** — verified to fit one track slot (measured: +896 B `.bss`, ~2.1 KB headroom).
 
-**Architecture:** Pure capacity bump of the existing native TT2 model. No new mechanism: raise `TT2_SCRIPT_COUNT` 6→10, `TT2_DELAY_DEPTH` 8→64, the Metro/Init indices, and the `static_assert` size gates; extend the editor's script navigation to 10. The script-indexed runtime arrays (`every[][]`, `j`, `k`, `scriptLastMs`) and the delay queue grow with the constants. Delay is a **runtime** mechanism (one copy), so it is a fixed cost, not per-scene. Live + Delay execution already exist (`runLiveCommand`, `tt2AdvanceDelays`).
+**Architecture:** Pure capacity bump of the existing native TT2 model. No new mechanism: raise `TT2_SCRIPT_COUNT` 6→10, `TT2_TRIGGER_INPUT_COUNT` 4→8 (original-Teletype 8 trig → 8 scripts; trigger inputs are configurable sources, not jacks), `TT2_DELAY_DEPTH` 8→64, the Metro/Init indices, and the `static_assert` size gates; extend the editor's script navigation to 10. The script-indexed runtime arrays (`every[][]`, `j`, `k`, `scriptLastMs`) and the delay queue grow with the constants. Delay is a **runtime** mechanism (one copy), so it is a fixed cost, not per-scene. Live + Delay execution already exist (`runLiveCommand`, `tt2AdvanceDelays`).
 
 **Tech Stack:** C++17, STM32F405 firmware. Unit tests under `build/` (UnitTest harness + ctest). Sim under `build/sim/debug`. ARM size probe under `build/stm32/release`.
 
@@ -26,23 +26,23 @@ depth: standard
 - **Upstream script model** (`teletype/src/script.h`): `REGULAR_SCRIPT_COUNT = 8`, `METRO_SCRIPT = 8`, `INIT_SCRIPT = 9`, `EDITABLE_SCRIPT_COUNT = 10`; Delay + Live are internal. `SCRIPT_MAX_COMMANDS = 6` lines/script (TT2 already matches). `teletype/src/state.h:24` `DELAY_SIZE = 64` (TT2 currently 8 — the gap), `STACK_SIZE = 16` / `Q_LENGTH = 64` (TT2 already matches).
 - **Scene bank is OUT of scope here** — that is the quad reshape in `docs/plans/2026-06-14-004-feat-tt2-supertrack-design.md`. This plan is the *single-program* parity bump that fits one slot.
 
-### Measured sizes (native; the plan's numbers)
+### Measured sizes — full combined parity (measured 2026-06-17)
 
-Host (native) sizes, re-measured 2026-06-17 — **includes the PRINT `dashboard[16]` (+32 B)** added this session.
+Scope of "after parity": 10 scripts + 64-deep delay + **8 trigger inputs** (4→8), on top of the now-committed PRINT `dashboard[16]` and per-output shaping fields. **Numbers are spike-measured** (constants bumped, built host + STM32 release, reverted), not estimated.
 
 | item | now | after parity |
 |---|---|---|
 | `TT2Script` | 302 | 302 |
-| `TT2EveryCount` | 6 | 6 |
-| `TeletypeProgram` (scripts×302 + 4 tt-patterns + hdr) | 2386 (6 scripts) | **~3594** (10 scripts) |
-| `TT2DelayEntry` | 60 | 60 |
-| `TT2DelayQueue` (entries×60 + count) | 482 (×8) | **~3842** (×64), **+3360** |
-| `TT2Variables` (incl `dashboard[16]`) | 472 | **~488** (+`j[10]`/`k[10]`) |
-| runtime script arrays (`every[10][6]`/`j`/`k`/`scriptLastMs`, 6→10) | — | **+~232** |
-| `TT2Runtime` | 2328 | **~5864** |
-| **`TT2Track`** (program + runtime + idx) | 4720 (~50% slot) | **~9464** |
+| `TeletypeProgram` (scripts + patterns + `triggerSource[8]` + shaping + hdr) | 2426 (6 scripts, 4 trig) | **3638** (10 scripts, 8 trig) |
+| `TT2DelayQueue` (entries×60 + count) | 482 (×8) | **3842** (×64) |
+| `TT2Variables` (incl `dashboard[16]`, `j[10]`/`k[10]`) | 472 | **~488** |
+| `TT2Runtime` (delay + script arrays + `inputLevel[8]`) | 2328 | **5872** |
+| **`TT2Track`** (program + runtime + idx) | 4760 | **9512** |
+| `Track` union (largest arm) | 9496 (`NoteTrack` gate) | **9536** (TT2Track now largest) |
 
-**THE GATE (key evaluation):** the `Track` union slot is sized to its largest member. Host: `sizeof(Track) = 9496`, `NoteTrack = 9468` (the current host gate), `CurveTrack = 9200`. Full-parity `TT2Track ≈ 9464` sits **~4 B under the host gate** (was ~36 before the PRINT dashboard add) — it still fits on host, but the slack is essentially gone. The real gate is **ARM**, where `CurveTrack ~10,092` / gate ~10,120 (`PROJECT.md` 2026-06-13); Task 3 measures ARM `sizeof(TT2Track)` directly. If `TT2Track` exceeds the ARM gate, **every one of the 8 slots inflates** (`Project._tracks` grows by `8 × overflow`). Given the thin host margin, **expect the `TT2_DELAY_DEPTH` fallback (Task 3, e.g. 64→48 saves ~960 B) to be the likely outcome** if ARM measures over. **Task 3 is the hard measurement gate.** The size asserts are part of the TDD here: they fail loudly the moment a bump overflows a bound.
+**Trigger bump (4→8):** `triggerSource[8]` (+4 B program), `inputLevel[8]` (+4 B runtime), engine `_prevInputState[8]` (CCMRAM). `TT2_TRIGGER_INPUTS`/`script_pol[8]` were already 8.
+
+**THE GATE — measured, it fits.** Full parity `TT2Track = 9512` exceeds the host `NoteTrack` gate (9468), so `TT2Track` becomes the largest `Track` arm and the union grows (`Track` 9496→9536) — `Project._tracks[8]` inflates. **But the STM32 release links clean, no region overflow:** `.bss` 113,216 → **114,112 (+896 B)**, `.data` and `.ccmram_bss` flat. `.data+.bss` = **120,684 B (~117.9 KB)**, ~2.1 KB under the 120 KB warning. **No `TT2_DELAY_DEPTH` fallback needed** — 64-deep delay + 8 triggers all fit. The ~2.1 KB remaining is the real headroom budget for anything after this.
 
 ---
 
@@ -101,8 +101,9 @@ static constexpr int TT2_SCRIPT_COUNT        = 10;   // 8 numbered + Metro + Ini
 // ...
 static constexpr int TT2_METRO_SCRIPT     = 8;
 static constexpr int TT2_INIT_SCRIPT      = 9;
+static constexpr int TT2_TRIGGER_INPUT_COUNT = 8;   // 8 trigger inputs -> scripts 1-8 (was 4)
 ```
-(`TT2_TRIGGER_SCRIPT_0 = 0`, `TT2_TRIGGER_SCRIPT_3 = 3` unchanged — the 4 jack-fired scripts. Scripts 5–8 (indices 4–7) are `SCRIPT`/call/MIDI-fired.) The `init()` loop and `bootScriptIndex = TT2_INIT_SCRIPT` (`:108`) follow automatically.
+**8 trigger inputs (4→8):** matches original Teletype's 8 trig → 8 scripts. TT2 trigger inputs are configurable *sources* (`triggerSource[i]` = CvIn / GateOut / LogicalGate), not 8 physical jacks, so 8 is feasible on Performer. This grows `triggerSource[8]` (+4 B) and `inputLevel[8]` (+4 B); `TT2_TRIGGER_INPUTS`/`script_pol[8]` were already 8. The `init()` loop and `bootScriptIndex = TT2_INIT_SCRIPT` follow automatically.
 
 **Step 4: Bump the program size assert**
 
@@ -190,14 +191,13 @@ int main(){ printf("TT2Track=%zu Track=%zu NoteTrack=%zu CurveTrack=%zu\n",
 EOF
 c++ -std=c++17 -DPLATFORM_SIM -I src/apps/sequencer -I src/core -I src -I src/platform/sim -I teletype/src -I teletype/libavr32/src /tmp/sz.cpp -o /tmp/sz && /tmp/sz; rm -f /tmp/sz /tmp/sz.cpp
 ```
-Expected: `TT2Track ≈ 9464` (host), must be `< NoteTrack (9468)` and `< Track (9496)`.
-**Host margin is now ~4 B** (was 36) — the PRINT `dashboard[16]` added +32 B on 2026-06-17. The host build still fits (TT2Track 9464 < NoteTrack 9468), but the slack is gone; treat the ARM measurement in Step 3 as the real gate, and expect the `TT2_DELAY_DEPTH` fallback to be likely.
+Expected (spike-measured 2026-06-17, full combined): host `TT2Track = 9512`. This **exceeds** `NoteTrack (9468)`, so `TT2Track` becomes the largest `Track` arm and the union grows to **9536** — `Project._tracks[8]` inflates. That's fine: the ARM build (Step 3) was measured to fit. The host gate is no longer a "stay under" target; the ARM `.bss` budget is.
 
 **Step 2: Set the exact assert**
 
 Modify `src/apps/sequencer/model/TT2Track.h:46` to the measured value:
 ```cpp
-static_assert(sizeof(TT2Track) == 9464, "TT2Track size drift");  // <-- exact measured value (incl PRINT dashboard)
+static_assert(sizeof(TT2Track) == 9512, "TT2Track size drift");  // <-- spike-measured (10 scripts + 64 delay + 8 trig + dashboard + shaping)
 ```
 
 **Step 3: GATE — STM32 size verification (hard decision point)**
@@ -207,9 +207,7 @@ Use the **PROJECT.md** measurement rule (there is no `STM32.md`): build the STM3
 Run: `make -C build/stm32/release sequencer 2>&1 | grep -iE "region|overflow|\.bss|\.data|\.ccmram"`
 Then re-probe the ARM `sizeof(TT2Track)` (size-print TU compiled for the target, or read the `.map`).
 
-Decision:
-- **TT2Track ≤ ARM model gate (~10,092 `CurveTrack`, per PROJECT.md 2026-06-13)** → proceed; the `Track` slot is unchanged, no per-track inflation, `Project._tracks` flat.
-- **TT2Track > the gate** → the union grows `8 × overflow`. Either (a) accept the RAM — confirm `.bss`/`.ccmram_bss` still fit the STM32F405 192 KB (128 K + 64 K CCM) budget via the PROJECT.md figures — or (b) reduce `TT2_DELAY_DEPTH` to the largest value that stays under the gate (e.g. 48 = +2400 B instead of +3360) and re-run Tasks 2–3. Record the chosen number here before continuing.
+**Measured outcome (2026-06-17 spike — accept the RAM):** the union does inflate (`TT2Track` 9512 is now the largest arm), but STM32 release **links clean, no overflow**: `.bss` 113,216 → **114,112 (+896 B)**, `.data`/`.ccmram_bss` flat, `.data+.bss` ~117.9 KB (~2.1 KB under the 120 KB warning). So **proceed with full 64-deep delay + 8 triggers — no `TT2_DELAY_DEPTH` fallback.** Re-confirm these exact numbers at execution (they shift if anything else lands first); the fallback (trim `TT2_DELAY_DEPTH` toward 48) only re-enters if a future addition pushes `.data+.bss` past the warning.
 
 **Step 4: Commit**
 
@@ -297,9 +295,9 @@ CASE("hw_parity_SCRIPT_reaches_metro_and_init") {
 Run: `make -C build TestTeletypeV2Function && ctest --test-dir build -R TeletypeV2Function --output-on-failure`
 Expected: PASS with no source change. If `SCRIPT 9/10` fail, the clamp is wrong — confirm it is `>= TT2_SCRIPT_COUNT` (not a stale `>= 8` or `> REGULAR_SCRIPT_COUNT`) and fix.
 
-**Step 3: Confirm jack-firing is unchanged**
+**Step 3: Trigger inputs fire all 8 numbered scripts (4→8)**
 
-Verify `updateInputTriggers` (`TT2TrackEngine.cpp:339`, `fireScript < TT2_SCRIPT_COUNT`) still only fires the **4 jack inputs** to scripts `0..3`. Scripts 5–8/Metro/Init are intentionally `SCRIPT`/call/MIDI-fired, not jack-bound — no change expected.
+With `TT2_TRIGGER_INPUT_COUNT = 8` (Task 1), `updateInputTriggers` (`TT2TrackEngine.cpp`) now samples **8** trigger inputs firing scripts **0..7** — `TI i → script i`, the original-Teletype 8-trig→8-script mapping (was 4 inputs → 0..3). The loop is already bounded by `TT2_TRIGGER_INPUT_COUNT`, so it scales with the constant; verify `_prevInputState`/`inputLevel` are sized `[8]` and `tt2RisingEdges` gets the new count. Metro (8) / Init (9) stay `SCRIPT`/call/MIDI-fired, not trigger-bound. Add a CASE: 8 distinct trigger sources fire scripts 0–7.
 
 **Step 4: Commit**
 
