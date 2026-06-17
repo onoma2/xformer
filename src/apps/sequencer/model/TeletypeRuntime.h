@@ -7,7 +7,7 @@
 #include <cstring>
 
 static constexpr int TT2_STACK_DEPTH      = 16;
-static constexpr int TT2_DELAY_DEPTH      = 8;
+static constexpr int TT2_DELAY_DEPTH      = 64;   // teletype DELAY_SIZE parity
 static constexpr int TT2_RNG_COUNT        = 5;
 static constexpr int TT2_VARIABLE_COUNT   = 20;
 static constexpr int TT2_CV_COUNT         = 8;
@@ -335,7 +335,7 @@ static_assert(sizeof(TT2Variables) <= 496, "TT2Variables size drift");
 static_assert(sizeof(TT2RuntimeCommand) <= 52, "TT2RuntimeCommand size drift");
 static_assert(sizeof(TT2Stack) <= 804, "TT2Stack size drift");
 static_assert(sizeof(TT2DelayEntry) <= 62, "TT2DelayEntry size drift");
-static_assert(sizeof(TT2DelayQueue) <= 484, "TT2DelayQueue size drift");
+static_assert(sizeof(TT2DelayQueue) <= 3850, "TT2DelayQueue size drift");  // 64x60+2 = 3842
 static_assert(sizeof(TT2EveryState) <= 372, "TT2EveryState size drift");
 static_assert(sizeof(TT2Metro) <= 14, "TT2Metro size drift");
 static_assert(sizeof(TT2Rng) <= 22, "TT2Rng size drift");

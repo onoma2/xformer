@@ -146,4 +146,8 @@ CASE("del_g_geometric_intervals") {
     expectEqual(int(f.runtime.delay.count), 0, "third fires at 31ms");
 }
 
+CASE("hw_parity_delay_depth") {
+    expectEqual(TT2_DELAY_DEPTH, 64, "64-deep delay (DELAY_SIZE parity)");
+}
+
 } // UNIT_TEST("TeletypeV2Delay")
