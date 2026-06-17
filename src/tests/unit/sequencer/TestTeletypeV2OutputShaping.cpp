@@ -2,6 +2,7 @@
 
 #include "engine/TeletypeOutputState.h"
 #include "engine/TT2Evaluator.h"
+#include "engine/TT2OutputShaping.h"
 
 #include "model/Types.h"
 
@@ -48,6 +49,23 @@ UNIT_TEST("TeletypeV2OutputShaping") {
             expectEqual(int(p.cvOutputQuantizeScale[i]), -1, "default no quantize");
             expectEqual(int(p.cvOutputRootNote[i]), 0, "default root 0");
         }
+    }
+
+    CASE("hw_parity_output_shaping_applied") {
+        using R = Types::VoltageRange;
+        auto approx = [](float a, float b) { float d = a - b; return (d < 0 ? -d : d) < 1e-3f; };
+        // default: Bipolar5V, no offset, no quantize -> identity
+        expectTrue(approx(Tt2OutputShaping::shapeCv(2.5f, R::Bipolar5V, 0, -1, 0, 0), 2.5f),
+                   "default is identity");
+        // Unipolar5V: base 0V (mid) -> 2.5V
+        expectTrue(approx(Tt2OutputShaping::shapeCv(0.f, R::Unipolar5V, 0, -1, 0, 0), 2.5f),
+                   "0V through Unipolar5V = 2.5V");
+        // offset +1V (100 centivolts)
+        expectTrue(approx(Tt2OutputShaping::shapeCv(0.f, R::Bipolar5V, 100, -1, 0, 0), 1.0f),
+                   "offset +1V");
+        // quantize: chromatic scale 0, 0.10V snaps to 1 semitone (1/12 V)
+        expectTrue(approx(Tt2OutputShaping::shapeCv(0.10f, R::Bipolar5V, 0, 0, 0, 0), 1.f / 12.f),
+                   "0.10V snaps to a semitone");
     }
 
     CASE("cv_slew_zero_snaps") {

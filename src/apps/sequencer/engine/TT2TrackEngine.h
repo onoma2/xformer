@@ -5,6 +5,7 @@
 #include "TT2Runner.h"
 #include "TT2Host.h"
 #include "TeletypeOutputState.h"
+#include "TT2OutputShaping.h"
 
 #include "model/Track.h"
 #include "model/TT2Track.h"
@@ -112,7 +113,11 @@ public:
         if (!(_output.cvDirty & (1 << index))) {
             return 0.f;
         }
-        return rawToVolts(int16_t(_output.cv[index].currentQ >> 8));
+        float v = rawToVolts(int16_t(_output.cv[index].currentQ >> 8));
+        const TeletypeProgram &p = _tt2Track.program();
+        return Tt2OutputShaping::shapeCv(v, p.cvOutputRange[index], p.cvOutputOffset[index],
+            p.cvOutputQuantizeScale[index], p.cvOutputRootNote[index],
+            _model.project().rootNote());
     }
 
     // Execute one script by index against the bound track's program/runtime.
