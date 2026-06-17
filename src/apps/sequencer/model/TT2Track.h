@@ -43,4 +43,4 @@ private:
     friend class Track;
 };
 
-static_assert(sizeof(TT2Track) <= 20000, "TT2Track size drift");  // exact gate set in hw-parity Task 3
+static_assert(sizeof(TT2Track) == 9512, "TT2Track size drift");  // 10 scripts + 64 delay + 8 trig + dashboard + shaping
