@@ -369,11 +369,18 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
             }
         } else if (key.isFunction()) {
             int fn = key.function();
-            if (fn >= 0 && fn < 4) {            // page+F1..F4 -> S5..S8 (indices 4..7)
-                setScriptIndex(4 + fn);
+            if (key.shiftModifier()) {          // shift+page+F1..F4 -> fire S5..S8
+                if (fn >= 0 && fn < kTriggerScriptCount &&
+                    _engine.selectedTrackEngine().trackMode() == Track::TrackMode::TeletypeV2) {
+                    _engine.selectedTrackEngine().as<TT2TrackEngine>().triggerScript(4 + fn);
+                }
                 event.consume();
-            } else if (fn == 4) {               // page+F5 -> Init
-                setScriptIndex(TT2_INIT_SCRIPT);
+            } else if (fn == 4) {               // page+F5 -> live/pattern
+                if (_liveMode) {
+                    setLiveMode(false);
+                } else {
+                    _manager.push(&_manager.pages().teletypePatternView);
+                }
                 event.consume();
             }
         }
@@ -382,40 +389,25 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
 
     if (key.isFunction()) {
         int fn = key.function();
-        if (key.shiftModifier()) {
+        if (key.shiftModifier()) {              // shift+F1..F4 -> fire S1..S4
             if (fn >= 0 && fn < kTriggerScriptCount) {
                 // Guard against race condition - engine may not be rebuilt yet
                 if (_engine.selectedTrackEngine().trackMode() != Track::TrackMode::TeletypeV2) {
                     event.consume();
                     return;
                 }
-                auto &trackEngine = _engine.selectedTrackEngine().as<TT2TrackEngine>();
-                trackEngine.triggerScript(fn);
+                _engine.selectedTrackEngine().as<TT2TrackEngine>().triggerScript(fn);
                 event.consume();
                 return;
             }
         }
-        if (fn == 4) {
-            if (_liveMode) {
-                setLiveMode(false);
-            } else {
-                _manager.push(&_manager.pages().teletypePatternView);
-            }
+        if (fn >= 0 && fn < 4) {                // F1..F4 cycle Sn <-> S(n+4)
+            setScriptIndex(_scriptIndex == fn ? 4 + fn : fn);
             event.consume();
             return;
         }
-        if (fn == 0) {
-            setScriptIndex(0);
-            event.consume();
-            return;
-        }
-        if (fn == 3) {
-            setScriptIndex(_scriptIndex == TT2_METRO_SCRIPT ? TT2_TRIGGER_SCRIPT_3 : TT2_METRO_SCRIPT);
-            event.consume();
-            return;
-        }
-        if (fn >= 0 && fn < kTriggerScriptCount) {
-            setScriptIndex(fn);
+        if (fn == 4) {                          // F5 cycle Metro <-> Init
+            setScriptIndex(_scriptIndex == TT2_METRO_SCRIPT ? TT2_INIT_SCRIPT : TT2_METRO_SCRIPT);
             event.consume();
             return;
         }
