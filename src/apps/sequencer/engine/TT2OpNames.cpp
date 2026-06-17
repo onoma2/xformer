@@ -69,6 +69,7 @@ const char *tt2OpName(int v) {
     case E_OP_M_ACT_A: return "M.ACT.A";
     case E_OP_M_RESET: return "M.RESET";
     case E_OP_M_RESET_A: return "M.RESET.A";
+    case E_OP_M_C: return "M.C";
     case E_OP_P_N: return "P.N";
     case E_OP_P: return "P";
     case E_OP_PN: return "PN";

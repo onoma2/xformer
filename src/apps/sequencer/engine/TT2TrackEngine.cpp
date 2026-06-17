@@ -166,6 +166,9 @@ void TT2TrackEngine::toggleMetroActive() {
 int16_t TT2TrackEngine::hostTempo() {
     return int16_t(std::lround(_engine.tempo()));
 }
+float TT2TrackEngine::metroTempo() const {
+    return _engine.tempo();
+}
 void TT2TrackEngine::hostSetTempo(int16_t bpm) {
     int b = bpm; if (b < 1) b = 1; if (b > 1000) b = 1000;
     _engine.setTempo(float(b));

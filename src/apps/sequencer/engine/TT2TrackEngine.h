@@ -90,7 +90,7 @@ public:
             runtime.clockMs += uint32_t(whole);  // drives TIME / LAST
             if (runtime.metroResetReq) { _metroAccumMs = 0; runtime.metroResetReq = 0; }  // M.RESET
             tt2AdvanceDelays(program, runtime, _output, whole);
-            tt2AdvanceMetro(program, runtime, _output, whole, _metroAccumMs);
+            tt2AdvanceMetro(program, runtime, _output, whole, _metroAccumMs, metroTempo());
         }
     }
 
@@ -203,6 +203,7 @@ private:
     void sampleInputs();
     float cvSourceVolts(TT2CvInputSource source) const;
     void processMidiMessage(const MidiMessage &message);
+    float metroTempo() const;  // live BPM for clock-synced metro (M.C)
 
     TT2Track &_tt2Track;
     TT2OutputState _output;

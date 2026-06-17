@@ -10,6 +10,7 @@ struct Fixture {
     TT2Runtime runtime;
     TT2OutputState output;
     int metroAccum = 0;
+    float bpm = 120.f;
     Fixture() {
         init(program);
         init(runtime);
@@ -19,7 +20,7 @@ struct Fixture {
         expectTrue(loadScriptText(program, idx, text) >= 0, "metro script loads");
     }
     void advance(int ms) {
-        tt2AdvanceMetro(program, runtime, output, ms, metroAccum);
+        tt2AdvanceMetro(program, runtime, output, ms, metroAccum, bpm);
     }
 };
 
@@ -73,6 +74,46 @@ CASE("interval_clamps_to_2ms") {
     f.runtime.variables.m_act = 1;
     f.advance(2);
     expectEqual(int(f.runtime.variables.a), 2, "fires at clamped 2ms");
+}
+
+CASE("mc_clock_sync_derives_ms_from_bpm") {
+    // M.C 1 16 at 120 BPM -> 1/16 note = 125ms.
+    Fixture f;
+    f.bpm = 120.f;
+    f.load(0, "M.C 1 16\n");
+    runScript(f.program, f.runtime, f.output, 0);
+    expectEqual(int(f.runtime.variables.metroSyncNum), 1, "num stored");
+    expectEqual(int(f.runtime.variables.metroSyncDen), 16, "den stored (clock mode)");
+    f.load(TT2_METRO_SCRIPT, "A ADD A 1\n");
+    f.runtime.variables.m_act = 1;
+    f.advance(120);
+    expectEqual(int(f.runtime.variables.m), 125, "m derived to 125ms");
+    expectEqual(int(f.runtime.variables.a), 1, "no fire before 125ms");
+    f.advance(10); // 130 >= 125
+    expectEqual(int(f.runtime.variables.a), 2, "fires at derived 125ms");
+}
+
+CASE("mc_retracks_tempo") {
+    // Same M.C 1 16 re-derives when BPM changes (140 -> ~107ms).
+    Fixture f;
+    f.bpm = 140.f;
+    f.load(0, "M.C 1 16\n");
+    runScript(f.program, f.runtime, f.output, 0);
+    f.load(TT2_METRO_SCRIPT, "A ADD A 1\n");
+    f.runtime.variables.m_act = 1;
+    f.advance(1);
+    expectEqual(int(f.runtime.variables.m), 107, "1/16 @140bpm ~= 107ms");
+}
+
+CASE("plain_m_reverts_to_free_ms") {
+    Fixture f;
+    f.load(0, "M.C 3 4\n");
+    runScript(f.program, f.runtime, f.output, 0);
+    expectEqual(int(f.runtime.variables.metroSyncDen), 4, "clock mode on");
+    f.load(1, "M 500\n");
+    runScript(f.program, f.runtime, f.output, 1);
+    expectEqual(int(f.runtime.variables.metroSyncDen), 0, "plain M clears sync");
+    expectEqual(int(f.runtime.variables.m), 500, "m = 500 free ms");
 }
 
 } // UNIT_TEST("TeletypeV2Metro")

@@ -85,6 +85,7 @@
         "M.ACT.A"     => { MATCH_OP(E_OP_M_ACT_A); };
         "M.RESET"     => { MATCH_OP(E_OP_M_RESET); };
         "M.RESET.A"   => { MATCH_OP(E_OP_M_RESET_A); };
+        "M.C"         => { MATCH_OP(E_OP_M_C); };
 
         # patterns
         "P.N"         => { MATCH_OP(E_OP_P_N); };

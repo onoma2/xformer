@@ -24,6 +24,8 @@ static void op_M_RESET_get(const void *data, scene_state_t *ss,
                            exec_state_t *es, command_state_t *cs);
 static void op_M_RESET_A_get(const void *data, scene_state_t *ss,
                              exec_state_t *es, command_state_t *cs);
+static void op_M_C_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
 
 const tele_op_t op_M = MAKE_GET_SET_OP(M, op_M_get, op_M_set, 0, true);
 
@@ -112,6 +114,7 @@ static void op_M_ACT_A_get(const void *NOTUSED(data),
 
 const tele_op_t op_M_RESET = MAKE_GET_OP(M.RESET, op_M_RESET_get, 0, false);
 const tele_op_t op_M_RESET_A = MAKE_GET_OP(M.RESET.A, op_M_RESET_A_get, 0, false);
+const tele_op_t op_M_C = MAKE_GET_OP(M.C, op_M_C_get, 2, false);
 
 static void op_M_RESET_get(const void *NOTUSED(data),
                            scene_state_t *NOTUSED(ss),
@@ -125,4 +128,10 @@ static void op_M_RESET_A_get(const void *NOTUSED(data),
                              exec_state_t *NOTUSED(es),
                              command_state_t *NOTUSED(cs)) {
     tele_metro_all_reset();
+}
+
+// No-op stub: TT2 handles M.C natively (clock-synced metro, see opMC). The
+// vendored C VM only needs a valid op for parsing + the op enum.
+static void op_M_C_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *NOTUSED(cs)) {
 }

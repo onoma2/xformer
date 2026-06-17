@@ -135,7 +135,9 @@ const tele_op_t *const tele_ops[E_OP__LENGTH] = {
     &op_MO_OFF, &op_MO_TRIG, &op_MO_S, &op_MO_R, &op_MO_D, &op_MO_M,
     &op_MO_O, &op_MO_T,
     // LFO.C — clocked-rate modulator alias (native-only)
-    &op_LFO_C
+    &op_LFO_C,
+    // M.C — clock-synced metro (native-only); appended last to keep op ordinals stable
+    &op_M_C
 };
 
 /////////////////////////////////////////////////////////////////

@@ -10,5 +10,6 @@ extern const tele_op_t op_M_A;
 extern const tele_op_t op_M_ACT_A;
 extern const tele_op_t op_M_RESET;
 extern const tele_op_t op_M_RESET_A;
+extern const tele_op_t op_M_C;
 
 #endif

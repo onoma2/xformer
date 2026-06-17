@@ -170,17 +170,27 @@ inline void tt2AdvanceDelays(const TeletypeProgram &program, TT2Runtime &runtime
 }
 
 // Advance the metro by deltaMs and fire the METRO script every M ms while
-// active. Faithful to upstream: interval = variables.m (>=2ms), gated by
-// variables.m_act; the accumulator resets when inactive (re-enable starts
-// fresh, like the host re-adding the timer). Empty metro script = no-op.
+// active. interval = variables.m (>=2ms), gated by variables.m_act; the
+// accumulator resets when inactive (re-enable starts fresh). In clock-sync mode
+// (M.C n d -> metroSyncDen>0) the ms period is derived from live BPM each tick:
+// ms = num/den of a whole note = num * 240000 / (den * bpm). Empty metro = no-op.
 inline void tt2AdvanceMetro(const TeletypeProgram &program, TT2Runtime &runtime,
-                            TT2OutputState &output, int deltaMs, int &metroAccumMs) {
+                            TT2OutputState &output, int deltaMs, int &metroAccumMs,
+                            float bpm) {
     if (!runtime.variables.m_act) {
         metroAccumMs = 0;
         return;
     }
     if (program.scripts[TT2_METRO_SCRIPT].length == 0) {
         return;
+    }
+    if (runtime.variables.metroSyncDen > 0 && bpm > 0.f) {
+        double ms = double(runtime.variables.metroSyncNum) * 240000.0
+                  / (double(runtime.variables.metroSyncDen) * double(bpm));
+        int derived = int(ms + 0.5);
+        if (derived < 2) derived = 2;
+        if (derived > 32767) derived = 32767;
+        runtime.variables.m = int16_t(derived);
     }
     int interval = runtime.variables.m;
     if (interval < 2) interval = 2;

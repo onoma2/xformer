@@ -437,6 +437,7 @@ typedef enum {
     E_OP_MO_O,
     E_OP_MO_T,
     E_OP_LFO_C,
+    E_OP_M_C,
     E_OP__LENGTH,
 } tele_op_idx_t;
 

@@ -41,6 +41,8 @@ struct TT2Variables {
     int16_t m;
     uint8_t m_act;
     uint8_t mutes;
+    int16_t metroSyncNum;   // M.C n/d clock-sync: numerator (den>0 = clock mode)
+    int16_t metroSyncDen;   // 0 = free ms (plain M); >0 = derive m from BPM each tick
     int16_t o;
     int16_t o_inc;
     int16_t o_min;

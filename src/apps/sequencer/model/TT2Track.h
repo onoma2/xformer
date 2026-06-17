@@ -43,4 +43,4 @@ private:
     friend class Track;
 };
 
-static_assert(sizeof(TT2Track) == 9512, "TT2Track size drift");  // 10 scripts + 64 delay + 8 trig + dashboard + shaping
+static_assert(sizeof(TT2Track) == 9520, "TT2Track size drift");  // 10 scripts + 64 delay + 8 trig + dashboard + shaping + M.C sync

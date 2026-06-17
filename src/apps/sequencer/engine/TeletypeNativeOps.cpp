@@ -2474,9 +2474,23 @@ static void opM(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
         if (!popStack(stack, stackSize, val, error)) return;
         if (val < 2) val = 2;
         runtime.variables.m = val;
+        runtime.variables.metroSyncDen = 0;  // plain M -> free ms (exit clock sync)
     } else {
         pushStack(stack, stackSize, runtime.variables.m, error);
     }
+}
+
+// M.C n d — clock-synced metro: period = n/d of a whole note, derived from live
+// BPM in tt2AdvanceMetro. Set-only (consumes 2); plain M / M! revert to free ms.
+static void opMC(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t n = 0, d = 0;
+    if (!popStack(stack, stackSize, n, error)) return;
+    if (!popStack(stack, stackSize, d, error)) return;
+    if (n < 1) n = 1;
+    if (d < 1) d = 1;
+    runtime.variables.metroSyncNum = n;
+    runtime.variables.metroSyncDen = d;
 }
 
 static void opMAct(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
@@ -4249,6 +4263,7 @@ namespace {
             table[E_OP_STATE]       = opState;
             table[E_OP_MUTE]        = opMute;
             table[E_OP_M]        = opM;
+            table[E_OP_M_C]      = opMC;
             table[E_OP_M_ACT]    = opMAct;
             table[E_OP_SCRIPT]   = opScript;
             table[E_OP_SYM_DOLLAR]    = opScript;
