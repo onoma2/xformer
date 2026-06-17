@@ -227,6 +227,7 @@ const char *tt2OpName(int v) {
     case E_OP_LFO_F: return "LFO.F";
     case E_OP_LFO_O: return "LFO.O";
     case E_OP_LFO_S: return "LFO.S";
+    case E_OP_LFO_C: return "LFO.C";
     case E_OP_G_TIME: return "G.TIME";
     case E_OP_G_TONE: return "G.TONE";
     case E_OP_G_RAMP: return "G.RAMP";

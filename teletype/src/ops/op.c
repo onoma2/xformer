@@ -133,7 +133,9 @@ const tele_op_t *const tele_ops[E_OP__LENGTH] = {
     // modulator (Performer, MO.*)
     &op_MO, &op_MO_P, &op_MO_SHAPE, &op_MO_RATE, &op_MO_DEPTH, &op_MO_MODE,
     &op_MO_OFF, &op_MO_TRIG, &op_MO_S, &op_MO_R, &op_MO_D, &op_MO_M,
-    &op_MO_O, &op_MO_T
+    &op_MO_O, &op_MO_T,
+    // LFO.C — clocked-rate modulator alias (native-only)
+    &op_LFO_C
 };
 
 /////////////////////////////////////////////////////////////////

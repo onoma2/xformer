@@ -28,3 +28,7 @@ const tele_op_t op_MO_D = MAKE_ALIAS_OP(MO.D, op_MO_noop_get, op_MO_noop_set, 1,
 const tele_op_t op_MO_M = MAKE_ALIAS_OP(MO.M, op_MO_noop_get, op_MO_noop_set, 1, true);
 const tele_op_t op_MO_O = MAKE_ALIAS_OP(MO.O, op_MO_noop_get, op_MO_noop_set, 1, true);
 const tele_op_t op_MO_T = MAKE_ALIAS_OP(MO.T, op_MO_noop_get, NULL, 1, false);
+
+// LFO.C — clocked-rate modulator alias (native-only, like MO.*); real behavior
+// is in TeletypeNativeOps.cpp. arity 2 (slot + divisor), mirrors LFO.R.
+const tele_op_t op_LFO_C = MAKE_GET_OP(LFO.C, op_MO_noop_get, 2, false);

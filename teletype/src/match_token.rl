@@ -250,6 +250,7 @@
         "LFO.F"       => { MATCH_OP(E_OP_LFO_F); };
         "LFO.O"       => { MATCH_OP(E_OP_LFO_O); };
         "LFO.S"       => { MATCH_OP(E_OP_LFO_S); };
+        "LFO.C"       => { MATCH_OP(E_OP_LFO_C); };
         "G.TIME"      => { MATCH_OP(E_OP_G_TIME); };
         "G.TONE"      => { MATCH_OP(E_OP_G_TONE); };
         "G.RAMP"      => { MATCH_OP(E_OP_G_RAMP); };
