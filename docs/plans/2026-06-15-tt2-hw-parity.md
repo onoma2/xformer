@@ -3,7 +3,7 @@ id: feat-tt2-hw-parity
 schema: plan
 title: "feat: TT2 full teletype HW parity (10 scripts + 64-deep delay)"
 type: feat
-status: active
+status: completed
 date: 2026-06-15
 depth: standard
 ---
