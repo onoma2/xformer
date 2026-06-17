@@ -2078,6 +2078,60 @@ static void opMoTrig(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // ---------------------------------------------------------------------------
+// Envelope ops (E.*) — ADSR-shape-locked sugar over the same modulator slots
+// as MO.*. The op family selects the shape: every write claims slot n as a
+// triggered ADSR (Shape::ADSR + Mode::Trig), then sets one field. Reads do not
+// mutate. Index 1-based (1..8). LFO.* deferred (rate representation undecided).
+// ---------------------------------------------------------------------------
+
+static void tt2ForceEnvelope(Modulator &m) {
+    m.setShape(Modulator::Shape::ADSR);
+    m.setMode(Modulator::Mode::Trig);
+}
+
+#define TT2_E_FIELD_OP(fn, getter, setter)                                     \
+    static void fn(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,    \
+                   int16_t *stack, uint8_t &stackSize, bool isSet,             \
+                   TT2EvalError &error) {                                      \
+        int16_t idx = 0;                                                       \
+        if (!popOutputIndex(stack, stackSize, idx, error, CONFIG_MODULATOR_COUNT)) return; \
+        TT2Host *h = tt2ActiveHost();                                          \
+        if (isSet && stackSize >= 1) {                                        \
+            int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return; \
+            if (h) { Modulator &m = h->hostModulator(uint8_t(idx)); tt2ForceEnvelope(m); m.setter(v); } \
+        } else {                                                              \
+            pushStack(stack, stackSize,                                       \
+                      h ? int16_t(h->hostModulator(uint8_t(idx)).getter()) : 0, error); \
+        }                                                                     \
+    }
+TT2_E_FIELD_OP(opEnvA, attack, setAttack)
+TT2_E_FIELD_OP(opEnvD, decay, setDecay)
+TT2_E_FIELD_OP(opEnvO, offset, setOffset)
+
+// Bare E: set claims the slot + sets the envelope peak (Amplitude); read pushes
+// the slot's live output (mirrors bare MO), not the Amplitude field.
+static void opEnv(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, CONFIG_MODULATOR_COUNT)) return;
+    TT2Host *h = tt2ActiveHost();
+    if (isSet && stackSize >= 1) {
+        int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+        if (h) { Modulator &m = h->hostModulator(uint8_t(idx)); tt2ForceEnvelope(m); m.setAmplitude(v); }
+    } else {
+        pushStack(stack, stackSize, h ? h->hostModulatorOutput(uint8_t(idx)) : 0, error);
+    }
+}
+
+static void opEnvT(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, CONFIG_MODULATOR_COUNT)) return;
+    TT2Host *h = tt2ActiveHost();
+    if (h) { tt2ForceEnvelope(h->hostModulator(uint8_t(idx))); h->hostModulatorTrigger(uint8_t(idx)); }
+}
+
+// ---------------------------------------------------------------------------
 // MIDI query ops (MI.*) — read the runtime MIDI buffer. Indexed ops read the
 // active frame's I loop var (1-based), matching upstream teletype/src/ops/midi.c.
 // ---------------------------------------------------------------------------
@@ -4001,6 +4055,12 @@ namespace {
             table[E_OP_MO_MODE]  = opMoMode;   table[E_OP_MO_M] = opMoMode;
             table[E_OP_MO_OFF]   = opMoOff;    table[E_OP_MO_O] = opMoOff;
             table[E_OP_MO_TRIG]  = opMoTrig;   table[E_OP_MO_T] = opMoTrig;
+            // E.* envelope aliases (ADSR-locked over the modulator slots).
+            table[E_OP_E]   = opEnv;
+            table[E_OP_E_A] = opEnvA;
+            table[E_OP_E_D] = opEnvD;
+            table[E_OP_E_O] = opEnvO;
+            table[E_OP_E_T] = opEnvT;
             // E_OP_G_O / E_OP_G_BAR / E_OP_G_B / E_OP_G_R left nullptr ->
             // UnsupportedOp (no live GeodeConfig field; see Geode ops comment).
             table[E_OP_MI_SYM_DOLLAR]      = opMiDollar;
