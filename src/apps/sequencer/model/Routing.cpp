@@ -3,6 +3,8 @@
 #include "Project.h"
 #include "ProjectVersion.h"
 
+#include "Platform.h"   // CCMRAM_BSS
+
 #include <cmath>
 
 //----------------------------------------
@@ -278,7 +280,7 @@ struct RouteOverrideEntry {
     uint8_t paramKey;
     uint8_t trackIndex;
 };
-static std::array<RouteOverrideEntry, CONFIG_ROUTE_COUNT * CONFIG_TRACK_COUNT> routeOverrides;
+static CCMRAM_BSS std::array<RouteOverrideEntry, CONFIG_ROUTE_COUNT * CONFIG_TRACK_COUNT> routeOverrides;  // CPU-only -> CCMRAM (not DMA)
 static size_t routeOverrideCount = 0;
 
 void Routing::clearRouteOverrides() {

@@ -12,6 +12,8 @@
 
 #include "os/os.h"
 
+#include "Platform.h"   // CCMRAM_BSS
+
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
@@ -383,7 +385,7 @@ union TeletypeLoadScratch {
     TeletypeLoadScratch() {}
     ~TeletypeLoadScratch() {}
 };
-TeletypeLoadScratch gTeletypeLoadScratch;
+CCMRAM_BSS TeletypeLoadScratch gTeletypeLoadScratch;  // CPU-only parse scratch -> CCMRAM (not DMA)
 
 // Preserve the TT1 names as aliases into the shared scratch.
 auto &ttActiveClip = gTeletypeLoadScratch.tt1.activeClip;

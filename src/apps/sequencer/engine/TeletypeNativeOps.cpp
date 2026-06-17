@@ -2,6 +2,8 @@
 #include "TT2Runner.h"
 #include "TT2Host.h"
 
+#include "Platform.h"   // CCMRAM_BSS
+
 // Pure helpers/tables from the linked teletype C lib (no scene_state_t / bridge
 // VM — these are stateless utilities + const data, safe to share and survive
 // Phase-5 bridge deletion).
@@ -4285,7 +4287,7 @@ namespace {
             table[E_OP_KILL]     = opKill;
         }
     };
-    OpTableBuilder opTableBuilder;
+    CCMRAM_BSS OpTableBuilder opTableBuilder;  // CPU-only dispatch table -> CCMRAM (not DMA)
 }
 
 const TT2OpFunc *tt2NativeOpTable = opTableBuilder.table;
