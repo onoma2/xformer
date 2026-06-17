@@ -2862,6 +2862,54 @@ static void opQAdd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
     }
 }
 
+static int16_t normalisePn(int16_t pn);  // defined with the pattern ops below
+
+// Q.2P [i] — copy the queue (0..q_n-1) into the current pattern (p_n) or pattern i.
+static void opQ2P(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    if (!program) { error = TT2EvalError::NoTrack; return; }
+    auto &v = runtime.variables;
+    int16_t pn = v.p_n;
+    if (stackSize >= 1) { if (!popStack(stack, stackSize, pn, error)) return; }
+    TT2Pattern &pat = const_cast<TeletypeProgram *>(program)->patterns[normalisePn(pn)];
+    int n = v.q_n; if (n < 0) n = 0; if (n > TT2_PATTERN_LENGTH) n = TT2_PATTERN_LENGTH;
+    for (int i = 0; i < n; ++i) pat.val[i] = v.q[i];
+    pat.len = uint16_t(n);
+}
+
+// Q.P2 [i] — copy the whole current pattern (or pattern i) into the queue; queue
+// length becomes the pattern length (Q.P2 copies the entire pattern, not up to len).
+static void opQP2(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    if (!program) { error = TT2EvalError::NoTrack; return; }
+    auto &v = runtime.variables;
+    int16_t pn = v.p_n;
+    if (stackSize >= 1) { if (!popStack(stack, stackSize, pn, error)) return; }
+    const TT2Pattern &pat = program->patterns[normalisePn(pn)];
+    for (int i = 0; i < TT2_PATTERN_LENGTH && i < TT2_Q_LENGTH; ++i) v.q[i] = pat.val[i];
+    int16_t len = int16_t(pat.len);
+    if (len < 1) len = 1; else if (len > TT2_Q_LENGTH) len = TT2_Q_LENGTH;
+    v.q_n = len;
+}
+
+// Q.RND [x] — get a random element from the queue; if x>0, set all active
+// elements to one random value.
+static void opQRnd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    auto &v = runtime.variables;
+    int n = v.q_n < 1 ? 1 : (v.q_n > TT2_Q_LENGTH ? TT2_Q_LENGTH : v.q_n);
+    if (isSet && stackSize >= 1) {
+        int16_t x = 0; if (!popStack(stack, stackSize, x, error)) return;
+        if (x > 0) {
+            int16_t r = int16_t(tt2RngNext(runtime.rng, TT2RngSlot::Rand));
+            for (int i = 0; i < n; ++i) v.q[i] = r;
+        }
+    } else {
+        uint32_t idx = tt2RngRange(runtime.rng, TT2RngSlot::Rand, uint32_t(n));
+        pushStack(stack, stackSize, v.q[idx], error);
+    }
+}
+
 static void opQSub(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
@@ -3884,6 +3932,8 @@ namespace {
             table[E_OP_BREV]     = opBrev;
             table[E_OP_RSH]      = opRsh;
             table[E_OP_LSH]      = opLsh;
+            table[E_OP_SYM_RIGHT_ANGLED_x2] = opRsh;  // >> alias of RSH
+            table[E_OP_SYM_LEFT_ANGLED_x2]  = opLsh;  // << alias of LSH
             table[E_OP_RROT]     = opRrot;
             table[E_OP_LROT]     = opLrot;
             table[E_OP_TURTLE]       = opTurtle;
@@ -3938,6 +3988,9 @@ namespace {
             table[E_OP_Q_SH]     = opQSh;
             table[E_OP_Q_ADD]    = opQAdd;
             table[E_OP_Q_SUB]    = opQSub;
+            table[E_OP_Q_2P]     = opQ2P;
+            table[E_OP_Q_P2]     = opQP2;
+            table[E_OP_Q_RND]    = opQRnd;
             table[E_OP_Q_MUL]    = opQMul;
             table[E_OP_Q_DIV]    = opQDiv;
             table[E_OP_Q_MOD]    = opQMod;
@@ -4191,6 +4244,7 @@ namespace {
             table[E_OP_IN]          = opIn;
             table[E_OP_IN_SCALE]    = opInScale;
             table[E_OP_PARAM]       = opParam;
+            table[E_OP_PRM]         = opParam;  // PRM alias of PARAM
             table[E_OP_PARAM_SCALE] = opParamScale;
             table[E_OP_STATE]       = opState;
             table[E_OP_MUTE]        = opMute;
