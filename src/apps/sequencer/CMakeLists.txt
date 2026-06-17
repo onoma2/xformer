@@ -23,6 +23,7 @@ set(sources
     engine/TeletypeNativeOps.cpp
     engine/TT2OpNames.cpp
     engine/TT2Printer.cpp
+    engine/TT2SceneSerializer.cpp
     engine/TT2TrackEngine.cpp
     engine/StochasticTrackEngine.cpp
     engine/StochasticGenerator.cpp
