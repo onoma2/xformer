@@ -850,9 +850,9 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
 
     const uint8_t keycode = event.keycode();
 
-    // F1-F5: run scripts or metro
+    // F1-F8: fire S1-S8; F9: fire Metro
     if (!event.ctrl() && !event.alt() && !event.shift()) {
-        if (keycode >= KeyboardEvent::KeyF1 && keycode <= KeyboardEvent::KeyF4) {
+        if (keycode >= KeyboardEvent::KeyF1 && keycode <= KeyboardEvent::KeyF8) {
             const int scriptIdx = keycode - KeyboardEvent::KeyF1;  // F1 → 0, F2 → 1, ...
             if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::TeletypeV2) {
                 auto &trackEngine = _engine.selectedTrackEngine().as<TT2TrackEngine>();
@@ -861,7 +861,7 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
             event.consume();
             return;
         }
-        if (keycode == KeyboardEvent::KeyF5) {
+        if (keycode == KeyboardEvent::KeyF9) {
             if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::TeletypeV2) {
                 auto &trackEngine = _engine.selectedTrackEngine().as<TT2TrackEngine>();
                 trackEngine.triggerScript(TT2_METRO_SCRIPT);
@@ -871,15 +871,20 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
         }
     }
 
-    // Alt+F1-F5: jump to edit script/metro
+    // Alt+F1-F8: edit S1-S8; Alt+F9: Metro; Alt+F10: Init
     if (event.alt() && !event.ctrl() && !event.shift()) {
-        if (keycode >= KeyboardEvent::KeyF1 && keycode <= KeyboardEvent::KeyF4) {
+        if (keycode >= KeyboardEvent::KeyF1 && keycode <= KeyboardEvent::KeyF8) {
             setScriptIndex(keycode - KeyboardEvent::KeyF1);
             event.consume();
             return;
         }
-        if (keycode == KeyboardEvent::KeyF5) {
+        if (keycode == KeyboardEvent::KeyF9) {
             setScriptIndex(TT2_METRO_SCRIPT);
+            event.consume();
+            return;
+        }
+        if (keycode == KeyboardEvent::KeyF10) {
+            setScriptIndex(TT2_INIT_SCRIPT);
             event.consume();
             return;
         }
