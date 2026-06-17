@@ -869,6 +869,14 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
             event.consume();
             return;
         }
+        if (keycode == KeyboardEvent::KeyF10) {
+            if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::TeletypeV2) {
+                auto &trackEngine = _engine.selectedTrackEngine().as<TT2TrackEngine>();
+                trackEngine.triggerScript(TT2_INIT_SCRIPT);
+            }
+            event.consume();
+            return;
+        }
     }
 
     // Alt+F1-F8: edit S1-S8; Alt+F9: Metro; Alt+F10: Init
