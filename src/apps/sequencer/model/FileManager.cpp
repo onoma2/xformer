@@ -362,10 +362,32 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, int slot) {
 }
 
 namespace {
-// Single staging program for atomic TT2 scene load — parked in SRAM, not on the
-// file-task stack (the explicit fix for the TT1 file-stack mess). Swapped into
-// the live track only on a clean parse.
-TeletypeProgram tt2StagingProgram;
+// TT1 track-load and TT2 scene-load never run together on the single file task,
+// so they share one scratch region (no net .bss growth from TT2 staging — the
+// TT1 clip buffers already cover a full TeletypeProgram). TT2 parses into
+// .tt2 and swaps into the live track only on a clean parse (atomic).
+struct Tt1LoadScratch {
+    TeletypeTrack::PatternSlot activeClip;
+    TeletypeTrack::PatternSlot activeClipBackup;
+    char lineBuffer[256];
+    struct {
+        uint8_t lengths[3];
+        std::array<tele_command_t, TeletypeTrack::ScriptLineCount> commands[3];
+    } sharedScriptsBackup;
+};
+union TeletypeLoadScratch {
+    Tt1LoadScratch tt1;
+    TeletypeProgram tt2;
+    TeletypeLoadScratch() {}
+    ~TeletypeLoadScratch() {}
+};
+TeletypeLoadScratch gTeletypeLoadScratch;
+
+// Preserve the TT1 names as aliases into the shared scratch.
+auto &ttActiveClip = gTeletypeLoadScratch.tt1.activeClip;
+auto &ttActiveClipBackup = gTeletypeLoadScratch.tt1.activeClipBackup;
+auto &ttLineBuffer = gTeletypeLoadScratch.tt1.lineBuffer;
+auto &ttSharedScriptsBackup = gTeletypeLoadScratch.tt1.sharedScriptsBackup;
 
 void tt2FileWrite(void *ctx, const char *data, size_t len) {
     static_cast<fs::FileWriter *>(ctx)->write(data, len);
@@ -408,13 +430,14 @@ fs::Error FileManager::readTt2Program(TT2Track &track, const char *path) {
     if (fileReader.error() != fs::OK) {
         return fileReader.error();
     }
-    bool ok = tt2DeserializeScene(tt2StagingProgram, tt2FileRead, &fileReader);
+    TeletypeProgram &staging = gTeletypeLoadScratch.tt2;
+    bool ok = tt2DeserializeScene(staging, tt2FileRead, &fileReader);
     fs::Error error = fileReader.finish();
     if (error == fs::OK && !ok) {
         error = fs::INVALID_DATA;
     }
     if (error == fs::OK) {
-        track.program() = tt2StagingProgram;  // atomic swap on clean parse
+        track.program() = staging;  // atomic swap on clean parse
     }
     return error;
 }
@@ -687,19 +710,6 @@ static const char *rootNoteName(int8_t note, FixedStringBuilder<8> &buffer) {
     return buffer;
 }
 
-namespace {
-    // Shared Teletype clip buffers to avoid large stack usage in file task.
-    // Phase 4: active-only format. 2 buffers instead of 4.
-    TeletypeTrack::PatternSlot ttActiveClip;       // Parse target for read
-    TeletypeTrack::PatternSlot ttActiveClipBackup;  // Rollback backup for read
-    char ttLineBuffer[256];
-
-    // Shared S1-S3 script backup for read transaction rollback.
-    struct {
-        uint8_t lengths[3];
-        std::array<tele_command_t, TeletypeTrack::ScriptLineCount> commands[3];
-    } ttSharedScriptsBackup;
-}
 
 static void writeSlotIo(fs::FileWriter &writer, const TeletypeTrack::PatternSlot &slot) {
     for (int i = 0; i < TeletypeTrack::TriggerInputCount; ++i) {

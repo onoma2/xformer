@@ -25,6 +25,13 @@ private:
     void editCell(int delta);
     bool isTt2() const;
 
+    void contextShow(bool doubleClick = false) override;
+    void contextAction(int index);
+    void loadScene();
+    void saveScene();
+    void loadSceneFromSlot(int slot);
+    void saveSceneToSlot(int slot);
+
     View _view = View::Outputs;
     int _col = 0;     // active column (F1..F4)
     int _row = 0;     // selected row

@@ -1,16 +1,31 @@
 #include "TT2IoConfigPage.h"
 
+#include "ui/pages/Pages.h"
 #include "ui/painters/WindowPainter.h"
 
 #include "model/TeletypeProgram.h"
 #include "model/Types.h"
 #include "model/Scale.h"
 #include "model/ModelUtils.h"
+#include "model/FileManager.h"
 
+#include "core/fs/FileSystem.h"
+#include "core/utils/StringBuilder.h"
 #include "core/Debug.h"
 
 #include <cstdio>
 #include <algorithm>
+
+enum class SceneAction {
+    Load,
+    Save,
+    Last
+};
+
+static const ContextMenuModel::Item sceneMenuItems[] = {
+    { "LOAD" },
+    { "SAVE" },
+};
 
 namespace {
 
@@ -241,6 +256,11 @@ void TT2IoConfigPage::keyPress(KeyPressEvent &event) {
     if (!isTt2()) return;
     const auto &key = event.key();
 
+    if (key.isContextMenu()) {
+        contextShow();
+        event.consume();
+        return;
+    }
     if (key.isEncoder()) {
         _edit = !_edit;
         event.consume();
@@ -265,4 +285,78 @@ void TT2IoConfigPage::encoder(EncoderEvent &event) {
     if (!isTt2()) return;
     if (_edit) editCell(event.value());
     else moveRow(event.value());
+}
+
+void TT2IoConfigPage::contextShow(bool doubleClick) {
+    showContextMenu(ContextMenu(
+        sceneMenuItems,
+        int(SceneAction::Last),
+        [&] (int index) { contextAction(index); },
+        [&] (int) { return true; },
+        doubleClick
+    ));
+}
+
+void TT2IoConfigPage::contextAction(int index) {
+    switch (SceneAction(index)) {
+    case SceneAction::Load: loadScene(); break;
+    case SceneAction::Save: saveScene(); break;
+    case SceneAction::Last: break;
+    }
+}
+
+void TT2IoConfigPage::loadScene() {
+    _manager.pages().fileSelect.show("LOAD TT2 SCENE", FileType::TeletypeV2Program, 0, false, [this] (bool result, int slot) {
+        if (result) {
+            _manager.pages().confirmation.show("ARE YOU SURE?", [this, slot] (bool result) {
+                if (result) loadSceneFromSlot(slot);
+            });
+        }
+    });
+}
+
+void TT2IoConfigPage::saveScene() {
+    _manager.pages().fileSelect.show("SAVE TT2 SCENE", FileType::TeletypeV2Program, 0, true, [this] (bool result, int slot) {
+        if (result) {
+            if (FileManager::slotUsed(FileType::TeletypeV2Program, slot)) {
+                _manager.pages().confirmation.show("ARE YOU SURE?", [this, slot] (bool result) {
+                    if (result) saveSceneToSlot(slot);
+                });
+            } else {
+                saveSceneToSlot(slot);
+            }
+        }
+    });
+}
+
+void TT2IoConfigPage::saveSceneToSlot(int slot) {
+    _engine.suspend();
+    _manager.pages().busy.show("SAVING TT2 SCENE ...");
+    FileManager::task([this, slot] () {
+        return FileManager::writeTt2Program(_project.selectedTrack().tt2Track(), nullptr, slot);
+    }, [this] (fs::Error result) {
+        if (result == fs::OK) {
+            showMessage("TT2 SCENE SAVED");
+        } else {
+            showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
+        }
+        _manager.pages().busy.close();
+        _engine.resume();
+    });
+}
+
+void TT2IoConfigPage::loadSceneFromSlot(int slot) {
+    _engine.suspend();
+    _manager.pages().busy.show("LOADING TT2 SCENE ...");
+    FileManager::task([this, slot] () {
+        return FileManager::readTt2Program(_project.selectedTrack().tt2Track(), slot);
+    }, [this] (fs::Error result) {
+        if (result == fs::OK) {
+            showMessage("TT2 SCENE LOADED");
+        } else {
+            showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
+        }
+        _manager.pages().busy.close();
+        _engine.resume();
+    });
 }
