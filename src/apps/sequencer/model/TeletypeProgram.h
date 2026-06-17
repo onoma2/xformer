@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MidiConfig.h"
+#include "Types.h"
 
 #include <cassert>
 #include <cstdint>
@@ -75,6 +76,7 @@ enum class TT2TriggerSource : uint8_t {
 // the editor I/O grid; defaults wire IN/PARAM/X/Y to CvIn1-4.
 enum class TT2CvInput : uint8_t { In, Param, X, Y, Z, T };
 static constexpr int TT2_CV_INPUT_COUNT = 6;
+static constexpr int TT2_CV_OUTPUT_COUNT = 8;  // per-output shaping (range/offset/quantize/root)
 
 enum class TT2CvInputSource : uint8_t {
     None,
@@ -99,6 +101,11 @@ struct TeletypeProgram {
     TT2Pattern patterns[TT2_PATTERN_COUNT];
     TT2TriggerSource triggerSource[TT2_TRIGGER_INPUT_COUNT];
     TT2CvInputSource cvInputSource[TT2_CV_INPUT_COUNT];
+    // Per-CV-output shaping (mirrors TT1 TeletypeTrack); applied in TT2TrackEngine::cvOutput.
+    Types::VoltageRange cvOutputRange[TT2_CV_OUTPUT_COUNT];
+    int16_t cvOutputOffset[TT2_CV_OUTPUT_COUNT];       // ×0.01 V, -500..500
+    int8_t cvOutputQuantizeScale[TT2_CV_OUTPUT_COUNT]; // -1 = off, else scale index
+    int8_t cvOutputRootNote[TT2_CV_OUTPUT_COUNT];      // -1 = project root
     MidiSourceConfig midiSource;  // per-track MIDI filter (port + channel); UI deferred
 };
 
@@ -126,6 +133,11 @@ inline void init(TeletypeProgram &p) {
     p.cvInputSource[int(TT2CvInput::Param)] = TT2CvInputSource::CvIn2;
     p.cvInputSource[int(TT2CvInput::X)]     = TT2CvInputSource::CvIn3;
     p.cvInputSource[int(TT2CvInput::Y)]     = TT2CvInputSource::CvIn4;
+    // Per-output shaping defaults: ±5V range, no quantize, 0 offset/root.
+    for (int i = 0; i < TT2_CV_OUTPUT_COUNT; i++) {
+        p.cvOutputRange[i] = Types::VoltageRange::Bipolar5V;
+        p.cvOutputQuantizeScale[i] = -1;
+    }
     p.midiSource = MidiSourceConfig();  // proper default (memset cleared it above)
 }
 
@@ -162,4 +174,4 @@ inline int16_t *patternVal(TT2Pattern &pat, uint16_t index) {
 static_assert(sizeof(TT2Command) <= 52, "TT2Command size drift");
 static_assert(sizeof(TT2Pattern) <= 140, "TT2Pattern size drift");
 static_assert(sizeof(TT2Script) <= 304, "TT2Script size drift");
-static_assert(sizeof(TeletypeProgram) <= 2392, "TeletypeProgram size drift");
+static_assert(sizeof(TeletypeProgram) <= 2440, "TeletypeProgram size drift");

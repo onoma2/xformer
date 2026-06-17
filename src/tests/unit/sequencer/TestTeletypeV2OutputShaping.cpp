@@ -40,6 +40,16 @@ UNIT_TEST("TeletypeV2OutputShaping") {
         expectTrue(cv.remainingMs == 0, "ramp complete");
     }
 
+    CASE("hw_parity_output_shaping_defaults") {
+        TeletypeProgram p; init(p);
+        for (int i = 0; i < TT2_OUTPUT_CV_COUNT; ++i) {
+            expectTrue(p.cvOutputRange[i] == Types::VoltageRange::Bipolar5V, "default ±5V");
+            expectEqual(int(p.cvOutputOffset[i]), 0, "default offset 0");
+            expectEqual(int(p.cvOutputQuantizeScale[i]), -1, "default no quantize");
+            expectEqual(int(p.cvOutputRootNote[i]), 0, "default root 0");
+        }
+    }
+
     CASE("cv_slew_zero_snaps") {
         TT2CvOutput cv = {};
         tt2SeedCvSlew(cv, 9000, 0);
