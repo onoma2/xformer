@@ -17,8 +17,6 @@ static constexpr int TT2_COMMAND_MAX_LENGTH  = 16;
 static constexpr int TT2_PATTERN_COUNT       = 4;
 static constexpr int TT2_PATTERN_LENGTH      = 64;
 
-static constexpr int TT2_TRIGGER_SCRIPT_0 = 0;
-static constexpr int TT2_TRIGGER_SCRIPT_3 = 3;
 static constexpr int TT2_METRO_SCRIPT     = 8;
 static constexpr int TT2_INIT_SCRIPT      = 9;
 

@@ -49,7 +49,7 @@
   .sym { color:#444; }
   .st { font-weight:600; font-size:.86rem; white-space:nowrap; }
   .st.w{color:var(--green)} .st.p{color:var(--amber)} .st.d{color:var(--gray)}
-  .col-op{width:24%} .col-sym{width:22%} .col-st{width:14%}
+  .col-op{width:30%} .col-st{width:16%}
   .chips { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px 16px; }
   .chips .fam { font-weight:600; margin:10px 0 4px; }
   .chips .fam:first-child{margin-top:0}
@@ -69,134 +69,117 @@
 <body>
 <main>
   <h1>Teletype ops — upstream vs TT2 native table</h1>
-  <p class="sub">Branch <code>feat/tt2-v2-native</code>. Scoped to the computational/musical core
-  (the families TT2 actually targets). Upstream hardware-module ops — ansible, telex, grid, MIDI,
-  just&nbsp;friends, WW — are out of scope by design and not listed.</p>
+  <p class="sub">Branch <code>feat/tt2-v2-native</code>, current state (2026-06-15). The
+  computational/musical core is <b>complete</b> — every family below is wired in the native
+  op table and covered by a passing <code>TestTeletypeV2*</code> suite. Performer-native
+  bridges (<code>W*</code> / <code>BUS</code> / <code>RT</code> / <code>MO.*</code> /
+  <code>G.*</code>) replace upstream's i2c hardware ops. Only i2c hardware-module families
+  (ansible, telex, grid, just&nbsp;friends, WW, disting) and multi-scene are out of scope by
+  design.</p>
 
   <div class="legend">
-    <span><i class="dot d-green"></i> wired in native op table</span>
-    <span><i class="dot d-amber"></i> pending (in spec, not yet wired)</span>
-    <span><i class="dot d-gray"></i> dropped / out of scope</span>
+    <span><i class="dot d-green"></i> wired in native op table (tested)</span>
+    <span><i class="dot d-amber"></i> unsupported by design (no backing field)</span>
+    <span><i class="dot d-gray"></i> out of scope (i2c hardware / multi-scene)</span>
   </div>
 
   <div class="summary">
-    <div class="card wired"><div class="n">~44</div><div class="l">ops wired</div></div>
-    <div class="card pend"><div class="n">18</div><div class="l">symbol aliases wired</div></div>
-    <div class="card pend"><div class="n">200+</div><div class="l">core ops pending</div></div>
+    <div class="card wired"><div class="n">19</div><div class="l">core families wired</div></div>
+    <div class="card pend"><div class="n">4</div><div class="l">ops unsupported by design</div></div>
+    <div class="card drop"><div class="n">i2c</div><div class="l">hardware modules out of scope</div></div>
   </div>
 
-  <div class="note green"><b>Control-flow language is complete</b> and not in this table —
-  IF / ELIF / ELSE, PROB, EVERY, SKIP, L (loop), the DEL family (DEL / .X / .R / .G / .B), and the
-  ms metro are handled as pre-op <i>modifiers</i> in lowering + the runner, not as native table ops.
-  Only their op-side hooks (<code>BREAK</code>, <code>BRK</code>, <code>KILL</code>,
-  <code>SCRIPT</code>, <code>DEL.CLR</code>, <code>M</code>, <code>M.ACT</code>) live in the table.</div>
+  <div class="note green"><b>Control-flow language is complete</b> — IF / ELIF / ELSE, PROB,
+  EVERY, SKIP, L (loop), the DEL family (DEL / .X / .R / .G / .B), and the ms metro are handled
+  as pre-op <i>modifiers</i> in lowering + the runner. Their op-side hooks
+  (<code>BREAK</code>/<code>BRK</code>, <code>KILL</code>, <code>SCRIPT</code>/<code>$</code>,
+  <code>DEL.CLR</code>, <code>M</code>/<code>M.ACT</code>) are wired in the table.</div>
 
-  <h2>Arithmetic &amp; min/max</h2>
+  <h2>Arithmetic, range, comparison &amp; logic</h2>
   <table>
-    <thead><tr><th class="col-op">Op</th><th class="col-sym">Symbol</th><th class="col-st">TT2</th><th>Note</th></tr></thead>
+    <thead><tr><th class="col-op">Family</th><th class="col-st">TT2</th><th>Note</th></tr></thead>
     <tbody>
-      <tr><td><code>ADD</code></td><td class="sym">+</td><td class="st w">wired</td><td>a + b</td></tr>
-      <tr><td><code>SUB</code></td><td class="sym">-</td><td class="st w">wired</td><td>a − b</td></tr>
-      <tr><td><code>MUL</code></td><td class="sym">*</td><td class="st w">wired</td><td>int32 product, clamp ±32767</td></tr>
-      <tr><td><code>DIV</code></td><td class="sym">/</td><td class="st w">wired</td><td>÷0 → 0, trunc toward zero</td></tr>
-      <tr><td><code>MOD</code></td><td class="sym">%</td><td class="st w">wired</td><td>÷0 → 0, sign follows dividend</td></tr>
-      <tr><td><code>MIN</code></td><td class="sym"></td><td class="st w">wired</td><td></td></tr>
-      <tr><td><code>MAX</code></td><td class="sym"></td><td class="st w">wired</td><td></td></tr>
-      <tr><td><code>ABS</code></td><td class="sym"></td><td class="st w">wired</td><td></td></tr>
-      <tr><td><code>SGN</code></td><td class="sym"></td><td class="st w">wired</td><td>−1 / 0 / 1</td></tr>
-      <tr><td><code>EXP</code></td><td class="sym"></td><td class="st p">pending</td><td>exponential curve lookup</td></tr>
-      <tr><td><code>BPM</code></td><td class="sym"></td><td class="st p">pending</td><td>ms-per-beat from bpm</td></tr>
+      <tr><td>Arithmetic <code>ADD SUB MUL DIV MOD MIN MAX ABS SGN EXP BPM</code></td><td class="st w">wired</td><td>+ symbols <code>+ - * / %</code></td></tr>
+      <tr><td>Range <code>LIM WRAP/WRP AVG INR OUTR INRI OUTRI</code></td><td class="st w">wired</td><td>+ symbols <code>&lt;&gt; &gt;&lt; &gt;=&lt; &lt;=&gt;</code></td></tr>
+      <tr><td>Comparison <code>EQ NE LT GT LTE GTE NZ EZ</code></td><td class="st w">wired</td><td>+ symbols <code>== != &lt; &gt; &lt;= &gt;= !</code></td></tr>
+      <tr><td>Logic <code>AND OR AND3 OR3 AND4 OR4 XOR</code></td><td class="st w">wired</td><td>+ symbols <code>&amp;&amp; || &amp;&amp;&amp; ||| …</code></td></tr>
     </tbody>
   </table>
 
-  <h2>Range &amp; bounds</h2>
+  <h2>Pitch &amp; scale</h2>
   <table>
-    <thead><tr><th class="col-op">Op</th><th class="col-sym">Symbol</th><th class="col-st">TT2</th><th>Note</th></tr></thead>
+    <thead><tr><th class="col-op">Family</th><th class="col-st">TT2</th><th>Note</th></tr></thead>
     <tbody>
-      <tr><td><code>LIM</code></td><td class="sym"></td><td class="st w">wired</td><td>clamp <code>value lo hi</code></td></tr>
-      <tr><td><code>WRAP</code> / <code>WRP</code></td><td class="sym"></td><td class="st w">wired</td><td>cyclic wrap into [lo, hi]</td></tr>
-      <tr><td><code>AVG</code></td><td class="sym"></td><td class="st w">wired</td><td>rounds half up</td></tr>
-      <tr><td><code>INR</code></td><td class="sym">&lt;&gt;</td><td class="st w">wired</td><td>word wired; symbol pending</td></tr>
-      <tr><td><code>OUTR</code></td><td class="sym">&gt;&lt;</td><td class="st w">wired</td><td>word wired; symbol pending</td></tr>
-      <tr><td><code>INRI</code></td><td class="sym">&gt;=&lt;</td><td class="st w">wired</td><td>word wired; symbol pending</td></tr>
-      <tr><td><code>OUTRI</code></td><td class="sym">&lt;=&gt;</td><td class="st w">wired</td><td>word wired; symbol pending</td></tr>
+      <tr><td><code>N VN HZ V VV</code></td><td class="st w">wired</td><td>note / volt converters</td></tr>
+      <tr><td><code>SCALE SCL SCALE0 SCL0</code></td><td class="st w">wired</td><td>scale tables</td></tr>
+      <tr><td><code>QT QT.S QT.CS QT.B QT.BX</code></td><td class="st w">wired</td><td>quantizers</td></tr>
+      <tr><td><code>N.S N.C N.CS N.B N.BX</code> · <code>JI</code> · <code>ER NR</code> · <code>DR.T DR.P DR.V</code></td><td class="st w">wired</td><td>note-in-scale, just-intonation, euclid, drum</td></tr>
     </tbody>
   </table>
 
-  <h2>Comparison &amp; logic</h2>
+  <h2>Randomness, bitwise, vars, timing</h2>
   <table>
-    <thead><tr><th class="col-op">Op</th><th class="col-sym">Symbol</th><th class="col-st">TT2</th><th>Note</th></tr></thead>
+    <thead><tr><th class="col-op">Family</th><th class="col-st">TT2</th><th>Note</th></tr></thead>
     <tbody>
-      <tr><td><code>EQ</code></td><td class="sym">==</td><td class="st w">wired</td><td rowspan="6">all → 1 / 0</td></tr>
-      <tr><td><code>NE</code></td><td class="sym">!=</td><td class="st w">wired</td></tr>
-      <tr><td><code>LT</code></td><td class="sym">&lt;</td><td class="st w">wired</td></tr>
-      <tr><td><code>GT</code></td><td class="sym">&gt;</td><td class="st w">wired</td></tr>
-      <tr><td><code>LTE</code></td><td class="sym">&lt;=</td><td class="st w">wired</td></tr>
-      <tr><td><code>GTE</code></td><td class="sym">&gt;=</td><td class="st w">wired</td></tr>
-      <tr><td><code>NZ</code></td><td class="sym"></td><td class="st w">wired</td><td>≠ 0</td></tr>
-      <tr><td><code>EZ</code></td><td class="sym"></td><td class="st w">wired</td><td>= 0</td></tr>
-      <tr><td><code>AND</code> / <code>OR</code></td><td class="sym">&amp;&amp; &nbsp; ||</td><td class="st w">wired</td><td>2-arg</td></tr>
-      <tr><td><code>AND3</code> / <code>OR3</code></td><td class="sym">&amp;&amp;&amp; &nbsp; |||</td><td class="st w">wired</td><td>3-arg</td></tr>
-      <tr><td><code>AND4</code> / <code>OR4</code></td><td class="sym">&amp;&amp;&amp;&amp; &nbsp; ||||</td><td class="st w">wired</td><td>4-arg</td></tr>
+      <tr><td>Random <code>RAND RND RRAND RRND R R.MIN R.MAX TOSS CHAOS CHAOS.R CHAOS.ALG</code> + all <code>*.SD</code> seeds</td><td class="st w">wired</td><td>RNG slots + seeds</td></tr>
+      <tr><td>Bitwise / shift <code>| &amp; ~ ^ XOR BSET BGET BCLR BTOG BREV RSH LSH RROT LROT</code></td><td class="st w">wired</td><td>+ symbols <code>&lt;&lt; &gt;&gt; &lt;&lt;&lt; &gt;&gt;&gt;</code></td></tr>
+      <tr><td>Variables <code>A B C D X Y Z T I J K</code></td><td class="st w">wired</td><td>scratch + loop index</td></tr>
+      <tr><td><code>O O.INC O.MIN O.MAX O.WRAP</code> · <code>DRUNK DRUNK.MIN/MAX/WRAP</code> · <code>FLIP</code></td><td class="st w">wired</td><td>auto-inc / random walk / toggle</td></tr>
+      <tr><td><code>TIME TIME.ACT LAST</code></td><td class="st w">wired</td><td>stopwatch + per-script LAST</td></tr>
     </tbody>
   </table>
 
-  <h2>Variables</h2>
+  <h2>Pattern, queue &amp; stack</h2>
   <table>
-    <thead><tr><th class="col-op">Op</th><th class="col-st">TT2</th><th>Note</th></tr></thead>
+    <thead><tr><th class="col-op">Family</th><th class="col-st">TT2</th><th>Note</th></tr></thead>
     <tbody>
-      <tr><td><code>A</code> <code>B</code> <code>X</code></td><td class="st w">wired</td><td>general scratch vars</td></tr>
-      <tr><td><code>I</code></td><td class="st w">wired</td><td>loop index</td></tr>
-      <tr><td><code>C</code> <code>D</code> <code>Y</code> <code>Z</code></td><td class="st p">pending</td><td>remaining scratch vars</td></tr>
-      <tr><td><code>O</code> <code>O.INC</code> <code>O.MIN/MAX/WRAP</code></td><td class="st p">pending</td><td>auto-increment register</td></tr>
-      <tr><td><code>T</code> <code>TIME</code> <code>TIME.ACT</code></td><td class="st p">pending</td><td>stopwatch</td></tr>
-      <tr><td><code>LAST</code> <code>DRUNK</code> <code>FLIP</code> <code>J</code> <code>K</code></td><td class="st p">pending</td><td></td></tr>
+      <tr><td>Pattern <code>P</code> + <code>PN</code> mirror — full family</td><td class="st w">wired</td><td>N/L/I/HERE/WRAP/START/END/NEXT/PREV/INS/RM/PUSH/POP/REV/ROT/SHUF/MIN/MAX/MINV/MAXV/SUM/AVG/FND/RND/SORT-via-P.* ; arithmetic P.+ P.- P.PA/PS/PM/PD/PMOD ; P.SCALE ; RND.P</td></tr>
+      <tr><td>Queue <code>Q Q.N Q.AVG Q.CLR Q.GRW Q.SUM Q.MIN Q.MAX Q.SRT Q.REV Q.SH Q.ADD Q.SUB Q.MUL Q.DIV Q.MOD Q.I</code></td><td class="st w">wired</td><td>queue buffer</td></tr>
+      <tr><td>Stack <code>S.ALL S.POP S.CLR S.L</code></td><td class="st w">wired</td><td></td></tr>
+      <tr><td>Turtle <code>@ @X @Y @MOVE @F @FX1/FY1/FX2/FY2 @SPEED @DIR @STEP @BUMP @WRAP @BOUNCE @SCRIPT @SHOW</code></td><td class="st w">wired</td><td>full turtle in runtime</td></tr>
     </tbody>
   </table>
 
-  <h2>Control flow &amp; I/O (op side)</h2>
+  <h2>Output, metro, functions, inputs</h2>
   <table>
-    <thead><tr><th class="col-op">Op</th><th class="col-st">TT2</th><th>Note</th></tr></thead>
+    <thead><tr><th class="col-op">Family</th><th class="col-st">TT2</th><th>Note</th></tr></thead>
     <tbody>
-      <tr><td><code>SCRIPT</code></td><td class="st w">wired</td><td>nested script call (get = current #)</td></tr>
-      <tr><td><code>BREAK</code> / <code>BRK</code></td><td class="st w">wired</td><td>stop enclosing L loop</td></tr>
-      <tr><td><code>KILL</code></td><td class="st w">wired</td><td>clear stack + metro + delays</td></tr>
-      <tr><td><code>DEL.CLR</code></td><td class="st w">wired</td><td>clear delay queue</td></tr>
-      <tr><td><code>M</code> <code>M.ACT</code></td><td class="st w">wired</td><td>metro interval / enable</td></tr>
-      <tr><td><code>CV</code> <code>TR</code></td><td class="st w">wired</td><td>8-ch output, get + set</td></tr>
-      <tr><td><code>$</code> <code>$F</code> <code>$L</code> <code>$S</code> <code>FR</code> <code>I1</code> <code>I2</code></td><td class="st p">pending</td><td>function calls + return values</td></tr>
-      <tr><td><code>SCRIPT.POL</code> <code>$.POL</code> <code>SYNC</code></td><td class="st p">pending</td><td></td></tr>
-      <tr><td><code>CV.OFF</code> <code>CV.SLEW</code> <code>TR.POL</code> <code>TR.TIME</code></td><td class="st p">pending</td><td>output shaping (in spec)</td></tr>
-      <tr><td><code>M.A</code> <code>M.RESET</code> <code>CV.CAL</code></td><td class="st p">pending</td><td></td></tr>
-      <tr><td><code>SCENE</code> <code>MUTE</code> <code>BUS</code> <code>RT</code> &nbsp;W*/G*/E*/LFO*</td><td class="st d">dropped</td><td>hardware-module / multi-scene specific</td></tr>
+      <tr><td><code>CV CV.SLEW CV.OFF CV.GET CV.SET</code> · <code>TR TR.POL TR.TIME TR.PULSE TR.P TR.TOG TR.W TR.D</code></td><td class="st w">wired</td><td>8-ch output, get + set, native slew/pulse shaping</td></tr>
+      <tr><td><code>INIT</code> family (CV/TR/P/SCRIPT/DATA/TIME + ALL)</td><td class="st w">wired</td><td></td></tr>
+      <tr><td>Metro / sync <code>M M.A M.ACT M.ACT.A M.RESET SYNC BPM TIF</code></td><td class="st w">wired</td><td></td></tr>
+      <tr><td>Functions <code>SCRIPT $ $F $F1 $F2 $L $L1 $L2 $S $S1 $S2 I1 I2 FR SCRIPT.POL $.POL</code></td><td class="st w">wired</td><td>nested calls + params + return</td></tr>
+      <tr><td>Control hooks <code>BREAK BRK KILL DEL.CLR</code></td><td class="st w">wired</td><td></td></tr>
+      <tr><td>Inputs <code>IN IN.SCALE PARAM PARAM.SCALE STATE MUTE</code></td><td class="st w">wired</td><td>analog ins + mute</td></tr>
     </tbody>
   </table>
 
-  <h2>Large pending families</h2>
-  <p class="sub" style="margin-top:-2px">Parsed by the lexer; native handlers not yet written. Each needs a backing subsystem.</p>
-  <div class="chips">
-    <div class="fam">Pitch &amp; scale <span class="st p">pending — needs scale tables</span></div>
-    <code>N</code><code>VN</code><code>HZ</code><code>V</code><code>VV</code><code>N.S</code><code>N.C</code><code>N.CS</code><code>N.B</code><code>N.BX</code><code>SCALE</code><code>SCL</code><code>SCALE0</code><code>SCL0</code><code>QT</code><code>QT.S</code><code>QT.CS</code><code>QT.B</code><code>QT.BX</code><code>JI</code><code>ER</code><code>NR</code><code>DR.T</code><code>DR.P</code><code>DR.V</code>
+  <h2>Performer-native bridges</h2>
+  <p class="sub" style="margin-top:-2px">Replace upstream's i2c hardware ops with direct
+  access to the Performer engine, modulators, and Geode.</p>
+  <table>
+    <thead><tr><th class="col-op">Family</th><th class="col-st">TT2</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>Transport / window <code>WBPM WBPM.S WMS WTU BAR WP WP.SET WR WR.ACT WNG WNN WNG.H WNN.H RT</code></td><td class="st w">wired</td><td>tempo, run, bar timing, cross-track note/pattern access</td></tr>
+      <tr><td>Shared bus <code>BUS</code></td><td class="st w">wired</td><td>read/write the CV bus lanes (4)</td></tr>
+      <tr><td>Modulator <code>MO MO.P MO.SHAPE MO.RATE MO.DEPTH MO.MODE MO.OFF MO.TRIG</code> + 1-letter aliases <code>MO.S/R/D/M/O/T</code></td><td class="st w">wired</td><td>control the global modulator engine from scripts</td></tr>
+      <tr><td>Geode <code>G.MODE G.TUNE G.V G.S G.RUN G.VAL G.TIME G.TONE G.RAMP G.CURV</code> + aliases</td><td class="st w">wired</td><td>trigger/configure Geode voices</td></tr>
+      <tr><td><code>G.O G.BAR G.B G.R</code></td><td class="st p">unsupported</td><td>by design — no live GeodeConfig field; left <code>nullptr</code> → UnsupportedOp</td></tr>
+      <tr><td>MIDI in <code>MI.*</code> — full family (last-note/velocity/cc/clock + counts)</td><td class="st w">wired</td><td>per-track MIDI source filter feeds the runtime</td></tr>
+    </tbody>
+  </table>
 
-    <div class="fam">Randomness <span class="st p">pending — needs RNG slots + seeds</span></div>
-    <code>RAND</code><code>RND</code><code>RRAND</code><code>RRND</code><code>R</code><code>R.MIN</code><code>R.MAX</code><code>TOSS</code><code>CHAOS</code><code>CHAOS.R</code><code>CHAOS.ALG</code>
+  <h2>Out of scope</h2>
+  <div class="note">Upstream i2c hardware-module ops are intentionally not parsed or wired —
+  they target external Eurorack modules TT2 does not bridge: <b>ansible</b>, <b>telex</b>
+  (TELEXi/TELEXo), <b>grid</b>/monome, <b>just&nbsp;friends</b> (<code>JF.*</code>),
+  <b>white whale</b> (<code>WW.*</code>), <b>disting EX</b>. Multi-scene
+  (<code>SCENE</code>/<code>PRESET</code>) is also out of scope (Performer uses its own
+  project/pattern model).</div>
 
-    <div class="fam">Bitwise &amp; shift <span class="st p">pending</span></div>
-    <code>|</code><code>&amp;</code><code>~</code><code>^</code><code>XOR</code><code>BSET</code><code>BGET</code><code>BCLR</code><code>BTOG</code><code>BREV</code><code>RSH</code><code>LSH</code><code>RROT</code><code>LROT</code><code>&lt;&lt;</code><code>&gt;&gt;</code><code>&lt;&lt;&lt;</code><code>&gt;&gt;&gt;</code>
-
-    <div class="fam">Pattern memory <span class="st p">pending — needs pattern store</span></div>
-    <code>P</code><code>PN</code><code>P.N</code><code>P.L</code><code>P.I</code><code>P.HERE</code><code>P.NEXT</code><code>P.PREV</code><code>P.INS</code><code>P.RM</code><code>P.PUSH</code><code>P.POP</code><code>P.MIN</code><code>P.MAX</code><code>P.RND</code><code>P.SORT</code><code>P.REV</code><code>P.ROT</code><code>P.+</code><code>P.-</code><code>P.SCALE</code><code>P.SUM</code><code>P.AVG</code><code>…+ PN.* mirror</code>
-
-    <div class="fam">Queue <span class="st p">pending — needs queue buffer</span></div>
-    <code>Q</code><code>Q.N</code><code>Q.AVG</code><code>Q.CLR</code><code>Q.GRW</code><code>Q.SUM</code><code>Q.MIN</code><code>Q.MAX</code><code>Q.RND</code><code>Q.SRT</code><code>Q.REV</code><code>Q.SH</code><code>Q.ADD</code><code>Q.SUB</code><code>Q.MUL</code><code>Q.DIV</code><code>Q.MOD</code>
-
-    <div class="fam">Stack <span class="st p">pending</span></div>
-    <code>S.ALL</code><code>S.POP</code><code>S.CLR</code><code>S.L</code>
-  </div>
-
-  <footer>Source: <code>teletype/src/ops/*.c</code> (upstream) vs the op table in
-  <code>src/apps/sequencer/engine/TeletypeNativeOps.cpp</code> (TT2). Pending counts are approximate —
-  the P/PN and Q families alone are ~100 symbols.</footer>
+  <footer>Source: native op table in
+  <code>src/apps/sequencer/engine/TeletypeNativeOps.cpp</code> (handler registrations) vs
+  <code>teletype/src/ops/*.c</code> (upstream). Family status reflects table coverage +
+  passing <code>TestTeletypeV2*</code> suites as of branch <code>feat/tt2-v2-native</code>.</footer>
 </main>
 </body>
 </html>
