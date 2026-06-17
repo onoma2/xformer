@@ -80,4 +80,98 @@ CASE("LFO.C is a recognized parser token") {
     expectTrue(parse("LFO.C 1 16", &src, err) == E_OK, "LFO.C parses");
 }
 
+CASE("LFO.R sets Free-domain centi-Hz rate, locks Sine/Run") {
+    ModStubHost host; tt2SetActiveHost(&host);
+    TT2Runtime rt = {}; init(rt); TT2OutputState out = {}; init(out);
+    evalText("LFO.R 1 100", rt, out);
+    expectTrue(host.mods[0].rateDomain() == Modulator::RateDomain::Free, "domain Free");
+    expectEqual(host.mods[0].rate(), 100, "rate = 100 centi-Hz (1Hz)");
+    expectTrue(host.mods[0].shape() == Modulator::Shape::Sine, "shape Sine");
+    expectTrue(host.mods[0].mode() == Modulator::Mode::Run, "mode Run");
+    tt2SetActiveHost(nullptr);
+}
+
+CASE("LFO.C sets Tempo-domain rate from note divisor (384/d)") {
+    ModStubHost host; tt2SetActiveHost(&host);
+    TT2Runtime rt = {}; init(rt); TT2OutputState out = {}; init(out);
+    evalText("LFO.C 1 16", rt, out);
+    expectTrue(host.mods[0].rateDomain() == Modulator::RateDomain::Tempo, "domain Tempo");
+    expectEqual(host.mods[0].rate(), 24, "1/16 -> rate 24");
+    evalText("LFO.C 1 4", rt, out);
+    expectEqual(host.mods[0].rate(), 96, "1/4 -> rate 96");
+    evalText("LFO.C 1 1", rt, out);
+    expectEqual(host.mods[0].rate(), 384, "whole note -> rate 384");
+    tt2SetActiveHost(nullptr);
+}
+
+CASE("LFO.A sets depth, LFO.O sets offset") {
+    ModStubHost host; tt2SetActiveHost(&host);
+    TT2Runtime rt = {}; init(rt); TT2OutputState out = {}; init(out);
+    evalText("LFO.A 1 100", rt, out);
+    expectEqual(host.mods[0].depth(), 100, "LFO.A -> depth");
+    evalText("LFO.O 1 -10", rt, out);
+    expectEqual(host.mods[0].offset(), -10, "LFO.O -> offset");
+    tt2SetActiveHost(nullptr);
+}
+
+CASE("any LFO.* write forces Shape::Sine and Mode::Run") {
+    ModStubHost host; tt2SetActiveHost(&host);
+    TT2Runtime rt = {}; init(rt); TT2OutputState out = {}; init(out);
+    host.mods[1].setShape(Modulator::Shape::ADSR);
+    host.mods[1].setMode(Modulator::Mode::Trig);
+    evalText("LFO.A 2 50", rt, out);
+    expectTrue(host.mods[1].shape() == Modulator::Shape::Sine, "shape forced Sine");
+    expectTrue(host.mods[1].mode() == Modulator::Mode::Run, "mode forced Run");
+    expectEqual(host.mods[1].depth(), 50, "depth still set");
+    tt2SetActiveHost(nullptr);
+}
+
+CASE("rate ops switch the slot's domain (later op wins)") {
+    ModStubHost host; tt2SetActiveHost(&host);
+    TT2Runtime rt = {}; init(rt); TT2OutputState out = {}; init(out);
+    evalText("LFO.R 3 200", rt, out);
+    evalText("LFO.C 3 8", rt, out);
+    expectTrue(host.mods[2].rateDomain() == Modulator::RateDomain::Tempo, "ends Tempo");
+    expectEqual(host.mods[2].rate(), 48, "1/8 -> rate 48");
+    tt2SetActiveHost(nullptr);
+}
+
+CASE("values clamp to each field's range") {
+    ModStubHost host; tt2SetActiveHost(&host);
+    TT2Runtime rt = {}; init(rt); TT2OutputState out = {}; init(out);
+    evalText("LFO.R 1 9999", rt, out);
+    expectEqual(host.mods[0].rate(), 1600, "Free rate clamps to 1600 (16Hz)");
+    evalText("LFO.R 1 0", rt, out);
+    expectEqual(host.mods[0].rate(), 1, "Free rate clamps to 1");
+    evalText("LFO.C 1 0", rt, out);
+    expectEqual(host.mods[0].rate(), 384, "divisor floored to 1 -> 384");
+    evalText("LFO.C 1 100", rt, out);
+    expectEqual(host.mods[0].rate(), 6, "384/100=3 clamps to Tempo min 6");
+    evalText("LFO.A 1 999", rt, out);
+    expectEqual(host.mods[0].depth(), 127, "depth clamps to 127");
+    evalText("LFO.O 1 999", rt, out);
+    expectEqual(host.mods[0].offset(), 63, "offset clamps to 63");
+    tt2SetActiveHost(nullptr);
+}
+
+CASE("read path returns the field, no lock applied") {
+    ModStubHost host; tt2SetActiveHost(&host);
+    TT2Runtime rt = {}; init(rt); TT2OutputState out = {}; init(out);
+    evalText("LFO.A 1 70", rt, out);
+    expectEqual(int(evalText("LFO.A 1", rt, out).value), 70, "LFO.A get returns depth");
+    tt2SetActiveHost(nullptr);
+}
+
+CASE("slot index out of range is OutOfRange, no write") {
+    ModStubHost host; tt2SetActiveHost(&host);
+    TT2Runtime rt = {}; init(rt); TT2OutputState out = {}; init(out);
+    int before = host.mods[0].rate();
+    expectTrue(evalText("LFO.R 0 100", rt, out).error == TT2EvalError::OutOfRange,
+               "slot 0 rejected");
+    expectTrue(evalText("LFO.R 9 100", rt, out).error == TT2EvalError::OutOfRange,
+               "slot 9 rejected");
+    expectEqual(host.mods[0].rate(), before, "no write on bad slot");
+    tt2SetActiveHost(nullptr);
+}
+
 }

@@ -2132,6 +2132,77 @@ static void opEnvT(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // ---------------------------------------------------------------------------
+// LFO ops (LFO.*) — Sine-shape-locked, free-running aliases over the modulator
+// slots. Every write forces Shape::Sine + Mode::Run. LFO.R sets a free rate in
+// centi-Hz; LFO.C a clocked rate from a note divisor (rate = PPQN*2/d). LFO.A/O
+// set depth/offset. Index 1-based. LFO.W/F/S deferred.
+// ---------------------------------------------------------------------------
+
+static void tt2ForceLfo(Modulator &m) {
+    m.setShape(Modulator::Shape::Sine);
+    m.setMode(Modulator::Mode::Run);
+}
+
+#define TT2_LFO_FIELD_OP(fn, getter, setter)                                   \
+    static void fn(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,    \
+                   int16_t *stack, uint8_t &stackSize, bool isSet,             \
+                   TT2EvalError &error) {                                      \
+        int16_t idx = 0;                                                       \
+        if (!popOutputIndex(stack, stackSize, idx, error, CONFIG_MODULATOR_COUNT)) return; \
+        TT2Host *h = tt2ActiveHost();                                          \
+        if (isSet && stackSize >= 1) {                                        \
+            int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return; \
+            if (h) { Modulator &m = h->hostModulator(uint8_t(idx)); tt2ForceLfo(m); m.setter(v); } \
+        } else {                                                              \
+            pushStack(stack, stackSize,                                       \
+                      h ? int16_t(h->hostModulator(uint8_t(idx)).getter()) : 0, error); \
+        }                                                                     \
+    }
+TT2_LFO_FIELD_OP(opLfoA, depth, setDepth)
+TT2_LFO_FIELD_OP(opLfoO, offset, setOffset)
+
+// LFO.R n x — free rate in centi-Hz (Free domain). Set the domain before the
+// rate so setRate() clamps into the Free range (1..1600).
+static void opLfoR(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, CONFIG_MODULATOR_COUNT)) return;
+    TT2Host *h = tt2ActiveHost();
+    if (isSet && stackSize >= 1) {
+        int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+        if (h) {
+            Modulator &m = h->hostModulator(uint8_t(idx));
+            tt2ForceLfo(m);
+            m.setRateDomain(Modulator::RateDomain::Free);
+            m.setRate(v);
+        }
+    } else {
+        pushStack(stack, stackSize, h ? int16_t(h->hostModulator(uint8_t(idx)).rate()) : 0, error);
+    }
+}
+
+// LFO.C n d — clocked rate from a note divisor (Tempo domain). rate = PPQN*2/d;
+// the setter clamps into the Tempo range (6..6144). d floored to 1.
+static void opLfoC(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    int16_t idx = 0;
+    if (!popOutputIndex(stack, stackSize, idx, error, CONFIG_MODULATOR_COUNT)) return;
+    TT2Host *h = tt2ActiveHost();
+    if (isSet && stackSize >= 1) {
+        int16_t d = 0; if (!popStack(stack, stackSize, d, error)) return;
+        if (h) {
+            Modulator &m = h->hostModulator(uint8_t(idx));
+            tt2ForceLfo(m);
+            m.setRateDomain(Modulator::RateDomain::Tempo);
+            int div = d < 1 ? 1 : int(d);
+            m.setRate((CONFIG_PPQN * 2) / div);
+        }
+    } else {
+        pushStack(stack, stackSize, h ? int16_t(h->hostModulator(uint8_t(idx)).rate()) : 0, error);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // MIDI query ops (MI.*) — read the runtime MIDI buffer. Indexed ops read the
 // active frame's I loop var (1-based), matching upstream teletype/src/ops/midi.c.
 // ---------------------------------------------------------------------------
@@ -4061,6 +4132,11 @@ namespace {
             table[E_OP_E_D] = opEnvD;
             table[E_OP_E_O] = opEnvO;
             table[E_OP_E_T] = opEnvT;
+            // LFO.* aliases (Sine-locked over the modulator slots). W/F/S deferred.
+            table[E_OP_LFO_R] = opLfoR;
+            table[E_OP_LFO_C] = opLfoC;
+            table[E_OP_LFO_A] = opLfoA;
+            table[E_OP_LFO_O] = opLfoO;
             // E_OP_G_O / E_OP_G_BAR / E_OP_G_B / E_OP_G_R left nullptr ->
             // UnsupportedOp (no live GeodeConfig field; see Geode ops comment).
             table[E_OP_MI_SYM_DOLLAR]      = opMiDollar;
