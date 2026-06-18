@@ -35,15 +35,6 @@ void clear_delays(scene_state_t *ss) {
 
 
 /////////////////////////////////////////////////////////////////
-// PARSE ////////////////////////////////////////////////////////
-
-tele_error_t parse(const char *cmd, tele_command_t *out,
-              char error_msg[TELE_ERROR_MSG_LENGTH]) {
-    // call the Ragel generated scanner function
-    return scanner(cmd, out, error_msg);
-}
-
-/////////////////////////////////////////////////////////////////
 // VALIDATE /////////////////////////////////////////////////////
 
 tele_error_t validate(const tele_command_t *c,
@@ -423,23 +414,3 @@ void tele_tr_pulse_end(scene_state_t *ss, uint8_t i) {
     tele_tr(i, ss->variables.tr[i]);
 }
 
-/////////////////////////////////////////////////////////////////
-// ERROR MESSAGES ///////////////////////////////////////////////
-
-const char *tele_error(tele_error_t e) {
-    const char *error_string[] = { "OK",
-                                   "UNKNOWN WORD",
-                                   "COMMAND TOO LONG",
-                                   "NOT ENOUGH PARAMS",
-                                   "TOO MANY PARAMS",
-                                   "MOD NOT ALLOWED HERE",
-                                   "EXTRA PRE SEPARATOR",
-                                   "NEED PRE SEPARATOR",
-                                   "BAD PRE SEPARATOR",
-                                   "NO SUB SEP IN PRE",
-                                   "MOVE LEFT",
-                                   "NEED SPACE AFTER :",
-                                   "NEED SPACE AFTER ;" };
-
-    return error_string[e];
-}

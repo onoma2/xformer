@@ -182,6 +182,7 @@ set(sources
     ../../../teletype/src/match_token.c
     ../../../teletype/src/scale.c
     ../../../teletype/src/scanner.c
+    ../../../teletype/src/tt_parser.c
     ../../../teletype/src/scene_serialization.c
     ../../../teletype/src/state.c
     ../../../teletype/src/table.c

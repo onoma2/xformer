@@ -6,7 +6,7 @@
 
 #include "command.h"
 #include "match_token.h"
-#include "teletype.h"
+#include "tt_parser.h"
 
 const size_t kMaxTokenLength = 32;
 

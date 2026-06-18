@@ -102,14 +102,6 @@ int16_t bit_reverse(int16_t unreversed, int8_t bits_to_reverse) {
     return reversed;
 }
 
-int16_t rev_bitstring_to_int(const char *token) {
-    int8_t length = strlen(token);
-    int16_t value = 0;
-    for (int8_t i = 0; i < length; i++) {
-        if (token[i] == '1') { value += 1 << i; }
-    }
-    return value;
-}
 
 void itoa_hex(uint16_t value, char *out) {
     static char num[] = "0123456789ABCDEF";

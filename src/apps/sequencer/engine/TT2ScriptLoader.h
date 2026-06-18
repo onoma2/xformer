@@ -4,15 +4,10 @@
 // frontend: each non-blank line is parse()'d -> lowerCommand()'d -> stored.
 // Shared by tests now and the editor/loader later.
 
-// Pre-include model/Types.h in C++ mode so that when teletype.h pulls in
-// state.h -> types.h inside extern "C", the C++ templates are already
-// processed and skipped by #pragma once (mirrors the TT2 test pattern).
-#include "model/Types.h"
 #include "model/TeletypeProgram.h"
 
 extern "C" {
-#include "command.h"
-#include "teletype.h"
+#include "tt_parser.h"
 }
 
 #include <cstdint>
