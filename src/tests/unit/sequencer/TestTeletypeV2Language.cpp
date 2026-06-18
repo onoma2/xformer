@@ -235,6 +235,17 @@ UNIT_TEST("TeletypeV2Language") {
         expectEqual(runtime.variables.n_scale_bits[2], int16_t(1387), "N.BX set slot 2");
     }
 
+    CASE("chaos_default_is_scaled_not_zero_state") {
+        // Must run before any other CHAOS case: chaos state is a TU-global
+        // initialized once. A first CHAOS read must use the scaled logistic
+        // default (fx=0.5, fr~3.5), not zero float state — regression guard
+        // for the native port of upstream's boot-time chaos_init().
+        TT2Runtime runtime = {}; init(runtime);
+        TT2OutputState output = {}; init(output);
+        expectEqual(int(getv("CHAOS", runtime, output)), 8749,
+                    "plain CHAOS after init returns scaled logistic default, not 0");
+    }
+
     CASE("chaos_get_set") {
         TT2Runtime runtime = {}; init(runtime);
         TT2OutputState output = {}; init(output);

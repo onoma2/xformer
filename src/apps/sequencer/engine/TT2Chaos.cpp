@@ -41,10 +41,17 @@ static const float chaos_henon_b = 0.3;
 static const int chaos_cell_count = 8;
 static const int chaos_cell_max = 0xff;
 
-// Positional init (C++17 has no C99 designated initializers): ix, fx, ir, fr,
-// fx0, fx1, alg — unspecified float history starts at 0, as in the C original.
-static chaos_state_t chaos_state = { 5000, 0.f, 5000, 0.f, 0.f, 0.f,
-                                     CHAOS_ALGO_LOGISTIC };
+// Upstream ran chaos_init() at boot (module/main.c) to scale fx/fr from the
+// integer defaults before any script; without it a first CHAOS read would
+// return zero-state instead of the scaled logistic default. Bake that scaling
+// into the static init so the native port matches. (Positional init — C++17
+// has no C99 designated initializers: ix, fx, ir, fr, fx0, fx1, alg.)
+static chaos_state_t makeDefaultChaosState() {
+    chaos_state_t s = { 5000, 0.f, 5000, 0.f, 0.f, 0.f, CHAOS_ALGO_LOGISTIC };
+    chaos_scale_values(&s);
+    return s;
+}
+static chaos_state_t chaos_state = makeDefaultChaosState();
 
 void chaos_init() {
     chaos_scale_values(&chaos_state);
