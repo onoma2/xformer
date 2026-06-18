@@ -19,3 +19,11 @@ void chaos_set_r(int16_t);
 int16_t chaos_get_r(void);
 void chaos_set_alg(int16_t);
 int16_t chaos_get_alg(void);
+
+// Scale tables indexed directly by TT2 dispatch (external linkage), ported
+// from the table.c subset.
+extern const uint16_t table_nr[32];
+extern const uint8_t table_n_s[9][7];
+extern const uint8_t table_n_c[13][4];
+extern const uint8_t table_n_cs[9][7];
+extern const uint16_t table_n_b[20];

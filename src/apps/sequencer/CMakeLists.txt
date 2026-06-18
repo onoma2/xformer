@@ -18,11 +18,11 @@ set(sources
     engine/MidiLearn.cpp
     engine/MidiOutputEngine.cpp
     engine/NoteTrackEngine.cpp
-    engine/TeletypeBridge.cpp
     engine/TeletypeNativeOps.cpp
     engine/TT2Chaos.cpp
     engine/TT2DrumHelpers.cpp
     engine/TT2Euclidean.cpp
+    engine/TT2ScaleTables.cpp
     engine/TT2OpNames.cpp
     engine/TT2Printer.cpp
     engine/TT2SceneSerializer.cpp
@@ -176,41 +176,10 @@ set(sources
     ui/painters/SequencePainter.cpp
     ui/painters/SongPainter.cpp
     ui/painters/WindowPainter.cpp
-    # teletype
-    ../../../teletype/src/chaos.c
-    ../../../teletype/src/command.c
-    ../../../teletype/src/drum_helpers.c
-    ../../../teletype/src/every.c
-    ../../../teletype/src/helpers.c
+    # teletype — Ragel tokenizer island only (everything else is now native C++)
     ../../../teletype/src/match_token.c
-    ../../../teletype/src/scale.c
     ../../../teletype/src/scanner.c
     ../../../teletype/src/tt_parser.c
-    ../../../teletype/src/scene_serialization.c
-    ../../../teletype/src/state.c
-    ../../../teletype/src/table.c
-    ../../../teletype/src/teletype.c
-    ../../../teletype/src/turtle.c
-    ../../../teletype/src/ops/controlflow.c
-    ../../../teletype/src/ops/delay.c
-    ../../../teletype/src/ops/hardware.c
-    ../../../teletype/src/ops/init.c
-    ../../../teletype/src/ops/maths.c
-    ../../../teletype/src/ops/metronome.c
-    ../../../teletype/src/ops/midi.c
-    ../../../teletype/src/ops/modulator.c
-    ../../../teletype/src/ops/op.c
-    ../../../teletype/src/ops/patterns.c
-    ../../../teletype/src/ops/queue.c
-    ../../../teletype/src/ops/seed.c
-    ../../../teletype/src/ops/stack.c
-    ../../../teletype/src/ops/turtle.c
-    ../../../teletype/src/ops/variables.c
-    ../../../teletype/libavr32/src/euclidean/data.c
-    ../../../teletype/libavr32/src/euclidean/euclidean.c
-    ../../../teletype/libavr32/src/music.c
-    ../../../teletype/libavr32/src/random.c
-    ../../../teletype/libavr32/src/util.c
 )
 
 include_directories(.)

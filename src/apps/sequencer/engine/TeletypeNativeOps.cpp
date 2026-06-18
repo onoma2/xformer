@@ -4,17 +4,7 @@
 
 #include "Platform.h"   // CCMRAM_BSS
 
-#include "TT2Helpers.h"  // native euclidean/tresillo/drum/velocity/chaos ports
-
-// Scale tables still come from the vendored table.c until U4 ports them native
-// (atomically with table.c's removal, to avoid a duplicate-symbol clash).
-extern "C" {
-    extern const uint16_t table_nr[32];
-    extern const uint8_t table_n_s[9][7];
-    extern const uint8_t table_n_c[13][4];
-    extern const uint8_t table_n_cs[9][7];
-    extern const uint16_t table_n_b[20];
-}
+#include "TT2Helpers.h"  // native euclidean/tresillo/drum/velocity/chaos + scale tables
 
 // ---------------------------------------------------------------------------
 // Helper: pop a 1-based output index and convert to 0-based.

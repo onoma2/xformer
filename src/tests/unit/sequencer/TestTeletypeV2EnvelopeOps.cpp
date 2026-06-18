@@ -6,7 +6,7 @@
 
 extern "C" {
 #include "command.h"
-#include "teletype.h"
+#include "tt_parser.h"
 #include "ops/op_enum.h"
 }
 

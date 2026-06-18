@@ -3,14 +3,11 @@
 #include "engine/TT2Evaluator.h"
 #include "engine/TT2TrackEngine.h"
 
-// Pre-include model/Types.h in C++ mode so that when teletype.h pulls in
-// state.h -> types.h inside extern "C", the C++ templates are already
-// processed and skipped by #pragma once.
 #include "model/Types.h"
 
 extern "C" {
 #include "command.h"
-#include "teletype.h"
+#include "tt_parser.h"
 #include "ops/op_enum.h"
 }
 
