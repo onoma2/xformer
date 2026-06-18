@@ -17,8 +17,7 @@
 #include "os/os.h"
 
 extern "C" {
-#include "command.h"
-#include "teletype.h"
+#include "tt_parser.h"
 }
 
 namespace {
@@ -692,11 +691,6 @@ void TeletypeScriptViewPage::commitLine() {
     tele_command_t parsed = {};
     char errorMsg[TELE_ERROR_MSG_LENGTH] = {};
     tele_error_t error = parse(_editBuffer, &parsed, errorMsg);
-    if (error != E_OK) {
-        showMessage(tele_error(error));
-        return;
-    }
-    error = validate(&parsed, errorMsg);
     if (error != E_OK) {
         showMessage(tele_error(error));
         return;
