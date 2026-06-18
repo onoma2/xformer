@@ -7,7 +7,6 @@
 
 #include "apps/sequencer/engine/PhaseFluxTrackEngine.h"
 #include "apps/sequencer/engine/NoteTrackEngine.h"
-#include "apps/sequencer/engine/TeletypeTrackEngine.h"
 #include "apps/sequencer/engine/StochasticTrackEngine.h"
 #include "apps/sequencer/engine/CurveTrackEngine.h"
 #include "apps/sequencer/engine/Engine.h"
@@ -45,7 +44,6 @@ CASE("print_sizes") {
     std::printf("NoteTrackEngine          = %zu bytes\n", sizeof(NoteTrackEngine));
     std::printf("CurveTrackEngine         = %zu bytes\n", sizeof(CurveTrackEngine));
     std::printf("StochasticTrackEngine    = %zu bytes\n", sizeof(StochasticTrackEngine));
-    std::printf("TeletypeTrackEngine      = %zu bytes\n", sizeof(TeletypeTrackEngine));
     std::printf("Engine::TrackEngineContainer = %zu bytes  (sized to largest engine)\n",
                 sizeof(Engine::TrackEngineContainer));
     std::printf("--- end engine probe ---\n");
