@@ -20,6 +20,9 @@ set(sources
     engine/NoteTrackEngine.cpp
     engine/TeletypeBridge.cpp
     engine/TeletypeNativeOps.cpp
+    engine/TT2Chaos.cpp
+    engine/TT2DrumHelpers.cpp
+    engine/TT2Euclidean.cpp
     engine/TT2OpNames.cpp
     engine/TT2Printer.cpp
     engine/TT2SceneSerializer.cpp

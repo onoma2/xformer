@@ -4,20 +4,11 @@
 
 #include "Platform.h"   // CCMRAM_BSS
 
-// Pure helpers/tables from the linked teletype C lib (no scene_state_t / bridge
-// VM — these are stateless utilities + const data, safe to share and survive
-// Phase-5 bridge deletion).
+#include "TT2Helpers.h"  // native euclidean/tresillo/drum/velocity/chaos ports
+
+// Scale tables still come from the vendored table.c until U4 ports them native
+// (atomically with table.c's removal, to avoid a duplicate-symbol clash).
 extern "C" {
-    int euclidean(int fill, int len, int step);
-    int tresillo(int bank, int pattern1, int pattern2, int len, int step);
-    int drum(int bank, int pattern, int step);
-    int velocity(int pattern, int step);
-    void chaos_set_val(int16_t);
-    int16_t chaos_get_val(void);
-    void chaos_set_r(int16_t);
-    int16_t chaos_get_r(void);
-    void chaos_set_alg(int16_t);
-    int16_t chaos_get_alg(void);
     extern const uint16_t table_nr[32];
     extern const uint8_t table_n_s[9][7];
     extern const uint8_t table_n_c[13][4];
