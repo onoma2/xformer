@@ -97,9 +97,6 @@ void ClipBoard::copyPattern(int patternIndex) {
         case Track::TrackMode::Indexed:
             pattern.sequences[trackIndex].data.indexed = track.indexedTrack().sequence(patternIndex);
             break;
-        case Track::TrackMode::Teletype:
-            pattern.sequences[trackIndex].data.teletypeClip = track.teletypeTrack().clipSnapshot(patternIndex);
-            break;
         case Track::TrackMode::Stochastic:
             pattern.sequences[trackIndex].data.stochastic = track.stochasticTrack().sequence(patternIndex);
             break;
@@ -275,9 +272,6 @@ void ClipBoard::pastePattern(int patternIndex) const {
                     break;
                 case Track::TrackMode::Indexed:
                     track.indexedTrack().sequence(patternIndex) = pattern.sequences[trackIndex].data.indexed;
-                    break;
-                case Track::TrackMode::Teletype:
-                    track.teletypeTrack().setClipForPerformerPattern(patternIndex, pattern.sequences[trackIndex].data.teletypeClip);
                     break;
                 case Track::TrackMode::Stochastic:
                     track.stochasticTrack().sequence(patternIndex) = pattern.sequences[trackIndex].data.stochastic;

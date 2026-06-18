@@ -12,7 +12,6 @@
 #include "TuesdayTrackEngine.h"
 #include "DiscreteMapTrackEngine.h"
 #include "IndexedTrackEngine.h"
-#include "TeletypeTrackEngine.h"
 #include "StochasticTrackEngine.h"
 #include "PhaseFluxTrackEngine.h"
 #include "TT2TrackEngine.h"
@@ -44,7 +43,7 @@
 
 class Engine : private Clock::Listener {
 public:
-    using TrackEngineContainer = Container<NoteTrackEngine, CurveTrackEngine, MidiCvTrackEngine, TuesdayTrackEngine, DiscreteMapTrackEngine, IndexedTrackEngine, TeletypeTrackEngine, StochasticTrackEngine, PhaseFluxTrackEngine, TT2TrackEngine>;
+    using TrackEngineContainer = Container<NoteTrackEngine, CurveTrackEngine, MidiCvTrackEngine, TuesdayTrackEngine, DiscreteMapTrackEngine, IndexedTrackEngine, StochasticTrackEngine, PhaseFluxTrackEngine, TT2TrackEngine>;
     using TrackEngineContainerArray = std::array<TrackEngineContainer, CONFIG_TRACK_COUNT>;
     using TrackEngineArray = std::array<TrackEngine *, CONFIG_TRACK_COUNT>;
 
@@ -179,10 +178,6 @@ public:
     void setCvOutput(int channel, float value) { _cvOutputOverrideValues[channel] = value; }
 
     void selectTrackPattern(int trackIndex, int patternIndex);
-    void panicTeletype();
-    void setTeletypeMetroAll(int16_t periodMs);
-    void setTeletypeMetroActiveAll(bool active);
-    void resetTeletypeMetroAll();
 
     const Clock &clock() const { return _clock; }
           Clock &clock()       { return _clock; }

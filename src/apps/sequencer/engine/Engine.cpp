@@ -446,37 +446,6 @@ void Engine::selectTrackPattern(int trackIndex, int patternIndex) {
     _model.project().playState().selectTrackPattern(trackIndex, patternIndex, PlayState::ExecuteType::Immediate);
 }
 
-void Engine::panicTeletype() {
-    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
-        if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
-            static_cast<TeletypeTrackEngine &>(*_trackEngines[trackIndex]).panic();
-        }
-    }
-}
-
-void Engine::setTeletypeMetroAll(int16_t periodMs) {
-    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
-        if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
-            static_cast<TeletypeTrackEngine &>(*_trackEngines[trackIndex]).setMetroPeriod(periodMs);
-        }
-    }
-}
-
-void Engine::setTeletypeMetroActiveAll(bool active) {
-    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
-        if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
-            static_cast<TeletypeTrackEngine &>(*_trackEngines[trackIndex]).setMetroActive(active);
-        }
-    }
-}
-
-void Engine::resetTeletypeMetroAll() {
-    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
-        if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
-            static_cast<TeletypeTrackEngine &>(*_trackEngines[trackIndex]).resetMetroTimer();
-        }
-    }
-}
 
 uint32_t Engine::noteDivisor() const {
     return _project.timeSignature().noteDivisor();
@@ -634,9 +603,6 @@ void Engine::updateTrackSetups() {
                 break;
             case Track::TrackMode::Indexed:
                 trackEngine = trackContainer.create<IndexedTrackEngine>(*this, _model, track);
-                break;
-            case Track::TrackMode::Teletype:
-                trackEngine = trackContainer.create<TeletypeTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::Stochastic:
                 trackEngine = trackContainer.create<StochasticTrackEngine>(*this, _model, track);

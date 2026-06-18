@@ -31,9 +31,6 @@ void Track::clearPattern(int patternIndex) {
     case TrackMode::Indexed:
         _track.indexed->sequence(patternIndex).clear();
         break;
-    case TrackMode::Teletype:
-        _track.teletype->clearClipForPerformerPattern(patternIndex);
-        break;
     case TrackMode::Stochastic:
         _track.stochastic->sequence(patternIndex).clear();
         break;
@@ -66,9 +63,6 @@ void Track::copyPattern(int src, int dst) {
         break;
     case TrackMode::Indexed:
         _track.indexed->sequence(dst) = _track.indexed->sequence(src);
-        break;
-    case TrackMode::Teletype:
-        _track.teletype->copyClipForPerformerPattern(src, dst);
         break;
     case TrackMode::Stochastic:
         _track.stochastic->sequence(dst) = _track.stochastic->sequence(src);
@@ -110,9 +104,6 @@ void Track::gateOutputName(int index, StringBuilder &str) const {
     case TrackMode::Indexed:
         _track.indexed->gateOutputName(index, str);
         break;
-    case TrackMode::Teletype:
-        _track.teletype->gateOutputName(index, str);
-        break;
     case TrackMode::Stochastic:
         str("Gate");
         break;
@@ -144,9 +135,6 @@ void Track::cvOutputName(int index, StringBuilder &str) const {
         break;
     case TrackMode::Indexed:
         _track.indexed->cvOutputName(index, str);
-        break;
-    case TrackMode::Teletype:
-        _track.teletype->cvOutputName(index, str);
         break;
     case TrackMode::Stochastic:
         str("CV");
@@ -188,9 +176,6 @@ void Track::write(VersionedSerializedWriter &writer) const {
         break;
     case TrackMode::Indexed:
         _track.indexed->write(writer);
-        break;
-    case TrackMode::Teletype:
-        _track.teletype->write(writer);
         break;
     case TrackMode::Stochastic:
         _track.stochastic->write(writer);
@@ -237,9 +222,6 @@ void Track::read(VersionedSerializedReader &reader) {
         break;
     case TrackMode::Indexed:
         _track.indexed->read(reader);
-        break;
-    case TrackMode::Teletype:
-        _track.teletype->read(reader);
         break;
     case TrackMode::Stochastic:
         _track.stochastic->read(reader);

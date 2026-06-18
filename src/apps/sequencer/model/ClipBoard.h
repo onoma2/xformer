@@ -108,7 +108,6 @@ private:
                 TuesdaySequence tuesday;
                 DiscreteMapSequence discreteMap;
                 IndexedSequence indexed;
-                TeletypeTrack::PatternSlot teletypeClip;
                 StochasticSequence stochastic;
                 PhaseFluxSequence phaseFlux;
             } data;

@@ -112,14 +112,6 @@ CASE("Phase routes for both Curve and PhaseFlux (globalPhase, shared key)") {
     expectEqual(int(RouteBrowse::paramKeyToTarget(ParamKey::Phase)), int(Routing::Target::Phase), "Phase reverse-resolves");
 }
 
-CASE("modes not wired into overrideParam() stay on the old path") {
-    uint8_t key; RouteParam::Range range;
-    // Teletype has no overrideParam() case (no routable params), so every target
-    // stays legacy. All other engines are now migrated.
-    expectFalse(RouteResolve::overrideParam(Mode::Teletype, Routing::Target::Scale, key, range), "Teletype non-migrated");
-    expectFalse(RouteResolve::overrideParam(Mode::Teletype, Routing::Target::Transpose, key, range), "Teletype non-migrated");
-}
-
 CASE("unmapped + special targets are never migrated") {
     uint8_t key; RouteParam::Range range;
     expectFalse(RouteResolve::overrideParam(Mode::Note, Routing::Target::Tempo, key, range), "Tempo");

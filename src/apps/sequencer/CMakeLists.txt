@@ -19,7 +19,6 @@ set(sources
     engine/MidiOutputEngine.cpp
     engine/NoteTrackEngine.cpp
     engine/TeletypeBridge.cpp
-    engine/TeletypeTrackEngine.cpp
     engine/TeletypeNativeOps.cpp
     engine/TT2OpNames.cpp
     engine/TT2Printer.cpp
@@ -68,7 +67,6 @@ set(sources
     model/DiscreteMapTrack.cpp
     model/IndexedSequence.cpp
     model/IndexedTrack.cpp
-    model/TeletypeTrack.cpp
     model/TuesdayTrack.cpp
     model/PlayState.cpp
     model/ParamTableGlobal.cpp
