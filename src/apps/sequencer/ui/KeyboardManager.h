@@ -18,7 +18,7 @@
 class KeyboardManager {
 public:
     static char hidKeycodeToAscii(uint8_t keycode, uint8_t modifiers);
-    static int hidKeycodeToStep(uint8_t keycode);
+    static int hidKeycodeToButton(uint8_t keycode);
 
     KeyboardManager();
 
