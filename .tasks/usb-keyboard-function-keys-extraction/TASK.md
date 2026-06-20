@@ -28,6 +28,7 @@ Eliminate the duplicated F1-F5 `pressFunctionButton` dispatch switch block that 
 - `src/apps/sequencer/ui/pages/TextInputPage.cpp:154` — custom text editor keyboard
 
 ## Decisions log
+- 2026-06-21: Follow-on fold — moved `handleFunctionKeys` to the top of `BasePage::keyboard()` itself, making the delegate-only 2-line overrides this task left behind redundant. Deleted 5 (Curve/Indexed/Tuesday/PhaseFlux/DiscreteMap edit pages, cpp+h); NoteSequenceEdit keeps its `isActiveForSelectedTrack` guard. F1-F5 now resolve on every BasePage subclass, including the ~24 that never overrode `keyboard()` — audit confirmed safe (function buttons are universal panel input). Sim build clean. Commit `4d2c1948`. Built alongside the sim↔hw keyboard-parity inventory `docs/plans/keyboard-binding-inventory.md`.
 - 2026-05-17: GeneratorPage added to extraction list (Pattern A with Enter/Escape inside `if(event.isPressed())`).
 - 2026-05-17: Pattern C (PerformerPage, PatternPage) refactored by placing `handleFunctionKeys()` in `default` case rather than at top, avoiding incorrect interception of custom F4 on PerformerPage.
 - 2026-05-17: Build verified — `.data=6,332`, `.bss=112,552`, `.ccmram_bss=54,804` (structural refactor, no new state).
