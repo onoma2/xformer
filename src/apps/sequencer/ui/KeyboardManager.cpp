@@ -52,6 +52,11 @@ int KeyboardManager::hidKeycodeToButton(uint8_t keycode) {
     }
 }
 
+int KeyboardManager::hidKeycodeToTrack(uint8_t keycode) {
+    int button = hidKeycodeToButton(keycode);
+    return MatrixMap::isTrack(button) ? MatrixMap::toTrack(button) : -1;
+}
+
 KeyboardManager::KeyboardManager() :
     _engine(nullptr),
     _messageManager(nullptr)

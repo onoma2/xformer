@@ -4,6 +4,7 @@
 
 #include "ui/LedPainter.h"
 #include "ui/MatrixMap.h"
+#include "ui/KeyboardManager.h"
 
 #include "model/TT2Track.h"
 
@@ -285,6 +286,16 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
     }
 
     const uint8_t keycode = event.keycode();
+
+    // Alt + track key (Q-I) selects the track; plain Q-I types in the editor.
+    if (event.alt() && !event.ctrl() && !event.shift()) {
+        int track = KeyboardManager::hidKeycodeToTrack(keycode);
+        if (track >= 0) {
+            _project.setSelectedTrackIndex(track);
+            event.consume();
+            return;
+        }
+    }
 
     // Ctrl+shortcuts
     if (event.ctrl()) {

@@ -60,4 +60,14 @@ CASE("unmapped keys return -1") {
     expectEqual(KeyboardManager::hidKeycodeToButton(0x00), -1, "null keycode unmapped");
 }
 
+CASE("hidKeycodeToTrack: q-row -> track 0-7, others -1") {
+    expectEqual(KeyboardManager::hidKeycodeToTrack(0x14), 0, "Q -> track 0");
+    expectEqual(KeyboardManager::hidKeycodeToTrack(0x1A), 1, "W -> track 1");
+    expectEqual(KeyboardManager::hidKeycodeToTrack(0x0C), 7, "I -> track 7");
+    expectEqual(KeyboardManager::hidKeycodeToTrack(0x04), -1, "A (step) not a track");
+    expectEqual(KeyboardManager::hidKeycodeToTrack(0x1E), -1, "1 (mode) not a track");
+    expectEqual(KeyboardManager::hidKeycodeToTrack(0x2C), -1, "space not a track");
+    expectEqual(KeyboardManager::hidKeycodeToTrack(0x28), -1, "Enter not a track");
+}
+
 }

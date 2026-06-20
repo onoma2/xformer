@@ -7,6 +7,7 @@
 #include "engine/TT2ScriptLoader.h"
 #include "ui/LedPainter.h"
 #include "ui/MatrixMap.h"
+#include "ui/KeyboardManager.h"
 
 #include "core/utils/StringBuilder.h"
 
@@ -875,6 +876,13 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
 
     // Alt+F1-F8: edit S1-S8; Alt+F9: Metro; Alt+F10: Init
     if (event.alt() && !event.ctrl() && !event.shift()) {
+        // Alt + track key (Q-I) selects the track; plain Q-I types in the editor.
+        int track = KeyboardManager::hidKeycodeToTrack(keycode);
+        if (track >= 0) {
+            _project.setSelectedTrackIndex(track);
+            event.consume();
+            return;
+        }
         if (keycode >= KeyboardEvent::KeyF1 && keycode <= KeyboardEvent::KeyF8) {
             setScriptIndex(keycode - KeyboardEvent::KeyF1);
             event.consume();
