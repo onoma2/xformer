@@ -903,8 +903,3 @@ TuesdayTrack &TuesdayEditPage::tuesdayTrack() {
 const TuesdayTrack &TuesdayEditPage::tuesdayTrack() const {
     return _project.selectedTrack().tuesdayTrack();
 }
-
-void TuesdayEditPage::keyboard(KeyboardEvent &event) {
-    if (handleFunctionKeys(event)) return;
-    BasePage::keyboard(event);
-}

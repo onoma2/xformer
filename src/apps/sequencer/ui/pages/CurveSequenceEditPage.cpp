@@ -1559,8 +1559,3 @@ void CurveSequenceEditPage::gatePresetsContextAction(int index) {
         }
     }
 }
-
-void CurveSequenceEditPage::keyboard(KeyboardEvent &event) {
-    if (handleFunctionKeys(event)) return;
-    BasePage::keyboard(event);
-}

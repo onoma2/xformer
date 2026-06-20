@@ -1994,8 +1994,3 @@ void DiscreteMapSequencePage::transformContextAction(int index) {
         break;
     }
 }
-
-void DiscreteMapSequencePage::keyboard(KeyboardEvent &event) {
-    if (handleFunctionKeys(event)) return;
-    BasePage::keyboard(event);
-}

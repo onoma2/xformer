@@ -46,6 +46,8 @@ bool BasePage::handleFunctionKeys(KeyboardEvent &event) {
 }
 
 void BasePage::keyboard(KeyboardEvent &event) {
+    if (handleFunctionKeys(event)) return;
+
     if (event.isPressed()) {
         if (event.keycode() == KeyboardEvent::KeyTab) {
             KeyState state;

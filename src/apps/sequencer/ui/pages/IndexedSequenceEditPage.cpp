@@ -1926,8 +1926,3 @@ void IndexedSequenceEditPage::durationTransformContextAction(int index) {
         break;
     }
 }
-
-void IndexedSequenceEditPage::keyboard(KeyboardEvent &event) {
-    if (handleFunctionKeys(event)) return;
-    BasePage::keyboard(event);
-}

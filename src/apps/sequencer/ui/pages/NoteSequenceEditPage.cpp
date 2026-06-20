@@ -1229,6 +1229,5 @@ void NoteSequenceEditPage::keyboard(KeyboardEvent &event) {
         return;
     }
 
-    if (handleFunctionKeys(event)) return;
     BasePage::keyboard(event);
 }
