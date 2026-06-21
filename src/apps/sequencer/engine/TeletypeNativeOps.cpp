@@ -1,6 +1,7 @@
 #include "TT2Evaluator.h"
 #include "TT2Runner.h"
 #include "TT2Host.h"
+#include "TeletypeNativeOps.h"
 
 #include "Platform.h"   // CCMRAM_BSS
 
@@ -424,6 +425,32 @@ static const int16_t tt2EtTable[128] = {
     14746, 14882, 15019, 15155, 15292, 15428, 15565, 15701, 15838, 15974, 16111, 16247,
     16384, 16521, 16657, 16794, 16930, 17067, 17203, 17340,
 };
+
+// Verbatim port of teletype pattern_mode transpose_n_value: quantize value to
+// the ET grid, shift by `interval` semitones (quantize-to-lower-note on
+// off-grid up-transpose), return that note's raw value.
+int16_t tt2TransposeSemitones(int16_t value, int interval) {
+    const int last = 127;
+    if (interval > last) interval = last;
+    else if (interval < -last) interval = -last;
+    if (value > tt2EtTable[last]) {
+        int idx = last;
+        if (interval < 0) idx++;
+        return tt2EtTable[(idx + interval) % (last + 1)];
+    }
+    int16_t newVal = 0;
+    for (int i = 0; i <= last; i++) {
+        if (tt2EtTable[i] >= value) {
+            int j = i + interval;
+            if (tt2EtTable[i] > value && interval > 0) j--;
+            if (j > last) j = j % last + 1;
+            else if (j < 0) j = j + last + 1;
+            newVal = tt2EtTable[j];
+            break;
+        }
+    }
+    return newVal;
+}
 
 // table_v[11]: integer volts 0..10 -> raw value. Verbatim from teletype/src/table.c.
 static const int16_t tt2VTable[11] = {

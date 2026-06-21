@@ -23,6 +23,7 @@ function(register_tuesday_test test file)
 endfunction(register_tuesday_test)
 
 register_sequencer_test(TestKeyboardMapping TestKeyboardMapping.cpp)
+register_sequencer_test(TestTT2Transpose TestTT2Transpose.cpp)
 register_sequencer_test(TestCurve TestCurve.cpp)
 register_sequencer_test(TestCurveTrack TestCurveTrack.cpp)
 register_sequencer_test(TestCurveTrackSerialization TestCurveTrackSerialization.cpp)
