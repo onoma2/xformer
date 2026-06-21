@@ -456,17 +456,7 @@ void NoteSequenceEditPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
     auto &sequence = _project.selectedNoteSequence();
 
-    if (key.isContextMenu()) {
-        contextShow();
-        event.consume();
-        return;
-    }
-
-    if (key.pageModifier() && event.count() == 2) {
-        contextShow(true);
-        event.consume();
-        return;
-    }
+    if (handleContextMenuKey(event)) return;
 
     if (key.isQuickEdit()) {
         quickEdit(key.quickEdit());

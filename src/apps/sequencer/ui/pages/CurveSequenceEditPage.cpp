@@ -566,20 +566,10 @@ void CurveSequenceEditPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
     auto &sequence = _project.selectedCurveSequence();
 
-    if (key.isContextMenu()) {
-        contextShow();
-        event.consume();
-        return;
-    }
+    if (handleContextMenuKey(event)) return;
 
     // Check page modifier shortcuts BEFORE quick edit
     // (quick edit catches Page + Step 8-15, so we need to intercept first)
-
-    if (key.pageModifier() && event.count() == 2) {
-        contextShow(true);
-        event.consume();
-        return;
-    }
 
     if (key.pageModifier() && key.is(Key::Step5)) {
         lfoContextShow();

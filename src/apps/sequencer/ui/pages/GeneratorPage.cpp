@@ -403,17 +403,7 @@ void GeneratorPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
-    if (key.isContextMenu()) {
-        contextShow();
-        event.consume();
-        return;
-    }
-
-    if (key.pageModifier() && event.count() == 2) {
-        contextShow(true);
-        event.consume();
-        return;
-    }
+    if (handleContextMenuKey(event)) return;
 
     if (key.isGlobal()) {
         return;
