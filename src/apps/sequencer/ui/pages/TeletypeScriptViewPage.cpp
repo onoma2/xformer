@@ -215,8 +215,8 @@ void TeletypeScriptViewPage::drawBipolarBar(Canvas &canvas, int x, int y, int w,
     }
 }
 
-// Live-value HUD: CV(8) bars + TR(8) gate squares + TI(4) input squares +
-// IN/PARAM/BUS bars. Activity readout only — no routing assignment (deferred).
+// Live-value HUD: CV(8) bars + TR(8) gate squares + TI(8, 2 rows) input squares
+// + IN/PARAM/BUS bars. Activity readout only — no routing assignment (deferred).
 void TeletypeScriptViewPage::drawHud(Canvas &canvas) {
     auto &track = _project.selectedTrack().tt2Track();
     auto &runtime = track.runtime();
@@ -239,23 +239,25 @@ void TeletypeScriptViewPage::drawHud(Canvas &canvas) {
             canvas.fillRect(x + 1, 31, kHudColW - 2, kHudColW - 2);
         }
     }
-    // TI: 4 trigger-input squares, under columns 0-3 (left edge flush with top).
+    // TI: 8 trigger-input squares as 2 rows (1-4 top, 5-8 bottom) under columns
+    // 0-3, brought up so the dashboard stays clear of the IN/PARAM/BUS bars.
     for (int i = 0; i < TT2_TRIGGER_INPUT_COUNT; ++i) {
-        int x = kHudX + i * kHudColPitch;
+        int x = kHudX + (i % 4) * kHudColPitch;
+        int y = 38 + (i / 4) * 7;
         canvas.setColor(Color::Low);
-        canvas.drawRect(x, 43, kHudColW, kHudColW);
+        canvas.drawRect(x, y, kHudColW, kHudColW);
         if (trackEngine.inputState(i)) {
             canvas.setColor(Color::Bright);
-            canvas.fillRect(x + 1, 44, kHudColW - 2, kHudColW - 2);
+            canvas.fillRect(x + 1, y + 1, kHudColW - 2, kHudColW - 2);
         }
     }
     // IN / PARAM (bright) + BUS x4 (dim); last BUS edge flush with the top row.
-    drawBipolarBar(canvas, 225, 41, 4, 11, clamp(int(runtime.variables.in), 0, 16383), Color::MediumBright, Color::Low);
-    drawBipolarBar(canvas, 230, 41, 4, 11, clamp(int(runtime.variables.param), 0, 16383), Color::MediumBright, Color::Low);
+    drawBipolarBar(canvas, 225, 38, 4, 13, clamp(int(runtime.variables.in), 0, 16383), Color::MediumBright, Color::Low);
+    drawBipolarBar(canvas, 230, 38, 4, 13, clamp(int(runtime.variables.param), 0, 16383), Color::MediumBright, Color::Low);
     static const int kBusX[4] = { 235, 240, 245, 250 };
     for (int i = 0; i < 4; ++i) {
         int raw = clamp(int((_engine.busCv(i) + 5.f) / 10.f * 16383.f), 0, 16383);
-        drawBipolarBar(canvas, kBusX[i], 41, 4, 11, raw, Color::MediumLow, Color::Low);
+        drawBipolarBar(canvas, kBusX[i], 38, 4, 13, raw, Color::MediumLow, Color::Low);
     }
 }
 

@@ -100,16 +100,20 @@ def render_tt2_script(canvas, lines, edit_text, script_label,
     # fixed positions, learned by location. Squares vs bars + brightness group
     # them: TI = gate squares, IN/PARAM = bright bipolar, BUS = dim bipolar.
     # TI squares align under the top columns 0-3 (left edge flush with the top row).
-    sq_y = 43
-    for i in range(4):                                  # 4 trigger inputs
-        x = COL_X0 + i * COL_PITCH
+    # 8 trigger inputs as 2 rows (1-4 top, 5-8 bottom) under columns 0-3, brought
+    # up so the dashboard stays clear of the IN/PARAM/BUS bars on the right.
+    sq_y0, sq_pitch = 38, 7
+    for i in range(8):
+        col, row = i % 4, i // 4
+        x = COL_X0 + col * COL_PITCH
+        y = sq_y0 + row * sq_pitch
         canvas.set_color(Color.Low)
-        canvas.draw_rect(x, sq_y, COL_W, COL_W)
+        canvas.draw_rect(x, y, COL_W, COL_W)
         if i < len(ti) and ti[i]:
             canvas.set_color(Color.Bright)
-            canvas.fill_rect(x + 1, sq_y + 1, COL_W - 2, COL_W - 2)
+            canvas.fill_rect(x + 1, y + 1, COL_W - 2, COL_W - 2)
     # IN / PARAM / BUS bars fill the right span; last BUS edge flush with the top row.
-    bar_y, bar_h = 41, 11
+    bar_y, bar_h = 38, 13
     draw_vbar(canvas, 225, bar_y, 4, bar_h, cv_in, Color.MediumBright, Color.Low)   # IN
     draw_vbar(canvas, 230, bar_y, 4, bar_h, param, Color.MediumBright, Color.Low)   # PARAM
     for i, x in enumerate((235, 240, 245, 250)):       # 4 BUS lanes (250+4 = 254)
@@ -131,14 +135,14 @@ def main():
     edit_text = "CV 3 V 2"
     cv = [12000, 4000, 8192, 16000, 6200, 8192, 10500, 2000]
     tr = [1, 0, 1, 0, 0, 1, 0, 0]
-    ti = [1, 0, 1, 1]
+    ti = [1, 0, 1, 1, 0, 1, 1, 0]
 
     fb = FrameBuffer(WIDTH, HEIGHT)
     canvas = Canvas(fb, brightness=1.0)
     render_tt2_script(canvas, lines, edit_text, "S1", cv, tr, ti,
                       cv_in=11000, param=5000, bus=[9000, 8192, 12500, 3000])
     img = framebuffer_to_image(fb, scale=4)
-    path = os.path.join(out_dir, "tt2-script-hud-proposed.png")
+    path = os.path.join(out_dir, "tt2-script-hud-2row.png")
     img.save(path)
     print("Saved", path)
 
