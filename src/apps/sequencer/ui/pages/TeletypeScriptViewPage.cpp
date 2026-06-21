@@ -710,6 +710,7 @@ void TeletypeScriptViewPage::commitLine() {
     char errorMsg[TELE_ERROR_MSG_LENGTH] = {};
     tele_error_t error = parse(_editBuffer, &parsed, errorMsg);
     if (error != E_OK) {
+        pushHistory(_editBuffer);
         showMessage(tele_error(error));
         return;
     }
