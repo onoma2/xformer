@@ -63,6 +63,7 @@ void TeletypeScriptViewPage::enter() {
     _liveMode = true;
     _selectedLine = 0;
     _hasLiveResult = false;
+    _undoOp = UndoOp::None;
     setEditBuffer("");
 }
 
@@ -638,6 +639,7 @@ void TeletypeScriptViewPage::setScriptIndex(int scriptIndex) {
     _liveMode = false;
     if (_scriptIndex != scriptIndex) {
         _scriptIndex = scriptIndex;
+        _undoOp = UndoOp::None;
         loadEditBuffer(0);
     }
 }
@@ -738,8 +740,14 @@ void TeletypeScriptViewPage::commitLine() {
     }
 
     auto &track = _project.selectedTrack().tt2Track();
+    auto &program = track.program();
+    TT2Script &script = program.scripts[_scriptIndex];
+    _undoOp = UndoOp::Overwrite;
+    _undoLine = _selectedLine;
+    _undoLength = script.length;
+    _undoCommand = script.commands[_selectedLine];
     _engine.lock();
-    setScriptCommand(track.program(), _scriptIndex, _selectedLine, _editBuffer);
+    setScriptCommand(program, _scriptIndex, _selectedLine, _editBuffer);
     _engine.unlock();
     // Commit succeeded; no UI message per current workflow.
 }
@@ -805,12 +813,39 @@ void TeletypeScriptViewPage::deleteLine() {
         tt2PrintCommand(program.scripts[_scriptIndex].commands[_selectedLine], lineBuffer, sizeof(lineBuffer));
         setEditBuffer(lineBuffer);
         copyLine();
+        _undoOp = UndoOp::Delete;
+        _undoLine = _selectedLine;
+        _undoLength = program.scripts[_scriptIndex].length;
+        _undoCommand = program.scripts[_scriptIndex].commands[_selectedLine];
     }
     _engine.lock();
     deleteScriptCommand(program, _scriptIndex, _selectedLine);
     _engine.unlock();
     loadEditBuffer(_selectedLine);
     showMessage("Line deleted");
+}
+
+void TeletypeScriptViewPage::undo() {
+    if (_undoOp == UndoOp::None || _liveMode) {
+        return;
+    }
+    auto &program = _project.selectedTrack().tt2Track().program();
+    TT2Script &script = program.scripts[_scriptIndex];
+    _engine.lock();
+    if (_undoOp == UndoOp::Overwrite) {
+        script.commands[_undoLine] = _undoCommand;
+    } else {  // Delete: re-insert the removed line, shifting the rest down
+        for (int i = _undoLength - 1; i > _undoLine; --i) {
+            script.commands[i] = script.commands[i - 1];
+        }
+        script.commands[_undoLine] = _undoCommand;
+    }
+    script.length = _undoLength;
+    _engine.unlock();
+    _undoOp = UndoOp::None;
+    _selectedLine = _undoLine;
+    loadEditBuffer(_undoLine);
+    showMessage("Undo");
 }
 
 void TeletypeScriptViewPage::pushHistory(const char *line) {
@@ -961,6 +996,10 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
             copyLine();
             _editBuffer[0] = '\0';
             _cursor = 0;
+            event.consume();
+            return;
+        case 0x1D: // Z
+            undo();
             event.consume();
             return;
         default:
@@ -1167,6 +1206,7 @@ void TeletypeScriptViewPage::loadScriptFromSlot(int slot) {
             _selectedLine = 0;
             _cursor = 0;
             _editBuffer[0] = '\0';
+            _undoOp = UndoOp::None;
             showMessage("TT2 SCRIPT LOADED");
         } else {
             showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));

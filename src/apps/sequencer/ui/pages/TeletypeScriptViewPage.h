@@ -2,6 +2,8 @@
 
 #include "BasePage.h"
 
+#include "model/TeletypeProgram.h"   // TT2Command for the undo record
+
 #include <cstdint>
 
 class TeletypeScriptViewPage : public BasePage {
@@ -32,6 +34,7 @@ private:
     void duplicateLine();
     void commentLine();
     void deleteLine();
+    void undo();
     void pushHistory(const char *line);
     void recallHistory(int direction);
     void setEditBuffer(const char *text);
@@ -68,4 +71,9 @@ private:
     int _historyCount = 0;
     int _historyHead = -1;
     int _historyCursor = -1;
+    enum class UndoOp { None, Overwrite, Delete };
+    UndoOp _undoOp = UndoOp::None;
+    int _undoLine = 0;
+    uint8_t _undoLength = 0;
+    TT2Command _undoCommand = {};
 };
