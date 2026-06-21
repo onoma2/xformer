@@ -7,6 +7,7 @@
 #include "ui/KeyboardManager.h"
 
 #include "model/TT2Track.h"
+#include "engine/TeletypeNativeOps.h"
 
 #include "core/math/Math.h"
 #include "core/utils/StringBuilder.h"
@@ -297,6 +298,61 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
         }
     }
 
+    // Bracket keys nudge the current cell (or the in-progress edit buffer). ch()
+    // is nulled under Ctrl/Alt, so dispatch on the keycode + modifiers: plain =
+    // +/-1 raw, Alt = +/-1 semitone, Ctrl = +/-fifth (7), Shift = +/-octave (12).
+    if (keycode == 0x2F || keycode == 0x30) {
+        int dir = (keycode == 0x30) ? 1 : -1;
+        int interval = 0;
+        if (event.alt() && !event.ctrl()) interval = dir;
+        else if (event.ctrl()) interval = dir * 7;
+        else if (event.shift()) interval = dir * 12;
+        auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
+        if (interval != 0) {
+            if (_editingNumber) {
+                _editBuffer = tt2TransposeSemitones(int16_t(_editBuffer), interval);
+            } else {
+                _engine.lock();
+                pat.val[_row] = tt2TransposeSemitones(pat.val[_row], interval);
+                _engine.unlock();
+            }
+        } else {
+            _engine.lock();
+            int16_t v = pat.val[_row];
+            pat.val[_row] = dir > 0 ? (v == INT16_MAX ? INT16_MIN : int16_t(v + 1))
+                                    : (v == INT16_MIN ? INT16_MAX : int16_t(v - 1));
+            _engine.unlock();
+            _editingNumber = false;
+        }
+        event.consume();
+        return;
+    }
+
+    // Alt+digit / Shift+Alt+digit: transpose the cell up/down by N semitones
+    // (verbatim mapping: 0 = 10, 1 = 11, else the digit).
+    if (event.alt() && !event.ctrl() && keycode >= 0x1E && keycode <= 0x27) {
+        int n = keycode - 0x1E + 1;
+        if (n == 1) n = 11;
+        int interval = event.shift() ? -n : n;
+        if (_editingNumber) {
+            _editBuffer = tt2TransposeSemitones(int16_t(_editBuffer), interval);
+        } else {
+            auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
+            _engine.lock();
+            pat.val[_row] = tt2TransposeSemitones(pat.val[_row], interval);
+            _engine.unlock();
+        }
+        event.consume();
+        return;
+    }
+
+    // Shift+L/S/E: set length/start/end to the cursor row.
+    if (event.shift() && !event.alt() && !event.ctrl()) {
+        if (keycode == 0x0F) { setLength(); event.consume(); return; }
+        if (keycode == 0x16) { setStart(); event.consume(); return; }
+        if (keycode == 0x08) { setEnd(); event.consume(); return; }
+    }
+
     // Ctrl+shortcuts
     if (event.ctrl()) {
         switch (keycode) {
@@ -448,28 +504,6 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
     // Minus/underscore: negate
     if (event.ch() == '-' || event.ch() == '_') {
         negateValue();
-        event.consume();
-        return;
-    }
-
-    // [ and ]: decrement/increment value by 1
-    if (event.ch() == '[') {
-        auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
-        _engine.lock();
-        int16_t val = pat.val[_row];
-        pat.val[_row] = val == INT16_MIN ? INT16_MAX : val - 1;
-        _engine.unlock();
-        _editingNumber = false;
-        event.consume();
-        return;
-    }
-    if (event.ch() == ']') {
-        auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
-        _engine.lock();
-        int16_t val = pat.val[_row];
-        pat.val[_row] = val == INT16_MAX ? INT16_MIN : val + 1;
-        _engine.unlock();
-        _editingNumber = false;
         event.consume();
         return;
     }
