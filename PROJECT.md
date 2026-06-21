@@ -116,6 +116,7 @@ The sequencer application follows a Model-Engine-UI separation:
 - `ControllerManager`: External controller integration
 - `Screensaver`: Power management and noise reduction
 - Uses `FrameBuffer` and `Canvas` for graphics rendering
+- Shared input helpers on `BasePage` (call these, don't re-inline): `keyboard()` folds USB-keyboard handling (USB F1-F5 → `handleFunctionKeys`); `handleContextMenuKey(KeyPressEvent&)` folds the two panel context-menu gestures (`isContextMenu` → `contextShow()`, Page double-press → `contextShow(true)`). The bare `if (key.pageModifier()) return;` catch-all stays inline per page — after that page's Page+Step/QuickEdit/Function handlers, never bundled into the helper (it would swallow them).
 
 ### Task Architecture (FreeRTOS)
 
