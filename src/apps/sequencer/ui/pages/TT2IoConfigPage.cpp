@@ -46,31 +46,32 @@ void rangeCode(Types::VoltageRange r, char *out) {
     out[2] = '\0';
 }
 
+// 2-letter source codes: IN=CvIn, GT=GateOut, LG=LogicalGate, None=--.
 void trigSourceCode(TT2TriggerSource s, char *out) {
     int i = int(s);
-    if (s == TT2TriggerSource::None) { out[0] = '-'; out[1] = '\0'; return; }
-    if (i >= int(TT2TriggerSource::CvIn1) && i <= int(TT2TriggerSource::CvIn4)) {
-        out[0] = 'I'; out[1] = char('1' + (i - int(TT2TriggerSource::CvIn1)));
-    } else if (i >= int(TT2TriggerSource::GateOut1) && i <= int(TT2TriggerSource::GateOut8)) {
-        out[0] = 'G'; out[1] = char('1' + (i - int(TT2TriggerSource::GateOut1)));
-    } else {
-        out[0] = 'L'; out[1] = char('1' + (i - int(TT2TriggerSource::LogicalGate1)));
+    if (s == TT2TriggerSource::None) { out[0] = '-'; out[1] = '-'; out[2] = '\0'; return; }
+    char a = 'I', b = 'N'; int base = int(TT2TriggerSource::CvIn1);
+    if (i >= int(TT2TriggerSource::GateOut1) && i <= int(TT2TriggerSource::GateOut8)) {
+        a = 'G'; b = 'T'; base = int(TT2TriggerSource::GateOut1);
+    } else if (i >= int(TT2TriggerSource::LogicalGate1) && i <= int(TT2TriggerSource::LogicalGate8)) {
+        a = 'L'; b = 'G'; base = int(TT2TriggerSource::LogicalGate1);
     }
-    out[2] = '\0';
+    out[0] = a; out[1] = b; out[2] = char('1' + (i - base)); out[3] = '\0';
 }
 
+// 2-letter source codes: IN=CvIn, CV=CvOut, RT=CvRoute, LC=LogicalCv, None=--.
 void cvSourceCode(TT2CvInputSource s, char *out) {
     int i = int(s);
-    if (s == TT2CvInputSource::None) { out[0] = '-'; out[1] = '\0'; return; }
-    char letter = 'I'; int base = int(TT2CvInputSource::CvIn1);
+    if (s == TT2CvInputSource::None) { out[0] = '-'; out[1] = '-'; out[2] = '\0'; return; }
+    char a = 'I', b = 'N'; int base = int(TT2CvInputSource::CvIn1);
     if (i >= int(TT2CvInputSource::CvOut1) && i <= int(TT2CvInputSource::CvOut8)) {
-        letter = 'O'; base = int(TT2CvInputSource::CvOut1);
+        a = 'C'; b = 'V'; base = int(TT2CvInputSource::CvOut1);
     } else if (i >= int(TT2CvInputSource::CvRoute1) && i <= int(TT2CvInputSource::CvRoute4)) {
-        letter = 'R'; base = int(TT2CvInputSource::CvRoute1);
+        a = 'R'; b = 'T'; base = int(TT2CvInputSource::CvRoute1);
     } else if (i >= int(TT2CvInputSource::LogicalCv1) && i <= int(TT2CvInputSource::LogicalCv8)) {
-        letter = 'L'; base = int(TT2CvInputSource::LogicalCv1);
+        a = 'L'; b = 'C'; base = int(TT2CvInputSource::LogicalCv1);
     }
-    out[0] = letter; out[1] = char('1' + (i - base)); out[2] = '\0';
+    out[0] = a; out[1] = b; out[2] = char('1' + (i - base)); out[3] = '\0';
 }
 
 } // namespace
@@ -171,7 +172,7 @@ void TT2IoConfigPage::draw(Canvas &canvas) {
     };
 
     if (_view == View::Outputs) {
-        const char *cols[4] = { "RNG", "QNT", "OFF", "ROOT" };
+        const char *cols[4] = { "RNG", "QNT", "OFFST", "ROOT" };
         const int colX[4] = { 60, 104, 148, 200 };
         const int gridTop = 18;
         const int visible = 5;
@@ -195,7 +196,7 @@ void TT2IoConfigPage::draw(Canvas &canvas) {
                     int q = program.cvOutputQuantizeScale[r];
                     if (q < 0) std::snprintf(buf, sizeof(buf), "-");
                     else { const char *nm = Scale::name(q); buf[0] = nm[0]; buf[1] = nm[1]; buf[2] = nm[2]; buf[3] = '\0'; }
-                } else if (c == 2) std::snprintf(buf, sizeof(buf), "%+.2f", program.cvOutputOffset[r] * 0.01f);
+                } else if (c == 2) stbsp_snprintf(buf, sizeof(buf), "%+.2f", program.cvOutputOffset[r] * 0.01f);  // newlib-nano has no float printf; stb does
                 else { int rn = program.cvOutputRootNote[r]; if (rn < 0) std::snprintf(buf, sizeof(buf), "*"); else std::snprintf(buf, sizeof(buf), "%s", kNoteNames[rn]); }
                 if (sel) { canvas.setColor(cellColor(true)); canvas.fillRect(colX[c] - 2, y, 30, rowH); canvas.setBlendMode(BlendMode::Sub); }
                 canvas.setColor(sel ? Color::Bright : Color::Medium);
@@ -211,28 +212,29 @@ void TT2IoConfigPage::draw(Canvas &canvas) {
             canvas.fillRect(W - 3, ty + th * _scroll / TT2_CV_OUTPUT_COUNT, 3, std::max(4, th * visible / TT2_CV_OUTPUT_COUNT));
         }
     } else {
-        // INPUTS: TRIG (col 0) | CV IN (col 1) | MIDI (col 2)
+        // INPUTS: TRIG (left) | CV IN (centre) | MIDI (right), spread full-width.
         const int gridTop = top + 7;
         canvas.setColor(Color::Low);
         canvas.drawText(2, top + 4, "TRIG");
-        canvas.drawText(70, top + 4, "CV IN");
-        canvas.drawText(170, top + 4, "MIDI");
+        canvas.drawText(98, top + 4, "CV IN");
+        canvas.drawText(208, top + 4, "MIDI");
         char buf[8];
         const char *cvNames[6] = { "IN", "PRM", "X", "Y", "Z", "T" };
-        int visRows = 5;
-        for (int r = 0; r < TT2_TRIGGER_INPUT_COUNT && r < visRows; ++r) {
-            int y = gridTop + r * rowH;
+        for (int r = 0; r < TT2_TRIGGER_INPUT_COUNT; ++r) {
+            int col = r / 4, row = r % 4;  // 2-up: T1-4 | T5-8
+            int nx = 2 + col * 42, vx = nx + 16;
+            int y = gridTop + row * rowH;
             FixedStringBuilder<4> nm("T%d", r + 1);
-            canvas.setColor(Color::Low); canvas.drawText(2, y + 5, nm);
+            canvas.setColor(Color::Low); canvas.drawText(nx, y + 5, nm);
             bool sel = (_col == 0 && r == _row);
             trigSourceCode(program.triggerSource[r], buf);
-            if (sel) { canvas.setColor(cellColor(true)); canvas.fillRect(16, y, 20, rowH); canvas.setBlendMode(BlendMode::Sub); }
-            canvas.setColor(sel ? Color::Bright : Color::Medium); canvas.drawText(18, y + 5, buf);
+            if (sel) { canvas.setColor(cellColor(true)); canvas.fillRect(vx - 2, y, 18, rowH); canvas.setBlendMode(BlendMode::Sub); }
+            canvas.setColor(sel ? Color::Bright : Color::Medium); canvas.drawText(vx, y + 5, buf);
             if (sel) canvas.setBlendMode(BlendMode::Set);
         }
         for (int r = 0; r < TT2_CV_INPUT_COUNT; ++r) {
             int sub = r / 3, subrow = r % 3;  // 2-up: IN/PRM/X | Y/Z/T
-            int nx = 70 + sub * 50, vx = nx + 20;
+            int nx = 98 + sub * 54, vx = nx + 20;
             int y = gridTop + subrow * rowH;
             canvas.setColor(Color::Low); canvas.drawText(nx, y + 5, cvNames[r]);
             bool sel = (_col == 1 && r == _row);
@@ -244,10 +246,10 @@ void TT2IoConfigPage::draw(Canvas &canvas) {
         // MIDI source (display only for now)
         bool midiSel = (_col == 2);
         canvas.setColor(midiSel ? Color::Bright : Color::Medium);
-        canvas.drawText(170, gridTop + 5, "OMNI");
+        canvas.drawText(208, gridTop + 5, "OMNI");
     }
 
-    const char *outFooter[5] = { "RNG", "QNT", "OFF", "ROOT", "NEXT" };
+    const char *outFooter[5] = { "RNG", "QNT", "OFFST", "ROOT", "NEXT" };
     const char *inFooter[5] = { "TRIG", "CV IN", "MIDI", "", "NEXT" };
     WindowPainter::drawFooter(canvas, _view == View::Outputs ? outFooter : inFooter, pageKeyState(), _col);
 }
