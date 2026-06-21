@@ -17,14 +17,18 @@
 #include <algorithm>
 
 enum class SceneAction {
+    Copy,
+    Paste,
     Load,
     Save,
     Last
 };
 
 static const ContextMenuModel::Item sceneMenuItems[] = {
-    { "LOAD" },
-    { "SAVE" },
+    { "COPY" },
+    { "PASTE" },
+    { "TTLOAD" },
+    { "TTSAVE" },
 };
 
 namespace {
@@ -292,13 +296,15 @@ void TT2IoConfigPage::contextShow(bool doubleClick) {
         sceneMenuItems,
         int(SceneAction::Last),
         [&] (int index) { contextAction(index); },
-        [&] (int) { return true; },
+        [&] (int index) { return SceneAction(index) != SceneAction::Paste || _model.clipBoard().canPasteTrack(); },
         doubleClick
     ));
 }
 
 void TT2IoConfigPage::contextAction(int index) {
     switch (SceneAction(index)) {
+    case SceneAction::Copy: _model.clipBoard().copyTrack(_project.selectedTrack()); break;
+    case SceneAction::Paste: _model.clipBoard().pasteTrack(_project.selectedTrack()); break;
     case SceneAction::Load: loadScene(); break;
     case SceneAction::Save: saveScene(); break;
     case SceneAction::Last: break;
