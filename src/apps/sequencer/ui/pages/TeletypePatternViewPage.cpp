@@ -43,6 +43,7 @@ void TeletypePatternViewPage::enter() {
     _offset = 0;
     _editingNumber = false;
     _editBuffer = 0;
+    _fieldEdit = FieldEdit::None;
 }
 
 void TeletypePatternViewPage::draw(Canvas &canvas) {
@@ -139,6 +140,20 @@ void TeletypePatternViewPage::draw(Canvas &canvas) {
             canvas.drawText(varsDotX, y + kTextYOffset, ".");
             canvas.drawText(varsLabelX, y + kTextYOffset, label);
         }
+    }
+
+    // Field-edit indicator (Alt+L/S/E): a cleared box + the field/value, drawn
+    // last so it overlays the grid while editing (collision-proof).
+    if (_fieldEdit != FieldEdit::None) {
+        const char *fl = _fieldEdit == FieldEdit::Length ? "LEN"
+                       : _fieldEdit == FieldEdit::Start ? "STR" : "END";
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), "%s %d", fl, _fieldBuffer);
+        int w = canvas.textWidth(buf) + 4;
+        canvas.setColor(Color::None);
+        canvas.fillRect(0, 56, w, 8);
+        canvas.setColor(Color::Bright);
+        canvas.drawText(2, 62, buf);
     }
 }
 
@@ -288,6 +303,24 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
 
     const uint8_t keycode = event.keycode();
 
+    // Field-edit sub-mode (opened by Alt+L/S/E below): digits edit the chosen
+    // length/start/end field; Backspace deletes a digit, Enter commits, Esc
+    // cancels. Alt+L/S/E switch fields; any other key closes and falls through.
+    if (_fieldEdit != FieldEdit::None) {
+        char fch = event.ch();
+        if (fch >= '0' && fch <= '9') {
+            _fieldBuffer = clamp(_fieldBuffer * 10 + (fch - '0'), 0, TT2_PATTERN_LENGTH);
+            event.consume();
+            return;
+        }
+        if (keycode == KeyboardEvent::KeyBackspace) { _fieldBuffer /= 10; event.consume(); return; }
+        if (keycode == KeyboardEvent::KeyEnter) { commitField(); _fieldEdit = FieldEdit::None; event.consume(); return; }
+        if (keycode == KeyboardEvent::KeyEscape) { _fieldEdit = FieldEdit::None; event.consume(); return; }
+        bool switchField = event.alt() && !event.ctrl() && !event.shift() &&
+                           (keycode == 0x0F || keycode == 0x16 || keycode == 0x08);
+        if (!switchField) _fieldEdit = FieldEdit::None;
+    }
+
     // Alt + track key (Q-I) selects the track; plain Q-I types in the editor.
     if (event.alt() && !event.ctrl() && !event.shift()) {
         int track = KeyboardManager::hidKeycodeToTrack(keycode);
@@ -351,6 +384,22 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
         if (keycode == 0x0F) { setLength(); event.consume(); return; }
         if (keycode == 0x16) { setStart(); event.consume(); return; }
         if (keycode == 0x08) { setEnd(); event.consume(); return; }
+    }
+
+    // Alt+L/S/E: open numeric field-edit for length/start/end.
+    if (event.alt() && !event.ctrl() && !event.shift()) {
+        FieldEdit f = keycode == 0x0F ? FieldEdit::Length
+                    : keycode == 0x16 ? FieldEdit::Start
+                    : keycode == 0x08 ? FieldEdit::End : FieldEdit::None;
+        if (f != FieldEdit::None) {
+            auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
+            _fieldEdit = f;
+            _fieldBuffer = f == FieldEdit::Length ? int(pat.len)
+                         : f == FieldEdit::Start ? int(pat.start) : int(pat.end);
+            _editingNumber = false;
+            event.consume();
+            return;
+        }
     }
 
     // Ctrl+shortcuts
@@ -671,4 +720,13 @@ void TeletypePatternViewPage::setEnd() {
     pat.end = int16_t(_row);
     _engine.unlock();
     _editingNumber = false;
+}
+
+void TeletypePatternViewPage::commitField() {
+    auto &pat = _project.selectedTrack().tt2Track().program().patterns[_patternIndex];
+    _engine.lock();
+    if (_fieldEdit == FieldEdit::Length) pat.len = uint16_t(clamp(_fieldBuffer, 0, TT2_PATTERN_LENGTH));
+    else if (_fieldEdit == FieldEdit::Start) pat.start = int16_t(clamp(_fieldBuffer, 0, TT2_PATTERN_LENGTH - 1));
+    else if (_fieldEdit == FieldEdit::End) pat.end = int16_t(clamp(_fieldBuffer, 0, TT2_PATTERN_LENGTH - 1));
+    _engine.unlock();
 }
