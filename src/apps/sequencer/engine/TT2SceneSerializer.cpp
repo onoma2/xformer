@@ -222,3 +222,26 @@ bool tt2DeserializeScene(TeletypeProgram &p, Tt2SceneRead rd, void *c) {
 
     return ok;
 }
+
+bool tt2SerializeScript(const TeletypeProgram &p, int scriptIndex, Tt2SceneWrite w, void *c) {
+    if (scriptIndex < 0 || scriptIndex >= TT2_SCRIPT_COUNT) return false;
+    char line[TT2_PRINT_LINE_MAX];
+    const TT2Script &sc = p.scripts[scriptIndex];
+    int len = sc.length > TT2_COMMANDS_PER_SCRIPT ? TT2_COMMANDS_PER_SCRIPT : sc.length;
+    for (int l = 0; l < len; ++l) {
+        if (!tt2PrintCommand(sc.commands[l], line, sizeof(line))) return false;
+        wstr(w, c, line);
+        wch(w, c, '\n');
+    }
+    return true;
+}
+
+bool tt2DeserializeScript(TeletypeProgram &p, int scriptIndex, Tt2SceneRead r, void *c) {
+    if (scriptIndex < 0 || scriptIndex >= TT2_SCRIPT_COUNT) return false;
+    char buf[TT2_COMMANDS_PER_SCRIPT * 128 + 1];
+    size_t n = 0;
+    int ch;
+    while ((ch = r(c)) >= 0 && n < sizeof(buf) - 1) buf[n++] = char(ch);
+    buf[n] = '\0';
+    return loadScriptText(p, scriptIndex, buf) >= 0;
+}

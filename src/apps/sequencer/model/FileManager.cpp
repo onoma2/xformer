@@ -39,6 +39,7 @@ FileTypeInfo fileTypeInfos[] = {
     { "PROJECTS", "PRO" },
     { "SCALES", "SCA" },
     { "TT2", "TXT" },
+    { "TT2SC", "TXT" },
 };
 
 static void slotPath(StringBuilder &str, FileType type, int slot) {
@@ -273,6 +274,50 @@ fs::Error FileManager::readTt2Program(TT2Track &track, const char *path) {
     }
     if (error == fs::OK) {
         track.program() = staging;  // atomic swap on clean parse
+    }
+    return error;
+}
+
+fs::Error FileManager::writeTt2Script(const TT2Track &track, int scriptIndex, const char *name, int slot) {
+    return writeFile(FileType::TeletypeV2Script, slot, [&] (const char *path) {
+        return writeTt2Script(track, scriptIndex, name, path);
+    });
+}
+
+fs::Error FileManager::readTt2Script(TT2Track &track, int scriptIndex, int slot) {
+    return readFile(FileType::TeletypeV2Script, slot, [&] (const char *path) {
+        return readTt2Script(track, scriptIndex, path);
+    });
+}
+
+fs::Error FileManager::writeTt2Script(const TT2Track &track, int scriptIndex, const char *name, const char *path) {
+    fs::FileWriter fileWriter(path);
+    if (fileWriter.error() != fs::OK) {
+        return fileWriter.error();
+    }
+    const char *safeName = (name && name[0]) ? name : "SCRIPT";
+    FixedStringBuilder<64> nameLine("NAME %s\n", safeName);
+    fileWriter.write(static_cast<const char *>(nameLine), std::strlen(nameLine));
+    tt2SerializeScript(track.program(), scriptIndex, tt2FileWrite, &fileWriter);
+    return fileWriter.finish();
+}
+
+fs::Error FileManager::readTt2Script(TT2Track &track, int scriptIndex, const char *path) {
+    fs::FileReader fileReader(path);
+    if (fileReader.error() != fs::OK) {
+        return fileReader.error();
+    }
+    TeletypeProgram &staging = gTeletypeLoadScratch;
+    bool ok = tt2DeserializeScript(staging, scriptIndex, tt2FileRead, &fileReader);
+    fs::Error error = fileReader.finish();
+    if (error == fs::END_OF_FILE) {
+        error = fs::OK;
+    }
+    if (error == fs::OK && !ok) {
+        error = fs::INVALID_DATA;
+    }
+    if (error == fs::OK) {
+        track.program().scripts[scriptIndex] = staging.scripts[scriptIndex];
     }
     return error;
 }

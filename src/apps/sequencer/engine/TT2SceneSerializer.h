@@ -27,3 +27,9 @@ bool tt2SerializeScene(const TeletypeProgram &program, Tt2SceneWrite write, void
 // skipped. Returns false on malformed input (script parse error, short numeric
 // row). The caller swaps `staging` into the live track only on true.
 bool tt2DeserializeScene(TeletypeProgram &staging, Tt2SceneRead read, void *ctx);
+
+// Serialize/deserialize a single script slot's text (its command lines only, no
+// #-section header). Deserialize replaces just that slot, leaving the rest of
+// the program untouched. Used by per-script save/load.
+bool tt2SerializeScript(const TeletypeProgram &program, int scriptIndex, Tt2SceneWrite write, void *ctx);
+bool tt2DeserializeScript(TeletypeProgram &program, int scriptIndex, Tt2SceneRead read, void *ctx);
