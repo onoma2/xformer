@@ -384,6 +384,9 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
             } else if (key.step() == 12) {
                 deleteLine();
                 event.consume();
+            } else if (key.step() == 13) {
+                undo();
+                event.consume();
             }
         } else if (key.isFunction()) {
             int fn = key.function();
