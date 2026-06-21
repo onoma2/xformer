@@ -44,6 +44,12 @@ protected:
     // Pages that just need F1-F5 + BasePage fallback don't need to override keyboard() at all.
     bool handleFunctionKeys(KeyboardEvent &event);
 
+    // Returns true if event was a context-menu gesture (isContextMenu → contextShow,
+    // or Page double-press → contextShow(true)). Pages call this near the top of
+    // keyPress() and fall through for everything else. Does NOT swallow plain
+    // pageModifier — that catch-all stays inline per page, after its Page+X handlers.
+    bool handleContextMenuKey(KeyPressEvent &event);
+
     virtual void keyboard(KeyboardEvent &event) override;
 
     PageContext &_context;

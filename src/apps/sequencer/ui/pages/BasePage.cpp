@@ -45,6 +45,21 @@ bool BasePage::handleFunctionKeys(KeyboardEvent &event) {
     return false;
 }
 
+bool BasePage::handleContextMenuKey(KeyPressEvent &event) {
+    const auto &key = event.key();
+    if (key.isContextMenu()) {
+        contextShow();
+        event.consume();
+        return true;
+    }
+    if (key.pageModifier() && event.count() == 2) {
+        contextShow(true);
+        event.consume();
+        return true;
+    }
+    return false;
+}
+
 void BasePage::keyboard(KeyboardEvent &event) {
     if (handleFunctionKeys(event)) return;
 
