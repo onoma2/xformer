@@ -58,6 +58,7 @@ private:
 
     void nextPage();
     void selectParam(int slot);
+    void contextShow(bool doubleClick = false) override;
     void contextAction(int index);
     bool contextActionEnabled(int index) const;
     void handleStepKeyPress(int step, bool shift);

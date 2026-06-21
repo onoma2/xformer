@@ -213,12 +213,7 @@ void TuesdayEditPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
 
     if (key.isContextMenu()) {
-        showContextMenu(ContextMenu(
-            contextMenuItems,
-            int(ContextAction::Last),
-            [&] (int index) { contextAction(index); },
-            [&] (int index) { return contextActionEnabled(index); }
-        ));
+        contextShow();
         event.consume();
         return;
     }
@@ -639,6 +634,16 @@ void TuesdayEditPage::selectParam(int slot) {
     if (param >= 0) {
         _selectedSlot = slot;
     }
+}
+
+void TuesdayEditPage::contextShow(bool doubleClick) {
+    showContextMenu(ContextMenu(
+        contextMenuItems,
+        int(ContextAction::Last),
+        [&] (int index) { contextAction(index); },
+        [&] (int index) { return contextActionEnabled(index); },
+        doubleClick
+    ));
 }
 
 void TuesdayEditPage::contextAction(int index) {
