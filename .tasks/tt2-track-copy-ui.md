@@ -15,9 +15,9 @@ copy/paste), so whole-track copy/paste was unreachable despite `ClipBoard` alrea
 - 2026-06-21: TT2 script/pattern editor pages have NO context menu — master's `TeletypeScriptViewPage` had SAVE/LOAD Sc/T9 via Page+Shift; dropped in the native port. The I/O config page is the only TT2 context menu.
 
 ## Open questions
-- [ ] Script-level copy missing: only line-level `copyLine`/`pasteLine` exist; no whole-script copy (slot→slot) or cross-track script copy. Build it?
-- [ ] Restore a context menu on the script editor itself, opened on Tab?
-- [ ] TT2 I/O enums look incomplete/weird vs master's TT1 I/O list — audit pending.
+- [ ] Script-level copy missing: only line-level `copyLine`/`pasteLine` exist; no whole-script *clipboard* copy (slot→slot) or cross-track script copy. (Per-script *file* save/load now exists — see `tt2-script-save-load`.)
+- [x] Restore a context menu on the script editor on Tab — done in `tt2-script-save-load` (SAVE Sc / LOAD Sc on Tab + Page+Shift).
+- [x] TT2 I/O enum audit vs master TT1 — done (inputs complete; output-dest routing intentionally absent).
 
 ## Completed steps
 - [x] COPY/PASTE/TTLOAD/TTSAVE on the TT2 I/O config context menu. Sim clean. Commit `05d4e6e4`.
