@@ -9,7 +9,10 @@
 #include "ui/MatrixMap.h"
 #include "ui/KeyboardManager.h"
 
+#include "model/FileManager.h"
+
 #include "core/utils/StringBuilder.h"
+#include "core/fs/FileSystem.h"
 
 #include <cstring>
 #include <cstdint>
@@ -33,6 +36,12 @@ constexpr int kHudColPitch = 8;
 constexpr int kHudColW = 6;
 // Trigger scripts get a function key each; metro/init are reached via [ ] nav.
 constexpr int kTriggerScriptCount = 4;
+
+enum class ScriptContextAction { Save, Load, Last };
+static const ContextMenuModel::Item scriptContextItems[] = {
+    { "SAVE Sc" },
+    { "LOAD Sc" },
+};
 } // namespace
 
 void clampTextToWidth(Canvas &canvas, char *text, int maxWidth) {
@@ -344,6 +353,12 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
     }
 
     const auto &key = event.key();
+
+    if (key.isContextMenu()) {
+        contextShow();
+        event.consume();
+        return;
+    }
 
     if (key.pageModifier()) {
         if (key.isLeft()) {
@@ -1016,8 +1031,8 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
         return;
     }
     if (keycode == KeyboardEvent::KeyTab) {
-        // Tab: insert space
-        insertChar(' ');
+        // Tab opens the script context menu (SAVE Sc / LOAD Sc).
+        contextShow();
         event.consume();
         return;
     }
@@ -1074,4 +1089,88 @@ void TeletypeScriptViewPage::commitLineAndAdvance() {
     if (_selectedLine < kLineCount - 1) {
         loadEditBuffer(_selectedLine + 1);
     }
+}
+
+void TeletypeScriptViewPage::contextShow(bool doubleClick) {
+    showContextMenu(ContextMenu(
+        scriptContextItems,
+        int(ScriptContextAction::Last),
+        [&] (int index) { contextAction(index); },
+        [&] (int index) { return contextActionEnabled(index); },
+        doubleClick
+    ));
+}
+
+void TeletypeScriptViewPage::contextAction(int index) {
+    switch (ScriptContextAction(index)) {
+    case ScriptContextAction::Save: saveScript(); break;
+    case ScriptContextAction::Load: loadScript(); break;
+    case ScriptContextAction::Last: break;
+    }
+}
+
+bool TeletypeScriptViewPage::contextActionEnabled(int index) const {
+    (void)index;
+    return FileManager::volumeMounted();
+}
+
+void TeletypeScriptViewPage::saveScript() {
+    _manager.pages().fileSelect.show("SAVE TT2 SCRIPT", FileType::TeletypeV2Script, 0, true, [this] (bool result, int slot) {
+        if (result) {
+            if (FileManager::slotUsed(FileType::TeletypeV2Script, slot)) {
+                _manager.pages().confirmation.show("ARE YOU SURE?", [this, slot] (bool result) {
+                    if (result) saveScriptToSlot(slot);
+                });
+            } else {
+                saveScriptToSlot(slot);
+            }
+        }
+    });
+}
+
+void TeletypeScriptViewPage::loadScript() {
+    _manager.pages().fileSelect.show("LOAD TT2 SCRIPT", FileType::TeletypeV2Script, 0, false, [this] (bool result, int slot) {
+        if (result) {
+            _manager.pages().confirmation.show("ARE YOU SURE?", [this, slot] (bool result) {
+                if (result) loadScriptFromSlot(slot);
+            });
+        }
+    });
+}
+
+void TeletypeScriptViewPage::saveScriptToSlot(int slot) {
+    int idx = _scriptIndex;
+    _engine.suspend();
+    _manager.pages().busy.show("SAVING TT2 SCRIPT ...");
+    FileManager::task([this, slot, idx] () {
+        return FileManager::writeTt2Script(_project.selectedTrack().tt2Track(), idx, nullptr, slot);
+    }, [this] (fs::Error result) {
+        if (result == fs::OK) {
+            showMessage("TT2 SCRIPT SAVED");
+        } else {
+            showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
+        }
+        _manager.pages().busy.close();
+        _engine.resume();
+    });
+}
+
+void TeletypeScriptViewPage::loadScriptFromSlot(int slot) {
+    int idx = _scriptIndex;
+    _engine.suspend();
+    _manager.pages().busy.show("LOADING TT2 SCRIPT ...");
+    FileManager::task([this, slot, idx] () {
+        return FileManager::readTt2Script(_project.selectedTrack().tt2Track(), idx, slot);
+    }, [this] (fs::Error result) {
+        if (result == fs::OK) {
+            _selectedLine = 0;
+            _cursor = 0;
+            _editBuffer[0] = '\0';
+            showMessage("TT2 SCRIPT LOADED");
+        } else {
+            showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
+        }
+        _manager.pages().busy.close();
+        _engine.resume();
+    });
 }

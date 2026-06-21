@@ -40,6 +40,14 @@ private:
     void drawHud(Canvas &canvas);
     void drawBipolarBar(Canvas &canvas, int x, int y, int w, int h, int raw, Color fill, Color outline);
 
+    void contextShow(bool doubleClick = false) override;
+    void contextAction(int index);
+    bool contextActionEnabled(int index) const;
+    void saveScript();
+    void loadScript();
+    void saveScriptToSlot(int slot);
+    void loadScriptFromSlot(int slot);
+
     int _selectedLine = 0;
     int _cursor = 0;
     int _scriptIndex = 0;
