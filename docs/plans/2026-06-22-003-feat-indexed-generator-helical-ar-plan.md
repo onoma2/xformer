@@ -1,119 +1,198 @@
 ---
-id: indexed-generator-helical-ar
+id: track-agnostic-generators
 schema: plan
-title: "feat: Indexed generator framework + helical AR generator"
+title: "feat: track-agnostic generator framework (Indexed first client + helical AR)"
 type: feat
 status: active
 date: 2026-06-22
 depth: deep
 ---
 
-# Indexed generator framework + helical AR generator
+# Track-agnostic generator framework
 
-Two coupled pieces: (1) make the Indexed track a client of the existing **Generator framework** — a
-bigger, more invasive bridge than first assumed, because the shared generator UI (`GeneratorPage`,
-the `StepSelection` width, the mode picker) is Note/Curve-shaped — and (2) add the **helical
-autoregressive generator** as a new Mode targeting Indexed (the Nebulae 2 helical map: deterministic
-coupled fold-feedback → note + variable per-step duration).
+De-Note/Curve-hardcode the Generator framework so any track that supplies a builder + a selection
+view can host generators. Prove and pay it off by making **Indexed** the first new client — which
+immediately gives Indexed the existing modes (Euclidean / Random / Init) — and add the **helical
+autoregressive generator** as the first new Mode (Nebulae 2 helical map: deterministic coupled
+fold-feedback → note + variable per-step duration).
 
-Origin: `docs/plans/2026-06-22-indexed-helical-ar-macro-design.md` (validated brainstorm; the AR
-algorithm + scope are settled there). Planning reopened the delivery decision: framework (knobs +
-preview), not the preset-menu macro path — which forces the bridge below.
-
-> **Cost note (post-review):** the bridge is materially larger than a "make Indexed a builder client
-> and reuse the page" change. `SequenceBuilderImpl<T>` cannot be used for Indexed (its `firstStep()`
-> is a rotation offset, not an edit-range start), and `GeneratorPage`/`StepSelection`/the picker each
-> hardcode Note/Curve assumptions. Reusing them means **modifying shared generator UI that Note and
-> Curve depend on** — regression surface, not just additive. See Risks.
+Origin: `docs/plans/2026-06-22-indexed-helical-ar-macro-design.md` (the AR algorithm + its scope are
+settled there). This plan was re-scoped from "helical AR on Indexed" to "track-agnostic generators"
+after four review rounds showed the bulk of the work is generic framework de-hardcoding, not the AR.
 
 ---
 
 ## Summary
 
-The Generator framework (`Generator` + `SequenceBuilder`, hosted by `GeneratorPage` with
-paramName/editParam + preview/apply) reaches only Note and Curve today. Three concrete couplings block
-Indexed:
+The Generator framework (`Generator` + `SequenceBuilder`, hosted by `GeneratorPage`, picked via
+`GeneratorSelectPage`) only reaches Note/Curve today because of four hardcodings, all verified:
 
-- `SequenceBuilderImpl<T>` calls `T::firstStep()/lastStep()/setFirstStep/setLastStep/step().layerValue()/setLayerValue()/steps()` and treats `firstStep()` as the generate range start. Indexed has none of that, and its `firstStep()` means rotation.
-- `GeneratorPage::show` and its member are `StepSelection<CONFIG_STEP_COUNT>` (64); Indexed owns `StepSelection<IndexedSequence::MaxSteps>` (48) — incompatible template types.
-- `GeneratorPage::currentStep()`/LED draw `switch` on Note/Curve, and the value-preview hardcodes 64 steps; the mode picker casts row→Mode directly.
+- `SequenceBuilderImpl<T>` assumes `T` has `firstStep()/lastStep()/setFirstStep/setLastStep/step().layerValue()/setLayerValue()/steps()` and treats `firstStep()` as the generate range start.
+- `GeneratorPage::show` + member are `StepSelection<CONFIG_STEP_COUNT>` (64) — a fixed width.
+- `GeneratorPage::currentStep()`/LEDs `switch` on Note/Curve, and the value-preview hardcodes 64 steps.
+- `GeneratorSelectPage` casts `selectedRow()` straight to `Mode` over all modes.
 
-So Indexed gets a **bespoke builder** (not the template) plus targeted genericization of the shared
-page/selection/picker, then the AR lands as a Mode. The AR map itself (deterministic, mono, coupled,
-no RNG) is per the origin doc and built as a pure, unit-tested helper.
+The rework removes those four assumptions (selection view, page rendering by builder length + track
+branch, picker row→Mode mapping, per-builder guarding), then onboards Indexed as the first client
+with a **bespoke builder** (the template can't be used — Indexed's `firstStep()` is rotation). The
+existing modes light up on Indexed as the agnostic-ness proof; helical AR (a pure, unit-tested map
++ a generator) is the first net-new Mode. Other tracks (PhaseFlux, Stochastic) become a documented
+follow-up: add their builder + selection view, nothing else.
 
 ---
 
 ## Problem Frame
 
-- **Why Indexed:** its steps carry a first-class 10-bit `duration` (variable step time) — the helical pitch↔duration coupling needs it. Note/Curve are fixed-grid.
-- **Why the framework, not the macro path:** the framework owns the knob param page + non-destructive preview/apply; the macro path is preset-menu, apply-direct. The user chose the framework path knowing it's the bigger build.
-- **The real gap (verified):** the framework's *engine* side (`SequenceBuilder`) and its *UI* side (`GeneratorPage`, `StepSelection`, `GeneratorSelectPage`) are both Note/Curve-shaped. The bridge must supply a bespoke Indexed builder AND genericize the shared UI without regressing Note/Curve.
+- **Goal shift:** the durable asset is a track-agnostic generator framework. Helical AR and "Indexed gains generators" are the first tenants that justify and validate it.
+- **Why Indexed first:** it's the track whose steps carry variable per-step `duration` (the helical coupling needs it) and it currently has *no* generator access at all — so onboarding it both delivers value (Euclidean/Random/Init + Helical) and exercises every generic seam.
+- **The framework's reusable contract (the point of the rework):** a track becomes a generator client by providing (1) a `SequenceBuilder` implementation over its sequence and (2) a width-agnostic selection view. The page, picker, and factory then work unchanged. This recipe is what future tracks reuse.
 
 ---
 
 ## Key Technical Decisions
 
-- **Bespoke `IndexedSequenceBuilder`, mandatory.** Implement the `SequenceBuilder` *base interface* directly against Indexed's real API (its step `noteIndex`/`duration`/`gateLength` accessors, its active-length range, its own preview clone). Do **not** add Note-style `firstStep`/`lastStep` to `IndexedSequence` — its `firstStep()` is rotation and must not be repurposed. The generate range comes from the apply selection / active length, passed in, not from `firstStep`.
-- **AR generator writes whole steps** via `builder.editSequence()` (like `AlgoGenerator`), not the single-layer `value()/setValue()` path — the coupling needs note+duration produced together.
-- **`GeneratorPage` is not type-agnostic; genericize the Note/Curve-specific points.** `currentStep()`, the LED draw, and the value-preview need an Indexed branch (and the preview must use the builder's `length()`, not `CONFIG_STEP_COUNT`). This is a change to shared UI — guard Note/Curve behavior.
-- **`StepSelection` width mismatch → type-erase the selection.** Introduce a small selection-view interface (`any()`/`firstSetIndex()`/`lastSetIndex()`/count) that both `StepSelection<64>` and `<48>` satisfy; `GeneratorPage::show` takes the interface. (Alternatives: template `show` on width, or an adapter — type-erasure keeps the page concrete and is least churny for the Note callers.)
-- **Mode picker needs explicit row↔Mode mapping.** Replace the `rows()=int(Mode::Last)` + `Mode(selectedRow())` cast with a per-context visible-`Mode[]` list + `modeForRow()`; the picker is given the set valid for the current track. Helical shown for Indexed; Algo stays Note-only.
-- **AR map = origin doc, verbatim** (fold-feedback note, √freq duration, fold-remainder gate, seed init, no RNG, convergence guard). Scale + loop length from the track.
-- **Project scale/root ride on the builder, not the static params.** `Generator::execute(mode, builder)` has no context arg, the per-generator `Params` are private statics in `Generator.cpp` the page can't reach, and `AlgoGenerator`'s ctor calls `update()` immediately — so context must exist *at construction*, ruling out "set a static after the fact." Resolution: the bespoke `IndexedSequenceBuilder` carries the resolved project scale (`const Scale&`) + root, set when the Indexed page constructs it (U5). `HelicalGenerator` (which already casts the base builder to `IndexedSequenceBuilder` for `editSequence()`) reads scale/root from it in `update()`. `execute(mode, builder)` stays unchanged (no Note/Curve factory regression); `helicalParams` holds only the 4 user knobs.
-- **Explicit build registration.** New sources go in the manual list at `src/apps/sequencer/CMakeLists.txt` (no globbing). The factory is a fixed `Container<EuclideanGenerator, RandomGenerator, AlgoGenerator>` + per-generator static `Params` in `Generator.cpp` — `HelicalGenerator` must be added to both, with its `Mode::Helical` case guarded by `dynamic_cast<IndexedSequenceBuilder*>(&builder)` (the bespoke builder type, not `SequenceBuilderImpl<…>`).
+- **Bespoke builders per non-conforming track; keep the template for Note/Curve.** `SequenceBuilderImpl<T>` stays for Note/Curve. Indexed gets a hand-written `IndexedSequenceBuilder` implementing the `SequenceBuilder` base against its real API; **do not** add Note-style `firstStep/lastStep` to `IndexedSequence` (its `firstStep()` is rotation). Generate range is passed in / from active length.
+- **Selection is type-erased to a view interface** covering `GeneratorPage`'s real contract: `selected(int)`, `clear()`, `keyDown(KeyEvent&, int stepOffset)`, `keyUp(KeyEvent&, int stepOffset)`, `any()/firstSetIndex()/lastSetIndex()`. `StepSelection<N>` implements it for any `N`; the page holds the interface. Note/Curve callers pass their existing selection as the view (behavior-neutral).
+- **`GeneratorPage` renders by builder length + a track branch, not 64/Note.** `currentStep()` and LEDs gain per-track handling; the value-preview uses the builder's `length()`. Note/Curve branches stay byte-for-byte.
+- **Picker uses an explicit visible-`Mode[]` + `modeForRow()`,** set per launching track. Note/Curve pass their existing set (unchanged); Indexed passes its set. Per-mode guarding in the factory via `dynamic_cast` to the required builder type (e.g. `Algo`→`NoteSequenceBuilder`, `Helical`→`IndexedSequenceBuilder`).
+- **Project scale/root ride on the builder.** `execute(mode, builder)` has no context arg, `Params` are private statics, and `AlgoGenerator`'s ctor calls `update()` immediately — so context must exist at construction. The `IndexedSequenceBuilder` carries the resolved project scale + root (set at launch); `HelicalGenerator` reads them. `execute` signature unchanged.
+- **Build registration is explicit.** New sources go in the manual list in `src/apps/sequencer/CMakeLists.txt`; new generators go in the `Container<…>` + a static `Params` in `Generator.cpp`.
+- **AR map = origin doc, verbatim** (fold-feedback note, √freq duration, fold-remainder gate, seed init, no RNG, convergence guard).
 
 ---
 
 ## High-Level Technical Design
 
-Launch flow (mirrors the Note path; the new/changed surface is annotated):
+The framework after the rework, and the launch flow:
 
 ```
-IndexedSequenceEditPage --Generate--> GeneratorSelectPage (visible-Mode[] for Indexed)   [U7 change]
-   -> create IndexedSequenceBuilder(selectedIndexedSequence(), range, layer)             [U1 new]
-   -> Generator factory(mode=Helical, builder)   // guard to Indexed builder             [U4 new]
-   -> GeneratorPage.show(generator, selectionView)   // selection type-erased,            [U5/U6 change]
-        Indexed branches in currentStep/LEDs/preview
-        apply -> builder writes the Indexed sequence
+Track edit page --Generate--> GeneratorSelectPage(visibleModes for this track)   [U2]
+   -> create <Track>SequenceBuilder(sequence, range[, scale/root])               [Note/Curve: existing; Indexed: U4]
+   -> Generator::execute(mode, builder)  // per-mode dynamic_cast guard           [U7 adds Helical]
+   -> GeneratorPage.show(generator, selectionView)                               [U1 selection view, U3 render-by-length]
+        apply -> builder writes the sequence
 ```
 
-Shared, Note/Curve-touching changes: `GeneratorPage` (U6), the selection-view interface (U5),
-`GeneratorSelectPage`/model (U7). Indexed-only new code: the builder (U1), the AR map (U2), the
-generator (U3), the factory entry (U4), the Indexed-page launch (U5).
+Generic seams (touch Note/Curve — must stay behavior-neutral): selection view (U1), picker mapping
+(U2), page rendering (U3). New per-client code: Indexed builder (U4) + launch (U5). New tenant:
+helical map (U6) + generator (U7).
 
 ---
 
 ## Implementation Units
 
-### U1. Bespoke IndexedSequenceBuilder
+### U1. Type-erase the step selection
 
-**Goal:** A hand-written `SequenceBuilder` for Indexed — the template can't be used.
+**Goal:** `GeneratorPage` accepts any-width selection via an interface.
 
 **Dependencies:** none.
 
 **Files:**
-- `src/apps/sequencer/engine/generators/IndexedSequenceBuilder.h` / `.cpp` (create — implements the `SequenceBuilder` base)
-- `src/apps/sequencer/CMakeLists.txt` (add `IndexedSequenceBuilder.cpp` to the explicit generator source list, ~line 38)
-- possibly `src/apps/sequencer/model/IndexedSequence.h` (only additive read/write helpers if missing; **not** firstStep/lastStep semantics)
+- `src/apps/sequencer/ui/StepSelection.h` (add the view interface; `StepSelection<N>` implements it)
+- `src/apps/sequencer/ui/pages/GeneratorPage.h` / `.cpp` (hold/accept the view; rewrite `selected()[i]` → `selected(i)`)
+- `src/apps/sequencer/ui/pages/NoteSequenceEditPage.cpp`, `CurveSequenceEditPage.cpp` (pass their selection as the view)
 
-**Approach:** Implement every `SequenceBuilder` virtual (`revert/apply/showOriginal/showPreview/showingPreview/updatePreview/originalLength/originalValue/length/setLength/value/setValue/clearSteps/copyStep/clearLayer`) against Indexed: keep `_edit`/`_original`/`_preview` Indexed copies; range = active length (or the passed apply range), **not** `firstStep()`. Expose `editSequence()` for whole-step writers. `value()/setValue()` map a chosen step field (noteIndex) ↔ float for the generic preview; the AR generator uses `editSequence()` directly. The builder also **carries the resolved project scale (`const Scale&`) + root**, set by the launch (U5), and exposes accessors — it's the only object the generator can reach that holds the project context. Verify Indexed's copy semantics suffice for the preview clone.
+**Approach:** Define a `StepSelectionView` (or similar) with `selected(int)`, `clear()`, `keyDown(KeyEvent&, int)`, `keyUp(KeyEvent&, int)`, `any()`, `firstSetIndex()`, `lastSetIndex()`. `StepSelection<N>` already has these (or trivially exposes them) → it implements the view. `GeneratorPage` stores `StepSelectionView*`. Rewrite the LED reads from `_stepSelection->selected()[i]` to `selected(i)`.
 
-**Patterns to follow:** `SequenceBuilderImpl<T>` (the contract to satisfy) and `AlgoGenerator`'s `editSequence()` usage — but re-implemented, not instantiated, for Indexed.
-
-**Execution note:** Characterization-first — pin the preview/apply/revert contract before the AR depends on it.
+**Execution note:** Behavior-neutral refactor — diff Note/Curve to confirm only the selection-pass changed.
 
 **Test scenarios:**
-- preview → apply commits to the Indexed sequence; revert restores the original; `showOriginal`/`showPreview` toggle correctly.
-- range is the active length / passed range; rotation `firstStep` is untouched after apply.
-- `value/setValue` round-trip the chosen field at range bounds.
-- Test expectation: builder round-trip via a small unit test if feasible; otherwise build + the U5/U6 manual preview exercises it.
+- Note generator: step keys still toggle selection inside the generator page; LEDs and clear behave identically.
+- Curve generator: same.
+- Test expectation: build + manual sim (Note generator), since the page has no unit harness.
 
-**Verification:** Builder drives preview/apply/revert over an Indexed sequence; Indexed rotation behavior unchanged; sim + STM32 build.
+**Verification:** Note/Curve generator pages behave identically; sim + STM32 build.
 
 ---
 
-### U2. Helical AR map — pure helper (test-first)
+### U2. Picker row↔Mode mapping + per-track visible set
+
+**Goal:** The picker offers a per-track mode subset via explicit mapping.
+
+**Dependencies:** none.
+
+**Files:**
+- `src/apps/sequencer/ui/model/GeneratorSelectListModel.h` (visible-`Mode[]` + `modeForRow()`)
+- `src/apps/sequencer/ui/pages/GeneratorSelectPage.cpp` / `.h` (accept the visible set; `closeWithResult` returns `modeForRow(selectedRow())`)
+- launching pages pass their set (Note/Curve: existing modes; Indexed in U5)
+
+**Approach:** Replace `rows()=int(Mode::Last)` + `Mode(selectedRow())` with a configurable visible-`Mode[]` + `modeForRow()`. Note/Curve pass their current full set (no behavior change).
+
+**Test scenarios:**
+- Note picker: same modes, same selection→Mode results as before.
+- A filtered set returns the correct `Mode` (no ordinal drift).
+- Test expectation: build + manual sim.
+
+**Verification:** Note picker unchanged; filtered sets map correctly.
+
+---
+
+### U3. GeneratorPage track-agnostic rendering
+
+**Goal:** Page renders/tracks by builder length + a per-track branch, not Note/64.
+
+**Dependencies:** U1.
+
+**Files:**
+- `src/apps/sequencer/ui/pages/GeneratorPage.cpp` (`currentStep()`, LEDs, value-preview)
+
+**Approach:** Drive the value-preview off the builder's `length()` instead of `CONFIG_STEP_COUNT`; add per-track `currentStep()`/LED handling so a new track can supply its playhead. Keep Note/Curve branches byte-for-byte. (Verified against Indexed once U4/U5 land.)
+
+**Test scenarios:**
+- Note/Curve: preview, LEDs, playhead unchanged.
+- A shorter-than-64 sequence previews without overrun (verified via Indexed in U5).
+- Test expectation: build + manual sim; Note regression check.
+
+**Verification:** Note/Curve visuals unchanged; preview length-driven.
+
+---
+
+### U4. IndexedSequenceBuilder (first new client)
+
+**Goal:** A bespoke `SequenceBuilder` for Indexed, carrying project scale/root.
+
+**Dependencies:** none.
+
+**Files:**
+- `src/apps/sequencer/engine/generators/IndexedSequenceBuilder.h` / `.cpp` (create)
+- `src/apps/sequencer/CMakeLists.txt` (add the source)
+- possibly `src/apps/sequencer/model/IndexedSequence.h` (additive accessors only; not firstStep/lastStep)
+
+**Approach:** Implement every `SequenceBuilder` virtual against Indexed: `_edit`/`_original`/`_preview` Indexed copies; range = active length / passed range (**not** rotation `firstStep`); `editSequence()` for whole-step writers; `value()/setValue()` map a chosen layer (so single-layer modes work). Carry resolved project scale (`const Scale&`) + root with accessors, set at construction (U5). Verify copy semantics for the preview clone.
+
+**Execution note:** Characterization-first — pin preview/apply/revert before tenants depend on it.
+
+**Test scenarios:**
+- preview→apply commits; revert restores; showOriginal/showPreview toggle.
+- range = active/passed range; rotation `firstStep` untouched after apply.
+- `value/setValue` round-trip a layer at range bounds.
+- Test expectation: builder unit test if feasible; else build + U5 manual.
+
+**Verification:** Builder drives preview/apply/revert; rotation intact; builds.
+
+---
+
+### U5. Indexed launch + existing modes (the agnostic-ness proof)
+
+**Goal:** Launch generators from the Indexed page; offer Init/Euclidean/Random (+ Helical after U7).
+
+**Dependencies:** U1, U2, U3, U4.
+
+**Files:**
+- `src/apps/sequencer/ui/pages/IndexedSequenceEditPage.cpp` / `.h` (Generate entry → picker → build → show)
+
+**Approach:** Mirror `NoteSequenceEditPage.cpp:1163`: construct `IndexedSequenceBuilder(sequence, range, _project.selectedScale(), root)`, pass the Indexed visible-`Mode[]` (Init/Euclidean/Random; Helical lists once U7 registers it) to the picker, run `Generator::execute`, show `GeneratorPage` with the Indexed selection as the view. Range from the Indexed step selection / active length; layer = the currently-edited Indexed layer for single-layer modes.
+
+**Test scenarios:**
+- Indexed: Generate → Euclidean fills a gate pattern on the chosen layer; Random fills; preview/apply/revert work.
+- Selection scopes the fill; full-sequence when nothing selected.
+- Test expectation: build + manual sim (this is the proof the framework is now track-agnostic).
+
+**Verification:** Indexed runs the existing generic modes end-to-end via the shared page/picker.
+
+---
+
+### U6. Helical AR map — pure helper (test-first)
 
 **Goal:** The deterministic coupled-AR step function as a standalone, unit-tested helper.
 
@@ -124,7 +203,7 @@ generator (U3), the factory entry (U4), the Indexed-page launch (U5).
 - `src/tests/unit/sequencer/TestHelicalAr.cpp` (create)
 - `src/tests/unit/sequencer/CMakeLists.txt` (register)
 
-**Approach:** `helicalArStep(pitch, dur, span, base, lawDir) → {noteIndex, durTicks, gateLen, newPitch, newDur}` per the origin doc: `raw = prevDur·W_DUR + prevPitch·W_PITCH`; `influence = fmod(raw, span)`; `noteIndex = round(influence)`; gate length from the fold remainder → 20–100%; duration = `base × law(√freq)` clamped; feed back. Borrow helical's constants (17.31 / 0.5 / 16.17). Include the convergence-guard nudge.
+**Approach:** `helicalArStep(pitch, dur, span, base, lawDir) → {noteIndex, durTicks, gateLen, newPitch, newDur}` per the origin doc: `raw = prevDur·W_DUR + prevPitch·W_PITCH`; `influence = fmod(raw, span)`; `noteIndex = round(influence)`; gate from the fold remainder → 20–100%; duration = `base × law(√freq)` clamped; feed back. Constants 17.31/0.5/16.17. Include the convergence-guard nudge.
 
 **Execution note:** Test-first (mirror `TuringRegister`/`TT2Transpose`).
 
@@ -132,156 +211,70 @@ generator (U3), the factory entry (U4), the Indexed-page launch (U5).
 - determinism: same seed+params → identical step stream.
 - coupling: changing the duration-feedback weight shifts the pitch trajectory.
 - octave range: `noteIndex` in `[0, octaveRange×scaleSize)`.
-- law direction: higher pitch → monotonically longer (or shorter) `durTicks`.
-- bounds: `durTicks` in the Indexed tick range; gate length in 20–100%.
+- law direction: higher pitch → monotonically longer/shorter `durTicks`.
+- bounds: `durTicks` in the Indexed tick range; gate length 20–100%.
 - convergence guard: a fixed-point-prone seed doesn't collapse to one note.
 
-**Verification:** `TestHelicalAr` green; sim + STM32 build.
+**Verification:** `TestHelicalAr` green; builds.
 
 ---
 
-### U3. HelicalGenerator (Generator subclass)
+### U7. HelicalGenerator + register Mode::Helical
 
-**Goal:** A `Generator` for `Mode::Helical` running U2 across the range, writing whole Indexed steps, with the 4 knob params.
+**Goal:** The AR generator (first net-new Mode), guarded to Indexed.
 
-**Dependencies:** U1, U2.
+**Dependencies:** U4, U6.
 
 **Files:**
 - `src/apps/sequencer/engine/generators/HelicalGenerator.h` / `.cpp` (create)
-- `src/apps/sequencer/CMakeLists.txt` (add `HelicalGenerator.cpp` to the explicit source list)
+- `src/apps/sequencer/CMakeLists.txt` (add the source)
+- `src/apps/sequencer/engine/generators/Generator.cpp` / `.h` (`Mode::Helical`, `modeName`, add to `Container<…>`, static `helicalParams`, guarded `execute` case)
 
-**Approach:** Mirror `AlgoGenerator`: take the Indexed builder, `editSequence()`, seed the AR from `seed`, run `helicalArStep` per step writing `setNoteIndex`/`setDuration`/`setGateLength`. For the √freq law resolve pitch via `sequence.selectedScale(scale)` + root, where the resolved project scale + root are **read from the `IndexedSequenceBuilder`** (cast from the base builder, as for `editSequence()`) — not from `Params`, since the ctor's `update()` runs before any post-construction config. `Params` holds only the 4 user knobs via `paramName`/`printParam`/`editParam`: octave range, base, law direction, seed (+ `randomizeSeed`). Deterministic preview/regenerate.
-
-**Patterns to follow:** `AlgoGenerator`.
-
-**Test scenarios:**
-- same params+seed → identical generated Indexed sequence (determinism).
-- octave-range/base params change span and step timing.
-- Test expectation: map correctness from U2; wiring is build + manual preview.
-
-**Verification:** Generating with Helical fills the Indexed sequence; params edit and re-preview; reproducible.
-
----
-
-### U4. Register + guard the Helical mode
-
-**Goal:** `Mode::Helical` in the factory, guarded to the Indexed builder.
-
-**Dependencies:** U3.
-
-**Files:**
-- `src/apps/sequencer/engine/generators/Generator.cpp` / `.h` (enum value, `modeName`, container + params + factory case)
-
-**Approach:** Add `Mode::Helical` + `modeName`. In `Generator.cpp`: add `HelicalGenerator` to the static `Container<EuclideanGenerator, RandomGenerator, AlgoGenerator>` (→ `…, AlgoGenerator, HelicalGenerator>`) and a `static HelicalGenerator::Params helicalParams`; add a `case Mode::Helical:` to `execute()` guarded by `dynamic_cast<IndexedSequenceBuilder*>(&builder)` (returns null otherwise), then `generatorContainer.create<HelicalGenerator>(builder, helicalParams)`. `Generator.cpp` is already in the CMake list. Adding an enum value shifts `Mode::Last`; the picker no longer relies on raw ordinals after U7, but grep for other `int(Mode::Last)` / `Mode(...)` casts.
+**Approach:** Mirror `AlgoGenerator`: take the builder, `editSequence()`, seed from `seed`, read project scale/root from the `IndexedSequenceBuilder` (cast), run `helicalArStep` per step writing `setNoteIndex`/`setDuration`/`setGateLength`. `Params` = octave range, base, law direction, seed (+ `randomizeSeed`) via `paramName`/`printParam`/`editParam`. Add to the factory container + a `case Mode::Helical:` guarded by `dynamic_cast<IndexedSequenceBuilder*>(&builder)`; add Helical to the Indexed visible-`Mode[]` (U5). Grep for other `int(Mode::Last)`/`Mode(...)` casts when adding the enum.
 
 **Test scenarios:**
-- factory returns HelicalGenerator for Indexed builder + Helical; guarded/null otherwise.
-- Test expectation: build + U5 launch check.
+- same params+seed → identical generated Indexed sequence; octave-range/base change span/timing.
+- Helical guarded out for non-Indexed builders.
+- Test expectation: map correctness from U6; wiring is build + manual preview.
 
-**Verification:** Factory builds; Helical resolves only for Indexed.
-
----
-
-### U5. Indexed launch + type-erased selection
-
-**Goal:** Launch the generator from the Indexed page; resolve the `StepSelection` width mismatch.
-
-**Dependencies:** U1, U4, U7.
-
-**Files:**
-- `src/apps/sequencer/ui/StepSelection.h` (add a width-agnostic selection-view interface the templates expose)
-- `src/apps/sequencer/ui/pages/GeneratorPage.h` / `.cpp` (`show` takes the view, not `StepSelection<CONFIG_STEP_COUNT>*`)
-- `src/apps/sequencer/ui/pages/IndexedSequenceEditPage.cpp` / `.h` (Generate entry → select → build → show)
-- `src/apps/sequencer/ui/pages/NoteSequenceEditPage.cpp`, `CurveSequenceEditPage.cpp` (pass the view — the regression touch)
-
-**Approach:** Introduce a selection-view interface covering `GeneratorPage`'s **actual** contract — `selected(int index)`, `clear()`, `keyDown(KeyEvent&, int stepOffset)`, `keyUp(KeyEvent&, int stepOffset)`, plus `any()`/`firstSetIndex()`/`lastSetIndex()` — implemented by `StepSelection<N>` for any `N`. Change `GeneratorPage` to hold the interface and rewrite its `_stepSelection->selected()[i]` LED reads to `selected(i)`; the `keyDown`/`keyUp`/`clear` call sites stay but go through the interface. Update the Note/Curve callers to pass the view (behavior-neutral). Wire the Indexed page's Generate launch mirroring `NoteSequenceEditPage.cpp:1163`: construct the `IndexedSequenceBuilder` with the resolved `_project.selectedScale()` + track/project root (the generator reads scale/root from it), range from the Indexed step selection / active length.
-
-**Execution note:** Behavior-neutral for Note/Curve — diff those callers to confirm only the selection-pass changed.
-
-**Test scenarios:**
-- Indexed: Generate → picker → preview → apply writes the sequence; selection range scopes the fill.
-- Note/Curve regression: their generator launch + range still behave identically.
-- Test expectation: build + manual sim (both Indexed and a Note generator).
-
-**Verification:** Indexed end-to-end works; Note/Curve generators unaffected; sim + STM32 build.
-
----
-
-### U6. GeneratorPage Indexed support (currentStep / LEDs / preview)
-
-**Goal:** The shared generator page renders and tracks an Indexed sequence correctly.
-
-**Dependencies:** U1, U5.
-
-**Files:**
-- `src/apps/sequencer/ui/pages/GeneratorPage.cpp` (`currentStep()`, `updateLeds`, `drawValueGenerator` / preview)
-
-**Approach:** Add a `Track::TrackMode::Indexed` branch to `currentStep()` (Indexed playhead via its engine) and to the LED draw. Make the value-preview use the builder's `length()` instead of the hardcoded `CONFIG_STEP_COUNT`, and handle Indexed's step count (≤48) + variable durations in the plot. Keep Note/Curve branches byte-for-byte.
-
-**Test scenarios:**
-- Indexed preview renders notes + variable durations without overrun (length ≤ 48, not 64); playhead/current-step tracks the Indexed engine; LEDs correct.
-- Note/Curve preview/LEDs/playhead unchanged.
-- Test expectation: build + manual sim, both track types.
-
-**Verification:** Indexed preview legible + correct playhead; Note/Curve visuals unchanged.
-
----
-
-### U7. Mode picker row↔Mode mapping + per-track filtering
-
-**Goal:** The picker offers the modes valid for the current track via an explicit mapping.
-
-**Dependencies:** none (precedes U5's launch).
-
-**Files:**
-- `src/apps/sequencer/ui/model/GeneratorSelectListModel.h` (visible-`Mode[]` + `modeForRow()`)
-- `src/apps/sequencer/ui/pages/GeneratorSelectPage.cpp` (`closeWithResult` returns `modeForRow(selectedRow())`; accept the visible set)
-
-**Approach:** Replace `rows()=int(Mode::Last)` + `Mode(selectedRow())` with a configurable visible-`Mode[]` (set by the launching page per track) and `modeForRow()` so a filtered list returns correct modes. Note/Curve pages pass their existing set (no behavior change); the Indexed page passes the Indexed-valid set (incl. Helical).
-
-**Test scenarios:**
-- Indexed picker lists the Indexed-valid modes incl. Helical; selecting any returns the right `Mode` (not a shifted ordinal).
-- Note picker unchanged: same modes, same results.
-- Test expectation: build + manual sim.
-
-**Verification:** Correct modes per track; no ordinal drift; Note/Curve picker identical.
+**Verification:** Indexed → Generate → Helical → tweak knobs → preview → apply; reseed regenerates; reproducible; not offered on Note/Curve.
 
 ---
 
 ## Scope Boundaries
 
-In scope: bespoke Indexed builder (U1); AR map + generator (U2/U3); factory mode (U4); the shared-UI genericization needed to host Indexed (U5–U7).
+In scope: the four de-hardcodings (U1–U3), Indexed as first client (U4–U5) with the existing modes,
+helical AR as the first new Mode (U6–U7).
 
-Out of scope / deferred (origin doc): Marbles warp, "steps" role-hierarchy, rests/gate on-off, gate-length depth knob, multi-voice/swarm/intone.
-
-### Deferred to Follow-Up Work
-- Enabling the *other* modes (Euclidean/Random/Init) on Indexed now that it has a builder — a separate evaluation; this plan only guarantees Helical.
-- AR output visualization beyond the standard preview.
+Out of scope / deferred:
+- **Other tracks as clients (PhaseFlux, Stochastic, …)** — the framework is built and proven track-agnostic here; onboarding another track is the documented recipe (its builder + selection view), a separate plan.
+- From the origin doc: Marbles warp, "steps" role-hierarchy, rests/gate on-off, gate-length depth knob, multi-voice/swarm/intone.
 
 ---
 
 ## System-Wide Impact
 
-- **Shared-UI surfaces touched (regression risk):** `GeneratorPage` (Indexed branches), `StepSelection` (selection-view interface), `GeneratorSelectPage`/model (row↔Mode). These are used by Note and Curve generators — changes must be behavior-neutral for them.
-- **Indexed-only new code:** builder, AR map, generator, factory entry, page launch.
-- **No save-format change:** `IndexedSequence` storage + serialization untouched (only additive accessors if needed; rotation `firstStep` semantics preserved).
-- **Affected users:** Indexed users gain a generator with knobs + preview; Note/Curve users should see zero change.
+- **Shared-UI surfaces (regression risk, Note/Curve):** selection view (U1), picker (U2), `GeneratorPage` rendering (U3). All changes behavior-neutral for Note/Curve, with explicit regression checks.
+- **New per-client code:** Indexed builder + launch.
+- **New tenant:** helical map + generator + factory entry.
+- **No save-format change:** Indexed storage/serialization untouched; rotation semantics preserved.
+- **Users:** Indexed gains generators (existing modes + Helical); Note/Curve unchanged; future tracks gain a cheap on-ramp.
 
 ---
 
 ## Risks & Mitigation
 
-- **Shared generator UI regression (highest).** U5–U7 modify `GeneratorPage`/`StepSelection`/the picker that Note/Curve rely on. Mitigation: keep Note/Curve branches byte-for-byte; explicit Note-generator regression check in U5/U6/U7 verification; land the selection-view + picker mapping as behavior-neutral refactors first, Indexed branches second.
-- **U1 builder correctness.** Hand-written builder must honor preview/apply/revert exactly and never touch rotation `firstStep`. Mitigation: characterization-first contract test before downstream units.
-- **`Mode::Last` / ordinal assumptions.** Adding a mode shifts the enum; any raw-ordinal use (beyond the picker, now fixed in U7) breaks silently. Mitigation: grep for `Mode(` casts and `int(Mode::Last)` during U4/U7.
-- **AR convergence to a fixed point.** Mitigation: convergence-guard nudge in U2, covered by a test.
-- **base→ticks calibration.** Tune in U2/U3; implementation-time.
+- **Shared generator UI regression (highest).** U1–U3 touch Note/Curve. Mitigation: keep their branches byte-for-byte; land U1–U3 as behavior-neutral refactors with a Note-generator regression check before any Indexed code.
+- **Bespoke builder correctness.** Must honor preview/apply/revert and never touch rotation `firstStep`. Mitigation: characterization-first contract (U4).
+- **Single-layer modes on Indexed** (Euclidean/Random) need a sensible target layer + range. Mitigation: launch passes the current Indexed layer; verify Euclidean/Random output in U5.
+- **Enum/ordinal assumptions.** Adding `Mode::Helical` shifts `Mode::Last`; the picker no longer casts ordinals (U2), but grep other casts (U7).
+- **AR convergence / base→ticks calibration.** Convergence-guard nudge + constant tuning (U6/U7), implementation-time.
 
 ---
 
 ## Verification (whole plan)
 
 - `TestHelicalAr` green; sim + STM32 release build clean.
-- Indexed end-to-end on the sim: Generate → Helical → edit octave-range/base/law/seed → non-destructive preview → apply; reseed regenerates; sequence breathes (variable durations) in the track scale.
-- **Regression:** a Note (and Curve) generator still launches, previews, and applies identically; the mode picker shows the same modes/results for Note/Curve.
-- No change to saved Indexed projects; rotation behavior intact.
+- **Framework agnostic-ness:** Indexed runs Euclidean/Random/Init via the shared page/picker (U5), and a Note (and Curve) generator still launches/previews/applies identically (U1–U3 regression).
+- **Helical:** Indexed → Generate → Helical → edit octave-range/base/law/seed → non-destructive preview → apply; reseed regenerates; sequence breathes in the track scale; not offered on Note/Curve.
+- No change to saved Indexed projects; rotation intact.
