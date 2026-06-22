@@ -6,6 +6,7 @@
 
 #include "core/utils/Random.h"
 #include "SortedQueue.h"
+#include "generators/TuringRegister.h"
 
 class TuesdayTrackEngine final : public TrackEngine {
 public:
@@ -122,6 +123,7 @@ private:
     TuesdayTickResult generateMinimal(const GenerationContext &ctx);
     TuesdayTickResult generateBlake(const GenerationContext &ctx);
     TuesdayTickResult generateGanz(const GenerationContext &ctx);
+    TuesdayTickResult generateTuring(const GenerationContext &ctx);
 
     // The "Pipeline": Converts abstract algorithm steps into quantized voltage
     float scaleToVolts(int noteIndex, int octave) const;
@@ -301,6 +303,7 @@ private:
     };
 
     AlgorithmState _algoState;
+    TuringRegister _turingSR;  // live Turing register (persists across steps -> drift)
 
     // Output state
     bool _activity = false;
