@@ -206,8 +206,8 @@ section as reference only; implementation planning lives in the new task.
 | Texts.h (centralized strings) | Strings scattered across cpp/pages | Possible flash win — verify string dedup before adopting |
 | RoutableListModel.h | No generic routable list-model base | Dedup refactor — tracked under core-architecture-optimization |
 
-### Actionable: Turing as a Tuesday algo
-Add a Turing-machine (looping shift register with per-step bit-flip probability) as the 16th algorithm in `TuesdayAlgoCore`, not a new track type. Reuses the entire Tuesday track + AlgoGenerator + preview/apply plumbing for one algo's worth of code — no new TrackMode, no model-union growth, no new pages.
+### Actionable: Turing as a Tuesday algo — DONE (2026-06-22)
+Shipped as Tuesday algo 15 — see `tuesday-turing-algo` (commits `8a42c4b1`/`8e9b053c`/`f9f87512`/`e7a400f7`). Note the survey's "one algo's worth of code" was optimistic: Tuesday implements algos twice (live `TuesdayTrackEngine` + `TuesdayAlgoCore`), so Turing landed in both, sharing a `TuringRegister` core.
 
 ### Candidate (musical correctness, not stability): scale-change note remap
 performer-nx's `FIX_BROKEN_SCALE_CHANGE` (`NoteSequence.cpp:200`, `Project.h:135/428`) calls `remapScale(oldScale, newScale)` when scale changes via routing, so stored note values keep their musical meaning instead of shifting to whatever the raw index lands on in the new scale. xformer's `writeRouted` `case Routing::Target::Scale` just `setScale()` — no remap. Not a crash (xformer's index math is bounds-safe), so out of Phase 0 scope; logged here as a correctness improvement if scale-change-while-playing ever feels wrong. The other two performer-nx scale toggles are not worth porting: `FIX_BROKEN_SCALES` is a ±5-octave range clamp xformer doesn't need (index already bounded).
