@@ -29,8 +29,9 @@ The Generator framework (`Generator` + `SequenceBuilder`, hosted by `GeneratorPa
 
 - `SequenceBuilderImpl<T>` assumes `T` has `firstStep()/lastStep()/setFirstStep/setLastStep/step().layerValue()/setLayerValue()/steps()` and treats `firstStep()` as the generate range start.
 - `GeneratorPage::show` + member are `StepSelection<CONFIG_STEP_COUNT>` (64) — a fixed width.
-- `GeneratorPage::currentStep()`/LEDs `switch` on Note/Curve, and the value-preview hardcodes 64 steps.
+- `GeneratorPage::currentStep()`/LEDs `switch` on Note/Curve, the value-preview hardcodes 64 steps, and section/bank nav is `% 4`.
 - `GeneratorSelectPage` casts `selectedRow()` straight to `Mode` over all modes.
+- The generic generators write a fixed 64 — `EuclideanGenerator` loops `CONFIG_STEP_COUNT`, `RandomGenerator` loops a fixed-64 pattern — overflowing a shorter (48-step Indexed) builder.
 
 The rework removes those four assumptions (selection view, page rendering by builder length + track
 branch, picker row→Mode mapping, per-builder guarding), then onboards Indexed as the first client
@@ -55,7 +56,8 @@ follow-up: add their builder + selection view, nothing else.
 - **Selection is type-erased to a view interface** covering `GeneratorPage`'s real contract: `selected(int)`, `clear()`, `keyDown(KeyEvent&, int stepOffset)`, `keyUp(KeyEvent&, int stepOffset)`, `any()/firstSetIndex()/lastSetIndex()`. `StepSelection<N>` implements it for any `N`; the page holds the interface. Note/Curve callers pass their existing selection as the view (behavior-neutral).
 - **`GeneratorPage` renders by builder length + a track branch, not 64/Note.** `currentStep()` and LEDs gain per-track handling; the value-preview uses the builder's `length()`. Note/Curve branches stay byte-for-byte.
 - **Picker uses an explicit visible-`Mode[]` + `modeForRow()`,** set per launching track. Note/Curve pass their existing set (unchanged); Indexed passes its set. Per-mode guarding in the factory via `dynamic_cast` to the required builder type (e.g. `Algo`→`NoteSequenceBuilder`, `Helical`→`IndexedSequenceBuilder`).
-- **Project scale/root ride on the builder.** `execute(mode, builder)` has no context arg, `Params` are private statics, and `AlgoGenerator`'s ctor calls `update()` immediately — so context must exist at construction. The `IndexedSequenceBuilder` carries the resolved project scale + root (set at launch); `HelicalGenerator` reads them. `execute` signature unchanged.
+- **Resolved scale/root ride on the builder, sequence-override-first.** `execute(mode, builder)` has no context arg, `Params` are private statics, and `AlgoGenerator`'s ctor calls `update()` immediately — so context must exist at construction. The `IndexedSequenceBuilder` carries the **resolved** scale + root, computed at launch exactly as the Indexed UI does (`IndexedSequenceEditPage.cpp:388`): scale = `sequence.selectedScale(_project.selectedScale())`, root = `sequence.rootNote() < 0 ? _project.rootNote() : sequence.rootNote()`. Passing the raw project scale would ignore a per-sequence scale/root override. `HelicalGenerator` reads them; `execute` signature unchanged.
+- **Generic generators must write `builder.length()`, not 64.** `EuclideanGenerator`/`RandomGenerator` hardcode the write count; on a 48-step Indexed builder that overflows. Length-bounding them is part of making the framework track-agnostic (U8).
 - **Build registration is explicit.** New sources go in the manual list in `src/apps/sequencer/CMakeLists.txt`; new generators go in the `Container<…>` + a static `Params` in `Generator.cpp`.
 - **AR map = origin doc, verbatim** (fold-feedback note, √freq duration, fold-remainder gate, seed init, no RNG, convergence guard).
 
@@ -159,7 +161,7 @@ helical map (U6) + generator (U7).
 - `src/apps/sequencer/CMakeLists.txt` (add the source)
 - possibly `src/apps/sequencer/model/IndexedSequence.h` (additive accessors only; not firstStep/lastStep)
 
-**Approach:** Implement every `SequenceBuilder` virtual against Indexed. Member shape mirrors `SequenceBuilderImpl`: **`IndexedSequence &_edit` is a live reference to the track's sequence** (so `apply()` commits to the model), `IndexedSequence _original` is a copy (revert), `IndexedSequence *_preview` a heap copy — a copy for `_edit` would pass local tests but never reach the track. Range = active length / passed range (**not** rotation `firstStep`); `editSequence()` returns `_edit` for whole-step writers; `value()/setValue()` map a chosen layer (single-layer modes). Carry resolved project scale (`const Scale&`) + root with accessors, set at construction (U5). Verify copy semantics for the preview clone.
+**Approach:** Implement every `SequenceBuilder` virtual against Indexed. Member shape mirrors `SequenceBuilderImpl`: **`IndexedSequence &_edit` is a live reference to the track's sequence** (so `apply()` commits to the model), `IndexedSequence _original` is a copy (revert), `IndexedSequence *_preview` a heap copy — a copy for `_edit` would pass local tests but never reach the track. Range = active length / passed range (**not** rotation `firstStep`); `editSequence()` returns `_edit` for whole-step writers; `value()/setValue()` map a chosen layer (single-layer modes). Carry the **resolved** scale (`const Scale&`) + root with accessors, set at construction (U5) via sequence-override-first resolution — not the raw project scale. Verify copy semantics for the preview clone.
 
 **Execution note:** Characterization-first — pin preview/apply/revert before tenants depend on it.
 
@@ -177,12 +179,12 @@ helical map (U6) + generator (U7).
 
 **Goal:** Launch generators from the Indexed page; offer Init/Euclidean/Random (+ Helical after U7).
 
-**Dependencies:** U1, U2, U3, U4.
+**Dependencies:** U1, U2, U3, U4, U8.
 
 **Files:**
 - `src/apps/sequencer/ui/pages/IndexedSequenceEditPage.cpp` / `.h` (Generate entry → picker → build → show)
 
-**Approach:** Mirror `NoteSequenceEditPage.cpp:1163`: construct `IndexedSequenceBuilder(sequence, range, _project.selectedScale(), root)`, pass the Indexed visible-`Mode[]` (Init/Euclidean/Random; Helical lists once U7 registers it) to the picker, run `Generator::execute`, show `GeneratorPage` with the Indexed selection as the view. Range from the Indexed step selection / active length; layer = the currently-edited Indexed layer for single-layer modes.
+**Approach:** Mirror `NoteSequenceEditPage.cpp:1163`: construct `IndexedSequenceBuilder(sequence, range, sequence.selectedScale(_project.selectedScale()), sequence.rootNote() < 0 ? _project.rootNote() : sequence.rootNote())` (resolved scale/root, sequence-override-first), pass the Indexed visible-`Mode[]` (Init/Euclidean/Random; Helical lists once U7 registers it) to the picker, run `Generator::execute`, show `GeneratorPage` with the Indexed selection as the view. Range from the Indexed step selection / active length; layer = the currently-edited Indexed layer for single-layer modes.
 
 **Test scenarios:**
 - Indexed: Generate → Euclidean fills a gate pattern on the chosen layer; Random fills; preview/apply/revert work.
@@ -238,7 +240,29 @@ helical map (U6) + generator (U7).
 - Helical guarded out for non-Indexed builders.
 - Test expectation: map correctness from U6; wiring is build + manual preview.
 
-**Verification:** Indexed → Generate → Helical → tweak knobs → preview → apply; reseed regenerates; reproducible; not offered on Note/Curve.
+**Verification:** Indexed → Generate → Helical → tweak knobs → preview → apply; reseed regenerates; reproducible; not offered on Note/Curve. With an Indexed sequence whose own scale/root differ from the project, the generated pitches follow the **sequence's** scale/root (override honored), not the project's.
+
+---
+
+### U8. Length-bound the generic generator write loops
+
+**Goal:** `EuclideanGenerator`/`RandomGenerator` (and any generic mode) write `builder.length()` steps, not a hardcoded 64 — so they're safe on any-width builder.
+
+**Dependencies:** none.
+
+**Files:**
+- `src/apps/sequencer/engine/generators/EuclideanGenerator.cpp`, `RandomGenerator.cpp` (audit `InitLayer`/`InitSteps` paths too)
+
+**Approach:** Replace the `CONFIG_STEP_COUNT` / fixed-64 write bounds with `_builder.length()` (after any `setLength`). For Note/Curve, `length()` drives the meaningful range; confirm output is unchanged for full-length sequences (and that a previously over-writing generator now correctly respects the active length). This is a Note/Curve-touching change — regression check required.
+
+**Execution note:** Behavior-neutral for Note/Curve where `length()` equals the prior bound; treat any difference as an intentional length-respect fix and confirm with a Note check.
+
+**Test scenarios:**
+- Indexed (48): Euclidean/Random issue no `setValue` past index 47 (no overflow, no `StepSelection` index ≥48).
+- Note (full length): Euclidean/Random output identical to before.
+- Test expectation: build + manual sim, both track types.
+
+**Verification:** Generic generators write within `0..length-1` on Indexed; Note/Curve output unchanged for full-length sequences.
 
 ---
 
