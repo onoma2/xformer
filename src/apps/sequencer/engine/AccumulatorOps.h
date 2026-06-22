@@ -1,26 +1,30 @@
 #pragma once
 
 // Stateless boundary-resolution functions for accumulator counters.
-// Extracted verbatim from model/Accumulator.cpp; see accumulator-v2-spec §13.9.
-// Caller supplies absolute min/max; polarity-to-bounds mapping happens upstream.
+// Unified convention: each op takes an explicit `direction` (+1 ascend, -1
+// descend, 0 = freeze / no-op) and a `magnitude`. Wrap/Hold/RTZ apply direction
+// to magnitude; Pendulum travels by the caller-owned `pendulumDir` (direction is
+// its freeze gate, and `magnitude` is the per-tick delta — the caller controls
+// its sign via pendulumDir or by passing a signed value). Caller supplies
+// absolute min/max; polarity-to-bounds mapping happens upstream. See
+// accumulator-v2-spec §13.9.
 
 namespace AccumulatorOps {
 
-// Wrap: on overflow, wrap to opposite limit (carry remainder).
-// direction: +1 ascends, -1 descends, 0 is no-op.
-void tickWrap(int &counter, int direction, int min, int max, int step);
+// Wrap: apply direction*magnitude, then positive-remainder modulo into [min,max].
+void tickWrap(int &counter, int direction, int magnitude, int min, int max);
 
-// Pendulum: bounces between min and max, flipping pendulumDir on hit.
-// pendulumDir is runtime state (caller owns it across calls).
-void tickPendulum(int &counter, int &pendulumDir, int min, int max, int step);
+// Pendulum: counter += magnitude*pendulumDir; flip pendulumDir at a bound.
+// direction == 0 freezes (no advance, no flip).
+void tickPendulum(int &counter, int &pendulumDir, int direction, int magnitude, int min, int max);
 
-// Hold: clips at the active-direction limit and sticks.
-void tickHold(int &counter, int direction, int min, int max, int step);
+// Hold: apply direction*magnitude, clip at the active-direction limit.
+void tickHold(int &counter, int direction, int magnitude, int min, int max);
 
-// Random: uniform random in [min, max]. Direction ignored.
-void tickRandom(int &counter, int min, int max);
+// Random: uniform random in [min, max]. direction == 0 freezes.
+void tickRandom(int &counter, int direction, int min, int max);
 
-// RTZ: snap to zero when counter is out of range. Direction unchanged.
-void tickRTZ(int &counter, int min, int max);
+// RTZ: apply direction*magnitude, then snap to zero if out of [min,max].
+void tickRTZ(int &counter, int direction, int magnitude, int min, int max);
 
 } // namespace AccumulatorOps

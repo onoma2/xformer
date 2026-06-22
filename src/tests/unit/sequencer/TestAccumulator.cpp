@@ -232,4 +232,24 @@ CASE("default_trigger_mode_is_step") {
     expectEqual(static_cast<int>(accumulator.triggerMode()), static_cast<int>(Accumulator::Step), "default triggerMode should be Step");
 }
 
+CASE("wrap_step_exceeds_range_stays_in_bounds") {
+    // step (5) > range (3). The unified modulo keeps the counter in [min,max];
+    // the pre-unification single-subtract could leave it out of range (the one
+    // documented behavior change — a latent-bug fix).
+    Accumulator accumulator;
+    accumulator.setDirection(Accumulator::Direction::Up);
+    accumulator.setEnabled(true);
+    accumulator.setMinValue(0);
+    accumulator.setMaxValue(2);
+    accumulator.setStepValue(5);
+    accumulator.setOrder(Accumulator::Order::Wrap);
+    accumulator.reset();
+    accumulator.tick(); // delayed first tick
+    for (int i = 0; i < 12; ++i) {
+        accumulator.tick();
+        int v = static_cast<int>(accumulator.currentValue());
+        expectTrue(v >= 0 && v <= 2, "wrap with step>range must stay in [min,max]");
+    }
+}
+
 } // UNIT_TEST("Accumulator")

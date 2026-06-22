@@ -1,4 +1,5 @@
 #include "Accumulator.h"
+#include "engine/AccumulatorOps.h"
 #include "core/utils/Random.h"
 #include "core/io/VersionedSerializedWriter.h"
 #include "core/io/VersionedSerializedReader.h"
@@ -55,66 +56,39 @@ void Accumulator::reset() {
     _hasStarted = false; // Reset delayed start flag
 }
 
+// All four delegate to the shared AccumulatorOps. _currentValue / _pendulumDirection
+// are `mutable`, so no const_cast is needed; bridge through a local int because the
+// ops take int& and the members are int16_t/int8_t. Direction: Up->+1, Down->-1,
+// Freeze->0 (the ops treat direction 0 as a no-op).
+
 void Accumulator::tickWithWrap() const {
-    if (_direction == Up) {
-        const_cast<Accumulator*>(this)->_currentValue += _stepValue;
-        if (_currentValue > _maxValue) {
-            const_cast<Accumulator*>(this)->_currentValue = _minValue + (_currentValue - _maxValue - 1);
-        }
-    } else if (_direction == Down) {
-        const_cast<Accumulator*>(this)->_currentValue -= _stepValue;
-        if (_currentValue < _minValue) {
-            const_cast<Accumulator*>(this)->_currentValue = _maxValue - (_minValue - _currentValue - 1);
-        }
-    }
+    int dir = (_direction == Up) ? 1 : (_direction == Down) ? -1 : 0;
+    int v = _currentValue;
+    AccumulatorOps::tickWrap(v, dir, _stepValue, _minValue, _maxValue);
+    _currentValue = int16_t(v);
 }
 
 void Accumulator::tickWithPendulum() const {
-    if (_direction == Freeze) return;
-
-    int step = _stepValue * _pendulumDirection;
-    const_cast<Accumulator*>(this)->_currentValue += step;
-
-    // Check for boundary conditions and reverse direction
-    if (_currentValue >= _maxValue) {
-        const_cast<Accumulator*>(this)->_currentValue = _maxValue;
-        const_cast<Accumulator*>(this)->_pendulumDirection = -1; // Change direction to down
-    } else if (_currentValue <= _minValue) {
-        const_cast<Accumulator*>(this)->_currentValue = _minValue;
-        const_cast<Accumulator*>(this)->_pendulumDirection = 1; // Change direction to up
-    }
+    int dir = (_direction == Up) ? 1 : (_direction == Down) ? -1 : 0;
+    int v = _currentValue;
+    int pdir = _pendulumDirection;
+    AccumulatorOps::tickPendulum(v, pdir, dir, _stepValue, _minValue, _maxValue);
+    _currentValue = int16_t(v);
+    _pendulumDirection = int8_t(pdir);
 }
 
 void Accumulator::tickWithRandom() const {
-    if (_direction == Freeze) return;
-
-    static ::Random rng;  // Use global namespace to avoid naming conflict with enum
-
-    if (_minValue == _maxValue) {
-        // If min equals max, just set to that value
-        const_cast<Accumulator*>(this)->_currentValue = _minValue;
-    } else {
-        // Generate a random value between min and max
-        int range = _maxValue - _minValue + 1; // +1 to make max inclusive
-        int randomValue = _minValue + (int)(rng.nextRange(range));
-        const_cast<Accumulator*>(this)->_currentValue = randomValue;
-    }
+    int dir = (_direction == Up) ? 1 : (_direction == Down) ? -1 : 0;
+    int v = _currentValue;
+    AccumulatorOps::tickRandom(v, dir, _minValue, _maxValue);
+    _currentValue = int16_t(v);
 }
 
 void Accumulator::tickWithHold() const {
-    if (_direction == Freeze) return;
-
-    if (_direction == Up) {
-        const_cast<Accumulator*>(this)->_currentValue += _stepValue;
-        if (_currentValue >= _maxValue) {
-            const_cast<Accumulator*>(this)->_currentValue = _maxValue;
-        }
-    } else if (_direction == Down) {
-        const_cast<Accumulator*>(this)->_currentValue -= _stepValue;
-        if (_currentValue <= _minValue) {
-            const_cast<Accumulator*>(this)->_currentValue = _minValue;
-        }
-    }
+    int dir = (_direction == Up) ? 1 : (_direction == Down) ? -1 : 0;
+    int v = _currentValue;
+    AccumulatorOps::tickHold(v, dir, _stepValue, _minValue, _maxValue);
+    _currentValue = int16_t(v);
 }
 
 void Accumulator::write(VersionedSerializedWriter &writer) const {

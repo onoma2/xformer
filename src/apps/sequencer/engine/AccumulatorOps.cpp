@@ -4,13 +4,13 @@
 
 namespace AccumulatorOps {
 
-void tickWrap(int &counter, int direction, int min, int max, int step) {
-    // Safe positive-remainder modulo: handles arbitrary overshoot in both
-    // directions (step can exceed range; single-subtract would leave counter
-    // outside [min,max]).
+void tickWrap(int &counter, int direction, int magnitude, int min, int max) {
     if (direction == 0) return;
-    if (direction > 0) counter += step;
-    else               counter -= step;
+    if (direction > 0) counter += magnitude;
+    else               counter -= magnitude;
+    // Safe positive-remainder modulo: handles arbitrary overshoot in both
+    // directions (magnitude can exceed range; single-subtract would leave the
+    // counter outside [min,max]).
     const int range = max - min + 1;
     if (range <= 0) return;
     int delta = counter - min;
@@ -18,10 +18,12 @@ void tickWrap(int &counter, int direction, int min, int max, int step) {
     counter = min + delta;
 }
 
-void tickPendulum(int &counter, int &pendulumDir, int min, int max, int step) {
-    // Diverges from NoteTrack's tickWithPendulum: PhaseFlux passes a signed
-    // step, so we flip pendulumDir at boundary rather than forcing ±1.
-    counter += step * pendulumDir;
+void tickPendulum(int &counter, int &pendulumDir, int direction, int magnitude, int min, int max) {
+    if (direction == 0) return; // freeze
+    // Travel is governed by the caller-owned pendulumDir; `direction` is only the
+    // freeze gate. The caller seeds pendulumDir (and/or signs magnitude) to set
+    // the initial travel sense.
+    counter += magnitude * pendulumDir;
     if (counter >= max) {
         counter = max;
         pendulumDir = -pendulumDir;
@@ -31,25 +33,20 @@ void tickPendulum(int &counter, int &pendulumDir, int min, int max, int step) {
     }
 }
 
-void tickHold(int &counter, int direction, int min, int max, int step) {
+void tickHold(int &counter, int direction, int magnitude, int min, int max) {
     if (direction > 0) {
-        counter += step;
-        if (counter >= max) {
-            counter = max;
-        }
+        counter += magnitude;
+        if (counter >= max) counter = max;
     } else if (direction < 0) {
-        counter -= step;
-        if (counter <= min) {
-            counter = min;
-        }
+        counter -= magnitude;
+        if (counter <= min) counter = min;
     }
+    // direction == 0 -> no-op
 }
 
-void tickRandom(int &counter, int min, int max) {
-    // Static rng matches the original Accumulator::tickWithRandom: keeps
-    // sequence continuity across calls without per-instance state.
+void tickRandom(int &counter, int direction, int min, int max) {
+    if (direction == 0) return; // freeze
     static ::Random rng;
-
     if (min == max) {
         counter = min;
     } else {
@@ -58,7 +55,10 @@ void tickRandom(int &counter, int min, int max) {
     }
 }
 
-void tickRTZ(int &counter, int min, int max) {
+void tickRTZ(int &counter, int direction, int magnitude, int min, int max) {
+    if (direction == 0) return; // freeze
+    if (direction > 0) counter += magnitude;
+    else               counter -= magnitude;
     if (counter > max || counter < min) {
         counter = 0;
     }

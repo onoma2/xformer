@@ -120,23 +120,23 @@ void PhaseFluxTrackEngine::advanceCounter(int &counter, int8_t &pendulumDir,
 
     switch (cfg.order()) {
     case AccumulatorConfig::Order::Wrap:
-        AccumulatorOps::tickWrap(counter, direction, absMin, absMax, magnitude);
+        AccumulatorOps::tickWrap(counter, direction, magnitude, absMin, absMax);
         break;
     case AccumulatorConfig::Order::Pendulum: {
-        // Signed step respected — first move follows the cell's configured drift sign.
-        // Diverges from NoteTrack (unsigned step + separate Direction enum).
+        // Pendulum travels by pendulumDir; pass the signed step as the per-tick
+        // delta so the first move follows the cell's configured drift sign
+        // (pendulumDir stays +1 — equivalent to NoteTrack's convention).
         int pdir = int(pendulumDir);
-        AccumulatorOps::tickPendulum(counter, pdir, absMin, absMax, step);
+        AccumulatorOps::tickPendulum(counter, pdir, direction, step, absMin, absMax);
         pendulumDir = int8_t(pdir);
         break;
     }
     case AccumulatorConfig::Order::Hold:
-        AccumulatorOps::tickHold(counter, direction, absMin, absMax, magnitude);
+        AccumulatorOps::tickHold(counter, direction, magnitude, absMin, absMax);
         break;
     case AccumulatorConfig::Order::RTZ:
-        // RTZ ops only checks bounds; advance manually first.
-        counter += step;
-        AccumulatorOps::tickRTZ(counter, absMin, absMax);
+        // Unified RTZ advances by direction*magnitude (== step) then snaps.
+        AccumulatorOps::tickRTZ(counter, direction, magnitude, absMin, absMax);
         break;
     }
 }
