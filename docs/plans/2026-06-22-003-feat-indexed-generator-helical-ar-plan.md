@@ -60,6 +60,8 @@ no RNG) is per the origin doc and built as a pure, unit-tested helper.
 - **`StepSelection` width mismatch → type-erase the selection.** Introduce a small selection-view interface (`any()`/`firstSetIndex()`/`lastSetIndex()`/count) that both `StepSelection<64>` and `<48>` satisfy; `GeneratorPage::show` takes the interface. (Alternatives: template `show` on width, or an adapter — type-erasure keeps the page concrete and is least churny for the Note callers.)
 - **Mode picker needs explicit row↔Mode mapping.** Replace the `rows()=int(Mode::Last)` + `Mode(selectedRow())` cast with a per-context visible-`Mode[]` list + `modeForRow()`; the picker is given the set valid for the current track. Helical shown for Indexed; Algo stays Note-only.
 - **AR map = origin doc, verbatim** (fold-feedback note, √freq duration, fold-remainder gate, seed init, no RNG, convergence guard). Scale + loop length from the track.
+- **Project scale/root must be injected.** A `Generator` owns only a `SequenceBuilder`, and `IndexedSequence::selectedScale` needs the *project* scale passed in (track scale falls back to project; root fallback lives at the call site). So the launch (U5) resolves `_project.selectedScale()` + project root and passes them into `HelicalGenerator::Params`; the generator computes the √freq law from `sequence.selectedScale(injectedProjectScale)` + injected root. The builder stays a pure model adapter (no scale).
+- **Explicit build registration.** New sources go in the manual list at `src/apps/sequencer/CMakeLists.txt` (no globbing). The factory is a fixed `Container<EuclideanGenerator, RandomGenerator, AlgoGenerator>` + per-generator static `Params` in `Generator.cpp` — `HelicalGenerator` must be added to both, with its `Mode::Helical` case guarded by `dynamic_cast<IndexedSequenceBuilder*>(&builder)` (the bespoke builder type, not `SequenceBuilderImpl<…>`).
 
 ---
 
@@ -92,6 +94,7 @@ generator (U3), the factory entry (U4), the Indexed-page launch (U5).
 
 **Files:**
 - `src/apps/sequencer/engine/generators/IndexedSequenceBuilder.h` / `.cpp` (create — implements the `SequenceBuilder` base)
+- `src/apps/sequencer/CMakeLists.txt` (add `IndexedSequenceBuilder.cpp` to the explicit generator source list, ~line 38)
 - possibly `src/apps/sequencer/model/IndexedSequence.h` (only additive read/write helpers if missing; **not** firstStep/lastStep semantics)
 
 **Approach:** Implement every `SequenceBuilder` virtual (`revert/apply/showOriginal/showPreview/showingPreview/updatePreview/originalLength/originalValue/length/setLength/value/setValue/clearSteps/copyStep/clearLayer`) against Indexed: keep `_edit`/`_original`/`_preview` Indexed copies; range = active length (or the passed apply range), **not** `firstStep()`. Expose `editSequence()` for whole-step writers. `value()/setValue()` map a chosen step field (noteIndex) ↔ float for the generic preview; the AR generator uses `editSequence()` directly. Verify Indexed's copy semantics suffice for the preview clone.
@@ -145,8 +148,9 @@ generator (U3), the factory entry (U4), the Indexed-page launch (U5).
 
 **Files:**
 - `src/apps/sequencer/engine/generators/HelicalGenerator.h` / `.cpp` (create)
+- `src/apps/sequencer/CMakeLists.txt` (add `HelicalGenerator.cpp` to the explicit source list)
 
-**Approach:** Mirror `AlgoGenerator`: take the Indexed builder, `editSequence()`, seed the AR from `seed`, read `selectedScale()` for the √freq law + degrees-per-octave, run `helicalArStep` per step writing `setNoteIndex`/`setDuration`/`setGateLength`. Params via `paramName`/`printParam`/`editParam`: octave range, base, law direction, seed (+ `randomizeSeed`). Deterministic preview/regenerate.
+**Approach:** Mirror `AlgoGenerator`: take the Indexed builder, `editSequence()`, seed the AR from `seed`, run `helicalArStep` per step writing `setNoteIndex`/`setDuration`/`setGateLength`. For the √freq law resolve pitch via `sequence.selectedScale(projectScale)` + root — **projectScale and root come from `HelicalGenerator::Params`, injected at launch** (U5); the generator/builder cannot resolve the project fallback alone. Params via `paramName`/`printParam`/`editParam`: octave range, base, law direction, seed (+ `randomizeSeed`); plus the injected projectScale/root (not user-editable). Deterministic preview/regenerate.
 
 **Patterns to follow:** `AlgoGenerator`.
 
@@ -166,9 +170,9 @@ generator (U3), the factory entry (U4), the Indexed-page launch (U5).
 **Dependencies:** U3.
 
 **Files:**
-- `src/apps/sequencer/engine/generators/Generator.h` / `.cpp` (enum value, `modeName`, factory case + builder-type guard)
+- `src/apps/sequencer/engine/generators/Generator.cpp` / `.h` (enum value, `modeName`, container + params + factory case)
 
-**Approach:** Add the enum + name; factory instantiates `HelicalGenerator` only for the Indexed builder (mirror the `Algo`→`NoteSequenceBuilder` guard at `Generator.cpp:35`). Adding an enum value shifts `Mode::Last`; confirm no code assumes a fixed mode count beyond the picker (handled in U7).
+**Approach:** Add `Mode::Helical` + `modeName`. In `Generator.cpp`: add `HelicalGenerator` to the static `Container<EuclideanGenerator, RandomGenerator, AlgoGenerator>` (→ `…, AlgoGenerator, HelicalGenerator>`) and a `static HelicalGenerator::Params helicalParams`; add a `case Mode::Helical:` to `execute()` guarded by `dynamic_cast<IndexedSequenceBuilder*>(&builder)` (returns null otherwise), then `generatorContainer.create<HelicalGenerator>(builder, helicalParams)`. `Generator.cpp` is already in the CMake list. Adding an enum value shifts `Mode::Last`; the picker no longer relies on raw ordinals after U7, but grep for other `int(Mode::Last)` / `Mode(...)` casts.
 
 **Test scenarios:**
 - factory returns HelicalGenerator for Indexed builder + Helical; guarded/null otherwise.
@@ -190,7 +194,7 @@ generator (U3), the factory entry (U4), the Indexed-page launch (U5).
 - `src/apps/sequencer/ui/pages/IndexedSequenceEditPage.cpp` / `.h` (Generate entry → select → build → show)
 - `src/apps/sequencer/ui/pages/NoteSequenceEditPage.cpp`, `CurveSequenceEditPage.cpp` (pass the view — the regression touch)
 
-**Approach:** Introduce a small selection-view interface (`any()`/`firstSetIndex()`/`lastSetIndex()`/count) implemented by `StepSelection<N>` for any `N`; change `GeneratorPage` to hold/accept it. Update the Note/Curve callers to pass the view (behavior-neutral for them). Wire the Indexed page's Generate launch mirroring `NoteSequenceEditPage.cpp:1163`, range from its step selection / active length.
+**Approach:** Introduce a small selection-view interface (`any()`/`firstSetIndex()`/`lastSetIndex()`/count) implemented by `StepSelection<N>` for any `N`; change `GeneratorPage` to hold/accept it. Update the Note/Curve callers to pass the view (behavior-neutral for them). Wire the Indexed page's Generate launch mirroring `NoteSequenceEditPage.cpp:1163`, range from its step selection / active length. **At launch, resolve `_project.selectedScale()` (project scale) + the project/track root and set them on `helicalParams` before `Generator::execute`** — this is how the generator gets the scale context it can't derive from the builder alone.
 
 **Execution note:** Behavior-neutral for Note/Curve — diff those callers to confirm only the selection-pass changed.
 
