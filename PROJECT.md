@@ -205,17 +205,17 @@ RAM is the tight resource. A feature is acceptable only if it stays within the b
 - CCMRAM target: `.ccmram_bss` below roughly **56 KB** unless hardware testing proves safe margin.
 - Flash is secondary right now; still measure `.text`, but do not optimize flash before RAM unless flash is the stated task.
 
-**Current measured baseline (2026-06-13). Refresh this block after resource-optimization work or before major feature work.**
-- Flash: `.text` = 934,124 B (≈ 912 KB); total loaded image 961,712 B, 21,328 B under the 960K partition.
-- SRAM (128 KB): `.data=6,572` + `.bss=112,720` = 119,292 B, about 91.0% used (still in the hard warning zone, ~708 B under the 120 KB threshold — flat vs the 2026-05-24 baseline). Largest blocks:
-  - `Model` = 88,312 B — dominates main SRAM. Inside it, `Project._tracks` = 80,960 B = 8 × 10,120 B track-variant container. The container is sized to the largest track mode (CurveTrack ≈ 10,092 B, NoteTrack ≈ 9,544 B); StochasticTrack at 8,444 B already fits, so stochastic-side shrinks do not free model SRAM unless every variant shrinks below the cap.
-  - LCD driver DMA buffer = 8,192 B normal SRAM.
-  - Teletype file slot globals = 4 × 1,226 B.
-  - USB host / filesystem globals ≈ 6 KB, mostly functional buffers.
-- CCM RAM (64 KB): `.ccmram_bss=48,352`, about 73.8% used (~6.7 KB freed since 2026-05-24 — routing-matrix removed `shaperState[8]` + per-route shaper state). Largest blocks:
-  - `Ui` = 27,752 B (includes 16,384 B 8-bit Canvas framebuffer).
-  - `Engine` = 11,940 B (engine-task slot — Stochastic cache adds 320 B per active stochastic track inside this slot; variant container also sized to the largest engine).
-  - FreeRTOS static stacks: engine/fs/ui = 4,256 B each; usbh/profiler = 2,208 B each.
+**Current measured baseline (2026-06-22). Refresh this block after resource-optimization work or before major feature work.**
+- Flash (960K app partition): `.text` = 603,240 B (≈ 589 KB); total loaded image ≈ 609,808 B, ~373 KB under the 960K partition. The TT2 native-parser refactor + TT1 removal purged the vendored teletype C tree (`match_token` et al.), reclaiming ~330 KB of flash vs the 2026-06-13 snapshot — flash is now comfortable.
+- SRAM (128 KB): `.data=6,476` + `.bss=108,644` = 115,120 B, about 87.8% used (~15.6 KB free, shared by heap+stack; out of the hard warning zone after the TT-tree purge dropped `.bss`). Largest blocks:
+  - `model` = 87,888 B — dominates main SRAM via the 8× track-variant container (sized to the largest track mode). Shrinking a non-largest track mode does not free model SRAM until every variant drops below the cap.
+  - `lcd` DMA buffer = 8,192 B normal SRAM.
+  - FreeRTOS task stacks + USB/FS globals make up most of the remainder.
+- CCMRAM (64 KB): `.ccmram_bss=54,312`, about 82.9% used (~11.2 KB free). Largest blocks:
+  - `ui` = 24,048 B (includes the 16,384 B 8-bit Canvas framebuffer + all page/selection instances).
+  - `engine` = 8,472 B (engine-task slot, sized to the largest track engine).
+  - FreeRTOS static stacks (ui/usbh/profiler) make up most of the remainder.
+- **Track-agnostic generator framework + Indexed Helical AR** (merged 2026-06-22) cost **+12 B SRAM** (`.data`, `helicalParams`) and **+492 B CCMRAM** (`IndexedSequenceEditPage` builder container) vs the pre-merge baseline (measured `7aafd1f5` → `master`). `.bss` byte-identical — the generator factory `Container` did not grow (Algo was already its largest member). Transient: a Helical/Indexed A/B preview mallocs one `IndexedSequence` clone (~460 B) from the shared heap+stack window, freed on apply/revert.
 - FreeRTOS heap disabled (static allocation only).
 - StochasticSequence = 496 B (64 events × 6 B = 384 B + 112 B knobs/seeds/tickets); StochasticTrack = 8,444 B (17 sequences × 496 B + ~12 B track-global).
 
@@ -223,11 +223,11 @@ RAM is the tight resource. A feature is acceptable only if it stays within the b
 
 **There is no dedicated heap.** The linker reserves only `.data` + `.bss` in main SRAM and leaves the gap between `end-of-.bss` and `top-of-stack` available for both libc heap and the call stack. The stack pointer starts at `_stack = ORIGIN(RAM) + LENGTH(RAM)` and grows down. The libc `_sbrk` walks `end` upward and **does not check against the stack pointer**, so a successful `new` can return memory that overlaps the live stack region. The fault manifests later as a hardfault when the stack scribbles into the "heap" allocation (or vice versa).
 
-**Numbers, current build:**
+**Numbers, current build (2026-06-22):**
 - RAM = 128 KB = 131,072 B.
-- `.data` + `.bss` (main SRAM portion only — `.ccmram_bss` lives separately) ≈ 119 KB.
-- Free space for heap + stack combined ≈ **12 KB**.
-- Practical stack ceiling is ~4 KB (worst-case ISR + audio path + UI draw). That leaves ~**8 KB** that any `new`/`malloc` can safely consume — across **all** allocators, for **all** tracks, **for the lifetime of the process**.
+- `.data` + `.bss` (main SRAM portion only — `.ccmram_bss` lives separately) ≈ 115 KB.
+- Free space for heap + stack combined ≈ **15.6 KB** (up from ~12 KB — the TT2/TT1 tree purge dropped `.bss`).
+- Practical stack ceiling is ~4 KB (worst-case ISR + audio path + UI draw). That leaves ~**11.6 KB** that any `new`/`malloc` can safely consume — across **all** allocators, for **all** tracks, **for the lifetime of the process**.
 
 **Recorded incident (2026-05-22):** `StochasticTrackEngine::initLockedSteps()` was allocating `new LockedParentEvent[CONFIG_STEP_COUNT]` = 5,888 B per stochastic track at engine construction. Two stochastic tracks → 11,776 B → wiped out the entire 12 KB heap+stack window, leaving 52 B for stack → hardfault on the next deep call after project load. One stochastic track worked because 5,940 B was enough stack headroom; two didn't. The heap-allocated lock cache was in the design from the very first stochastic commit, so this risk was latent since stochastic shipped.
 
