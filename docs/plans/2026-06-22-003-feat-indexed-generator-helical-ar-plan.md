@@ -134,13 +134,14 @@ helical map (U6) + generator (U7).
 **Dependencies:** U1.
 
 **Files:**
-- `src/apps/sequencer/ui/pages/GeneratorPage.cpp` (`currentStep()`, LEDs, value-preview)
+- `src/apps/sequencer/engine/generators/Generator.h` (add a public `length()` accessor)
+- `src/apps/sequencer/ui/pages/GeneratorPage.cpp` (`currentStep()`, LEDs, value-preview, section nav)
 
-**Approach:** Drive the value-preview off the builder's `length()` instead of `CONFIG_STEP_COUNT`; add per-track `currentStep()`/LED handling so a new track can supply its playhead. Keep Note/Curve branches byte-for-byte. (Verified against Indexed once U4/U5 land.)
+**Approach:** `GeneratorPage` holds `const Generator&` and `_builder` is protected, so add a public `int Generator::length() const { return _builder.length(); }`. Then: (a) drive the value-preview off `generator.length()` instead of `CONFIG_STEP_COUNT`; (b) make **section/bank navigation length-derived** — replace the hardcoded `_section = (_section + 3) % 4` with a bank count of `ceil(length / StepCount)` (StepCount=16), clamping/wrapping `_section` to it, and reset/clamp `_section` in `show`/`init` when a generator with fewer banks opens (else `stepOffset()` reaches 48 → unchecked `StepSelection::flip` at index ≥48 on the 48-wide Indexed selection); (c) per-track `currentStep()`/LED handling. Keep Note/Curve branches byte-for-byte (64 → 4 banks naturally). Verified against Indexed once U4/U5 land.
 
 **Test scenarios:**
-- Note/Curve: preview, LEDs, playhead unchanged.
-- A shorter-than-64 sequence previews without overrun (verified via Indexed in U5).
+- Note/Curve: preview, LEDs, playhead, and 4-bank Left/Right nav unchanged.
+- Indexed (48): exactly 3 banks; Left/Right wrap 0..2 (never bank 3 → no selection index ≥48); preview length-driven, no overrun; opening the Indexed generator after a Note one clamps `_section` back in range.
 - Test expectation: build + manual sim; Note regression check.
 
 **Verification:** Note/Curve visuals unchanged; preview length-driven.
@@ -158,15 +159,15 @@ helical map (U6) + generator (U7).
 - `src/apps/sequencer/CMakeLists.txt` (add the source)
 - possibly `src/apps/sequencer/model/IndexedSequence.h` (additive accessors only; not firstStep/lastStep)
 
-**Approach:** Implement every `SequenceBuilder` virtual against Indexed: `_edit`/`_original`/`_preview` Indexed copies; range = active length / passed range (**not** rotation `firstStep`); `editSequence()` for whole-step writers; `value()/setValue()` map a chosen layer (so single-layer modes work). Carry resolved project scale (`const Scale&`) + root with accessors, set at construction (U5). Verify copy semantics for the preview clone.
+**Approach:** Implement every `SequenceBuilder` virtual against Indexed. Member shape mirrors `SequenceBuilderImpl`: **`IndexedSequence &_edit` is a live reference to the track's sequence** (so `apply()` commits to the model), `IndexedSequence _original` is a copy (revert), `IndexedSequence *_preview` a heap copy — a copy for `_edit` would pass local tests but never reach the track. Range = active length / passed range (**not** rotation `firstStep`); `editSequence()` returns `_edit` for whole-step writers; `value()/setValue()` map a chosen layer (single-layer modes). Carry resolved project scale (`const Scale&`) + root with accessors, set at construction (U5). Verify copy semantics for the preview clone.
 
 **Execution note:** Characterization-first — pin preview/apply/revert before tenants depend on it.
 
 **Test scenarios:**
-- preview→apply commits; revert restores; showOriginal/showPreview toggle.
+- preview→apply mutates the **real model sequence** (assert via the project's Indexed sequence, not the builder's local state — `_edit` must be a live reference); revert restores; showOriginal/showPreview toggle.
 - range = active/passed range; rotation `firstStep` untouched after apply.
 - `value/setValue` round-trip a layer at range bounds.
-- Test expectation: builder unit test if feasible; else build + U5 manual.
+- Test expectation: builder unit test if feasible; else build + U5 manual (apply must visibly change the played sequence).
 
 **Verification:** Builder drives preview/apply/revert; rotation intact; builds.
 
