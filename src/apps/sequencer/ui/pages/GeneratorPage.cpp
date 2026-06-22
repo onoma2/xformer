@@ -12,6 +12,7 @@
 #include "engine/Engine.h"
 #include "engine/NoteTrackEngine.h"
 #include "engine/CurveTrackEngine.h"
+#include "engine/IndexedTrackEngine.h"
 #include "core/math/Math.h"
 
 #include <cstddef>
@@ -185,6 +186,11 @@ int GeneratorPage::currentStep() const {
         const auto &sequence = _project.selectedCurveSequence();
         return trackEngine.isActiveSequence(sequence) ? trackEngine.currentStep() : -1;
     }
+    case Track::TrackMode::Indexed: {
+        const auto &trackEngine = _engine.selectedTrackEngine().as<IndexedTrackEngine>();
+        const auto &sequence = _project.selectedIndexedSequence();
+        return trackEngine.isActiveSequence(sequence) ? trackEngine.currentStep() : -1;
+    }
     default:
         return -1;
     }
@@ -356,6 +362,19 @@ void GeneratorPage::updateLeds(Leds &leds) {
                 int stepIndex = stepOffset() + i;
                 bool red = (stepIndex == currentStep) || (_stepSelection && _stepSelection->selected(stepIndex));
                 bool green = (stepIndex != currentStep) && (sequence.step(stepIndex).gate() || (_stepSelection && _stepSelection->selected(stepIndex)));
+                leds.set(MatrixMap::fromStep(i), red, green);
+            }
+        }
+        break;
+    case Track::TrackMode::Indexed: {
+            const auto &trackEngine = _engine.selectedTrackEngine().as<IndexedTrackEngine>();
+            const auto &sequence = _project.selectedIndexedSequence();
+            currentStep = trackEngine.isActiveSequence(sequence) ? trackEngine.currentStep() : -1;
+            for (int i = 0; i < 16; ++i) {
+                int stepIndex = stepOffset() + i;
+                bool sel = _stepSelection && _stepSelection->selected(stepIndex);
+                bool red = (stepIndex == currentStep) || sel;
+                bool green = (stepIndex != currentStep) && (sequence.step(stepIndex).gateLength() > 0 || sel);
                 leds.set(MatrixMap::fromStep(i), red, green);
             }
         }
