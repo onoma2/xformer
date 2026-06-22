@@ -14,7 +14,7 @@ struct HelicalAr {
     static constexpr float kWeightDuration = 17.31f;
     static constexpr float kWeightPitch = 0.5f;
     static constexpr float kGateMinFraction = 0.2f; // gate spans 20..100% of duration
-    static constexpr float kNudge = 1.61803f;        // perturbation to break fixed points
+    static constexpr float kIdentity = 1.123f;       // irrational fold offset (helical.instr giVoiceOffsets)
 
     struct Result {
         int noteIndex;
@@ -24,23 +24,21 @@ struct HelicalAr {
 
     float pitch = 0.f;
     float dur = 0.f;
-    int lastNote = -1000;
-    int repeat = 0;
 
     void seed(uint32_t value) {
         pitch = float(value % 997) * 0.01f;
         dur = float((value / 997) % 997) * 0.1f + 1.f;
-        lastNote = -1000;
-        repeat = 0;
     }
 
-    // base x sqrt(freq) law in octaves; lawDir>=0 makes higher notes longer.
+    // base x sqrt(freq) law in octaves; lawDir>=0 makes higher pitch longer.
+    static float durationFloat(float octaves, int base, int lawDir) {
+        float sqrtFreq = std::pow(2.f, octaves * 0.5f);
+        return lawDir >= 0 ? float(base) * sqrtFreq : float(base) / sqrtFreq;
+    }
+
     static int durationForNote(int noteIndex, int scaleSize, int base, int lawDir, int minTicks, int maxTicks) {
         if (scaleSize < 1) scaleSize = 1;
-        float octaves = float(noteIndex) / float(scaleSize);
-        float sqrtFreq = std::pow(2.f, octaves * 0.5f);
-        float d = lawDir >= 0 ? float(base) * sqrtFreq : float(base) / sqrtFreq;
-        int ticks = int(d + 0.5f);
+        int ticks = int(durationFloat(float(noteIndex) / float(scaleSize), base, lawDir) + 0.5f);
         if (ticks < minTicks) ticks = minTicks;
         if (ticks > maxTicks) ticks = maxTicks;
         return ticks;
@@ -50,8 +48,11 @@ struct HelicalAr {
     Result step(int span, int scaleSize, int base, int lawDir, int minTicks, int maxTicks) {
         if (span < 1) span = 1;
 
+        if (scaleSize < 1) scaleSize = 1;
         float spanF = float(span);
-        float raw = dur * kWeightDuration + pitch * kWeightPitch;
+
+        // irrational identity offset keeps the fold off trivial fixed points
+        float raw = dur * kWeightDuration + pitch * kWeightPitch + kIdentity;
         float influence = std::fmod(raw, spanF);
         if (influence < 0.f) {
             influence += spanF;
@@ -61,7 +62,12 @@ struct HelicalAr {
         if (note >= span) note = span - 1;
         if (note < 0) note = 0;
 
-        int durationTicks = durationForNote(note, scaleSize, base, lawDir, minTicks, maxTicks);
+        // law on the CONTINUOUS folded pitch (not the rounded note): the fed-back
+        // duration carries continuous state, so the fold stays chaotic not periodic
+        float rawDur = durationFloat(influence / float(scaleSize), base, lawDir);
+        int durationTicks = int(rawDur + 0.5f);
+        if (durationTicks < minTicks) durationTicks = minTicks;
+        if (durationTicks > maxTicks) durationTicks = maxTicks;
 
         // the rounding discards a free [0,1) value -> per-step gate length
         float rem = influence - float(note);
@@ -71,20 +77,9 @@ struct HelicalAr {
         if (gateLength > durationTicks) gateLength = durationTicks;
         if (gateLength < 0) gateLength = 0;
 
-        // feedback: this step's duration steers the next note (the coupling)
+        // feedback: continuous (unclamped) duration + folded pitch — the coupling
         pitch = influence;
-        dur = float(durationTicks);
-
-        // convergence guard: perturb the carried state if a note keeps repeating
-        if (note == lastNote) {
-            if (++repeat >= 2) {
-                pitch += kNudge;
-                repeat = 0;
-            }
-        } else {
-            repeat = 0;
-        }
-        lastNote = note;
+        dur = rawDur;
 
         return Result{ note, durationTicks, gateLength };
     }

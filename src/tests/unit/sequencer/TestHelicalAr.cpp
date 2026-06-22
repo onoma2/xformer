@@ -80,4 +80,31 @@ CASE("does not collapse to a single repeated note") {
     expectTrue(varied, "sequence varies, no fixed-point collapse");
 }
 
+CASE("stays lively — no short cycle, varied notes") {
+    for (int span : {14, 24}) {
+        int scaleSize = span / 2;
+        HelicalAr h;
+        h.seed(0x1234);
+        std::vector<int> notes;
+        for (int i = 0; i < 96; ++i) {
+            notes.push_back(h.step(span, scaleSize, 192, +1, 24, 768).noteIndex);
+        }
+        const int start = 48; // examine the tail, past any transient
+        for (int p = 1; p <= 16; ++p) {
+            bool periodic = true;
+            for (int i = start; i + p < int(notes.size()); ++i) {
+                if (notes[i] != notes[i + p]) { periodic = false; break; }
+            }
+            expectTrue(!periodic, "tail not periodic at any period 1..16");
+        }
+        std::vector<int> seen;
+        for (int i = start; i < int(notes.size()); ++i) {
+            bool found = false;
+            for (int s : seen) if (s == notes[i]) { found = true; break; }
+            if (!found) seen.push_back(notes[i]);
+        }
+        expectTrue(int(seen.size()) > 6, "tail visits many distinct notes");
+    }
+}
+
 }
