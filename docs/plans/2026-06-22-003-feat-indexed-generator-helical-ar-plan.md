@@ -25,7 +25,7 @@ after four review rounds showed the bulk of the work is generic framework de-har
 ## Summary
 
 The Generator framework (`Generator` + `SequenceBuilder`, hosted by `GeneratorPage`, picked via
-`GeneratorSelectPage`) only reaches Note/Curve today because of four hardcodings, all verified:
+`GeneratorSelectPage`) only reaches Note/Curve today because of five hardcodings, all verified:
 
 - `SequenceBuilderImpl<T>` assumes `T` has `firstStep()/lastStep()/setFirstStep/setLastStep/step().layerValue()/setLayerValue()/steps()` and treats `firstStep()` as the generate range start.
 - `GeneratorPage::show` + member are `StepSelection<CONFIG_STEP_COUNT>` (64) — a fixed width.
@@ -33,8 +33,8 @@ The Generator framework (`Generator` + `SequenceBuilder`, hosted by `GeneratorPa
 - `GeneratorSelectPage` casts `selectedRow()` straight to `Mode` over all modes.
 - The generic generators write a fixed 64 — `EuclideanGenerator` loops `CONFIG_STEP_COUNT`, `RandomGenerator` loops a fixed-64 pattern — overflowing a shorter (48-step Indexed) builder.
 
-The rework removes those four assumptions (selection view, page rendering by builder length + track
-branch, picker row→Mode mapping, per-builder guarding), then onboards Indexed as the first client
+The rework removes those five assumptions (bespoke builder for the non-conforming track, selection view, page rendering by builder length + track
+branch, picker row→Mode mapping, length-bounding the generic generators), then onboards Indexed as the first client
 with a **bespoke builder** (the template can't be used — Indexed's `firstStep()` is rotation). The
 existing modes light up on Indexed as the agnostic-ness proof; helical AR (a pure, unit-tested map
 + a generator) is the first net-new Mode. Other tracks (PhaseFlux, Stochastic) become a documented
@@ -271,7 +271,7 @@ helical map (U6) + generator (U7).
 
 ## Scope Boundaries
 
-In scope: the four de-hardcodings (U1–U3), Indexed as first client (U4–U5) with the existing modes,
+In scope: the generic de-hardcodings (U1–U3 + U8 generator write/param bounds), Indexed as first client (U4–U5) with the existing modes,
 helical AR as the first new Mode (U6–U7).
 
 Out of scope / deferred:
@@ -282,7 +282,7 @@ Out of scope / deferred:
 
 ## System-Wide Impact
 
-- **Shared-UI surfaces (regression risk, Note/Curve):** selection view (U1), picker (U2), `GeneratorPage` rendering (U3). All changes behavior-neutral for Note/Curve, with explicit regression checks.
+- **Shared surfaces (regression risk, Note/Curve):** selection view (U1), picker (U2), `GeneratorPage` rendering (U3), **and shared generator *behavior* — `EuclideanGenerator`/`RandomGenerator` param + write bounds (U8)**. All changes behavior-neutral for Note/Curve, with explicit regression checks.
 - **New per-client code:** Indexed builder + launch.
 - **New tenant:** helical map + generator + factory entry.
 - **No save-format change:** Indexed storage/serialization untouched; rotation semantics preserved.
@@ -292,7 +292,7 @@ Out of scope / deferred:
 
 ## Risks & Mitigation
 
-- **Shared generator UI regression (highest).** U1–U3 touch Note/Curve. Mitigation: keep their branches byte-for-byte; land U1–U3 as behavior-neutral refactors with a Note-generator regression check before any Indexed code.
+- **Shared generator UI + behavior regression (highest).** U1–U3 (shared page/picker/selection) **and U8 (`EuclideanGenerator`/`RandomGenerator` param + write bounds)** touch Note/Curve. Mitigation: keep their branches byte-for-byte / capacity==64 for Note/Curve; land U1–U3 + U8 as behavior-neutral refactors with a Note-generator regression check (params still reach 64, output unchanged) before any Indexed code.
 - **Bespoke builder correctness.** Must honor preview/apply/revert and never touch rotation `firstStep`. Mitigation: characterization-first contract (U4).
 - **Single-layer modes on Indexed** (Euclidean/Random) need a sensible target layer + range. Mitigation: launch passes the current Indexed layer; verify Euclidean/Random output in U5.
 - **Enum/ordinal assumptions.** Adding `Mode::Helical` shifts `Mode::Last`; the picker no longer casts ordinals (U2), but grep other casts (U7).
