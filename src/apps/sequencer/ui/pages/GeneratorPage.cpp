@@ -290,7 +290,7 @@ void GeneratorPage::draw(Canvas &canvas) {
 
         FixedStringBuilder<16> str;
         if (seedDrivenGenerator(_generator->mode()) && paramIndex == 0 && !_generator->showingPreview()) {
-            str("ORIGINAL");
+            str("ORIG");
         } else {
             _generator->printParam(paramIndex, str);
         }
@@ -303,19 +303,22 @@ void GeneratorPage::draw(Canvas &canvas) {
         drawParamValue(2, int(RandomGenerator::Param::Scale));
         drawParamValue(3, int(RandomGenerator::Param::Bias));
     } else if (_generator->mode() == Generator::Mode::Euclidean) {
-        drawValue(0, _generator->showingPreview() ? "CURRENT" : "ORIGINAL", true);
+        drawValue(0, _generator->showingPreview() ? "CURR" : "ORIG", true);
         drawParamValue(1, int(EuclideanGenerator::Param::Offset));
         drawParamValue(2, int(EuclideanGenerator::Param::Steps));
         drawParamValue(3, int(EuclideanGenerator::Param::Beats));
     } else if (_generator->mode() == Generator::Mode::Algo) {
-        drawValue(0, _generator->showingPreview() ? "CURRENT" : "ORIGINAL", true);
+        drawValue(0, _generator->showingPreview() ? "CURR" : "ORIG", true);
         drawParamValue(1, int(AlgoGenerator::Param::Algorithm));
         drawParamValue(2, int(AlgoGenerator::Param::Flow));
         drawParamValue(3, int(AlgoGenerator::Param::Ornament));
         drawParamValue(4, int(AlgoGenerator::Param::Power));
     } else {
         for (int i = 0; i < _generator->paramCount(); ++i) {
-            drawParamValue(i, i);
+            // seed-driven slot 0 carries the ORIG/CURR badge or 8-char seed hex — render
+            // it tiny like the Random/Algo branches so it fits the footer slot
+            bool tiny = seedDrivenGenerator(_generator->mode()) && i == 0;
+            drawParamValue(i, i, tiny);
         }
     }
 
