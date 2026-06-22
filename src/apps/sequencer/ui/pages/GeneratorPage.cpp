@@ -8,6 +8,7 @@
 #include "engine/generators/EuclideanGenerator.h"
 #include "engine/generators/RandomGenerator.h"
 #include "engine/generators/AlgoGenerator.h"
+#include "engine/generators/HelicalGenerator.h"
 
 #include "engine/Engine.h"
 #include "engine/NoteTrackEngine.h"
@@ -910,6 +911,13 @@ void GeneratorPage::contextShow(bool doubleClick) {
         _contextMenuItems[2] = { "REGEN" };
         _contextMenuItems[3] = { "CANCEL" };
         _contextMenuItems[4] = { "COMMIT" };
+    } else if (_generator->mode() == Generator::Mode::Helical) {
+        snprintf(_contextMenuAuxLabel, sizeof(_contextMenuAuxLabel), "BASE %d", static_cast<const HelicalGenerator *>(_generator)->base());
+        _contextMenuItems[0] = { "" };
+        _contextMenuItems[1] = { _contextMenuAuxLabel };
+        _contextMenuItems[2] = { "REGEN" };
+        _contextMenuItems[3] = { "CANCEL" };
+        _contextMenuItems[4] = { "COMMIT" };
     } else {
         _contextMenuItems[0] = { "NEW RAND" };
         _contextMenuItems[1] = { "RESEED" };
@@ -960,6 +968,30 @@ void GeneratorPage::contextAction(int index) {
         switch (index) {
         case 1:
             gGeneratorContextQuickEditModel.configure(_generator, int(AlgoGenerator::Param::Variation), "VAR", [&] {
+                _generator->update();
+                _generator->updatePreview();
+            });
+            _manager.pages().quickEdit.show(gGeneratorContextQuickEditModel, 0);
+            return;
+        case 2:
+            init();
+            break;
+        case 3:
+            revert();
+            break;
+        case 4:
+            commit();
+            break;
+        default:
+            break;
+        }
+        return;
+    }
+
+    if (_generator->mode() == Generator::Mode::Helical) {
+        switch (index) {
+        case 1:
+            gGeneratorContextQuickEditModel.configure(_generator, int(HelicalGenerator::Param::Base), "BASE", [&] {
                 _generator->update();
                 _generator->updatePreview();
             });
@@ -1045,6 +1077,10 @@ bool GeneratorPage::contextActionEnabled(int index) const {
     }
 
     if (_generator->mode() == Generator::Mode::Algo) {
+        return index >= 1 && index <= 4;
+    }
+
+    if (_generator->mode() == Generator::Mode::Helical) {
         return index >= 1 && index <= 4;
     }
 
