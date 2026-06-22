@@ -3,7 +3,7 @@ id: track-agnostic-generators
 schema: plan
 title: "feat: track-agnostic generator framework (Indexed first client + helical AR)"
 type: feat
-status: active
+status: completed
 date: 2026-06-22
 depth: deep
 ---

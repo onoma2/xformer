@@ -9,6 +9,8 @@
 #include "model/Scale.h"
 #include "model/Routing.h"
 
+#include "engine/generators/Generator.h"
+
 #include "core/utils/StringBuilder.h"
 #include "core/utils/Random.h"
 #include "core/math/Math.h"
@@ -32,6 +34,7 @@ enum class ContextAction {
     Insert,
     MakeFirst,
     Delete,
+    Generate,
     Last
 };
 
@@ -39,6 +42,22 @@ static const ContextMenuModel::Item seqContextMenuItems[] = {
     { "INIT" },
     { "COPY" },
     { "PASTE" },
+    { "GENER" },
+};
+
+static const ContextAction seqContextActions[] = {
+    ContextAction::Init,
+    ContextAction::Copy,
+    ContextAction::Paste,
+    ContextAction::Generate,
+};
+
+static const Generator::Mode indexedGeneratorModes[] = {
+    Generator::Mode::InitLayer,
+    Generator::Mode::InitSteps,
+    Generator::Mode::Euclidean,
+    Generator::Mode::Random,
+    Generator::Mode::Helical,
 };
 
 static const ContextMenuModel::Item stepContextMenuItems[] = {
@@ -1005,9 +1024,9 @@ void IndexedSequenceEditPage::contextShow(bool doubleClick) {
     if (_contextMode == ContextMode::Sequence) {
         showContextMenu(ContextMenu(
             seqContextMenuItems,
-            3, // count
-            [&] (int index) { contextAction(index); },
-            [&] (int index) { return contextActionEnabled(index); },
+            4, // count
+            [&] (int index) { contextAction(static_cast<int>(seqContextActions[index])); },
+            [&] (int index) { return contextActionEnabled(static_cast<int>(seqContextActions[index])); },
             doubleClick
         ));
     } else {
@@ -1050,9 +1069,35 @@ void IndexedSequenceEditPage::contextAction(int index) {
     case ContextAction::Delete:
         deleteStep();
         break;
+    case ContextAction::Generate:
+        generateSequence();
+        break;
     default:
         break;
     }
+}
+
+void IndexedSequenceEditPage::generateSequence() {
+    IndexedSequenceBuilder::Layer layer;
+    switch (_editMode) {
+    case EditMode::Duration: layer = IndexedSequenceBuilder::Layer::Duration; break;
+    case EditMode::Gate:     layer = IndexedSequenceBuilder::Layer::GateLength; break;
+    case EditMode::Note:
+    default:                 layer = IndexedSequenceBuilder::Layer::NoteIndex; break;
+    }
+
+    _manager.pages().generatorSelect.show([this, layer] (bool success, Generator::Mode mode) {
+        if (success) {
+            auto &sequence = _project.selectedIndexedSequence();
+            const auto &scale = sequence.selectedScale(_project.selectedScale());
+            int rootNote = sequence.rootNote() < 0 ? _project.rootNote() : sequence.rootNote();
+            auto builder = _builderContainer.create<IndexedSequenceBuilder>(sequence, layer, scale, rootNote);
+            auto generator = Generator::execute(mode, *builder);
+            if (generator) {
+                _manager.pages().generator.show(generator, &_stepSelection);
+            }
+        }
+    }, indexedGeneratorModes, int(sizeof(indexedGeneratorModes) / sizeof(indexedGeneratorModes[0])));
 }
 
 bool IndexedSequenceEditPage::contextActionEnabled(int index) const {

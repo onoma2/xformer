@@ -1302,6 +1302,14 @@ void CurveSequenceEditPage::duplicateSequence() {
     showMessage("STEPS DUPLICATED");
 }
 
+static const Generator::Mode curveGeneratorModes[] = {
+    Generator::Mode::InitLayer,
+    Generator::Mode::InitSteps,
+    Generator::Mode::Euclidean,
+    Generator::Mode::Random,
+    Generator::Mode::Algo,
+};
+
 void CurveSequenceEditPage::generateSequence() {
     _manager.pages().generatorSelect.show([this] (bool success, Generator::Mode mode) {
         if (success) {
@@ -1311,7 +1319,7 @@ void CurveSequenceEditPage::generateSequence() {
                 _manager.pages().generator.show(generator, &_stepSelection);
             }
         }
-    });
+    }, curveGeneratorModes, int(sizeof(curveGeneratorModes) / sizeof(curveGeneratorModes[0])));
 }
 
 void CurveSequenceEditPage::quickEdit(int index) {

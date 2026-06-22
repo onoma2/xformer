@@ -24,6 +24,9 @@ public:
     virtual int length() const = 0;
     virtual void setLength(int length) = 0;
 
+    // physical step capacity of the target sequence (write/param upper bound)
+    virtual int capacity() const = 0;
+
     virtual float value(int index) const = 0;
     virtual void setValue(int index, float value) = 0;
 
@@ -113,6 +116,10 @@ public:
     void setLength(int length) override {
         _edit.setFirstStep(0);
         _edit.setLastStep(length - 1);
+    }
+
+    int capacity() const override {
+        return CONFIG_STEP_COUNT;
     }
 
     float value(int index) const override {

@@ -38,6 +38,7 @@ set(sources
     engine/generators/AlgoGenerator.cpp
     engine/generators/EuclideanGenerator.cpp
     engine/generators/Generator.cpp
+    engine/generators/HelicalGenerator.cpp
     engine/generators/RandomGenerator.cpp
     engine/generators/Rhythm.cpp
     engine/generators/TuesdayAlgoCore.cpp

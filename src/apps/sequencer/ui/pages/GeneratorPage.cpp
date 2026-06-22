@@ -8,10 +8,12 @@
 #include "engine/generators/EuclideanGenerator.h"
 #include "engine/generators/RandomGenerator.h"
 #include "engine/generators/AlgoGenerator.h"
+#include "engine/generators/HelicalGenerator.h"
 
 #include "engine/Engine.h"
 #include "engine/NoteTrackEngine.h"
 #include "engine/CurveTrackEngine.h"
+#include "engine/IndexedTrackEngine.h"
 #include "core/math/Math.h"
 
 #include <cstddef>
@@ -105,7 +107,7 @@ enum class ContextAction {
 };
 
 static bool seedDrivenGenerator(Generator::Mode mode) {
-    return mode == Generator::Mode::Random || mode == Generator::Mode::Algo;
+    return mode == Generator::Mode::Random || mode == Generator::Mode::Algo || mode == Generator::Mode::Helical;
 }
 
 static bool abPreviewGenerator(Generator::Mode mode) {
@@ -148,7 +150,7 @@ GeneratorPage::GeneratorPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context)
 {}
 
-void GeneratorPage::show(Generator *generator, StepSelection<CONFIG_STEP_COUNT> *stepSelection) {
+void GeneratorPage::show(Generator *generator, StepSelectionView *stepSelection) {
     _generator = generator;
     _stepSelection = stepSelection;
     _previewArmed = false;
@@ -183,6 +185,11 @@ int GeneratorPage::currentStep() const {
     case Track::TrackMode::Curve: {
         const auto &trackEngine = _engine.selectedTrackEngine().as<CurveTrackEngine>();
         const auto &sequence = _project.selectedCurveSequence();
+        return trackEngine.isActiveSequence(sequence) ? trackEngine.currentStep() : -1;
+    }
+    case Track::TrackMode::Indexed: {
+        const auto &trackEngine = _engine.selectedTrackEngine().as<IndexedTrackEngine>();
+        const auto &sequence = _project.selectedIndexedSequence();
         return trackEngine.isActiveSequence(sequence) ? trackEngine.currentStep() : -1;
     }
     default:
@@ -283,7 +290,7 @@ void GeneratorPage::draw(Canvas &canvas) {
 
         FixedStringBuilder<16> str;
         if (seedDrivenGenerator(_generator->mode()) && paramIndex == 0 && !_generator->showingPreview()) {
-            str("ORIGINAL");
+            str("ORIG");
         } else {
             _generator->printParam(paramIndex, str);
         }
@@ -296,19 +303,22 @@ void GeneratorPage::draw(Canvas &canvas) {
         drawParamValue(2, int(RandomGenerator::Param::Scale));
         drawParamValue(3, int(RandomGenerator::Param::Bias));
     } else if (_generator->mode() == Generator::Mode::Euclidean) {
-        drawValue(0, _generator->showingPreview() ? "CURRENT" : "ORIGINAL", true);
+        drawValue(0, _generator->showingPreview() ? "CURR" : "ORIG", true);
         drawParamValue(1, int(EuclideanGenerator::Param::Offset));
         drawParamValue(2, int(EuclideanGenerator::Param::Steps));
         drawParamValue(3, int(EuclideanGenerator::Param::Beats));
     } else if (_generator->mode() == Generator::Mode::Algo) {
-        drawValue(0, _generator->showingPreview() ? "CURRENT" : "ORIGINAL", true);
+        drawValue(0, _generator->showingPreview() ? "CURR" : "ORIG", true);
         drawParamValue(1, int(AlgoGenerator::Param::Algorithm));
         drawParamValue(2, int(AlgoGenerator::Param::Flow));
         drawParamValue(3, int(AlgoGenerator::Param::Ornament));
         drawParamValue(4, int(AlgoGenerator::Param::Power));
     } else {
         for (int i = 0; i < _generator->paramCount(); ++i) {
-            drawParamValue(i, i);
+            // seed-driven slot 0 carries the ORIG/CURR badge or 8-char seed hex — render
+            // it tiny like the Random/Algo branches so it fits the footer slot
+            bool tiny = seedDrivenGenerator(_generator->mode()) && i == 0;
+            drawParamValue(i, i, tiny);
         }
     }
 
@@ -322,6 +332,7 @@ void GeneratorPage::draw(Canvas &canvas) {
         break;
     case Generator::Mode::Random:
     case Generator::Mode::Algo:
+    case Generator::Mode::Helical:
         drawValueGenerator(canvas, *_generator);
         break;
     case Generator::Mode::Last:
@@ -342,8 +353,8 @@ void GeneratorPage::updateLeds(Leds &leds) {
             currentStep = trackEngine.isActiveSequence(sequence) ? trackEngine.currentStep() : -1;
             for (int i = 0; i < 16; ++i) {
                 int stepIndex = stepOffset() + i;
-                bool red = (stepIndex == currentStep) || (_stepSelection && _stepSelection->selected()[stepIndex]);
-                bool green = (stepIndex != currentStep) && (sequence.step(stepIndex).gate() || (_stepSelection && _stepSelection->selected()[stepIndex]));
+                bool red = (stepIndex == currentStep) || (_stepSelection && _stepSelection->selected(stepIndex));
+                bool green = (stepIndex != currentStep) && (sequence.step(stepIndex).gate() || (_stepSelection && _stepSelection->selected(stepIndex)));
                 leds.set(MatrixMap::fromStep(i), red, green);
             }
         }
@@ -354,8 +365,21 @@ void GeneratorPage::updateLeds(Leds &leds) {
             currentStep = trackEngine.isActiveSequence(sequence) ? trackEngine.currentStep() : -1;
             for (int i = 0; i < 16; ++i) {
                 int stepIndex = stepOffset() + i;
-                bool red = (stepIndex == currentStep) || (_stepSelection && _stepSelection->selected()[stepIndex]);
-                bool green = (stepIndex != currentStep) && (sequence.step(stepIndex).gate() || (_stepSelection && _stepSelection->selected()[stepIndex]));
+                bool red = (stepIndex == currentStep) || (_stepSelection && _stepSelection->selected(stepIndex));
+                bool green = (stepIndex != currentStep) && (sequence.step(stepIndex).gate() || (_stepSelection && _stepSelection->selected(stepIndex)));
+                leds.set(MatrixMap::fromStep(i), red, green);
+            }
+        }
+        break;
+    case Track::TrackMode::Indexed: {
+            const auto &trackEngine = _engine.selectedTrackEngine().as<IndexedTrackEngine>();
+            const auto &sequence = _project.selectedIndexedSequence();
+            currentStep = trackEngine.isActiveSequence(sequence) ? trackEngine.currentStep() : -1;
+            for (int i = 0; i < 16; ++i) {
+                int stepIndex = stepOffset() + i;
+                bool sel = _stepSelection && _stepSelection->selected(stepIndex);
+                bool red = (stepIndex == currentStep) || sel;
+                bool green = (stepIndex != currentStep) && (sequence.step(stepIndex).gateLength() > 0 || sel);
                 leds.set(MatrixMap::fromStep(i), red, green);
             }
         }
@@ -485,14 +509,15 @@ void GeneratorPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
-    // Section navigation with Left/Right buttons
+    // Section navigation with Left/Right buttons (bank count derived from capacity)
+    const int bankCount = _generator ? (_generator->capacity() + StepCount - 1) / StepCount : 1;
     if (key.isLeft()) {
-        _section = (_section + 3) % 4;
+        _section = (_section + bankCount - 1) % bankCount;
         event.consume();
         return;
     }
     if (key.isRight()) {
-        _section = (_section + 1) % 4;
+        _section = (_section + 1) % bankCount;
         event.consume();
         return;
     }
@@ -605,7 +630,7 @@ void GeneratorPage::drawEuclideanGenerator(Canvas &canvas, const EuclideanGenera
 }
 
 void GeneratorPage::drawValueGenerator(Canvas &canvas, const Generator &generator) const {
-    const int steps = CONFIG_STEP_COUNT;
+    const int steps = generator.capacity();
     const int baselineY = PlotArea::Top + PlotArea::Height / 2;
     const int amplitude = PlotArea::Height / 2;
 
@@ -889,6 +914,13 @@ void GeneratorPage::contextShow(bool doubleClick) {
         _contextMenuItems[2] = { "REGEN" };
         _contextMenuItems[3] = { "CANCEL" };
         _contextMenuItems[4] = { "COMMIT" };
+    } else if (_generator->mode() == Generator::Mode::Helical) {
+        snprintf(_contextMenuAuxLabel, sizeof(_contextMenuAuxLabel), "BASE %d", static_cast<const HelicalGenerator *>(_generator)->base());
+        _contextMenuItems[0] = { "" };
+        _contextMenuItems[1] = { _contextMenuAuxLabel };
+        _contextMenuItems[2] = { "REGEN" };
+        _contextMenuItems[3] = { "CANCEL" };
+        _contextMenuItems[4] = { "COMMIT" };
     } else {
         _contextMenuItems[0] = { "NEW RAND" };
         _contextMenuItems[1] = { "RESEED" };
@@ -939,6 +971,30 @@ void GeneratorPage::contextAction(int index) {
         switch (index) {
         case 1:
             gGeneratorContextQuickEditModel.configure(_generator, int(AlgoGenerator::Param::Variation), "VAR", [&] {
+                _generator->update();
+                _generator->updatePreview();
+            });
+            _manager.pages().quickEdit.show(gGeneratorContextQuickEditModel, 0);
+            return;
+        case 2:
+            init();
+            break;
+        case 3:
+            revert();
+            break;
+        case 4:
+            commit();
+            break;
+        default:
+            break;
+        }
+        return;
+    }
+
+    if (_generator->mode() == Generator::Mode::Helical) {
+        switch (index) {
+        case 1:
+            gGeneratorContextQuickEditModel.configure(_generator, int(HelicalGenerator::Param::Base), "BASE", [&] {
                 _generator->update();
                 _generator->updatePreview();
             });
@@ -1024,6 +1080,10 @@ bool GeneratorPage::contextActionEnabled(int index) const {
     }
 
     if (_generator->mode() == Generator::Mode::Algo) {
+        return index >= 1 && index <= 4;
+    }
+
+    if (_generator->mode() == Generator::Mode::Helical) {
         return index >= 1 && index <= 4;
     }
 

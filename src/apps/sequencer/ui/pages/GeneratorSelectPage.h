@@ -11,7 +11,7 @@ public:
     using ResultCallback = std::function<void(bool, Generator::Mode)>;
 
     using ListPage::show;
-    void show(ResultCallback callback);
+    void show(ResultCallback callback, const Generator::Mode *modes = nullptr, int count = 0);
 
     virtual void enter() override;
     virtual void exit() override;

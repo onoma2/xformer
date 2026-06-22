@@ -14,8 +14,9 @@ GeneratorSelectPage::GeneratorSelectPage(PageManager &manager, PageContext &cont
     ListPage(manager, context, _listModel)
 {}
 
-void GeneratorSelectPage::show(ResultCallback callback) {
+void GeneratorSelectPage::show(ResultCallback callback, const Generator::Mode *modes, int count) {
     _callback = callback;
+    _listModel.setModes(modes, count);
     ListPage::show();
 }
 
@@ -77,6 +78,6 @@ void GeneratorSelectPage::keyboard(KeyboardEvent &event) {
 void GeneratorSelectPage::closeWithResult(bool result) {
     Page::close();
     if (_callback) {
-        _callback(result, Generator::Mode(selectedRow()));
+        _callback(result, _listModel.modeForRow(selectedRow()));
     }
 }
