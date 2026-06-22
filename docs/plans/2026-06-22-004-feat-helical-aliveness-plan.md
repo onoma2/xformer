@@ -3,7 +3,7 @@ id: helical-aliveness
 schema: plan
 title: "feat: make the helical generator less static (continuous state + Marbles warp)"
 type: feat
-status: active
+status: completed
 date: 2026-06-22
 depth: standard
 ---
@@ -37,8 +37,9 @@ convergence guard only catches period‑1 (a stuck single note), so 2–3 note l
 
 ## Scope
 
-In scope: U1 continuous-state feedback (+ identity offset), U2 Marbles warp (+ bias/spread knobs).
-Out of scope: the swarm / polyphony; the "steps" role-hierarchy quantization; gate-length depth knob.
+In scope: U1 continuous-state feedback (+ identity offset); U2 Helicity (law-depth knob) + floorless
+centered law. Out of scope: the Marbles distribution warp (dropped — continuous state + helicity gave
+enough variety); the swarm / polyphony; the "steps" role-hierarchy; gate-length depth knob.
 
 ---
 
@@ -75,9 +76,11 @@ Indexed sequence audibly evolves rather than looping every few steps.
 
 ---
 
-## U2. Marbles distribution warp (organic variety)
+## U2. Helicity (law depth) + floorless centered law
 
-**Goal:** reshape the fold remainder into a clustered/skewed distribution like the original.
+**Goal:** widen the rhythmic range. The √freq exponent was hardcoded at 0.5, and the long law pinned
+duration to `>= base` — so durations only spanned ~2:1 (192–384). Expose the exponent ("helicity")
+and centre the law on `base` so duration swings below and above it.
 
 **Dependencies:** U1.
 
@@ -86,28 +89,24 @@ Indexed sequence audibly evolves rather than looping every few steps.
 - `src/apps/sequencer/engine/generators/HelicalGenerator.h` / `.cpp`
 - `src/tests/unit/sequencer/TestHelicalAr.cpp`
 
-**Approach:** Port the warp (`helical.instr:357-363`) before quantizing to note:
-`u = influence/span`; `skew = bias<0.5 ? 1+(0.5-bias)·10 : 1/(1+(bias-0.5)·10)`;
-`uSkew = pow(u, skew)`; `P = pow(2, (spread-0.5)·6)`;
-`marblesU = pow(uSkew,P)/(pow(uSkew,P)+pow(1-uSkew,P)+1e-6)`; `warped = marblesU·span`.
-`note = round(warped)`; feed back `pitch = warped`. `bias`/`spread` in [0,1], default 0.5 (=
-identity warp, behaviour reduces to U1). Add `Bias` + `Spread` to `HelicalGenerator::Params`/`Param`
-and editParam/printParam; footer shows the first five (Seed, Range, Base, Law, Bias), `Spread` rides
-the context-menu aux slot (replacing the BASE quick-edit). Indexed-only, unchanged registration.
+**Approach:** Law becomes `base · 2^(octavesCentered · depth)` where
+`octavesCentered = (influence − span/2) / scaleSize` (centred → no base floor) and `depth` is the
+helicity (0.5 = sqrt-freq, 1 = freq-proportional, up to 2 = exaggerated). Add `Helicity` to
+`HelicalGenerator::Params`/`Param` (stored ×10, range 1–20, default 8 = 0.8), footer label **HELI**
+(fifth slot — all five fit; the footer already renders longer labels like `NEW RAND`). Lower the
+generator's clamp floor to ~12 ticks so short notes are reachable. Indexed-only, unchanged registration.
 
 **Test scenarios (add):**
-- `bias=spread=0.5` reproduces U1 output exactly (identity warp).
-- `spread` toward 1 clusters noteIndex toward the span edges; `bias` shifts the histogram centre.
-- determinism holds for all bias/spread.
+- higher helicity → wider durationTicks range (ratio at depth 1.5 > 1.5× the ratio at depth 0.3).
+- existing determinism / bounds / liveliness still green at the new defaults.
 
-**Verification:** `TestHelicalAr` green; sim builds; sweeping Bias/Spread visibly changes the
-note distribution; default still behaves like U1.
+**Verification:** `TestHelicalAr` green; sim builds; the HELI knob audibly opens the rhythmic range
+(~2:1 at 0.8 up to ~13:1 at 2.0), with durations both shorter and longer than `base`.
 
 ---
 
 ## Sequencing
 
-Land U1 first and listen — continuous state alone likely fixes "static." U2 is additive (defaults to
-no-op) and adds organic shaping if U1 still feels too regular. Constants borrow the original verbatim
-(`17.31`, `0.5`, `16.17` if the law needs the norm; `kIdentity` from `giVoiceOffsets`), tuned at
-implementation time.
+Both units shipped. U1 (continuous state) killed the short cycles; U2 (helicity + floorless law)
+opened the rhythmic range. Marbles was dropped — the two together gave enough variety without it.
+Constants borrow the original verbatim (`17.31`, `0.5`; `kIdentity` from `giVoiceOffsets`).

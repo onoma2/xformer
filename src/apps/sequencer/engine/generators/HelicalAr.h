@@ -30,22 +30,23 @@ struct HelicalAr {
         dur = float((value / 997) % 997) * 0.1f + 1.f;
     }
 
-    // base x sqrt(freq) law in octaves; lawDir>=0 makes higher pitch longer.
-    static float durationFloat(float octaves, int base, int lawDir) {
-        float sqrtFreq = std::pow(2.f, octaves * 0.5f);
-        return lawDir >= 0 ? float(base) * sqrtFreq : float(base) / sqrtFreq;
+    // base x 2^(octaves*depth) law; depth ("helicity") sets how hard pitch stretches
+    // duration (0.5 = sqrt-freq, 1 = freq-proportional). lawDir>=0 = higher pitch longer.
+    static float durationFloat(float octaves, int base, int lawDir, float depth) {
+        float e = octaves * depth;
+        return float(base) * std::pow(2.f, lawDir >= 0 ? e : -e);
     }
 
-    static int durationForNote(int noteIndex, int scaleSize, int base, int lawDir, int minTicks, int maxTicks) {
+    static int durationForNote(int noteIndex, int scaleSize, int base, int lawDir, float depth, int minTicks, int maxTicks) {
         if (scaleSize < 1) scaleSize = 1;
-        int ticks = int(durationFloat(float(noteIndex) / float(scaleSize), base, lawDir) + 0.5f);
+        int ticks = int(durationFloat(float(noteIndex) / float(scaleSize), base, lawDir, depth) + 0.5f);
         if (ticks < minTicks) ticks = minTicks;
         if (ticks > maxTicks) ticks = maxTicks;
         return ticks;
     }
 
     // span = octaveRange x scaleSize (fold modulus / usable scale degrees).
-    Result step(int span, int scaleSize, int base, int lawDir, int minTicks, int maxTicks) {
+    Result step(int span, int scaleSize, int base, int lawDir, float depth, int minTicks, int maxTicks) {
         if (span < 1) span = 1;
 
         if (scaleSize < 1) scaleSize = 1;
@@ -62,9 +63,10 @@ struct HelicalAr {
         if (note >= span) note = span - 1;
         if (note < 0) note = 0;
 
-        // law on the CONTINUOUS folded pitch (not the rounded note): the fed-back
-        // duration carries continuous state, so the fold stays chaotic not periodic
-        float rawDur = durationFloat(influence / float(scaleSize), base, lawDir);
+        // law on the CONTINUOUS folded pitch, centered on the span midpoint so duration
+        // swings below AND above base (no base floor); fed-back duration stays continuous
+        float octavesCentered = (influence - 0.5f * spanF) / float(scaleSize);
+        float rawDur = durationFloat(octavesCentered, base, lawDir, depth);
         int durationTicks = int(rawDur + 0.5f);
         if (durationTicks < minTicks) durationTicks = minTicks;
         if (durationTicks > maxTicks) durationTicks = maxTicks;

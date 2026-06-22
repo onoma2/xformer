@@ -17,6 +17,7 @@ public:
         OctaveRange,
         Base,
         LawDir,
+        Helicity,
         Last
     };
 
@@ -25,6 +26,7 @@ public:
         uint8_t octaveRange = 2;
         uint16_t base = 192;
         int8_t lawDir = 1;
+        uint8_t helicity = 8;   // law depth x10: 8 => 0.8 (sqrt is 5)
     };
 
     HelicalGenerator(SequenceBuilder &builder, Params &params);
@@ -52,6 +54,9 @@ public:
 
     int lawDir() const { return _params.lawDir; }
     void setLawDir(int v) { _params.lawDir = v >= 0 ? 1 : -1; }
+
+    int helicity() const { return _params.helicity; }
+    void setHelicity(int v) { _params.helicity = clamp(v, 1, 20); }
 
 private:
     Params &_params;

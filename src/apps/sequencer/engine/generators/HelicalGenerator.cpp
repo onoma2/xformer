@@ -8,7 +8,7 @@
 
 #include "os/os.h"
 
-static constexpr int kMinTicks = 24;
+static constexpr int kMinTicks = 12;   // no base floor — pitch can push duration short
 static constexpr int kMaxTicks = 768;
 
 HelicalGenerator::HelicalGenerator(SequenceBuilder &builder, Params &params) :
@@ -25,6 +25,7 @@ const char *HelicalGenerator::paramName(int index) const {
     case Param::OctaveRange: return "Range";
     case Param::Base:        return "Base";
     case Param::LawDir:      return "Law";
+    case Param::Helicity:    return "HELI";
     case Param::Last:        break;
     }
     return nullptr;
@@ -46,6 +47,9 @@ void HelicalGenerator::editParam(int index, int value, bool shift) {
     case Param::LawDir:
         setLawDir(value);
         break;
+    case Param::Helicity:
+        setHelicity(helicity() + value);
+        break;
     case Param::Last:
         break;
     }
@@ -57,6 +61,7 @@ void HelicalGenerator::printParam(int index, StringBuilder &str) const {
     case Param::OctaveRange: str("%d", octaveRange()); break;
     case Param::Base:        str("%d", base()); break;
     case Param::LawDir:      str(_params.lawDir >= 0 ? "LONG" : "SHORT"); break;
+    case Param::Helicity:    str("%.1f", _params.helicity * 0.1f); break;
     case Param::Last:        break;
     }
 }
@@ -89,11 +94,13 @@ void HelicalGenerator::update() {
 
     int stepCount = _builder.length();
 
+    float depth = _params.helicity * 0.1f;
+
     HelicalAr ar;
     ar.seed(_params.seed);
 
     for (int i = 0; i < stepCount; ++i) {
-        auto r = ar.step(span, scaleSize, _params.base, _params.lawDir, kMinTicks, kMaxTicks);
+        auto r = ar.step(span, scaleSize, _params.base, _params.lawDir, depth, kMinTicks, kMaxTicks);
         auto &step = seq.step(i);
         step.setNoteIndex(int8_t(r.noteIndex));
         step.setDuration(uint16_t(r.durationTicks));
