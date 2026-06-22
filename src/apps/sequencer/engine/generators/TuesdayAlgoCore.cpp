@@ -210,6 +210,14 @@ void TuesdayAlgoCore::init(const AlgoParams &params) {
         break;
     }
 
+    case 15: { // TURING
+        _rng = Random(flowSeed);
+        _extraRng = Random(ornamentSeed + 0x9e3779b9);
+        _turing.seed(seed);
+        _turing.setLength(_rng, uint8_t(2 + flow * 2));
+        break;
+    }
+
     default: {
         _algoState.test.mode = (flow - 1) >> 3;
         _algoState.test.sweepSpeed = ((flow - 1) & 0x3);
@@ -373,6 +381,10 @@ void TuesdayAlgoCore::reseed() {
         _algoState.stepwave.is_stepped = true;
         break;
     }
+
+    case 15: // TURING
+        _turing.seed(_rng.next());
+        break;
     }
 }
 
@@ -393,8 +405,26 @@ AlgoResult TuesdayAlgoCore::generate(int algorithm, const AlgoContext &ctx) {
     case 12: return generateAphex(ctx);
     case 13: return generateAutechre(ctx);
     case 14: return generateStepwave(ctx);
+    case 15: return generateTuring(ctx);
     default: return generateTest(ctx);
     }
+}
+
+AlgoResult TuesdayAlgoCore::generateTuring(const AlgoContext &ctx) {
+    (void)ctx;
+    AlgoResult result;
+    result.velocity = 255;
+    result.gateRatio = clamp(50 + _params.gateLength * 3, 50, 400);
+    if (int(_rng.nextRange(100)) < _params.glide) {
+        result.slide = true;
+    }
+    uint8_t prob = uint8_t((_params.power * 255) / 16);   // power 0-16 -> flip probability
+    uint32_t v = _turing.clock(_rng, prob);
+    int range = 1 + _params.ornament;                     // ornament 0-16 -> note spread
+    int idx = int(v % uint32_t(range));
+    result.note = idx % 12;
+    result.octave = idx / 12;
+    return result;
 }
 
 // --- Algorithm generators (adapted from TuesdayTrackEngine) ---

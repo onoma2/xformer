@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/utils/Random.h"
+#include "TuringRegister.h"
 
 #include <cstdint>
 #include <algorithm>
@@ -166,6 +167,7 @@ private:
     AlgoResult generateAphex(const AlgoContext &ctx);
     AlgoResult generateAutechre(const AlgoContext &ctx);
     AlgoResult generateStepwave(const AlgoContext &ctx);
+    AlgoResult generateTuring(const AlgoContext &ctx);
 
     // State
     AlgoParams _params;
@@ -174,4 +176,5 @@ private:
     Random _rng;
     Random _extraRng;
     AlgorithmState _algoState;
+    TuringRegister _turing;
 };
