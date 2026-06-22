@@ -28,14 +28,14 @@ public:
 
     // algorithm
 
-    int algorithm() const { return Routing::routedValueInt(ParamKey::Algorithm, _trackIndex, _algorithm, 0, 14); }
+    int algorithm() const { return Routing::routedValueInt(ParamKey::Algorithm, _trackIndex, _algorithm, 0, 15); }
     void setAlgorithm(int algorithm) {
-        _algorithm = clamp(algorithm, 0, 14);
+        _algorithm = clamp(algorithm, 0, 15);
     }
 
     void editAlgorithm(int value, bool shift) {
-        // Cycle only through valid algorithms: 0-14 (consecutive)
-        static const int VALID_ALGORITHMS[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+        // Cycle only through valid algorithms: 0-15 (consecutive)
+        static const int VALID_ALGORITHMS[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
         const int VALID_COUNT = 15;
 
         // Find current algorithm position in valid array

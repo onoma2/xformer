@@ -811,7 +811,7 @@ void TuesdayEditPage::handleStepKeyUp(int step, bool shift) {
 void TuesdayEditPage::randomizeSequence() {
     auto &sequence = _project.selectedTuesdaySequence();
 
-    static const int algorithms[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+    static const int algorithms[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
     static const int algorithmCount = int(sizeof(algorithms) / sizeof(algorithms[0]));
 
     sequence.setAlgorithm(algorithms[rng.nextRange(algorithmCount)]);

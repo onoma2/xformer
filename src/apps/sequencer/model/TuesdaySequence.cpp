@@ -26,6 +26,7 @@ void TuesdaySequence::printAlgorithm(StringBuilder &str) const {
     case 12: str("Aphex"); break;
     case 13: str("Autech"); break;
     case 14: str("StepWave"); break;
+    case 15: str("Turing"); break;
     default: str("%d", algorithm()); break;
     }
 }
