@@ -352,6 +352,92 @@ public:
     }
 
     //----------------------------------------
+    // Param dictionary
+    //----------------------------------------
+
+    // Canonical address table shared by engine, UI, and TT2 MO.* ops. The address
+    // is the storage field; the shape reinterprets the label (Spring relabels).
+    enum class Param : uint8_t {
+        Shape, Rate, Depth, Mode, Offset,
+        Attack, Decay, Sustain, Release, Amplitude,
+        Smooth, Phase, Invert, RateDomain, GateSource,
+        Last
+    };
+
+    static int paramCount() { return int(Param::Last); }
+
+    int paramGet(int addr) const {
+        if (addr < 0 || addr >= int(Param::Last)) return 0;
+        switch (Param(addr)) {
+        case Param::Shape:      return int(shape());
+        case Param::Rate:       return rate();
+        case Param::Depth:      return depth();
+        case Param::Mode:       return int(mode());
+        case Param::Offset:     return offset();
+        case Param::Attack:     return attack();
+        case Param::Decay:      return decay();
+        case Param::Sustain:    return sustain();
+        case Param::Release:    return release();
+        case Param::Amplitude:  return amplitude();
+        case Param::Smooth:     return smooth();
+        case Param::Phase:      return phase();
+        case Param::Invert:     return invert() ? 1 : 0;
+        case Param::RateDomain: return int(rateDomain());
+        case Param::GateSource: return int(gateSource());
+        case Param::Last:       break;
+        }
+        return 0;
+    }
+
+    void paramSet(int addr, int v) {
+        if (addr < 0 || addr >= int(Param::Last)) return;
+        switch (Param(addr)) {
+        case Param::Shape:      setShape(Shape(v)); break;
+        case Param::Rate:       setRate(v); break;
+        case Param::Depth:      setDepth(v); break;
+        case Param::Mode:       setMode(Mode(v)); break;
+        case Param::Offset:     setOffset(v); break;
+        case Param::Attack:     setAttack(v); break;
+        case Param::Decay:      setDecay(v); break;
+        case Param::Sustain:    setSustain(v); break;
+        case Param::Release:    setRelease(v); break;
+        case Param::Amplitude:  setAmplitude(v); break;
+        case Param::Smooth:     setSmooth(v); break;
+        case Param::Phase:      setPhase(v); break;
+        case Param::Invert:     setInvert(v != 0); break;
+        case Param::RateDomain: setRateDomain(RateDomain(v)); break;
+        case Param::GateSource: setGateSource(Routing::Source(v)); break;
+        case Param::Last:       break;
+        }
+    }
+
+    // Per-shape label for an address. Spring relabels reused fields per the
+    // Spring reuse comment above.
+    static const char *paramName(int addr, Shape shape) {
+        bool spring = isSpringShape(shape);
+        if (addr < 0 || addr >= int(Param::Last)) return nullptr;
+        switch (Param(addr)) {
+        case Param::Shape:      return "SHAPE";
+        case Param::Rate:       return spring ? "STRIKE" : "RATE";
+        case Param::Depth:      return "DEPTH";
+        case Param::Mode:       return "MODE";
+        case Param::Offset:     return "OFFSET";
+        case Param::Attack:     return spring ? "TENSION" : "ATTACK";
+        case Param::Decay:      return spring ? "RING" : "DECAY";
+        case Param::Sustain:    return "SUSTAIN";
+        case Param::Release:    return "RELEASE";
+        case Param::Amplitude:  return "AMP";
+        case Param::Smooth:     return spring ? "CLANG" : "SLEW";
+        case Param::Phase:      return spring ? "PICKUP" : "PHASE";
+        case Param::Invert:     return "INVERT";
+        case Param::RateDomain: return "DOMAIN";
+        case Param::GateSource: return "GATE";
+        case Param::Last:       break;
+        }
+        return nullptr;
+    }
+
+    //----------------------------------------
     // Methods
     //----------------------------------------
 

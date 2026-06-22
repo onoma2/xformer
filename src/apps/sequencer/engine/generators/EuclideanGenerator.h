@@ -37,17 +37,17 @@ public:
     // steps
 
     int steps() const { return _params.steps; }
-    void setSteps(int steps) { _params.steps = clamp(steps, 1, CONFIG_STEP_COUNT); }
+    void setSteps(int steps) { _params.steps = clamp(steps, 1, _builder.capacity()); }
 
     // beats
 
     int beats() const { return _params.beats; }
-    void setBeats(int beats) { _params.beats = clamp(beats, 1, CONFIG_STEP_COUNT); }
+    void setBeats(int beats) { _params.beats = clamp(beats, 1, _builder.capacity()); }
 
     // offset
 
     int offset() const { return _params.offset; }
-    void setOffset(int offset) { _params.offset = clamp(offset, 0, CONFIG_STEP_COUNT - 1); }
+    void setOffset(int offset) { _params.offset = clamp(offset, 0, _builder.capacity() - 1); }
 
     // pattern
 

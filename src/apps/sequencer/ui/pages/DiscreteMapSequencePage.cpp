@@ -553,17 +553,7 @@ void DiscreteMapSequencePage::keyUp(KeyEvent &event) {
 
 void DiscreteMapSequencePage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
-    if (key.isContextMenu()) {
-        contextShow();
-        event.consume();
-        return;
-    }
-
-    if (key.pageModifier() && event.count() == 2) {
-        contextShow(true);
-        event.consume();
-        return;
-    }
+    if (handleContextMenuKey(event)) return;
 
     // Shift + double-click on step button (top row only): select all stages with same value
     if (key.shiftModifier() && key.isStep() && key.step() < 8 && event.count() == 2 && _sequence) {
@@ -1993,9 +1983,4 @@ void DiscreteMapSequencePage::transformContextAction(int index) {
     case TransformContextAction::Last:
         break;
     }
-}
-
-void DiscreteMapSequencePage::keyboard(KeyboardEvent &event) {
-    if (handleFunctionKeys(event)) return;
-    BasePage::keyboard(event);
 }

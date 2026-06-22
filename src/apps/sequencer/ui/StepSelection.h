@@ -8,10 +8,21 @@
 #include <cstdint>
 #include <cstdlib>
 
-template<size_t N>
-class StepSelection {
+// Width-agnostic view of a step selection, so GeneratorPage can host any track's
+// StepSelection<N> regardless of its step count.
+class StepSelectionView {
 public:
-    void keyDown(KeyEvent &event, int stepOffset) {
+    virtual ~StepSelectionView() = default;
+    virtual void keyDown(KeyEvent &event, int stepOffset) = 0;
+    virtual void keyUp(KeyEvent &event, int stepOffset) = 0;
+    virtual void clear() = 0;
+    virtual bool selected(int index) const = 0;
+};
+
+template<size_t N>
+class StepSelection : public StepSelectionView {
+public:
+    void keyDown(KeyEvent &event, int stepOffset) override {
         const auto &key = event.key();
 
         if (key.pageModifier()) {
@@ -44,7 +55,7 @@ public:
         }
     }
 
-    void keyUp(KeyEvent &event, int stepOffset) {
+    void keyUp(KeyEvent &event, int stepOffset) override {
         const auto &key = event.key();
 
         if (key.pageModifier()) {
@@ -97,7 +108,7 @@ public:
         }
     }
 
-    void clear() {
+    void clear() override {
         _selected.reset();
         _mode = Mode::Immediate;
         _first = -1;
@@ -166,6 +177,8 @@ public:
     }
 
     const std::bitset<N> &selected() const { return _selected; }
+
+    bool selected(int index) const override { return _selected[index]; }
 
     bool operator[](int index) const {
         return _selected[index];

@@ -100,7 +100,8 @@ void RandomGenerator::update() {
         _pattern[i] = clamp(value, 0, 255);
     }
 
-    for (size_t i = 0; i < _pattern.size(); ++i) {
+    int writeCount = clamp(_builder.capacity(), 0, int(_pattern.size()));
+    for (int i = 0; i < writeCount; ++i) {
         _builder.setValue(i, _pattern[i] * (1.f / 255.f));
     }
 }

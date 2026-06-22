@@ -62,17 +62,7 @@ void ProjectPage::updateLeds(Leds &leds) {
 void ProjectPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
 
-    if (key.isContextMenu()) {
-        contextShow();
-        event.consume();
-        return;
-    }
-
-    if (key.pageModifier() && event.count() == 2) {
-        contextShow(true);
-        event.consume();
-        return;
-    }
+    if (handleContextMenuKey(event)) return;
 
     if (key.pageModifier()) {
 #ifdef CONFIG_ENABLE_ASTEROIDS

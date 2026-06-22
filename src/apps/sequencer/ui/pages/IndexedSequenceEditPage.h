@@ -4,6 +4,8 @@
 #include "ui/StepSelection.h"
 #include "ui/model/IndexedSequenceListModel.h"
 #include "model/IndexedSequence.h"
+#include "engine/generators/IndexedSequenceBuilder.h"
+#include "core/utils/Container.h"
 
 class IndexedSequenceEditPage : public BasePage {
 public:
@@ -18,7 +20,6 @@ public:
     virtual void keyDown(KeyEvent &event) override;
     virtual void keyUp(KeyEvent &event) override;
     virtual void keyPress(KeyPressEvent &event) override;
-    virtual void keyboard(KeyboardEvent &event) override;
     virtual void encoder(EncoderEvent &event) override;
 
     // Public accessor for step selection (used by math page)
@@ -66,6 +67,7 @@ private:
     void copySequence();
     void pasteSequence();
     void initSequence();
+    void generateSequence();
     void updateMonitorStep();
 
     IndexedSequence::Step& step(int index);
@@ -105,6 +107,7 @@ private:
 
     IndexedSequenceListModel _listModel;
     StepSelection<IndexedSequence::MaxSteps> _stepSelection;
+    Container<IndexedSequenceBuilder> _builderContainer;
     bool _splitQuickEditActive = false;
     int _splitQuickEditCount = 2;
     bool _mergeQuickEditActive = false;

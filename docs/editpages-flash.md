@@ -1,5 +1,12 @@
 # Edit Page Flash Triage
 
+> **Update 2026-06-13 — superseded by `docs/ui-editpages-flash.md`** (consolidated
+> research with current symbol sizes; the numbers below are stale). Two corrections:
+> the Stochastic descriptor-table target is `contextAction` (3,448 B, where the
+> 16-slot map is triplicated), NOT `editLiveStep` (now only 748 B); and the dominant
+> flash lever is **compiler flags** (`-funroll-loops` removal, `-Os`, `-flto`) — far
+> larger than any single page — which none of these per-page notes covered.
+
 Snapshot: 2026-06-05.
 
 This note excludes the detailed PhaseFlux proposal in `docs/pf-flash.md` and ranks the other edit-page flash contributors.

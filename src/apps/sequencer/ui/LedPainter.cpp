@@ -5,7 +5,6 @@
 #include "PageKeyMap.h"
 
 #include "engine/Engine.h"
-#include "engine/TeletypeTrackEngine.h"
 
 #include <array>
 
@@ -19,32 +18,12 @@
 
 void LedPainter::drawTrackGatesAndSelectedTrack(Leds &leds, const Engine &engine, const PlayState &playState, int selectedTrack) {
     bool blink = (os::ticks() % os::time::ms(200)) < os::time::ms(100);
-    std::array<bool, 8> trOverrideActive{};
-    std::array<bool, 8> trOverrideValue{};
-
-    for (int track = 0; track < 8; ++track) {
-        const auto &trackEngine = engine.trackEngine(track);
-        if (trackEngine.trackMode() != Track::TrackMode::Teletype) {
-            continue;
-        }
-        const auto &teletypeEngine = trackEngine.as<TeletypeTrackEngine>();
-        for (int offset = 0; offset < TeletypeTrackEngine::TriggerOutputCount; ++offset) {
-            int targetTrack = track + offset;
-            if (targetTrack >= 8) {
-                break;
-            }
-            if (!trOverrideActive[targetTrack]) {
-                trOverrideActive[targetTrack] = true;
-                trOverrideValue[targetTrack] = teletypeEngine.trActivity(offset);
-            }
-        }
-    }
 
     for (int track = 0; track < 8; ++track) {
         const auto &trackEngine = engine.trackEngine(track);
         const auto &trackState = playState.trackState(track);
 
-        bool activity = trOverrideActive[track] ? trOverrideValue[track] : trackEngine.activity();
+        bool activity = trackEngine.activity();
         bool mute = (trackState.hasMuteRequest() && trackState.mute() != trackState.requestedMute()) ? blink : trackEngine.mute();
         bool selected = track == selectedTrack;
 

@@ -4,7 +4,7 @@
 
 Teletype v2 is a breaking Performer-native dialect, not a compatibility port.
 
-Old project compatibility is explicitly out of scope. Legacy Teletype file compatibility is explicitly out of scope. `scene_state_t` is not long-term truth. The Monome hardware model is not being emulated. The current bridge-heavy implementation was useful as proof of concept, but it is not the target architecture.
+Old project compatibility is explicitly out of scope. Legacy Teletype file compatibility is explicitly out of scope. `scene_state_t` is not long-term truth. The Monome hardware model is not being emulated. The native dialect is now the live, broad implementation (see Current State); the bridge-heavy `scene_state_t` engine still coexists as `TrackMode::Teletype` and is the deletion target, not the target architecture.
 
 The goal is a native Performer scripting language derived from Teletype:
 
@@ -16,6 +16,64 @@ The goal is a native Performer scripting language derived from Teletype:
 - drop hardware-only legacy;
 - delete wrapper paths once the native dialect covers the kept language.
 
+## Current State (2026-06-14)
+
+`TrackMode::TeletypeV2` runs as a native `TT2TrackEngine`: parse (Ragel) → lower → native ops → `TT2OutputState`. No `scene_state_t`, no `tele_*` bridge, no C VM in the runtime. The legacy bridge engine (`TrackMode::Teletype`) still coexists and is the **source of truth** for op coverage + the eventual deletion target (Action Plan Phase 5), gated on the native path reaching editor + bridge-parity (see the bridge-parity gaps below; modules/scenes deferred).
+
+### Done — native, tested, STM32-green
+- **Control/timing language (MODs):** IF / ELIF / ELSE, PROB, EVERY / SKIP, L, BREAK / BRK, SCRIPT, KILL, S (stack push), the full DEL family; ms-based metro.
+- **Op families:** math (ADD/SUB/MUL/DIV/MOD/MIN/MAX/ABS/SGN + symbols), comparison (EQ/NE/LT/GT/LTE/GTE + symbols), logic (AND/OR/AND3/OR3/AND4/OR4/NZ/EZ), range (LIM/WRAP/WRP/AVG/INR/OUTR/INRI/OUTRI), queue (`Q.*`), stack (`S.*`), pitch (`N`, `V`), and the **full pattern family** (`P`/`PN` — value/bounds/nav/insert-remove/reorder/whole-window arith/query/random).
+- **Runtime/model:** variables store, scale tables, RNG slots, delay queue, 8 CV + 8 TR output state, serialized `TeletypeProgram` (6 scripts + 4 patterns).
+- **Trigger-input firing:** `TT2TrackEngine` samples 4 trigger inputs each update and fires scripts 0-3 on rising edges; per-input source (CvIn/GateOut/LogicalGate, mirroring the legacy dispatch) defaults to CvIn1-4 — the editing UI for it rides with the deferred editor I/O grid.
+- **Output shaping:** native linear ms CV slew (raw<<8 fixed-point, exact interpolation, no sub-LSB stall) + offset; one-shot TR pulse with rest polarity. Per-ms shaping pass in `update(dt)`; `cvOutput()` emits the ramped value. Ops `CV.SLEW`/`CV.OFF`/`TR.POL`/`TR.TIME`/`TR.PULSE`/`TR.P`/`TR.TOG`.
+- **Engine inputs:** six CV-mapped sources (`TT2CvInputSource`, defaulted CvIn1-4) feed `IN`/`PARAM` (scaled) and the working variables `X`/`Y`/`Z`/`T`; sampled each refresh in `update(dt)`. Ops `IN`/`IN.SCALE`/`PARAM`/`PARAM.SCALE`, plus `STATE` (latched trigger level) and `MUTE` (gates trigger firing). UI for the source routing rides with the deferred editor I/O grid.
+- **Build:** release switched to `-Os` (reclaimed ~352 KB flash; ~350 KB headroom); op breadth no longer flash-bound.
+
+- **Language tail:** variable ops (`O`/`DRUNK`/`FLIP`/`TIME`/`LAST` + `C`/`D`/`Y`/`Z`/`T`/`J`/`K` and the `O.`/`DRUNK.`/`R.` companions; `TIME`/`LAST` driven by a runtime ms clock), randomness (`RAND`/`RRAND`/`R`/`TOSS`), pitch tail (`SCALE`/`SCL`/`SCALE0`/`QT`, `VN`/`VV`/`HZ`, `P.SCALE`/`PN.SCALE`), bitwise/shift (`| & ~ ^ XOR`, `BSET`/`BGET`/`BCLR`/`BTOG`/`BREV`, `RSH`/`LSH`/`RROT`/`LROT`), function calls (`$`/`$F`/`$F1`/`$F2`, `$L`/`$S` line calls, `I1`/`I2`, `FR`).
+- **Turtle (`@` ops):** fixed-point walker over pattern memory (x = pattern 0-3, y = index 0-63), verbatim port of `turtle.c` — move/step/fence/wrap/bump/bounce/speed/dir/script/show.
+- **Parity harness (`TestTeletypeV2Parity`):** evaluates a deterministic op set (math/comparison/logic/range/pitch/scale/bitwise/shift) through both the legacy C VM and the native runner, asserting equal results. Caught reversed bitwise operands (corrected to value-first: `BSET x i`, `RSH x n`). One documented divergence: the C VM's `QT` returns 0 when it should round up to `(c+1)*step` (a TT1 bug) — native `QT` is correct, so `QT` is excluded from the parity set. RNG/stateful ops are out of scope (the two RNGs can't agree bit-for-bit).
+
+### Bridge-parity porting ✅ COMPLETE (source of truth = the current `TeletypeTrack` bridge)
+
+The bridge — not upstream Teletype — was the coverage target. **All six porting batches are done**; the native runner now covers the bridge's usable op surface. Deterministic ops are parity-verified against the bridge C VM (`TestTeletypeV2Parity`); stateful/engine/MIDI ops are unit-tested + on-device.
+
+- **P1 ✅** `RND`/`RRND`, `EXP`, `JI`, comparison/logic/shift symbols (`><`/`<>`/`>=<`/`<=>`/`!`/`<<<`/`>>>`/`&&&`/`|||`/`&&&&`/`||||`).
+- **P2 ✅** euclid/drum (`ER`/`NR`/`DR.T`/`DR.P`/`DR.V`, reuse linked C helpers), `CHAOS`(`.R`/`.ALG`), seeds (`SEED`/`*.SEED`/`*.SD`), scale-bitmask (`N.S`/`N.C`/`N.CS` + `QT.S`/`QT.CS` parity-verified; `N.B`/`N.BX`/`QT.B`/`QT.BX` bounds-safe, degree-walk parity is a follow-up).
+- **P3 ✅** `INIT.*` family.
+- **P4 ✅** `TIF`, `M!`, `CV.GET`/`CV.SET`, `M.A`/`M.ACT.A`/`M.RESET`(`.A`)/`SYNC`, `SCRIPT.POL`/`$.POL`, `TR.W`/`TR.D` (per-TR width/divisor).
+- **P5 ✅** `BUS` + `W*`/`RT` via the new **`TT2Host`** interface (`TT2TrackEngine` implements it, registers active around script exec via `ScopedHost`, keeping the op layer off `Engine.h`): `WBPM`/`WBPM.S`/`WMS`/`WTU`/`BAR`/`WP`/`WP.SET`/`WR`/`W.ACT`/`WNG`/`WNN`/`WNG.H`/`WNN.H`/`RT`/`BUS`; `BPM` (pure, parity-verified).
+- **P6 ✅** **MIDI** — `TT2Midi` runtime buffer; `TT2TrackEngine::receiveMidi`/`processMidiMessage` (filter by per-track `MidiSourceConfig` → populate → fire `MI.$`-bound script); the native `MI.*` query family (last-event/indexed-by-`I`/counts/channels/`MI.$`/`MI.CLKD`; `MI.CLKR` no-op, MIDI-clock derivation deferred).
+
+### Modulator + Geode control ✅ — native `MO.*` / `G.*` over the real engines
+
+`TrackMode::TeletypeV2` controls the **real** modulator slots and Geode engine via thin BUS-style accessor ops (not a redefinition; the modulator UI stays the control surface). Plan: `docs/plans/2026-06-14-006-feat-tt2-mod-geode-ops-plan.md`.
+- **`Modulator::Param` dictionary** — one canonical address table (shape=0 … 15 fields), shared by engine, ops, and (eventually) UI; a façade over the existing field accessors.
+- **`MO.*`** — `MO n` reads a slot's output; `MO.P n addr [v]` reads/writes any field by address; `MO.SHAPE/RATE/DEPTH/MODE/OFF` + `MO.TRIG` are fixed-addr sugar (short aliases `MO.S/R/D/M/O/T`). Last-writer-wins with the knob; native units. Drives `Project::modulator(n)` via `TT2Host`.
+- **`G.*`** — native handlers over the existing tokens: `G.TIME/TONE/RAMP/CURV/MODE` globals, `G.RUN` (fixed run macro on M2, quantized to offset's 128 steps), `G.TUNE`, `G.V` (voice 0=all, full gate-fire sequence), `G.VAL` (mix), `G.S` compound. `G.O`/`G.BAR`/`G.R` have no live `GeodeConfig` field → `UnsupportedOp`.
+
+### Deferred — separate efforts (not standalone ports)
+
+- **Legacy Envelopes `E.*` / LFO `LFO.*`.** Bridge sub-engines, superseded by the generic `MO.*` modulator control above (no native per-shape `E.*`/`LFO.*`); they die with the bridge.
+- **`ModulatorPage` dictionary realignment** — make the UI reference `Modulator::Param` (needs a physical-slot→addr adapter + ui-preview). The shared address already holds in the model; this is cosmetic-internal follow-up.
+- **The modulator engine rework** (`.tasks/modulator-enhancements.md`) — independent UI-driven track; the ops adapt to whatever it lands.
+- **Scenes (`SCENE`/`SCENE.G`/`SCENE.P`).** Stubbed in the bridge today (`tele_scene` no-op) but **may return** — not dropped.
+- **Calibration** (`CV.CAL`/`IN.CAL.*`/`PARAM.CAL.*`) — bridge no-op (`tele_cv_cal`/`tele_save_calibration` empty).
+
+### Remaining — editor (plan written)
+Repoint the editing UI to TeletypeV2, reusing the working pages. `tele2_ops[]` native op registry + `TT2Command→text` printer (no `tele_ops[]`/`print_command` round-trip), per-line edit, rebind the script + pattern pages TrackMode-aware (live mode → native runner), TopPage routing, a behavioral parity harness (orig C VM vs native runner). Plan: `docs/plans/2026-06-14-001-feat-tt2-editor-repoint-plan.md`. Defers the I/O grid (needs the trigger-input / I/O-routing model above) + file save/load.
+
+### Stubbed in the bridge → parity by omission (safe to skip)
+
+The bridge no-ops these on Performer, so the native runner omitting them loses nothing versus the source of truth:
+
+- **i2c** (`tele_ii_tx`/`tele_ii_rx` empty) and therefore **all external-device families**: Telex `TO.*`/`TI.*`, Ansible/Kria/Levels/Cycles/Arp, White Whale, Meadowphysics, Earthsea, ORCA, Just Friends, ER-301 `SC.*`, Disting EX, Crow, I2C2MIDI, Matrixarchate, `W/` audio.
+- **Grid** (`grid_key_press`/`device_flip` empty) and **live-submode** (`set_live_submode` empty): grid ops, `LIVE.*`.
+
+(Earlier this section claimed "no Performer hardware" and wrongly swept MIDI + the native modules + scenes into it — corrected above: MIDI is real/essential, modules are real-but-deferred, scenes may return.)
+
+### Recommended order
+Engine mechanics ✅, language tail ✅, turtle ✅, **bridge-parity porting ✅ (P1–P6 done)**, **native modulator + Geode control ✅ (`MO.*`/`G.*`)**. The native runner now covers the bridge's usable op surface. Remaining: the **editor** (repoint the editing UI to the native runner — the on-device audition gate), then **bridge deletion** (Phase 5), gated only on the editor + the deferred buckets (legacy E/LFO die with the bridge; `ModulatorPage` dictionary realignment; scenes; calibration).
+
 ## Non-Goals
 
 - No full upstream Teletype compatibility.
@@ -25,6 +83,46 @@ The goal is a native Performer scripting language derived from Teletype:
 - No fake Teletype hardware panel hidden behind Performer routing.
 - No heap-backed script strings.
 - No project version ceremony during dev-stage work unless release prep starts.
+
+## Project End State
+
+The final project state has one active Performer Teletype implementation: Teletype++.
+
+Old Teletype remains useful only as source material for token spelling, parser compatibility, and semantic reference tests. It is not the runtime architecture.
+
+Target ownership:
+
+```text
+Performer Teletype++ track
+  model:  TeletypeProgram + TT2Runtime
+  engine: TT2OutputState + scheduling/output plumbing
+  parser: existing Ragel frontend -> native lowering
+```
+
+Replacement boundary:
+
+- replace active Performer execution paths based on `scene_state_t`, `TeletypeBridge`, `tele_*` output callbacks, `g_activeEngine`, and old `TeletypeTrackEngine` bridge execution;
+- keep Ragel tokenization/parsing as the source-compatibility frontend unless it becomes a proven blocker;
+- keep token/op spelling tables only as compatibility input, not as a reason to preserve old runtime shape;
+- keep hardware-independent pasted-script compatibility as the user-facing rule;
+- do not preserve Monome hardware-only behavior or old Performer project files during dev-stage work.
+
+Deletion is allowed only after the native path covers the kept language slice, has scheduler coverage for init/metro/trigger/delay, and passes a bounded golden-script smoke set. Deletion is not a license to add new dialect surface.
+
+## Scope Guard
+
+Do not expand this work into a second Teletype product, a full upstream emulator, or an old-project migration layer.
+
+The path is:
+
+```text
+native TT2 covers kept language
+  -> wire TT2 as the Performer Teletype track
+  -> run golden pasted-script smoke set
+  -> remove old bridge/runtime from active track path
+```
+
+Anything outside that path needs a separate task.
 
 ## Hard Compatibility Rule
 
@@ -222,7 +320,7 @@ Keep these names and preserve 1-4 behavior. Extend them to 1-8 and remove bridge
 
 These are not part of the hardware-independent pasted-script contract. Drop them from v2 unless they are later redesigned as explicit Performer-native features.
 
-- Parser-visible scene/hardware surface: `INIT.SCENE`, `SCENE`, `SCENE.G`, `SCENE.P`, `LIVE.GRID`, `LIVE.G`.
+- Grid surface: `LIVE.GRID`, `LIVE.G` (grid no-op in the bridge). **Scene ops (`SCENE`/`SCENE.G`/`SCENE.P`/`INIT.SCENE`) are NOT dropped** — deferred, may return (see Current State).
 - Raw ii/I2C family: `IIA`, `IIS*`, `IIQ*`, `IIB*`.
 - External device families present in source: Ansible/Kria/Meadow/Levels/Cycles/Arp, White Whale, Meadowphysics, Earthsea, Just Friends, Telex `TO.*` / `TI.*`, Crow, ER-301 `SC.*`, Disting EX, ORCA, I2C2MIDI, Grid, Fader, Matrixarchate, W/ audio module families (`W/`, `W/S`, `W/D`, `W/T`).
 
@@ -298,6 +396,8 @@ Useful suggestions that still apply:
    Build success and simulator checks are not enough for this track. Hardware boot, timing, CV output, trigger output, and audible behavior are the gate.
 
 ## Action Plan
+
+**Status (2026-06-14) — see Current State for the live roadmap.** Phase 0 (dialect definition) ✅, Phase 1 (native data model) ✅, Phase 2 (native core interpreter) ✅ **and well beyond** (the full op surface + control-flow MODs + patterns are native and tested). Phase 3 (native output semantics) ✅ — instant `CV`/`TR` plus slew / pulse / offset / polarity (the "output shaping" engine) are native and tested. Phase 4 (native modules: envelopes/LFO/Geode) **deferred to the modulator rework** — these are real, working features in the bridge, not ported standalone. Bridge-parity porting ✅ — P1–P6 done (MIDI, BUS, W\*/`RT`, scale-bitmask, euclid/drum, INIT, seeds, chaos, the symbol/alias tail) all native. Phase 5 (delete bridge) **pending**, gated only on the native editor + the deferred buckets (modules → modulator rework, scenes, calibration). The phase definitions below stay as the architectural frame; the prioritized remaining work lives in Current State.
 
 ### Phase 0: Dialect Definition
 

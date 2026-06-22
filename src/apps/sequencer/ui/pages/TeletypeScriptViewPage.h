@@ -2,6 +2,8 @@
 
 #include "BasePage.h"
 
+#include "model/TeletypeProgram.h"   // TT2Command for the undo record
+
 #include <cstdint>
 
 class TeletypeScriptViewPage : public BasePage {
@@ -20,9 +22,6 @@ private:
     void handleStepKey(int step, bool shift);
     void loadEditBuffer(int line);
     void setScriptIndex(int scriptIndex);
-    void contextShow(bool doubleClick = false) override;
-    void contextAction(int index);
-    bool contextActionEnabled(int index) const;
     void insertText(const char *text, bool addSpace);
     void removeLastInsert(int count);
     void insertChar(char c);
@@ -35,21 +34,22 @@ private:
     void duplicateLine();
     void commentLine();
     void deleteLine();
-    void saveScript();
-    void loadScript();
-    void saveScriptToSlot(int slot);
-    void loadScriptFromSlot(int slot);
-    void saveTrack();
-    void loadTrack();
-    void saveTrackToSlot(int slot);
-    void loadTrackFromSlot(int slot);
+    void undo();
     void pushHistory(const char *line);
     void recallHistory(int direction);
     void setEditBuffer(const char *text);
     void commitLineAndAdvance();
 
-    void drawIoGrid(Canvas &canvas);
-    void drawBipolarBar(Canvas &canvas, int x, int y, uint16_t value, Color fillColor, Color outlineColor);
+    void drawHud(Canvas &canvas);
+    void drawBipolarBar(Canvas &canvas, int x, int y, int w, int h, int raw, Color fill, Color outline);
+
+    void contextShow(bool doubleClick = false) override;
+    void contextAction(int index);
+    bool contextActionEnabled(int index) const;
+    void saveScript();
+    void loadScript();
+    void saveScriptToSlot(int slot);
+    void loadScriptFromSlot(int slot);
 
     int _selectedLine = 0;
     int _cursor = 0;
@@ -71,4 +71,9 @@ private:
     int _historyCount = 0;
     int _historyHead = -1;
     int _historyCursor = -1;
+    enum class UndoOp { None, Overwrite, Delete };
+    UndoOp _undoOp = UndoOp::None;
+    int _undoLine = 0;
+    uint8_t _undoLength = 0;
+    TT2Command _undoCommand = {};
 };

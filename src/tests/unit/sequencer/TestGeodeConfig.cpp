@@ -30,6 +30,18 @@ CASE("ranged setters clamp") {
     g.setMode(9); expectEqual(g.mode(), 2, "mode clamps to 2");
 }
 
+CASE("setTune 0/0 normalizes to default ratio (no engine churn)") {
+    GeodeConfig g; g.clear();
+    g.setTune(2, 5, 4);
+    expectEqual(g.tuneNumerator(2), 5, "explicit num kept");
+    g.setTune(2, 0, 0);   // reset
+    expectEqual(g.tuneNumerator(2), 3, "voice 2 (index) -> default num (v+1)=3");
+    expectEqual(g.tuneDenominator(2), 1, "default den 1");
+    g.setTune(0, 7, 0);   // zero denominator also resets
+    expectEqual(g.tuneNumerator(0), 1, "voice 0 -> default num 1");
+    expectEqual(g.tuneDenominator(0), 1, "default den 1");
+}
+
 CASE("serialize round-trip preserves all fields incl dormant tune") {
     uint8_t buf[512];
     std::memset(buf, 0, sizeof(buf));

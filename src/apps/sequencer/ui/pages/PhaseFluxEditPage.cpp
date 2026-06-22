@@ -427,17 +427,6 @@ void PhaseFluxEditPage::keyPress(KeyPressEvent &event) {
     }
 }
 
-void PhaseFluxEditPage::keyboard(KeyboardEvent &event) {
-    // USB keyboard baseline (matches NoteSequenceEditPage):
-    //   F1..F5         → hardware F-buttons (Shift modifier preserved)
-    //   Tab            → PAGE+SHIFT (= opens context menu)
-    //   Left / Right   → hardware Left/Right keys
-    //   Up / Down      → encoder rotation (one click per press)
-    // Global shortcuts (Escape / Space) come via TopPage.
-    if (handleFunctionKeys(event)) return;
-    BasePage::keyboard(event);
-}
-
 void PhaseFluxEditPage::encoder(EncoderEvent &event) {
     editSlot(_selectedSlot, event.value(), event.pressed() || globalKeyState()[Key::Shift]);
     event.consume();

@@ -213,12 +213,7 @@ void TuesdayEditPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
 
     if (key.isContextMenu()) {
-        showContextMenu(ContextMenu(
-            contextMenuItems,
-            int(ContextAction::Last),
-            [&] (int index) { contextAction(index); },
-            [&] (int index) { return contextActionEnabled(index); }
-        ));
+        contextShow();
         event.consume();
         return;
     }
@@ -641,6 +636,16 @@ void TuesdayEditPage::selectParam(int slot) {
     }
 }
 
+void TuesdayEditPage::contextShow(bool doubleClick) {
+    showContextMenu(ContextMenu(
+        contextMenuItems,
+        int(ContextAction::Last),
+        [&] (int index) { contextAction(index); },
+        [&] (int index) { return contextActionEnabled(index); },
+        doubleClick
+    ));
+}
+
 void TuesdayEditPage::contextAction(int index) {
     switch (ContextAction(index)) {
     case ContextAction::Init:
@@ -806,7 +811,7 @@ void TuesdayEditPage::handleStepKeyUp(int step, bool shift) {
 void TuesdayEditPage::randomizeSequence() {
     auto &sequence = _project.selectedTuesdaySequence();
 
-    static const int algorithms[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+    static const int algorithms[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
     static const int algorithmCount = int(sizeof(algorithms) / sizeof(algorithms[0]));
 
     sequence.setAlgorithm(algorithms[rng.nextRange(algorithmCount)]);
@@ -902,9 +907,4 @@ TuesdayTrack &TuesdayEditPage::tuesdayTrack() {
 
 const TuesdayTrack &TuesdayEditPage::tuesdayTrack() const {
     return _project.selectedTrack().tuesdayTrack();
-}
-
-void TuesdayEditPage::keyboard(KeyboardEvent &event) {
-    if (handleFunctionKeys(event)) return;
-    BasePage::keyboard(event);
 }

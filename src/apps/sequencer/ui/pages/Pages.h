@@ -45,9 +45,9 @@
 #include "IndexedSequenceEditPage.h"
 #include "IndexedRouteConfigPage.h"
 #include "IndexedMathPage.h"
-#include "TeletypeEditPage.h"
 #include "TeletypePatternViewPage.h"
 #include "TeletypeScriptViewPage.h"
+#include "TT2IoConfigPage.h"
 #include "StochasticConfigPage.h"
 #include "StochasticPerformancePage.h"
 #include "StochasticSequenceEditPage.h"
@@ -93,9 +93,9 @@ struct Pages {
     IndexedSequenceEditPage indexedSequenceEdit;
     IndexedRouteConfigPage indexedRouteConfig;
     IndexedMathPage indexedMath;
-    TeletypeEditPage teletypeEdit;
     TeletypePatternViewPage teletypePatternView;
     TeletypeScriptViewPage teletypeScriptView;
+    TT2IoConfigPage tt2IoConfig;
     StochasticConfigPage stochasticConfig;
     StochasticPerformancePage stochasticPerformance;
     StochasticSequenceEditPage stochasticSequenceEdit;
@@ -157,9 +157,9 @@ struct Pages {
         indexedSequenceEdit(manager, context),
         indexedRouteConfig(manager, context),
         indexedMath(manager, context),
-        teletypeEdit(manager, context),
         teletypePatternView(manager, context),
         teletypeScriptView(manager, context),
+        tt2IoConfig(manager, context),
         stochasticConfig(manager, context),
         stochasticPerformance(manager, context),
         stochasticSequenceEdit(manager, context),

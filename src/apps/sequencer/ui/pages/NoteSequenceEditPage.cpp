@@ -456,17 +456,7 @@ void NoteSequenceEditPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
     auto &sequence = _project.selectedNoteSequence();
 
-    if (key.isContextMenu()) {
-        contextShow();
-        event.consume();
-        return;
-    }
-
-    if (key.pageModifier() && event.count() == 2) {
-        contextShow(true);
-        event.consume();
-        return;
-    }
+    if (handleContextMenuKey(event)) return;
 
     if (key.isQuickEdit()) {
         quickEdit(key.quickEdit());
@@ -1165,6 +1155,14 @@ void NoteSequenceEditPage::duplicateSequence() {
     showMessage("STEPS DUPLICATED");
 }
 
+static const Generator::Mode noteGeneratorModes[] = {
+    Generator::Mode::InitLayer,
+    Generator::Mode::InitSteps,
+    Generator::Mode::Euclidean,
+    Generator::Mode::Random,
+    Generator::Mode::Algo,
+};
+
 void NoteSequenceEditPage::generateSequence() {
     if (!isActiveForSelectedTrack()) {
         return;
@@ -1178,7 +1176,7 @@ void NoteSequenceEditPage::generateSequence() {
                 _manager.pages().generator.show(generator, &_stepSelection);
             }
         }
-    });
+    }, noteGeneratorModes, int(sizeof(noteGeneratorModes) / sizeof(noteGeneratorModes[0])));
 }
 
 void NoteSequenceEditPage::quickEdit(int index) {
@@ -1229,6 +1227,5 @@ void NoteSequenceEditPage::keyboard(KeyboardEvent &event) {
         return;
     }
 
-    if (handleFunctionKeys(event)) return;
     BasePage::keyboard(event);
 }

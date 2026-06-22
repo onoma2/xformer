@@ -23,13 +23,9 @@ UNIT_TEST("CurveTrackLfoShapesIntegration") {
         // Test another LFO function
         sequence.populateWithSquareWaveLfo(8, 15);
 
-        // Verify alternating pattern for square wave
+        // Square populate writes a single StepUp shape per step.
         for (int i = 8; i <= 15; ++i) {
-            if ((i - 8) % 2 == 0) {
-                expectEqual(sequence.step(i).shape(), static_cast<int>(Curve::StepUp));
-            } else {
-                expectEqual(sequence.step(i).shape(), static_cast<int>(Curve::StepDown));
-            }
+            expectEqual(sequence.step(i).shape(), static_cast<int>(Curve::StepUp));
         }
     }
 
@@ -41,20 +37,10 @@ UNIT_TEST("CurveTrackLfoShapesIntegration") {
         
         auto &sequence = track.sequence(0);
         
-        // Verify sine wave pattern was applied
-        int upCount = 0, downCount = 0;
+        // Sine populate writes a single Bell shape per step.
         for (int i = 0; i <= 7; ++i) {
-            int shape = sequence.step(i).shape();
-            if (shape == static_cast<int>(Curve::SmoothUp)) {
-                upCount++;
-            } else if (shape == static_cast<int>(Curve::SmoothDown)) {
-                downCount++;
-            }
+            expectEqual(sequence.step(i).shape(), static_cast<int>(Curve::Bell));
         }
-        
-        // Should have both up and down shapes for sine pattern
-        expect(upCount > 0);
-        expect(downCount > 0);
     }
 
     CASE("LFO functions preserve other step properties") {
@@ -99,7 +85,7 @@ UNIT_TEST("CurveTrackLfoShapesIntegration") {
         
         // Verify some shapes were set
         expectEqual(sequence.step(0).shape(), static_cast<int>(Curve::Triangle));
-        expectEqual(sequence.step(16).shape(), static_cast<int>(Curve::SmoothUp)); // First half of sine
+        expectEqual(sequence.step(16).shape(), static_cast<int>(Curve::Bell)); // sine populate uses Bell
         expectEqual(sequence.step(20).shape(), static_cast<int>(Curve::RampUp));
     }
 

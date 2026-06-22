@@ -203,41 +203,27 @@ UNIT_TEST("CurveTrackLfoShapes") {
         }
     }
 
-    CASE("populateWithSineWaveLfo creates proper sine-like pattern") {
+    CASE("populateWithSineWaveLfo fills with Bell shape") {
         CurveTrack track;
         auto& sequence = track.sequence(0);
 
-        sequence.populateWithSineWaveLfo(0, 7);  // 8 steps for clear pattern
+        sequence.populateWithSineWaveLfo(0, 7);  // 8 steps
 
-        // Check that we have both up and down shapes for a sine-like pattern
-        int upCount = 0, downCount = 0;
+        // Sine populate writes a single Bell shape per step (1 cycle per step).
         for (int i = 0; i <= 7; ++i) {
-            int shape = sequence.step(i).shape();
-            if (shape == static_cast<int>(Curve::SmoothUp)) {
-                upCount++;
-            } else if (shape == static_cast<int>(Curve::SmoothDown)) {
-                downCount++;
-            }
+            expectEqual(sequence.step(i).shape(), static_cast<int>(Curve::Bell));
         }
-
-        // Should have both up and down shapes for sine pattern
-        expect(upCount > 0);
-        expect(downCount > 0);
     }
 
-    CASE("populateWithSquareWaveLfo alternates shapes properly") {
+    CASE("populateWithSquareWaveLfo fills with StepUp shape") {
         CurveTrack track;
         auto& sequence = track.sequence(0);
 
         sequence.populateWithSquareWaveLfo(0, 7);  // 8 steps
 
-        // Check alternating pattern
+        // Square populate writes a single StepUp shape per step.
         for (int i = 0; i <= 7; ++i) {
-            if (i % 2 == 0) {
-                expectEqual(sequence.step(i).shape(), static_cast<int>(Curve::StepUp));
-            } else {
-                expectEqual(sequence.step(i).shape(), static_cast<int>(Curve::StepDown));
-            }
+            expectEqual(sequence.step(i).shape(), static_cast<int>(Curve::StepUp));
         }
     }
 

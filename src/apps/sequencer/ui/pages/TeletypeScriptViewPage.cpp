@@ -2,27 +2,26 @@
 
 #include "Pages.h"
 
-#include "engine/TeletypeBridge.h"
-#include "engine/TeletypeTrackEngine.h"
-#include "model/FileDefs.h"
-#include "model/FileManager.h"
-#include "model/TeletypeTrack.h"
+#include "engine/TT2TrackEngine.h"
+#include "engine/TT2Printer.h"
+#include "engine/TT2ScriptLoader.h"
 #include "ui/LedPainter.h"
 #include "ui/MatrixMap.h"
+#include "ui/KeyboardManager.h"
+
+#include "model/FileManager.h"
 
 #include "core/utils/StringBuilder.h"
+#include "core/fs/FileSystem.h"
 
 #include <cstring>
 #include <cstdint>
+#include <cstdio>
 
 #include "os/os.h"
 
 extern "C" {
-#include "command.h"
-#include "script.h"
-#include "state.h"
-#include "teletype.h"
-#include "teletype_io.h"
+#include "tt_parser.h"
 }
 
 namespace {
@@ -32,14 +31,17 @@ constexpr int kRowStepY = 8;
 constexpr int kEditLineY = 54;
 constexpr int kLabelX = 4;
 constexpr int kTextX = 16;
-constexpr int kGridBusX = 196;
-constexpr int kGridMainX = 214;
-constexpr int kGridInParamX = 246;
-constexpr int kGridY = 15;
-constexpr int kGridColW = 8;
-constexpr int kGridRowH = 8;
-// Flip to false for hardware testing without engine suspend.
-constexpr bool kSuspendEngineForScriptIO = true;
+constexpr int kHudX = 192;       // live-value HUD region (script text clamps to its left)
+constexpr int kHudColPitch = 8;
+constexpr int kHudColW = 6;
+// Trigger scripts get a function key each; metro/init are reached via [ ] nav.
+constexpr int kTriggerScriptCount = 4;
+
+enum class ScriptContextAction { Save, Load, Last };
+static const ContextMenuModel::Item scriptContextItems[] = {
+    { "SAVE Sc" },
+    { "LOAD Sc" },
+};
 } // namespace
 
 void clampTextToWidth(Canvas &canvas, char *text, int maxWidth) {
@@ -52,21 +54,6 @@ void clampTextToWidth(Canvas &canvas, char *text, int maxWidth) {
     }
 }
 
-enum class ContextAction {
-    SaveScript,
-    LoadScript,
-    SaveTrack,
-    LoadTrack,
-    Last
-};
-
-static const ContextMenuModel::Item contextMenuItems[] = {
-    { "SAVE Sc" },
-    { "LOAD Sc" },
-    { "SAVE T9" },
-    { "LOAD T9" },
-};
-
 TeletypeScriptViewPage::TeletypeScriptViewPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context) {
 }
@@ -76,17 +63,18 @@ void TeletypeScriptViewPage::enter() {
     _liveMode = true;
     _selectedLine = 0;
     _hasLiveResult = false;
+    _undoOp = UndoOp::None;
     setEditBuffer("");
 }
 
 void TeletypeScriptViewPage::draw(Canvas &canvas) {
-    if (_project.selectedTrack().trackMode() != Track::TrackMode::Teletype) {
+    if (_project.selectedTrack().trackMode() != Track::TrackMode::TeletypeV2) {
         close();
         return;
     }
 
-    // CRITICAL: Check engine track mode too - model may have changed but engines not rebuilt yet
-    if (_engine.selectedTrackEngine().trackMode() != Track::TrackMode::Teletype) {
+    // Engine track mode may lag the model after a mode change; guard the cast.
+    if (_engine.selectedTrackEngine().trackMode() != Track::TrackMode::TeletypeV2) {
         close();
         return;
     }
@@ -96,40 +84,42 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
     canvas.setFont(_liveMode ? Font::Small : Font::Tele);
     canvas.setBlendMode(BlendMode::Set);
 
-    auto &track = _project.selectedTrack().teletypeTrack();
-    scene_state_t &state = track.state();
+    auto &track = _project.selectedTrack().tt2Track();
+    auto &program = track.program();
     const int scriptIndex = _scriptIndex;
-    const uint8_t len = ss_get_script_len(&state, scriptIndex);
+    const uint8_t len = program.scripts[scriptIndex].length;
 
     FixedStringBuilder<4> scriptLabel;
     if (_liveMode) {
         scriptLabel("L");
-    } else if (scriptIndex == METRO_SCRIPT) {
+    } else if (scriptIndex == TT2_METRO_SCRIPT) {
         scriptLabel("M");
+    } else if (scriptIndex == TT2_INIT_SCRIPT) {
+        scriptLabel("I");
     } else {
         scriptLabel("S%d", scriptIndex + 1);
     }
     canvas.setColor(Color::Medium);
     int scriptWidth = canvas.textWidth(scriptLabel);
     int scriptX = Width - 2 - scriptWidth;
-    if (scriptIndex == TeletypeTrack::SlotScriptIndex || scriptIndex == METRO_SCRIPT) {
-        FixedStringBuilder<4> slotLabel("P%d", track.activePatternSlot() + 1);
-        int slotWidth = canvas.textWidth(slotLabel);
-        int slotX = scriptX - slotWidth - 4;
-        canvas.drawText(slotX, 8, slotLabel);
-    }
     canvas.drawText(scriptX, 8, scriptLabel);
 
     if (_liveMode) {
-        auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
+        auto &trackEngine = _engine.selectedTrackEngine().as<TT2TrackEngine>();
+        auto &runtime = track.runtime();
+        const auto &output = trackEngine.output();
+        bool slewActive = false;
+        for (int i = 0; i < TT2_OUTPUT_CV_COUNT; ++i) {
+            if (output.cv[i].remainingMs > 0) { slewActive = true; break; }
+        }
         const int iconY = 8;
         int x = kLabelX;
         const char *icons[] = { "M", "S", "D", "St" };
         bool states[] = {
-            state.variables.m_act && ss_get_script_len(&state, METRO_SCRIPT) > 0,
-            trackEngine.anyCvSlewActive(),
-            TeletypeBridge::hasDelays(),
-            TeletypeBridge::hasStack()
+            runtime.variables.m_act && program.scripts[TT2_METRO_SCRIPT].length > 0,
+            slewActive,
+            runtime.delay.count > 0,
+            runtime.stack.top > 0
         };
         for (int i = 0; i < 4; ++i) {
             canvas.setColor(states[i] ? Color::Bright : Color::Low);
@@ -138,16 +128,14 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
         }
     }
 
+    const int maxTextWidth = kHudX - 2 - kTextX;
     for (int i = 0; i < kLineCount; ++i) {
         int y = kRowStartY + i * kRowStepY;
-        char lineText[128] = {};
+        char lineText[TT2_PRINT_LINE_MAX] = {};
 
         if (_liveMode) {
             if (i == 4) {
-                int dashScreen = TeletypeBridge::dashboardScreen();
-                if (dashScreen >= 0 && dashScreen < 16) {
-                    std::snprintf(lineText, sizeof(lineText), "%d", get_dashboard_value(dashScreen));
-                } else if (_hasLiveResult) {
+                if (_hasLiveResult) {
                     std::snprintf(lineText, sizeof(lineText), "%d", _liveResult);
                 }
             } else if (i == 3 && _historyCount > 0 && _historyHead >= 0) {
@@ -157,10 +145,7 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
                 lineText[0] = '\0';
             }
         } else if (i < len) {
-            const tele_command_t *cmd = ss_get_script_command(&state, scriptIndex, i);
-            if (cmd) {
-                print_command(cmd, lineText);
-            }
+            tt2PrintCommand(program.scripts[scriptIndex].commands[i], lineText, sizeof(lineText));
         }
 
         if (_liveMode) {
@@ -169,7 +154,7 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
             } else {
                 canvas.setColor(Color::Medium);
             }
-        } else if (ss_get_script_comment(&state, scriptIndex, i)) {
+        } else if (i < len && program.scripts[scriptIndex].commands[i].commented) {
             canvas.setColor(Color::Low);
         } else {
             canvas.setColor(i == _selectedLine ? Color::Bright : Color::Medium);
@@ -182,15 +167,14 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
         if (_liveMode && i == 3 && _historyCount > 0 && _historyHead >= 0) {
             textY -= 4;
         }
-        const int maxTextWidth = kGridBusX - 2 - kTextX;
         clampTextToWidth(canvas, lineText, maxTextWidth);
         canvas.drawText(kTextX, textY, lineText);
     }
 
-    char editText[128] = {};
+    char editText[TT2_PRINT_LINE_MAX] = {};
     std::snprintf(editText, sizeof(editText), "> %s", _editBuffer);
     canvas.setColor(Color::Bright);
-    const int maxEditWidth = kGridBusX - 2 - kLabelX;
+    const int maxEditWidth = Width - 2 - kLabelX;
     clampTextToWidth(canvas, editText, maxEditWidth);
     canvas.drawText(kLabelX, kEditLineY + 4, editText);
 
@@ -208,7 +192,7 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
     }
     int cursorX = kLabelX + prefixWidth + cursorOffset;
     int cursorY = kEditLineY;
-    const int maxCursorX = kGridBusX - 2;
+    const int maxCursorX = Width - 2;
     if (os::ticks() % os::time::ms(800) < os::time::ms(400) &&
         cursorX + cursorWidth <= maxCursorX) {
         canvas.setColor(Color::Medium);
@@ -219,100 +203,71 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
         canvas.setBlendMode(BlendMode::Set);
     }
 
-    drawIoGrid(canvas);
+    drawHud(canvas);
 }
 
-void TeletypeScriptViewPage::drawIoGrid(Canvas &canvas) {
-    const int trackIndex = _project.selectedTrackIndex();
-    const auto &track = _project.selectedTrack().teletypeTrack();
-    const auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
-
-    // --- BUS BLOCK (x=196) ---
-    for (int i = 0; i < 4; ++i) {
-        int x = kGridBusX + (i % 2) * kGridColW;
-        int y = kGridY + (i / 2) * 16;
-        float volts = trackEngine.busCv(i);
-        uint16_t raw = clamp(int((volts + 5.0f) / 10.0f * 16383.0f), 0, 16383);
-        drawBipolarBar(canvas, x, y, raw, Color::MediumBright, Color::Low);
-    }
-
-    // --- MAIN GRID (x=214) ---
-    auto gateSlotForPhysical = [this, trackIndex] (int gateOutIndex) -> int {
-        int slot = 0;
-        const auto &gateOutputTracks = _project.gateOutputTracks();
-        for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
-            if (gateOutputTracks[i] == trackIndex) {
-                if (i == gateOutIndex) {
-                    return slot;
-                }
-                ++slot;
-            }
-        }
-        return -1;
-    };
-    for (int i = 0; i < 4; ++i) {
-        int x = kGridMainX + i * kGridColW;
-
-        // Row 1: TI
-        bool tiAssigned = track.triggerInputSource(i) != TeletypeTrack::TriggerInputSource::None;
-        bool tiActive = trackEngine.inputState(i);
-        canvas.setColor(tiAssigned ? (tiActive ? Color::Bright : Color::Medium) : Color::Low);
-        canvas.fillRect(x + 1, kGridY + 1, 6, 6);
-
-        // Row 2: TO
-        auto toDest = track.triggerOutputDest(i);
-        int gateIdx = int(toDest);
-        bool toOwned = _project.gateOutputTrack(gateIdx) == trackIndex;
-        int gateSlot = gateSlotForPhysical(gateIdx);
-        bool toActive = gateSlot >= 0 ? trackEngine.gateOutput(gateSlot) : false;
-        if (toOwned) {
-            canvas.setColor(toActive ? Color::Bright : Color::Medium);
-            canvas.fillRect(x + 1, kGridY + kGridRowH + 1, 6, 6);
-        } else {
-            // Outline indicates layout mismatch (mapped, but not owned by this track).
-            canvas.setColor(Color::MediumLow);
-            canvas.drawRect(x + 1, kGridY + kGridRowH + 1, 6, 6);
-            if (toActive) {
-                canvas.fillRect(x + 2, kGridY + kGridRowH + 2, 4, 4);
-            }
-        }
-
-        // Row 3: CV
-        auto cvDest = track.cvOutputDest(i);
-        int cvIdx = int(cvDest);
-        bool cvOwned = _project.cvOutputTrack(cvIdx) == trackIndex;
-        uint16_t cvRaw = trackEngine.cvRaw(i);
-        Color cvFill = cvOwned ? Color::MediumBright : Color::MediumLow;
-        Color cvOutline = cvOwned ? cvFill : Color::MediumLow;
-        drawBipolarBar(canvas, x, kGridY + kGridRowH * 2, cvRaw, cvFill, cvOutline);
-    }
-
-    // --- IN/PARAM COLUMN (x=246) ---
-    // IN (Top)
-    bool inAssigned = track.cvInSource() != TeletypeTrack::CvInputSource::None;
-    drawBipolarBar(canvas, kGridInParamX, kGridY, static_cast<uint16_t>(track.state().variables.in), inAssigned ? Color::MediumBright : Color::Low, Color::Low);
-    // PARAM (Bot)
-    bool paramAssigned = track.cvParamSource() != TeletypeTrack::CvInputSource::None;
-    drawBipolarBar(canvas, kGridInParamX, kGridY + 16, static_cast<uint16_t>(track.state().variables.param), paramAssigned ? Color::MediumBright : Color::Low, Color::Low);
-}
-
-void TeletypeScriptViewPage::drawBipolarBar(Canvas &canvas, int x, int y, uint16_t value, Color fillColor, Color outlineColor) {
-    canvas.setColor(outlineColor);
-    canvas.drawRect(x + 1, y + 1, 6, 14);
-
-    int32_t val = int32_t(value) - 8192;
-    int h = (std::abs(val) * 7) / 8192;
-    h = clamp(h, 0, 7);
-
-    int centerY = y + 7;
-
-    if (h > 0) {
-        canvas.setColor(fillColor);
+// Bipolar value bar: raw 0..16383, 8192 = center. Frame + inner level fill.
+void TeletypeScriptViewPage::drawBipolarBar(Canvas &canvas, int x, int y, int w, int h, int raw, Color fill, Color outline) {
+    canvas.setColor(outline);
+    canvas.drawRect(x, y, w, h);
+    int val = raw - 8192;
+    int mag = val < 0 ? -val : val;
+    int half = (h - 2) / 2;
+    int bar = clamp(mag * half / 8192, 0, half);
+    int cy = y + h / 2;
+    if (bar > 0) {
+        canvas.setColor(fill);
         if (val >= 0) {
-            canvas.fillRect(x + 2, centerY - h + 1, 4, h);
+            canvas.fillRect(x + 1, cy - bar, w - 2, bar);
         } else {
-            canvas.fillRect(x + 2, centerY + 1, 4, h);
+            canvas.fillRect(x + 1, cy + 1, w - 2, bar);
         }
+    }
+}
+
+// Live-value HUD: CV(8) bars + TR(8) gate squares + TI(8, 2 rows) input squares
+// + IN/PARAM/BUS bars. Activity readout only — no routing assignment (deferred).
+void TeletypeScriptViewPage::drawHud(Canvas &canvas) {
+    auto &track = _project.selectedTrack().tt2Track();
+    auto &runtime = track.runtime();
+    auto &trackEngine = _engine.selectedTrackEngine().as<TT2TrackEngine>();
+    const auto &output = trackEngine.output();
+
+    // CV row: 8 bipolar bars (live value).
+    for (int i = 0; i < 8; ++i) {
+        int x = kHudX + i * kHudColPitch;
+        int raw = clamp(int(output.cv[i].currentQ >> 8), 0, 16383);
+        drawBipolarBar(canvas, x, 12, kHudColW, 15, raw, Color::MediumBright, Color::Low);
+    }
+    // TR row: 8 gate squares (frame + inner surface lit when high).
+    for (int i = 0; i < 8; ++i) {
+        int x = kHudX + i * kHudColPitch;
+        canvas.setColor(Color::Low);
+        canvas.drawRect(x, 30, kHudColW, kHudColW);
+        if (output.tr[i].level != 0) {
+            canvas.setColor(Color::Bright);
+            canvas.fillRect(x + 1, 31, kHudColW - 2, kHudColW - 2);
+        }
+    }
+    // TI: 8 trigger-input squares as 2 rows (1-4 top, 5-8 bottom) under columns
+    // 0-3, brought up so the dashboard stays clear of the IN/PARAM/BUS bars.
+    for (int i = 0; i < TT2_TRIGGER_INPUT_COUNT; ++i) {
+        int x = kHudX + (i % 4) * kHudColPitch;
+        int y = 38 + (i / 4) * 7;
+        canvas.setColor(Color::Low);
+        canvas.drawRect(x, y, kHudColW, kHudColW);
+        if (trackEngine.inputState(i)) {
+            canvas.setColor(Color::Bright);
+            canvas.fillRect(x + 1, y + 1, kHudColW - 2, kHudColW - 2);
+        }
+    }
+    // IN / PARAM (bright) + BUS x4 (dim); last BUS edge flush with the top row.
+    drawBipolarBar(canvas, 225, 38, 4, 13, clamp(int(runtime.variables.in), 0, 16383), Color::MediumBright, Color::Low);
+    drawBipolarBar(canvas, 230, 38, 4, 13, clamp(int(runtime.variables.param), 0, 16383), Color::MediumBright, Color::Low);
+    static const int kBusX[4] = { 235, 240, 245, 250 };
+    for (int i = 0; i < 4; ++i) {
+        int raw = clamp(int((_engine.busCv(i) + 5.f) / 10.f * 16383.f), 0, 16383);
+        drawBipolarBar(canvas, kBusX[i], 38, 4, 13, raw, Color::MediumLow, Color::Low);
     }
 }
 
@@ -351,7 +306,7 @@ void TeletypeScriptViewPage::updateLeds(Leds &leds) {
 
     // Override with Page mode actions (using unmask/mask pattern)
     if (page && !shift) {
-        // Page mode: Clipboard/edit actions on steps 8-12
+        // Page mode: Clipboard/edit actions on steps 8-12 (no Comment; TT2 drops comments)
         const bool pageStepRed[8] = {
             true,   // Step 8: Copy (yellow)
             false,  // Step 9: Paste (green)
@@ -366,7 +321,7 @@ void TeletypeScriptViewPage::updateLeds(Leds &leds) {
             true,           // Step 8: Copy (yellow)
             _hasClipboard,  // Step 9: Paste (green if valid)
             true,           // Step 10: Duplicate (yellow)
-            false,          // Step 11: Comment (red)
+            false,          // Step 11: unused
             false,          // Step 12: Delete (red)
             false,          // Step 13
             false,          // Step 14
@@ -392,16 +347,16 @@ void TeletypeScriptViewPage::setLiveMode(bool enabled) {
 }
 
 void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
+    // Input can arrive at this (pushed) page before draw() closes it on a mode
+    // change; bail before any tt2Track() deref on a non-TT2 track.
+    if (_project.selectedTrack().trackMode() != Track::TrackMode::TeletypeV2) {
+        return;
+    }
+
     const auto &key = event.key();
 
     if (key.isContextMenu()) {
         contextShow();
-        event.consume();
-        return;
-    }
-
-    if (key.pageModifier() && event.count() == 2) {
-        contextShow(true);
         event.consume();
         return;
     }
@@ -429,6 +384,25 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
             } else if (key.step() == 12) {
                 deleteLine();
                 event.consume();
+            } else if (key.step() == 13) {
+                undo();
+                event.consume();
+            }
+        } else if (key.isFunction()) {
+            int fn = key.function();
+            if (key.shiftModifier()) {          // shift+page+F1..F4 -> fire S5..S8
+                if (fn >= 0 && fn < kTriggerScriptCount &&
+                    _engine.selectedTrackEngine().trackMode() == Track::TrackMode::TeletypeV2) {
+                    _engine.selectedTrackEngine().as<TT2TrackEngine>().triggerScript(4 + fn);
+                }
+                event.consume();
+            } else if (fn == 4) {               // page+F5 -> live/pattern
+                if (_liveMode) {
+                    setLiveMode(false);
+                } else {
+                    _manager.push(&_manager.pages().teletypePatternView);
+                }
+                event.consume();
             }
         }
         return;
@@ -436,40 +410,25 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
 
     if (key.isFunction()) {
         int fn = key.function();
-        if (key.shiftModifier()) {
-            if (fn >= 0 && fn < TeletypeTrack::ScriptSlotCount) {
+        if (key.shiftModifier()) {              // shift+F1..F4 -> fire S1..S4
+            if (fn >= 0 && fn < kTriggerScriptCount) {
                 // Guard against race condition - engine may not be rebuilt yet
-                if (_engine.selectedTrackEngine().trackMode() != Track::TrackMode::Teletype) {
+                if (_engine.selectedTrackEngine().trackMode() != Track::TrackMode::TeletypeV2) {
                     event.consume();
                     return;
                 }
-                auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
-                trackEngine.triggerScript(fn);
+                _engine.selectedTrackEngine().as<TT2TrackEngine>().triggerScript(fn);
                 event.consume();
                 return;
             }
         }
-        if (fn == 4) {
-            if (_liveMode) {
-                setLiveMode(false);
-            } else {
-                _manager.push(&_manager.pages().teletypePatternView);
-            }
+        if (fn >= 0 && fn < 4) {                // F1..F4 cycle Sn <-> S(n+4)
+            setScriptIndex(_scriptIndex == fn ? 4 + fn : fn);
             event.consume();
             return;
         }
-        if (fn == 0) {
-            setScriptIndex(0);
-            event.consume();
-            return;
-        }
-        if (fn == 3) {
-            setScriptIndex(_scriptIndex == METRO_SCRIPT ? 3 : METRO_SCRIPT);
-            event.consume();
-            return;
-        }
-        if (fn >= 0 && fn < TeletypeTrack::EditableScriptCount) {
-            setScriptIndex(fn);
+        if (fn == 4) {                          // F5 cycle Metro <-> Init
+            setScriptIndex(_scriptIndex == TT2_METRO_SCRIPT ? TT2_INIT_SCRIPT : TT2_METRO_SCRIPT);
             event.consume();
             return;
         }
@@ -512,48 +471,10 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
     }
 }
 
-void TeletypeScriptViewPage::contextShow(bool doubleClick) {
-    showContextMenu(ContextMenu(
-        contextMenuItems,
-        int(ContextAction::Last),
-        [&] (int index) { contextAction(index); },
-        [&] (int index) { return contextActionEnabled(index); },
-        doubleClick
-    ));
-}
-
-void TeletypeScriptViewPage::contextAction(int index) {
-    switch (ContextAction(index)) {
-    case ContextAction::SaveScript:
-        saveScript();
-        break;
-    case ContextAction::LoadScript:
-        loadScript();
-        break;
-    case ContextAction::SaveTrack:
-        saveTrack();
-        break;
-    case ContextAction::LoadTrack:
-        loadTrack();
-        break;
-    case ContextAction::Last:
-        break;
-    }
-}
-
-bool TeletypeScriptViewPage::contextActionEnabled(int index) const {
-    switch (ContextAction(index)) {
-    case ContextAction::SaveScript:
-    case ContextAction::LoadScript:
-    case ContextAction::SaveTrack:
-    case ContextAction::LoadTrack:
-        return FileManager::volumeMounted();
-    default:
-        return true;
-    }
-}
-
 void TeletypeScriptViewPage::encoder(EncoderEvent &event) {
+    if (_project.selectedTrack().trackMode() != Track::TrackMode::TeletypeV2) {
+        return;
+    }
     if (globalKeyState()[Key::Shift]) {
         int next = _selectedLine + event.value();
         if (next < 0) {
@@ -704,25 +625,24 @@ void TeletypeScriptViewPage::loadEditBuffer(int line) {
     _editBuffer[0] = '\0';
     _cursor = 0;
 
-    auto &track = _project.selectedTrack().teletypeTrack();
-    scene_state_t &state = track.state();
+    auto &track = _project.selectedTrack().tt2Track();
+    auto &program = track.program();
     const int scriptIndex = _scriptIndex;
-    const uint8_t len = ss_get_script_len(&state, scriptIndex);
+    const uint8_t len = program.scripts[scriptIndex].length;
     if (_selectedLine < len) {
-        if (const tele_command_t *cmd = ss_get_script_command(&state, scriptIndex, _selectedLine)) {
-            print_command(cmd, _editBuffer);
-            _cursor = int(std::strlen(_editBuffer));
-        }
+        tt2PrintCommand(program.scripts[scriptIndex].commands[_selectedLine], _editBuffer, EditBufferSize);
+        _cursor = int(std::strlen(_editBuffer));
     }
 }
 
 void TeletypeScriptViewPage::setScriptIndex(int scriptIndex) {
-    if (scriptIndex < 0 || scriptIndex >= TeletypeTrack::EditableScriptCount) {
+    if (scriptIndex < 0 || scriptIndex >= TT2_SCRIPT_COUNT) {
         return;
     }
     _liveMode = false;
     if (_scriptIndex != scriptIndex) {
         _scriptIndex = scriptIndex;
+        _undoOp = UndoOp::None;
         loadEditBuffer(0);
     }
 }
@@ -795,11 +715,7 @@ void TeletypeScriptViewPage::commitLine() {
     char errorMsg[TELE_ERROR_MSG_LENGTH] = {};
     tele_error_t error = parse(_editBuffer, &parsed, errorMsg);
     if (error != E_OK) {
-        showMessage(tele_error(error));
-        return;
-    }
-    error = validate(&parsed, errorMsg);
-    if (error != E_OK) {
+        pushHistory(_editBuffer);
         showMessage(tele_error(error));
         return;
     }
@@ -808,35 +724,33 @@ void TeletypeScriptViewPage::commitLine() {
 
     if (_liveMode) {
         // Guard against race condition - engine may not be rebuilt yet
-        if (_engine.selectedTrackEngine().trackMode() != Track::TrackMode::Teletype) {
+        if (_engine.selectedTrackEngine().trackMode() != Track::TrackMode::TeletypeV2) {
             showMessage("ENGINE NOT READY");
             return;
         }
-        auto &track = _project.selectedTrack().teletypeTrack();
-        scene_state_t &state = track.state();
-        auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
-        TeletypeBridge::ScopedEngine scope(trackEngine);
-        exec_state_t es;
-        es_init(&es);
-        es_push(&es);
-        es_set_script_number(&es, LIVE_SCRIPT);
-        es_set_line_number(&es, 0);
-        process_result_t result = process_command(&state, &es, &parsed);
-        _hasLiveResult = result.has_value;
-        if (result.has_value) {
+        TT2Command lowered = {};
+        if (!lowerCommand(parsed, lowered)) {
+            showMessage("TOO LONG");
+            return;
+        }
+        auto &trackEngine = _engine.selectedTrackEngine().as<TT2TrackEngine>();
+        TT2EvalResult result = trackEngine.runLiveCommand(lowered);
+        _hasLiveResult = result.stackSize > 0;
+        if (_hasLiveResult) {
             _liveResult = result.value;
         }
         return;
     }
 
-    auto &track = _project.selectedTrack().teletypeTrack();
-    scene_state_t &state = track.state();
-    const int scriptIndex = _scriptIndex;
+    auto &track = _project.selectedTrack().tt2Track();
+    auto &program = track.program();
+    TT2Script &script = program.scripts[_scriptIndex];
+    _undoOp = UndoOp::Overwrite;
+    _undoLine = _selectedLine;
+    _undoLength = script.length;
+    _undoCommand = script.commands[_selectedLine];
     _engine.lock();
-    ss_overwrite_script_command(&state, scriptIndex, _selectedLine, &parsed);
-    if (scriptIndex == TeletypeTrack::SlotScriptIndex || scriptIndex == METRO_SCRIPT) {
-        track.captureActiveClip();
-    }
+    setScriptCommand(program, _scriptIndex, _selectedLine, _editBuffer);
     _engine.unlock();
     // Commit succeeded; no UI message per current workflow.
 }
@@ -860,20 +774,17 @@ void TeletypeScriptViewPage::duplicateLine() {
     if (_liveMode) {
         return;
     }
-    auto &track = _project.selectedTrack().teletypeTrack();
-    scene_state_t &state = track.state();
-    const int scriptIndex = _scriptIndex;
-    const tele_command_t *cmd = ss_get_script_command(&state, scriptIndex, _selectedLine);
-    if (!cmd) {
+    auto &track = _project.selectedTrack().tt2Track();
+    auto &program = track.program();
+    if (_selectedLine >= program.scripts[_scriptIndex].length) {
         return;
     }
+    char lineBuffer[TT2_PRINT_LINE_MAX] = {};
+    tt2PrintCommand(program.scripts[_scriptIndex].commands[_selectedLine], lineBuffer, sizeof(lineBuffer));
     _engine.lock();
-    ss_insert_script_command(&state, scriptIndex, _selectedLine + 1, cmd);
+    insertScriptCommand(program, _scriptIndex, _selectedLine + 1, lineBuffer);
     if (_selectedLine < kLineCount - 1) {
         _selectedLine += 1;
-    }
-    if (scriptIndex == TeletypeTrack::SlotScriptIndex || scriptIndex == METRO_SCRIPT) {
-        track.captureActiveClip();
     }
     _engine.unlock();
     loadEditBuffer(_selectedLine);
@@ -883,13 +794,14 @@ void TeletypeScriptViewPage::commentLine() {
     if (_liveMode) {
         return;
     }
-    auto &track = _project.selectedTrack().teletypeTrack();
-    scene_state_t &state = track.state();
-    _engine.lock();
-    ss_toggle_script_comment(&state, _scriptIndex, _selectedLine);
-    if (_scriptIndex == TeletypeTrack::SlotScriptIndex || _scriptIndex == METRO_SCRIPT) {
-        track.captureActiveClip();
+    auto &program = _project.selectedTrack().tt2Track().program();
+    TT2Script &script = program.scripts[_scriptIndex];
+    if (_selectedLine >= script.length) {
+        return;
     }
+    _engine.lock();
+    uint8_t &c = script.commands[_selectedLine].commented;
+    c = c ? 0 : 1;
     _engine.unlock();
 }
 
@@ -897,197 +809,47 @@ void TeletypeScriptViewPage::deleteLine() {
     if (_liveMode) {
         return;
     }
-    auto &track = _project.selectedTrack().teletypeTrack();
-    scene_state_t &state = track.state();
-    if (const tele_command_t *cmd = ss_get_script_command(&state, _scriptIndex, _selectedLine)) {
-        char lineBuffer[EditBufferSize] = {};
-        print_command(cmd, lineBuffer);
+    auto &track = _project.selectedTrack().tt2Track();
+    auto &program = track.program();
+    if (_selectedLine < program.scripts[_scriptIndex].length) {
+        char lineBuffer[TT2_PRINT_LINE_MAX] = {};
+        tt2PrintCommand(program.scripts[_scriptIndex].commands[_selectedLine], lineBuffer, sizeof(lineBuffer));
         setEditBuffer(lineBuffer);
         copyLine();
+        _undoOp = UndoOp::Delete;
+        _undoLine = _selectedLine;
+        _undoLength = program.scripts[_scriptIndex].length;
+        _undoCommand = program.scripts[_scriptIndex].commands[_selectedLine];
     }
     _engine.lock();
-    ss_delete_script_command(&state, _scriptIndex, _selectedLine);
-    if (_scriptIndex == TeletypeTrack::SlotScriptIndex || _scriptIndex == METRO_SCRIPT) {
-        track.captureActiveClip();
-    }
+    deleteScriptCommand(program, _scriptIndex, _selectedLine);
     _engine.unlock();
     loadEditBuffer(_selectedLine);
     showMessage("Line deleted");
 }
 
-void TeletypeScriptViewPage::saveScript() {
-    if (_scriptIndex >= TeletypeTrack::EditableScriptCount) {
-        showMessage("SCRIPT ONLY");
+void TeletypeScriptViewPage::undo() {
+    if (_undoOp == UndoOp::None || _liveMode) {
         return;
     }
-    _manager.pages().fileSelect.show("SAVE SCRIPT", FileType::TeletypeScript, 0, true,
-        [this] (bool result, int slot) {
-            if (!result) {
-                return;
-            }
-            if (FileManager::slotUsed(FileType::TeletypeScript, slot)) {
-                _manager.pages().confirmation.show("ARE YOU SURE?", [this, slot] (bool result) {
-                    if (result) {
-                        saveScriptToSlot(slot);
-                    }
-                });
-            } else {
-                saveScriptToSlot(slot);
-            }
-        });
-}
-
-void TeletypeScriptViewPage::loadScript() {
-    if (_scriptIndex >= TeletypeTrack::EditableScriptCount) {
-        showMessage("SCRIPT ONLY");
-        return;
+    auto &program = _project.selectedTrack().tt2Track().program();
+    TT2Script &script = program.scripts[_scriptIndex];
+    _engine.lock();
+    if (_undoOp == UndoOp::Overwrite) {
+        script.commands[_undoLine] = _undoCommand;
+    } else {  // Delete: re-insert the removed line, shifting the rest down
+        for (int i = _undoLength - 1; i > _undoLine; --i) {
+            script.commands[i] = script.commands[i - 1];
+        }
+        script.commands[_undoLine] = _undoCommand;
     }
-    _manager.pages().fileSelect.show("LOAD SCRIPT", FileType::TeletypeScript, 0, false,
-        [this] (bool result, int slot) {
-            if (!result) {
-                return;
-            }
-            _manager.pages().confirmation.show("ARE YOU SURE?", [this, slot] (bool result) {
-                if (result) {
-                    loadScriptFromSlot(slot);
-                }
-            });
-        });
+    script.length = _undoLength;
+    _engine.unlock();
+    _undoOp = UndoOp::None;
+    _selectedLine = _undoLine;
+    loadEditBuffer(_undoLine);
+    showMessage("Undo");
 }
-
-void TeletypeScriptViewPage::saveScriptToSlot(int slot) {
-    if (kSuspendEngineForScriptIO) {
-        _engine.suspend();
-    }
-    _manager.pages().busy.show("SAVING SCRIPT ...");
-
-    FileManager::task([this, slot] () {
-        auto &track = _project.selectedTrack().teletypeTrack();
-        FixedStringBuilder<FileHeader::NameLength> scriptName;
-        if (_scriptIndex == TeletypeTrack::SlotScriptIndex) {
-            scriptName("%.5s-S%d", _project.name(), track.activePatternSlot() + 1);
-        } else if (_scriptIndex == METRO_SCRIPT) {
-            scriptName("%.7s-M", _project.name());
-        } else {
-            scriptName("%.6s-S%d", _project.name(), _scriptIndex + 1);
-        }
-        return FileManager::writeTeletypeScript(track, _scriptIndex, scriptName, slot);
-    }, [this] (fs::Error result) {
-        if (result == fs::OK) {
-            showMessage("SCRIPT SAVED");
-        } else {
-            showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
-        }
-        _manager.pages().busy.close();
-        if (kSuspendEngineForScriptIO) {
-            _engine.resume();
-        }
-    });
-}
-
-void TeletypeScriptViewPage::loadScriptFromSlot(int slot) {
-    if (kSuspendEngineForScriptIO) {
-        _engine.suspend();
-    }
-    _manager.pages().busy.show("LOADING SCRIPT ...");
-
-    FileManager::task([this, slot] () {
-        auto &track = _project.selectedTrack().teletypeTrack();
-        return FileManager::readTeletypeScript(track, _scriptIndex, slot);
-    }, [this] (fs::Error result) {
-        if (result == fs::OK) {
-            showMessage("SCRIPT LOADED");
-            loadEditBuffer(_selectedLine);
-        } else if (result == fs::INVALID_CHECKSUM) {
-            showMessage("INVALID SCRIPT FILE");
-        } else {
-            showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
-        }
-        _manager.pages().busy.close();
-        if (kSuspendEngineForScriptIO) {
-            _engine.resume();
-        }
-    });
-}
-
-void TeletypeScriptViewPage::saveTrack() {
-    _manager.pages().fileSelect.show("SAVE TRACK", FileType::TeletypeTrack, 0, true,
-        [this] (bool result, int slot) {
-            if (!result) {
-                return;
-            }
-            if (FileManager::slotUsed(FileType::TeletypeTrack, slot)) {
-                _manager.pages().confirmation.show("ARE YOU SURE?", [this, slot] (bool result) {
-                    if (result) {
-                        saveTrackToSlot(slot);
-                    }
-                });
-            } else {
-                saveTrackToSlot(slot);
-            }
-        });
-}
-
-void TeletypeScriptViewPage::loadTrack() {
-    _manager.pages().fileSelect.show("LOAD TRACK", FileType::TeletypeTrack, 0, false,
-        [this] (bool result, int slot) {
-            if (!result) {
-                return;
-            }
-            _manager.pages().confirmation.show("ARE YOU SURE?", [this, slot] (bool result) {
-                if (result) {
-                    loadTrackFromSlot(slot);
-                }
-            });
-        });
-}
-
-void TeletypeScriptViewPage::saveTrackToSlot(int slot) {
-    if (kSuspendEngineForScriptIO) {
-        _engine.suspend();
-    }
-    _manager.pages().busy.show("SAVING TRACK ...");
-
-    FileManager::task([this, slot] () {
-        auto &track = _project.selectedTrack().teletypeTrack();
-        return FileManager::writeTeletypeTrack(track, _project.name(), slot);
-    }, [this] (fs::Error result) {
-        if (result == fs::OK) {
-            showMessage("TRACK SAVED");
-        } else {
-            showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
-        }
-        _manager.pages().busy.close();
-        if (kSuspendEngineForScriptIO) {
-            _engine.resume();
-        }
-    });
-}
-
-void TeletypeScriptViewPage::loadTrackFromSlot(int slot) {
-    if (kSuspendEngineForScriptIO) {
-        _engine.suspend();
-    }
-    _manager.pages().busy.show("LOADING TRACK ...");
-
-    FileManager::task([this, slot] () {
-        auto &track = _project.selectedTrack().teletypeTrack();
-        return FileManager::readTeletypeTrack(track, slot);
-    }, [this] (fs::Error result) {
-        if (result == fs::OK) {
-            showMessage("TRACK LOADED");
-        } else if (result == fs::INVALID_CHECKSUM || result == fs::INVALID_DATA) {
-            showMessage("INVALID TRACK FILE");
-        } else {
-            showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
-        }
-        _manager.pages().busy.close();
-        if (kSuspendEngineForScriptIO) {
-            _engine.resume();
-        }
-    });
-}
-
 
 void TeletypeScriptViewPage::pushHistory(const char *line) {
     if (!line || line[0] == '\0') {
@@ -1133,43 +895,66 @@ void TeletypeScriptViewPage::setEditBuffer(const char *text) {
 }
 
 void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
+    if (_project.selectedTrack().trackMode() != Track::TrackMode::TeletypeV2) {
+        return;
+    }
+
     const uint8_t keycode = event.keycode();
 
-    // F1-F5: run scripts or metro
+    // F1-F8: fire S1-S8; F9: fire Metro
     if (!event.ctrl() && !event.alt() && !event.shift()) {
-        if (keycode >= KeyboardEvent::KeyF1 && keycode <= KeyboardEvent::KeyF4) {
+        if (keycode >= KeyboardEvent::KeyF1 && keycode <= KeyboardEvent::KeyF8) {
             const int scriptIdx = keycode - KeyboardEvent::KeyF1;  // F1 → 0, F2 → 1, ...
-            if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Teletype) {
-                auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
+            if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::TeletypeV2) {
+                auto &trackEngine = _engine.selectedTrackEngine().as<TT2TrackEngine>();
                 trackEngine.triggerScript(scriptIdx);
             }
             event.consume();
             return;
         }
-        if (keycode == KeyboardEvent::KeyF5) {
-            if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Teletype) {
-                auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
-                trackEngine.triggerScript(METRO_SCRIPT);
+        if (keycode == KeyboardEvent::KeyF9) {
+            if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::TeletypeV2) {
+                auto &trackEngine = _engine.selectedTrackEngine().as<TT2TrackEngine>();
+                trackEngine.triggerScript(TT2_METRO_SCRIPT);
+            }
+            event.consume();
+            return;
+        }
+        if (keycode == KeyboardEvent::KeyF10) {
+            if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::TeletypeV2) {
+                auto &trackEngine = _engine.selectedTrackEngine().as<TT2TrackEngine>();
+                trackEngine.triggerScript(TT2_INIT_SCRIPT);
             }
             event.consume();
             return;
         }
     }
 
-    // Alt+F1-F5: jump to edit script/metro
+    // Alt+F1-F8: edit S1-S8; Alt+F9: Metro; Alt+F10: Init
     if (event.alt() && !event.ctrl() && !event.shift()) {
-        if (keycode >= KeyboardEvent::KeyF1 && keycode <= KeyboardEvent::KeyF4) {
+        // Alt + track key (Q-I) selects the track; plain Q-I types in the editor.
+        int track = KeyboardManager::hidKeycodeToTrack(keycode);
+        if (track >= 0) {
+            _project.setSelectedTrackIndex(track);
+            event.consume();
+            return;
+        }
+        if (keycode >= KeyboardEvent::KeyF1 && keycode <= KeyboardEvent::KeyF8) {
             setScriptIndex(keycode - KeyboardEvent::KeyF1);
             event.consume();
             return;
         }
-        if (keycode == KeyboardEvent::KeyF5) {
-            setScriptIndex(METRO_SCRIPT);
+        if (keycode == KeyboardEvent::KeyF9) {
+            setScriptIndex(TT2_METRO_SCRIPT);
             event.consume();
             return;
         }
-        // Alt+/ : toggle line comment (hardware edit_mode.c behavior)
-        if (keycode == 0x38) {  // HID_SLASH
+        if (keycode == KeyboardEvent::KeyF10) {
+            setScriptIndex(TT2_INIT_SCRIPT);
+            event.consume();
+            return;
+        }
+        if (keycode == 0x38) {  // HID_SLASH — toggle line comment
             commentLine();
             event.consume();
             return;
@@ -1177,6 +962,21 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
     }
 
     if (event.ctrl()) {
+        // Ctrl+F1-F8: mute/unmute trigger script; Ctrl+F9: stop/start metro
+        if (keycode >= KeyboardEvent::KeyF1 && keycode <= KeyboardEvent::KeyF8) {
+            if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::TeletypeV2) {
+                _engine.selectedTrackEngine().as<TT2TrackEngine>().toggleScriptMute(keycode - KeyboardEvent::KeyF1);
+            }
+            event.consume();
+            return;
+        }
+        if (keycode == KeyboardEvent::KeyF9) {
+            if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::TeletypeV2) {
+                _engine.selectedTrackEngine().as<TT2TrackEngine>().toggleMetroActive();
+            }
+            event.consume();
+            return;
+        }
         // Ctrl+shortcuts
         switch (keycode) {
         case KeyboardEvent::KeyHome:
@@ -1199,6 +999,10 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
             copyLine();
             _editBuffer[0] = '\0';
             _cursor = 0;
+            event.consume();
+            return;
+        case 0x1D: // Z
+            undo();
             event.consume();
             return;
         default:
@@ -1270,8 +1074,8 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
         return;
     }
     if (keycode == KeyboardEvent::KeyTab) {
-        // Tab: insert space
-        insertChar(' ');
+        // Tab opens the script context menu (SAVE Sc / LOAD Sc).
+        contextShow();
         event.consume();
         return;
     }
@@ -1284,7 +1088,7 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
         return;
     }
     if (event.ch() == ']') {
-        if (_scriptIndex < TeletypeTrack::EditableScriptCount - 1) {
+        if (_scriptIndex < TT2_SCRIPT_COUNT - 1) {
             setScriptIndex(_scriptIndex + 1);
         }
         event.consume();
@@ -1328,4 +1132,89 @@ void TeletypeScriptViewPage::commitLineAndAdvance() {
     if (_selectedLine < kLineCount - 1) {
         loadEditBuffer(_selectedLine + 1);
     }
+}
+
+void TeletypeScriptViewPage::contextShow(bool doubleClick) {
+    showContextMenu(ContextMenu(
+        scriptContextItems,
+        int(ScriptContextAction::Last),
+        [&] (int index) { contextAction(index); },
+        [&] (int index) { return contextActionEnabled(index); },
+        doubleClick
+    ));
+}
+
+void TeletypeScriptViewPage::contextAction(int index) {
+    switch (ScriptContextAction(index)) {
+    case ScriptContextAction::Save: saveScript(); break;
+    case ScriptContextAction::Load: loadScript(); break;
+    case ScriptContextAction::Last: break;
+    }
+}
+
+bool TeletypeScriptViewPage::contextActionEnabled(int index) const {
+    (void)index;
+    return FileManager::volumeMounted();
+}
+
+void TeletypeScriptViewPage::saveScript() {
+    _manager.pages().fileSelect.show("SAVE TT2 SCRIPT", FileType::TeletypeV2Script, 0, true, [this] (bool result, int slot) {
+        if (result) {
+            if (FileManager::slotUsed(FileType::TeletypeV2Script, slot)) {
+                _manager.pages().confirmation.show("ARE YOU SURE?", [this, slot] (bool result) {
+                    if (result) saveScriptToSlot(slot);
+                });
+            } else {
+                saveScriptToSlot(slot);
+            }
+        }
+    });
+}
+
+void TeletypeScriptViewPage::loadScript() {
+    _manager.pages().fileSelect.show("LOAD TT2 SCRIPT", FileType::TeletypeV2Script, 0, false, [this] (bool result, int slot) {
+        if (result) {
+            _manager.pages().confirmation.show("ARE YOU SURE?", [this, slot] (bool result) {
+                if (result) loadScriptFromSlot(slot);
+            });
+        }
+    });
+}
+
+void TeletypeScriptViewPage::saveScriptToSlot(int slot) {
+    int idx = _scriptIndex;
+    _engine.suspend();
+    _manager.pages().busy.show("SAVING TT2 SCRIPT ...");
+    FileManager::task([this, slot, idx] () {
+        return FileManager::writeTt2Script(_project.selectedTrack().tt2Track(), idx, nullptr, slot);
+    }, [this] (fs::Error result) {
+        if (result == fs::OK) {
+            showMessage("TT2 SCRIPT SAVED");
+        } else {
+            showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
+        }
+        _manager.pages().busy.close();
+        _engine.resume();
+    });
+}
+
+void TeletypeScriptViewPage::loadScriptFromSlot(int slot) {
+    int idx = _scriptIndex;
+    _engine.suspend();
+    _manager.pages().busy.show("LOADING TT2 SCRIPT ...");
+    FileManager::task([this, slot, idx] () {
+        return FileManager::readTt2Script(_project.selectedTrack().tt2Track(), idx, slot);
+    }, [this] (fs::Error result) {
+        if (result == fs::OK) {
+            _selectedLine = 0;
+            _cursor = 0;
+            _editBuffer[0] = '\0';
+            _undoOp = UndoOp::None;
+            showMessage("TT2 SCRIPT LOADED");
+        } else {
+            showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
+        }
+        _manager.pages().busy.close();
+        _engine.resume();
+    });
 }

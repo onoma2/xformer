@@ -13,7 +13,6 @@
 #include "engine/TuesdayTrackEngine.h"
 #include "engine/DiscreteMapTrackEngine.h"
 #include "engine/IndexedTrackEngine.h"
-#include "engine/TeletypeTrackEngine.h"
 #include "engine/TrackEngine.h"
 #include "model/NoteSequence.h"
 #include "model/CurveSequence.h"
@@ -23,7 +22,6 @@
 #include "model/TuesdayTrack.h"
 #include "model/DiscreteMapTrack.h"
 #include "model/IndexedTrack.h"
-#include "model/TeletypeTrack.h"
 #include "model/Track.h"
 #include "model/Model.h"
 
@@ -106,6 +104,8 @@ MonitorPage::MonitorPage(PageManager &manager, PageContext &context) :
 {}
 
 void MonitorPage::enter() {
+    // Fresh worst-case window each time the page opens (drops the boot spike).
+    _engine.resetEngineUpdateStats();
 }
 
 void MonitorPage::exit() {
@@ -313,6 +313,24 @@ void MonitorPage::drawStats(Canvas &canvas) {
         drawValue(2, "USBMIDI OVF:", str);
     }
 
+    {
+        // Worst Engine::update() since page open, paired with how many ticks it
+        // drained — per-tick µs vs the tick budget is the real "keeping up" metric.
+        // update() batches all pending ticks, so a high total over many ticks is
+        // fine; only a high PER-TICK % means the engine is falling behind.
+        uint32_t maxUs = _engine.engineUpdateMaxUs();
+        uint32_t maxTicks = _engine.engineUpdateMaxTicks();
+        float budgetUs = _engine.clock().tickDuration() * 1e6f;
+        if (maxTicks > 0 && budgetUs > 0.f) {
+            int perTickPct = int((maxUs / float(maxTicks)) * 100.f / budgetUs);
+            FixedStringBuilder<24> str("%uus/%ut %d%%", maxUs, maxTicks, perTickPct);
+            drawValue(3, "ENG WORST:", str);
+        } else {
+            FixedStringBuilder<24> str("%uus", maxUs);
+            drawValue(3, "ENG WORST:", str);
+        }
+    }
+
 }
 
 void MonitorPage::drawVersion(Canvas &canvas) {
@@ -373,10 +391,9 @@ void MonitorPage::drawSizes(Canvas &canvas) {
         drawRow(4, "TuesdayTrack", sizeof(TuesdayTrack));
         drawRow(5, "DiscreteMapTrack", sizeof(DiscreteMapTrack));
         drawRow(6, "IndexedTrack", sizeof(IndexedTrack));
-        drawRow(7, "TeletypeTrack", sizeof(TeletypeTrack));
-        drawRow2(8, "Container", sizeof(Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack, TeletypeTrack>), sizeof(Engine::TrackEngineContainer));
-        drawRow(9, "NoteSeq", sizeof(NoteSequence));
-        drawRow(10, "CurveSeq", sizeof(CurveSequence));
+        drawRow2(7, "Container", sizeof(Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack>), sizeof(Engine::TrackEngineContainer));
+        drawRow(8, "NoteSeq", sizeof(NoteSequence));
+        drawRow(9, "CurveSeq", sizeof(CurveSequence));
         break;
     case 1: // Sequences
         drawRow(0, "NoteSeq", sizeof(NoteSequence));
@@ -399,8 +416,7 @@ void MonitorPage::drawSizes(Canvas &canvas) {
         drawRow(3, "TuesdayTrackEngine", sizeof(TuesdayTrackEngine));
         drawRow(4, "DiscreteMapTE", sizeof(DiscreteMapTrackEngine));
         drawRow(5, "IndexedTrackEngine", sizeof(IndexedTrackEngine));
-        drawRow(6, "TeletypeTE", sizeof(TeletypeTrackEngine));
-        drawRow(7, "TrackEngine", sizeof(TrackEngine));
+        drawRow(6, "TrackEngine", sizeof(TrackEngine));
         break;
     case 4: // Engine & Model & global
         drawRow(0, "Engine", sizeof(Engine));
@@ -411,15 +427,6 @@ void MonitorPage::drawSizes(Canvas &canvas) {
         drawRow2(5, "TEContainer[]", sizeof(Engine::TrackEngineContainerArray), sizeof(Engine::TrackEngineContainer));
         drawRow(6, "TEArray", sizeof(Engine::TrackEngineArray));
         drawRow(7, "MidiOutEngine", sizeof(MidiOutputEngine));
-        break;
-    case 5: // Teletype
-        drawRow(0, "TTTrack", sizeof(TeletypeTrack));
-        drawRow(1, "TTSlot", sizeof(TeletypeTrack::PatternSlot));
-        drawRow(2, "scene_state", sizeof(scene_state_t));
-        drawRow(3, "tele_cmd", sizeof(tele_command_t));
-        drawRow(4, "scene_pat", sizeof(scene_pattern_t));
-        drawRow(5, "TTTE", sizeof(TeletypeTrackEngine));
-        drawRow(6, "TECont", sizeof(Engine::TrackEngineContainer));
         break;
     }
 

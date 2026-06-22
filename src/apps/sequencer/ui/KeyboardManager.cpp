@@ -31,17 +31,30 @@ char KeyboardManager::hidKeycodeToAscii(uint8_t keycode, uint8_t modifiers) {
     return 0;
 }
 
-int KeyboardManager::hidKeycodeToStep(uint8_t keycode) {
-    static constexpr uint8_t stepKeycodes[] = {
-        0x14, 0x1A, 0x08, 0x15, 0x17, 0x1C, 0x18, 0x0C,
-        0x04, 0x16, 0x07, 0x09, 0x0A, 0x0B, 0x0D, 0x0E,
-    };
-    for (int i = 0; i < 16; ++i) {
-        if (keycode == stepKeycodes[i]) {
-            return i;
-        }
+int KeyboardManager::hidKeycodeToButton(uint8_t keycode) {
+    // Panel-faithful USB-keyboard layout, mirroring the sim's SDL keymap.
+    static constexpr uint8_t trackKeycodes[] = { 0x14, 0x1A, 0x08, 0x15, 0x17, 0x1C, 0x18, 0x0C };
+    static constexpr uint8_t stepLowKeycodes[] = { 0x04, 0x16, 0x07, 0x09, 0x0A, 0x0B, 0x0D, 0x0E };
+    static constexpr uint8_t stepHighKeycodes[] = { 0x1D, 0x1B, 0x06, 0x19, 0x05, 0x11, 0x10, 0x36 };
+
+    for (int i = 0; i < 8; ++i) {
+        if (keycode == trackKeycodes[i]) return MatrixMap::fromTrack(i);
+        if (keycode == stepLowKeycodes[i]) return MatrixMap::fromStep(i);
+        if (keycode == stepHighKeycodes[i]) return MatrixMap::fromStep(8 + i);
     }
-    return -1;
+    switch (keycode) {
+    case 0x1E: return Key::Play;
+    case 0x1F: return Key::Tempo;
+    case 0x20: return Key::Pattern;
+    case 0x21: return Key::Performer;
+    case 0x2C: return Key::Encoder;
+    default: return -1;
+    }
+}
+
+int KeyboardManager::hidKeycodeToTrack(uint8_t keycode) {
+    int button = hidKeycodeToButton(keycode);
+    return MatrixMap::isTrack(button) ? MatrixMap::toTrack(button) : -1;
 }
 
 KeyboardManager::KeyboardManager() :
@@ -85,13 +98,12 @@ void KeyboardManager::process(KeyState &pageKeyState, KeyState &globalKeyState,
         char ch = hidKeycodeToAscii(event.keycode, event.modifiers);
 
         if (!_engine->isSuspended()) {
-            int step = -1;
+            int keyCode = -1;
             if (mapStepKeys) {
-                step = (event.modifiers & 0x44) ? -1 : hidKeycodeToStep(event.keycode);
+                keyCode = (event.modifiers & 0x44) ? -1 : hidKeycodeToButton(event.keycode);
             }
-            if (step >= 0) {
+            if (keyCode >= 0) {
                 bool isDown = event.pressed != 0;
-                int keyCode = MatrixMap::fromStep(step);
                 pageKeyState[keyCode] = isDown;
                 globalKeyState[keyCode] = isDown;
 

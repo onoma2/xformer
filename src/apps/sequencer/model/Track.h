@@ -10,7 +10,7 @@
 #include "PhaseFluxTrack.h"
 #include "Serialize.h"
 #include "StochasticTrack.h"
-#include "TeletypeTrack.h"
+#include "TT2Track.h"
 #include "TuesdayTrack.h"
 #include "Types.h"
 
@@ -46,9 +46,9 @@ public:
     Tuesday,
     DiscreteMap,
     Indexed,
-    Teletype,
     Stochastic,
     PhaseFlux,
+    TeletypeV2,
     Last,
     Default = Note
   };
@@ -67,12 +67,12 @@ public:
       return "Discrete";
     case TrackMode::Indexed:
       return "Indexed";
-    case TrackMode::Teletype:
-      return "T9type";
     case TrackMode::Stochastic:
       return "Stochastic";
     case TrackMode::PhaseFlux:
       return "PhaseFlux";
+    case TrackMode::TeletypeV2:
+      return "T++ (v2)";
     case TrackMode::Last:
       break;
     }
@@ -88,9 +88,9 @@ public:
     case TrackMode::Tuesday:     return 'A';
     case TrackMode::DiscreteMap: return 'D';
     case TrackMode::Indexed:     return 'I';
-    case TrackMode::Teletype:    return 'T';
     case TrackMode::Stochastic:  return 'S';
     case TrackMode::PhaseFlux:   return 'P';
+    case TrackMode::TeletypeV2:  return '2';
     case TrackMode::Last:        break;
     }
     return '?';
@@ -110,11 +110,11 @@ public:
       return 4;
     case TrackMode::Indexed:
       return 5;
-    case TrackMode::Teletype:
-      return 6;
     case TrackMode::Stochastic:
-      return 7;
+      return 6;
     case TrackMode::PhaseFlux:
+      return 7;
+    case TrackMode::TeletypeV2:
       return 8;
     case TrackMode::Last:
       break;
@@ -227,16 +227,6 @@ public:
     return _container.as<IndexedTrack>();
   }
 
-  // teletypeTrack
-
-  const TeletypeTrack &teletypeTrack() const {
-    SANITIZE_TRACK_MODE(_trackMode, TrackMode::Teletype);
-    return _container.as<TeletypeTrack>();
-  }
-  TeletypeTrack &teletypeTrack() {
-    SANITIZE_TRACK_MODE(_trackMode, TrackMode::Teletype);
-    return _container.as<TeletypeTrack>();
-  }
 
   // stochasticTrack
 
@@ -258,6 +248,17 @@ public:
   PhaseFluxTrack &phaseFluxTrack() {
     SANITIZE_TRACK_MODE(_trackMode, TrackMode::PhaseFlux);
     return _container.as<PhaseFluxTrack>();
+  }
+
+  // tt2Track
+
+  const TT2Track &tt2Track() const {
+    SANITIZE_TRACK_MODE(_trackMode, TrackMode::TeletypeV2);
+    return _container.as<TT2Track>();
+  }
+  TT2Track &tt2Track() {
+    SANITIZE_TRACK_MODE(_trackMode, TrackMode::TeletypeV2);
+    return _container.as<TT2Track>();
   }
 
   //----------------------------------------
@@ -307,14 +308,14 @@ private:
     case TrackMode::Indexed:
       _container.as<IndexedTrack>().setTrackIndex(trackIndex);
       break;
-    case TrackMode::Teletype:
-      _container.as<TeletypeTrack>().setTrackIndex(trackIndex);
-      break;
     case TrackMode::Stochastic:
       _container.as<StochasticTrack>().setTrackIndex(trackIndex);
       break;
     case TrackMode::PhaseFlux:
       _container.as<PhaseFluxTrack>().setTrackIndex(trackIndex);
+      break;
+    case TrackMode::TeletypeV2:
+      _container.as<TT2Track>().setTrackIndex(trackIndex);
       break;
     case TrackMode::Last:
       break;
@@ -354,10 +355,6 @@ private:
       _track.indexed = _container.create<IndexedTrack>();
       _track.indexed->setTrackIndex(_trackIndex); // Set track index here
       break;
-    case TrackMode::Teletype:
-      _track.teletype = _container.create<TeletypeTrack>();
-      _track.teletype->setTrackIndex(_trackIndex); // Set track index here
-      break;
     case TrackMode::Stochastic:
       _track.stochastic = _container.create<StochasticTrack>();
       _track.stochastic->setTrackIndex(_trackIndex); // Set track index here
@@ -365,6 +362,10 @@ private:
     case TrackMode::PhaseFlux:
       _track.phaseFlux = _container.create<PhaseFluxTrack>();
       _track.phaseFlux->setTrackIndex(_trackIndex);
+      break;
+    case TrackMode::TeletypeV2:
+      _track.tt2 = _container.create<TT2Track>();
+      _track.tt2->setTrackIndex(_trackIndex);
       break;
     case TrackMode::Last:
       break;
@@ -377,7 +378,7 @@ private:
   Routable<int8_t> _cvOutputRotate;
   Routable<int8_t> _gateOutputRotate;
 
-  Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack, TeletypeTrack, StochasticTrack, PhaseFluxTrack> _container;
+  Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack, StochasticTrack, PhaseFluxTrack, TT2Track> _container;
   union {
     NoteTrack *note;
     CurveTrack *curve;
@@ -385,9 +386,9 @@ private:
     TuesdayTrack *tuesday;
     DiscreteMapTrack *discreteMap;
     IndexedTrack *indexed;
-    TeletypeTrack *teletype;
     StochasticTrack *stochastic;
     PhaseFluxTrack *phaseFlux;
+    TT2Track *tt2;
   } _track;
 
   friend class Project;

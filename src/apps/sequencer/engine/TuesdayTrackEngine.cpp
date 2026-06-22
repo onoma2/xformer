@@ -266,6 +266,14 @@ void TuesdayTrackEngine::initAlgorithm() {
         break;
     }
 
+    case 15: { // TURING
+        _rng = Random(flowSeed);
+        _extraRng = Random(ornamentSeed + 0x9e3779b9);
+        _turingSR.seed(flowSeed);
+        _turingSR.setLength(_rng, uint8_t(2 + flow * 2));
+        break;
+    }
+
     default: {
         // Fallback to TEST
         _algoState.test.mode = (flow - 1) >> 3;
@@ -510,6 +518,10 @@ void TuesdayTrackEngine::reseed() {
         _algoState.stepwave.is_stepped = true;
         break;
     }
+
+    case 15: // TURING
+        _turingSR.seed(_rng.next());
+        break;
 }
 }
 
@@ -1684,6 +1696,24 @@ float TuesdayTrackEngine::scaleToVolts(int noteIndex, int octave) const {
     return voltage;
 }
 
+TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateTuring(const GenerationContext &ctx) {
+    (void)ctx;
+    const auto &sequence = tuesdayTrack().sequence(pattern());
+    TuesdayTickResult result;
+    result.velocity = 255;
+    result.gateRatio = clamp(50 + sequence.gateLength() * 3, 50, 400);
+    if (int(_rng.nextRange(100)) < sequence.glide()) {
+        result.slide = true;
+    }
+    uint8_t prob = uint8_t((sequence.power() * 255) / 16);   // power 0-16 -> flip probability
+    uint32_t v = _turingSR.clock(_rng, prob);                // running rng + persistent reg -> live drift
+    int range = 1 + sequence.ornament();
+    int idx = int(v % uint32_t(range));
+    result.note = idx % 12;
+    result.octave = idx / 12;
+    return result;
+}
+
 TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t tick) {
     const auto &sequence = tuesdayTrack().sequence(pattern());
     int algorithm = sequence.algorithm();
@@ -1708,6 +1738,7 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
     case 12: return generateAphex(ctx);
     case 13: return generateAutechre(ctx);
     case 14: return generateStepwave(ctx);
+    case 15: return generateTuring(ctx);
     default: return generateTest(ctx);
     }
 }

@@ -45,8 +45,4 @@ static inline void cmd_set(tele_command_t *cmd, uint8_t idx, tele_word_t tag,
     cmd->value[idx] = value;
 }
 
-void copy_command(tele_command_t *dst, const tele_command_t *src);
-void copy_post_command(tele_command_t *dst, const tele_command_t *src);
-void print_command(const tele_command_t *c, char *out);
-
 #endif

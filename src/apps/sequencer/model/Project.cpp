@@ -2,6 +2,56 @@
 #include "ProjectVersion.h"
 #include "StochasticTypes.h"
 
+#if PLATFORM_SIM
+#include "engine/TT2ScriptLoader.h"
+namespace {
+// Seed a TeletypeV2 track with demo scripts spanning the op surface so the
+// simulator boots an auditable TT2 patch without hand-typing on hardware.
+// Trigger scripts S1-S4 = indices 0-3, metro = 4, init = 5.
+void seedTeletypeV2Demo(TeletypeProgram &p) {
+    // Deterministic by design: no RND, so every op's effect is self-evident on
+    // the HUD / modulator page. The metro drives Mod 1 so it animates live.
+    loadScriptText(p, 0,                  // S1: classic ops (fixed chord + IF/EVERY)
+        "CV 2 N 0\n"
+        "CV 3 N ADD 4 0\n"
+        "CV 4 N MUL 2 6\n"
+        "IF EQ 1 1 : TR.P 2\n"
+        "EVERY 2 : TR.P 3\n");
+    loadScriptText(p, 1,                  // S2: Performer window + BUS (cross-track)
+        "WBPM 120\n"
+        "WR 1\n"
+        "BUS 1 V 2\n"
+        "CV 5 BUS 1\n"
+        "WNG 2 0 1\n"
+        "WNN 2 0 7\n");
+    loadScriptText(p, 2,                  // S3: 8th-pair additive routing (metro-fired)
+        "MO.DEPTH 1 MUL X 12\n"           // relocated from metro (keeps Mod 1 depth live)
+        "CV 8 N MUL X 2\n"                // TT2 CV sums onto physical CV jack 8
+        "TR.P 8\n");                      // TT2 gate ORs onto physical gate jack 8
+    loadScriptText(p, 3,                  // S4: Geode
+        "G.MODE 1\n"
+        "G.TUNE 1 2\n"
+        "G.V 1 4 2\n"
+        "G.V 2 4 2\n"
+        "G.RUN 64\n");
+    loadScriptText(p, TT2_METRO_SCRIPT,   // M: counter drives Mod 1 + jack 1, fires S3 for jack 8
+        "X ADD X 1\n"
+        "X MOD X 8\n"
+        "MO.RATE 1 MUL X 16\n"
+        "CV 1 N MUL X 2\n"
+        "TR.P 1\n"
+        "SCRIPT 3\n");
+    loadScriptText(p, TT2_INIT_SCRIPT,    // I: boot config (runs once on start)
+        "X 0\n"
+        "MO.SHAPE 1 1\n"
+        "MO.RATE 1 30\n"
+        "MO.DEPTH 1 50\n"
+        "M 500\n"
+        "M.ACT 1\n");
+}
+} // namespace
+#endif
+
 Project::Project() :
     _playState(*this),
     _routing(*this)
@@ -77,19 +127,51 @@ void Project::clear() {
     setSelectedPatternIndex(0);
 
     // load demo project on simulator
-#if PLATFORM_SIM
-    // Track 1: Curve track as CV source for DiscreteMap
-    track(0).setTrackMode(Track::TrackMode::Curve);
-    auto &curve = curveSequence(0, 0);
-    curve.setDivisor(192);  // Slow sweep
-    curve.setFirstStep(0);
-    curve.setLastStep(0);  // Single step for simple ramp
+    //
+    // STRESS_TIMING_DEMO: temporary -Os timing-probe patch. When 1, a fresh
+    // project (New Project / factory init) boots a heavy 8-track patch on BOTH
+    // hardware and sim, for reading the MonitorPage "ENG WORST" probe under load.
+    // Set back to 0 when the timing experiment is done. Non-destructive — loading
+    // a saved project still overwrites clear().
+#define STRESS_TIMING_DEMO 0
+#if STRESS_TIMING_DEMO
+    // 8 active tracks across the heaviest engines at fast tempo. RAM-safe: only
+    // ONE Stochastic track (two have hardfaulted on boot — see PROJECT.md).
+    setTempo(240.f);
+    setScale(2);
 
-    // Single curve step sweeping full range
-    auto &cv = curve.step(0);
-    cv.setShape(3);  // Linear
-    cv.setMin(0);    // -5V
-    cv.setMax(255);  // +5V
+    track(0).setTrackMode(Track::TrackMode::Stochastic);
+
+    track(1).setTrackMode(Track::TrackMode::PhaseFlux);
+    track(1).phaseFluxTrack().setOctave(+1);
+    track(2).setTrackMode(Track::TrackMode::PhaseFlux);
+
+    track(3).setTrackMode(Track::TrackMode::Curve);
+    {
+        auto &c = curveSequence(3, 0);
+        c.setDivisor(12);   // fast sweep — CV churn every few ticks
+        c.setFirstStep(0);
+        c.setLastStep(15);
+        for (int i = 0; i < 16; ++i) {
+            auto &s = c.step(i);
+            s.setShape(3);
+            s.setMin(0);
+            s.setMax(255);
+        }
+    }
+
+    track(4).setTrackMode(Track::TrackMode::Tuesday);
+
+    for (int t = 5; t <= 7; ++t) {
+        track(t).setTrackMode(Track::TrackMode::Note);
+        noteSequence(t, 0).setLastStep(15);
+        noteSequence(t, 0).setGates({ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 });
+    }
+#elif PLATFORM_SIM
+    // Track 1: TeletypeV2 showcase - 6 scripts spanning the op surface so the sim
+    // boots an auditable TT2 patch (classic / Performer W. + BUS / MO / Geode).
+    track(0).setTrackMode(Track::TrackMode::TeletypeV2);
+    seedTeletypeV2Demo(track(0).tt2Track().program());
 
     noteSequence(1, 0).setLastStep(15);
     noteSequence(1, 0).setGates({ 0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0 });
@@ -128,9 +210,6 @@ void Project::setTrackMode(int trackIndex, Track::TrackMode trackMode) {
     // TODO make sure engine is synced to this before updating UI
     _playState.revertSnapshot();
     _tracks[trackIndex].setTrackMode(trackMode);
-    if (trackMode == Track::TrackMode::Teletype) {
-        _tracks[trackIndex].teletypeTrack().seedOutputDestsFromTrackIndex(trackIndex);
-    }
     _observable.notify(TrackModeChanged);
 }
 

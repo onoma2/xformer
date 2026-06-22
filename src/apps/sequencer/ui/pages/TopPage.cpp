@@ -139,12 +139,6 @@ void TopPage::keyPress(KeyPressEvent &event) {
         }
     }
 
-    if (key.pageModifier() && key.isTrack() && key.track() == 6) {
-        _engine.panicTeletype();
-        showMessage("TT PANIC");
-        event.consume();
-    }
-
     if (key.isPlay()) {
         if (key.pageModifier()) {
             _engine.toggleRecording();
@@ -228,8 +222,11 @@ void TopPage::setTrackView(TrackView view) {
     case Track::TrackMode::Curve:
     case Track::TrackMode::MidiCv:
     case Track::TrackMode::Tuesday:
-    case Track::TrackMode::Teletype:
         setMainPage(pages.track);
+        break;
+    case Track::TrackMode::TeletypeV2:
+        // Page+S2 (Track) — TT2 I/O config page (script/pattern live on Sequence).
+        setMainPage(pages.tt2IoConfig);
         break;
     case Track::TrackMode::Stochastic:
         // Page+S2 (Track) — Stochastic's analog of the generic track list-model.
@@ -317,7 +314,7 @@ void TopPage::setSequenceView(SequenceView view) {
             break;
         }
         break;
-    case Track::TrackMode::Teletype:
+    case Track::TrackMode::TeletypeV2:
         setMainPage(pages.teletypeScriptView);
         break;
     case Track::TrackMode::Stochastic:
@@ -354,7 +351,7 @@ void TopPage::setSequenceEditPage() {
     case Track::TrackMode::Indexed:
         setMainPage(pages.indexedSequenceEdit);
         break;
-    case Track::TrackMode::Teletype:
+    case Track::TrackMode::TeletypeV2:
         setMainPage(pages.teletypeScriptView);
         break;
     case Track::TrackMode::Stochastic:

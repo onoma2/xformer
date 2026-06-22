@@ -5,7 +5,6 @@
 #include "ListModel.h"
 
 #include "model/Project.h"
-#include "model/TeletypeTrack.h"
 
 #include <array>
 
@@ -34,13 +33,7 @@ public:
             }
             str("Track%d:", trackIndex + 1);
             const auto &track = _project.track(trackIndex);
-            if (track.trackMode() == Track::TrackMode::Teletype &&
-                outputIndex < TeletypeTrack::TriggerOutputCount) {
-                int dest = int(track.teletypeTrack().triggerOutputDest(outputIndex)) + 1;
-                str(" TT G%d", dest);
-            } else {
-                track.gateOutputName(outputIndex, str);
-            }
+            track.gateOutputName(outputIndex, str);
         }
     }
 

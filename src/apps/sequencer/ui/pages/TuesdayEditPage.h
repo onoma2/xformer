@@ -17,7 +17,6 @@ public:
     virtual void keyDown(KeyEvent &event) override;
     virtual void keyUp(KeyEvent &event) override;
     virtual void keyPress(KeyPressEvent &event) override;
-    virtual void keyboard(KeyboardEvent &event) override;
     virtual void encoder(EncoderEvent &event) override;
 
 private:
@@ -59,6 +58,7 @@ private:
 
     void nextPage();
     void selectParam(int slot);
+    void contextShow(bool doubleClick = false) override;
     void contextAction(int index);
     bool contextActionEnabled(int index) const;
     void handleStepKeyPress(int step, bool shift);

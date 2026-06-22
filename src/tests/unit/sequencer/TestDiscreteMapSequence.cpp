@@ -2,6 +2,15 @@
 
 #include "apps/sequencer/model/DiscreteMapSequence.h"
 
+// clear() seeds a musical fret-pattern of thresholds (not all-zero); the
+// randomize change-detection cases need a known all-zero baseline, so they zero
+// the stages explicitly after clear().
+static void zeroStages(DiscreteMapSequence &seq) {
+    for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+        seq.stage(i).clear();
+    }
+}
+
 UNIT_TEST("DiscreteMapSequence") {
 
 CASE("default_values") {
@@ -9,7 +18,7 @@ CASE("default_values") {
     seq.clear();
     expectEqual(static_cast<int>(seq.clockSource()), static_cast<int>(DiscreteMapSequence::ClockSource::Internal), "clock source");
     expectEqual(seq.divisor(), 192, "divisor");
-    expectEqual(seq.gateLength(), 1, "gate length");
+    expectEqual(seq.gateLength(), 0, "gate length (0 = 1T pulse)");
     expectTrue(seq.loop(), "loop enabled");
     expectEqual(static_cast<int>(seq.thresholdMode()), static_cast<int>(DiscreteMapSequence::ThresholdMode::Position), "threshold mode");
     expectEqual(seq.scale(), -1, "scale default (project)");
@@ -17,7 +26,8 @@ CASE("default_values") {
     expectFalse(seq.slewEnabled(), "slew off");
     for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
         const auto &stage = seq.stage(i);
-        expectEqual(int(stage.threshold()), 0, "threshold init");
+        // clear() seeds a fret pattern, so threshold defaults are non-zero but in range
+        expectTrue(int(stage.threshold()) >= -100 && int(stage.threshold()) <= 100, "threshold in range");
         expectEqual(static_cast<int>(stage.direction()), static_cast<int>(DiscreteMapSequence::Stage::TriggerDir::Off), "direction init");
         expectEqual(int(stage.noteIndex()), 0, "note index init");
     }
@@ -42,15 +52,15 @@ CASE("stage_note_index_clamp") {
     stage.setNoteIndex(60);
     expectEqual(int(stage.noteIndex()), 60, "within range");
     stage.setNoteIndex(90);
-    expectEqual(int(stage.noteIndex()), 64, "clamped max");
+    expectEqual(int(stage.noteIndex()), 63, "clamped max");
     stage.setNoteIndex(-90);
     expectEqual(int(stage.noteIndex()), -63, "clamped min");
 }
 
 CASE("toggle_methods") {
     DiscreteMapSequence seq;
-    seq.toggleClockSource();
-    expectEqual(static_cast<int>(seq.clockSource()), static_cast<int>(DiscreteMapSequence::ClockSource::External), "clock toggled");
+    seq.toggleClockSource();   // 3-way cycle: Internal -> InternalTriangle -> External
+    expectEqual(static_cast<int>(seq.clockSource()), static_cast<int>(DiscreteMapSequence::ClockSource::InternalTriangle), "clock toggled to InternalTriangle");
     seq.toggleThresholdMode();
     expectEqual(static_cast<int>(seq.thresholdMode()), static_cast<int>(DiscreteMapSequence::ThresholdMode::Length), "threshold toggled");
     seq.toggleLoop();
@@ -71,7 +81,7 @@ CASE("gate_length_clamp") {
 
 CASE("randomize_thresholds") {
     DiscreteMapSequence seq;
-    seq.clear(); // Ensure all values start at 0
+    seq.clear(); zeroStages(seq); // clear() seeds a fret pattern; zero for change-detection
 
     // Verify initial state
     for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
@@ -97,7 +107,7 @@ CASE("randomize_thresholds") {
 
 CASE("randomize_notes") {
     DiscreteMapSequence seq;
-    seq.clear(); // Ensure all values start at 0
+    seq.clear(); zeroStages(seq); // clear() seeds a fret pattern; zero for change-detection
 
     // Verify initial state
     for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
@@ -123,7 +133,7 @@ CASE("randomize_notes") {
 
 CASE("randomize_directions") {
     DiscreteMapSequence seq;
-    seq.clear(); // Ensure all values start at 0
+    seq.clear(); zeroStages(seq); // clear() seeds a fret pattern; zero for change-detection
 
     // Verify initial state
     for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
@@ -149,7 +159,7 @@ CASE("randomize_directions") {
 
 CASE("randomize_all") {
     DiscreteMapSequence seq;
-    seq.clear(); // Ensure all values start at 0
+    seq.clear(); zeroStages(seq); // clear() seeds a fret pattern; zero for change-detection
 
     // Verify initial state
     for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
@@ -178,7 +188,7 @@ CASE("randomize_all") {
 
 CASE("randomize_methods_combined") {
     DiscreteMapSequence seq;
-    seq.clear(); // Ensure all values start at 0
+    seq.clear(); zeroStages(seq); // clear() seeds a fret pattern; zero for change-detection
 
     // First randomize only thresholds
     seq.randomizeThresholds();
@@ -195,7 +205,7 @@ CASE("randomize_methods_combined") {
     expectFalse(anyDirectionChanged, "directions unchanged after randomizeThresholds");
 
     // Reset for next test
-    seq.clear();
+    seq.clear(); zeroStages(seq);
 
     // Now randomize only notes
     seq.randomizeNotes();
@@ -212,7 +222,7 @@ CASE("randomize_methods_combined") {
     expectFalse(anyDirectionChanged, "directions unchanged after randomizeNotes");
 
     // Reset for next test
-    seq.clear();
+    seq.clear(); zeroStages(seq);
 
     // Now randomize only directions
     seq.randomizeDirections();

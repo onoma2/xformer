@@ -12,9 +12,9 @@
 #include "TuesdayTrackEngine.h"
 #include "DiscreteMapTrackEngine.h"
 #include "IndexedTrackEngine.h"
-#include "TeletypeTrackEngine.h"
 #include "StochasticTrackEngine.h"
 #include "PhaseFluxTrackEngine.h"
+#include "TT2TrackEngine.h"
 #include "CvInput.h"
 #include "CvOutput.h"
 #include "RoutingEngine.h"
@@ -43,7 +43,7 @@
 
 class Engine : private Clock::Listener {
 public:
-    using TrackEngineContainer = Container<NoteTrackEngine, CurveTrackEngine, MidiCvTrackEngine, TuesdayTrackEngine, DiscreteMapTrackEngine, IndexedTrackEngine, TeletypeTrackEngine, StochasticTrackEngine, PhaseFluxTrackEngine>;
+    using TrackEngineContainer = Container<NoteTrackEngine, CurveTrackEngine, MidiCvTrackEngine, TuesdayTrackEngine, DiscreteMapTrackEngine, IndexedTrackEngine, StochasticTrackEngine, PhaseFluxTrackEngine, TT2TrackEngine>;
     using TrackEngineContainerArray = std::array<TrackEngineContainer, CONFIG_TRACK_COUNT>;
     using TrackEngineArray = std::array<TrackEngine *, CONFIG_TRACK_COUNT>;
 
@@ -74,6 +74,13 @@ public:
 
     void init();
     void update();
+
+    // Engine::update() timing probe (µs, wall clock). Temporary instrumentation
+    // for the -Os timing check — worst-case main-loop processing vs tick budget.
+    uint32_t engineUpdateLastUs() const { return _updateLastUs; }
+    uint32_t engineUpdateMaxUs() const { return _updateMaxUs; }
+    uint32_t engineUpdateMaxTicks() const { return _updateMaxTicks; }
+    void resetEngineUpdateStats() { _updateLastUs = 0; _updateMaxUs = 0; _updateMaxTicks = 0; }
 
     // locking temporarily puts the engine in a state where completely skips all updates
     // lock should only be hold for very short amounts of time
@@ -171,10 +178,6 @@ public:
     void setCvOutput(int channel, float value) { _cvOutputOverrideValues[channel] = value; }
 
     void selectTrackPattern(int trackIndex, int patternIndex);
-    void panicTeletype();
-    void setTeletypeMetroAll(int16_t periodMs);
-    void setTeletypeMetroActiveAll(bool active);
-    void resetTeletypeMetroAll();
 
     const Clock &clock() const { return _clock; }
           Clock &clock()       { return _clock; }
@@ -198,6 +201,9 @@ public:
 
     const ModulatorEngine &modulatorEngine() const { return _modulatorEngine; }
           ModulatorEngine &modulatorEngine()       { return _modulatorEngine; }
+
+    const GeodeEngine &geodeEngine() const { return _geodeEngine; }
+          GeodeEngine &geodeEngine()       { return _geodeEngine; }
 
     const MidiOutputEngine &midiOutputEngine() const { return _midiOutputEngine; }
           MidiOutputEngine &midiOutputEngine()       { return _midiOutputEngine; }
@@ -305,6 +311,12 @@ private:
 
     WallClock _wallClock;
     uint32_t _lastWallUs = 0;
+
+    void updateImpl();
+    uint32_t _updateLastUs = 0;
+    uint32_t _updateMaxUs = 0;
+    uint32_t _updateTicks = 0;
+    uint32_t _updateMaxTicks = 0;
 
     // midi monitoring
     struct {

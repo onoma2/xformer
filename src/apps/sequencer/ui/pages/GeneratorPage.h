@@ -32,7 +32,7 @@ public:
     GeneratorPage(PageManager &manager, PageContext &context);
 
     using BasePage::show;
-    void show(Generator *generator, StepSelection<CONFIG_STEP_COUNT> *stepSelection);
+    void show(Generator *generator, StepSelectionView *stepSelection);
 
     virtual void enter() override;
     virtual void exit() override;
@@ -70,7 +70,7 @@ private:
     void drawValueGenerator(Canvas &canvas, const Generator &generator) const;
 
     Generator *_generator;
-    StepSelection<CONFIG_STEP_COUNT> *_stepSelection;
+    StepSelectionView *_stepSelection;
 
     std::pair<uint8_t, uint8_t> _valueRange;
 

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teletype ops — upstream vs TT2</title>
+<style>
+  :root {
+    --blue:#2563eb; --green:#16a34a; --amber:#ca8a04; --gray:#9ca3af;
+    --line:#e5e5e5; --ink:#1a1a1a;
+  }
+  * { box-sizing:border-box; }
+  body {
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    background:#fafafa; color:var(--ink); margin:0; padding:24px; line-height:1.5;
+  }
+  main { max-width:880px; margin:0 auto; }
+  h1 { font-size:1.5rem; line-height:1.3; margin:0 0 4px; }
+  h2 {
+    font-size:1.25rem; line-height:1.3; margin:34px 0 10px;
+    padding-bottom:5px; border-bottom:2px solid var(--blue); color:var(--blue);
+  }
+  p.sub { color:#555; margin:0 0 18px; }
+  .legend { display:flex; gap:18px; flex-wrap:wrap; font-size:.9rem; margin:14px 0 4px; }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .dot { width:11px; height:11px; border-radius:50%; display:inline-block; }
+  .d-green{background:var(--green)} .d-amber{background:var(--amber)} .d-gray{background:var(--gray)}
+  .summary {
+    display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:18px 0 8px;
+  }
+  .card {
+    background:#fff; border:1px solid var(--line); border-radius:8px;
+    padding:14px 16px; text-align:center;
+  }
+  .card .n { font-size:1.6rem; font-weight:700; }
+  .card.wired .n{color:var(--green)} .card.pend .n{color:var(--amber)} .card.drop .n{color:var(--gray)}
+  .card .l { font-size:.8rem; color:#666; text-transform:uppercase; letter-spacing:.04em; }
+  table { width:100%; border-collapse:collapse; margin:4px 0 6px; font-size:.95rem; }
+  thead th {
+    text-align:left; background:rgba(37,99,235,.08); color:var(--blue);
+    padding:9px 12px; border:1px solid var(--line); font-weight:600;
+  }
+  td { padding:8px 12px; border:1px solid var(--line); vertical-align:top; }
+  tbody tr:nth-child(even){ background:#fafafa; }
+  tbody tr:nth-child(odd){ background:#fff; }
+  code, .sym {
+    font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:.9em;
+  }
+  .sym { color:#444; }
+  .st { font-weight:600; font-size:.86rem; white-space:nowrap; }
+  .st.w{color:var(--green)} .st.p{color:var(--amber)} .st.d{color:var(--gray)}
+  .col-op{width:30%} .col-st{width:16%}
+  .chips { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px 16px; }
+  .chips .fam { font-weight:600; margin:10px 0 4px; }
+  .chips .fam:first-child{margin-top:0}
+  .chips code {
+    display:inline-block; background:#f3f4f6; border:1px solid var(--line);
+    border-radius:4px; padding:1px 6px; margin:2px 3px 2px 0; color:#374151;
+  }
+  .note {
+    border-left:3px solid var(--amber); background:#fffdf5; padding:10px 14px;
+    margin:12px 0; font-size:.92rem; color:#5b4a16; border-radius:0 6px 6px 0;
+  }
+  .note.blue{ border-color:var(--blue); background:#f5f8ff; color:#1e3a8a; }
+  .note.green{ border-color:var(--green); background:#f3fdf6; color:#14532d; }
+  footer { margin-top:30px; font-size:.82rem; color:#888; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Teletype ops — upstream vs TT2 native table</h1>
+  <p class="sub">Branch <code>feat/tt2-v2-native</code>, current state (2026-06-15). The
+  computational/musical core is <b>complete</b> — every family below is wired in the native
+  op table and covered by a passing <code>TestTeletypeV2*</code> suite. Performer-native
+  bridges (<code>W*</code> / <code>BUS</code> / <code>RT</code> / <code>MO.*</code> /
+  <code>G.*</code>) replace upstream's i2c hardware ops. Only i2c hardware-module families
+  (ansible, telex, grid, just&nbsp;friends, WW, disting) and multi-scene are out of scope by
+  design.</p>
+
+  <div class="legend">
+    <span><i class="dot d-green"></i> wired in native op table (tested)</span>
+    <span><i class="dot d-amber"></i> unsupported by design (no backing field)</span>
+    <span><i class="dot d-gray"></i> out of scope (i2c hardware / multi-scene)</span>
+  </div>
+
+  <div class="summary">
+    <div class="card wired"><div class="n">19</div><div class="l">core families wired</div></div>
+    <div class="card pend"><div class="n">4</div><div class="l">ops unsupported by design</div></div>
+    <div class="card drop"><div class="n">i2c</div><div class="l">hardware modules out of scope</div></div>
+  </div>
+
+  <div class="note green"><b>Control-flow language is complete</b> — IF / ELIF / ELSE, PROB,
+  EVERY, SKIP, L (loop), the DEL family (DEL / .X / .R / .G / .B), and the ms metro are handled
+  as pre-op <i>modifiers</i> in lowering + the runner. Their op-side hooks
+  (<code>BREAK</code>/<code>BRK</code>, <code>KILL</code>, <code>SCRIPT</code>/<code>$</code>,
+  <code>DEL.CLR</code>, <code>M</code>/<code>M.ACT</code>) are wired in the table.</div>
+
+  <h2>Arithmetic, range, comparison &amp; logic</h2>
+  <table>
+    <thead><tr><th class="col-op">Family</th><th class="col-st">TT2</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>Arithmetic <code>ADD SUB MUL DIV MOD MIN MAX ABS SGN EXP BPM</code></td><td class="st w">wired</td><td>+ symbols <code>+ - * / %</code></td></tr>
+      <tr><td>Range <code>LIM WRAP/WRP AVG INR OUTR INRI OUTRI</code></td><td class="st w">wired</td><td>+ symbols <code>&lt;&gt; &gt;&lt; &gt;=&lt; &lt;=&gt;</code></td></tr>
+      <tr><td>Comparison <code>EQ NE LT GT LTE GTE NZ EZ</code></td><td class="st w">wired</td><td>+ symbols <code>== != &lt; &gt; &lt;= &gt;= !</code></td></tr>
+      <tr><td>Logic <code>AND OR AND3 OR3 AND4 OR4 XOR</code></td><td class="st w">wired</td><td>+ symbols <code>&amp;&amp; || &amp;&amp;&amp; ||| …</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2>Pitch &amp; scale</h2>
+  <table>
+    <thead><tr><th class="col-op">Family</th><th class="col-st">TT2</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td><code>N VN HZ V VV</code></td><td class="st w">wired</td><td>note / volt converters</td></tr>
+      <tr><td><code>SCALE SCL SCALE0 SCL0</code></td><td class="st w">wired</td><td>scale tables</td></tr>
+      <tr><td><code>QT QT.S QT.CS QT.B QT.BX</code></td><td class="st w">wired</td><td>quantizers</td></tr>
+      <tr><td><code>N.S N.C N.CS N.B N.BX</code> · <code>JI</code> · <code>ER NR</code> · <code>DR.T DR.P DR.V</code></td><td class="st w">wired</td><td>note-in-scale, just-intonation, euclid, drum</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Randomness, bitwise, vars, timing</h2>
+  <table>
+    <thead><tr><th class="col-op">Family</th><th class="col-st">TT2</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>Random <code>RAND RND RRAND RRND R R.MIN R.MAX TOSS CHAOS CHAOS.R CHAOS.ALG</code> + all <code>*.SD</code> seeds</td><td class="st w">wired</td><td>RNG slots + seeds</td></tr>
+      <tr><td>Bitwise / shift <code>| &amp; ~ ^ XOR BSET BGET BCLR BTOG BREV RSH LSH RROT LROT</code></td><td class="st w">wired</td><td>+ symbols <code>&lt;&lt; &gt;&gt; &lt;&lt;&lt; &gt;&gt;&gt;</code></td></tr>
+      <tr><td>Variables <code>A B C D X Y Z T I J K</code></td><td class="st w">wired</td><td>scratch + loop index</td></tr>
+      <tr><td><code>O O.INC O.MIN O.MAX O.WRAP</code> · <code>DRUNK DRUNK.MIN/MAX/WRAP</code> · <code>FLIP</code></td><td class="st w">wired</td><td>auto-inc / random walk / toggle</td></tr>
+      <tr><td><code>TIME TIME.ACT LAST</code></td><td class="st w">wired</td><td>stopwatch + per-script LAST</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Pattern, queue &amp; stack</h2>
+  <table>
+    <thead><tr><th class="col-op">Family</th><th class="col-st">TT2</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>Pattern <code>P</code> + <code>PN</code> mirror — full family</td><td class="st w">wired</td><td>N/L/I/HERE/WRAP/START/END/NEXT/PREV/INS/RM/PUSH/POP/REV/ROT/SHUF/MIN/MAX/MINV/MAXV/SUM/AVG/FND/RND/SORT-via-P.* ; arithmetic P.+ P.- P.PA/PS/PM/PD/PMOD ; P.SCALE ; RND.P</td></tr>
+      <tr><td>Queue <code>Q Q.N Q.AVG Q.CLR Q.GRW Q.SUM Q.MIN Q.MAX Q.SRT Q.REV Q.SH Q.ADD Q.SUB Q.MUL Q.DIV Q.MOD Q.I</code></td><td class="st w">wired</td><td>queue buffer</td></tr>
+      <tr><td>Stack <code>S.ALL S.POP S.CLR S.L</code></td><td class="st w">wired</td><td></td></tr>
+      <tr><td>Turtle <code>@ @X @Y @MOVE @F @FX1/FY1/FX2/FY2 @SPEED @DIR @STEP @BUMP @WRAP @BOUNCE @SCRIPT @SHOW</code></td><td class="st w">wired</td><td>full turtle in runtime</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Output, metro, functions, inputs</h2>
+  <table>
+    <thead><tr><th class="col-op">Family</th><th class="col-st">TT2</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td><code>CV CV.SLEW CV.OFF CV.GET CV.SET</code> · <code>TR TR.POL TR.TIME TR.PULSE TR.P TR.TOG TR.W TR.D</code></td><td class="st w">wired</td><td>8-ch output, get + set, native slew/pulse shaping</td></tr>
+      <tr><td><code>INIT</code> family (CV/TR/P/SCRIPT/DATA/TIME + ALL)</td><td class="st w">wired</td><td></td></tr>
+      <tr><td>Metro / sync <code>M M.A M.ACT M.ACT.A M.RESET SYNC BPM TIF</code></td><td class="st w">wired</td><td></td></tr>
+      <tr><td>Functions <code>SCRIPT $ $F $F1 $F2 $L $L1 $L2 $S $S1 $S2 I1 I2 FR SCRIPT.POL $.POL</code></td><td class="st w">wired</td><td>nested calls + params + return</td></tr>
+      <tr><td>Control hooks <code>BREAK BRK KILL DEL.CLR</code></td><td class="st w">wired</td><td></td></tr>
+      <tr><td>Inputs <code>IN IN.SCALE PARAM PARAM.SCALE STATE MUTE</code></td><td class="st w">wired</td><td>analog ins + mute</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Performer-native bridges</h2>
+  <p class="sub" style="margin-top:-2px">Replace upstream's i2c hardware ops with direct
+  access to the Performer engine, modulators, and Geode.</p>
+  <table>
+    <thead><tr><th class="col-op">Family</th><th class="col-st">TT2</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>Transport / window <code>WBPM WBPM.S WMS WTU BAR WP WP.SET WR WR.ACT WNG WNN WNG.H WNN.H RT</code></td><td class="st w">wired</td><td>tempo, run, bar timing, cross-track note/pattern access</td></tr>
+      <tr><td>Shared bus <code>BUS</code></td><td class="st w">wired</td><td>read/write the CV bus lanes (4)</td></tr>
+      <tr><td>Modulator <code>MO MO.P MO.SHAPE MO.RATE MO.DEPTH MO.MODE MO.OFF MO.TRIG</code> + 1-letter aliases <code>MO.S/R/D/M/O/T</code></td><td class="st w">wired</td><td>control the global modulator engine from scripts</td></tr>
+      <tr><td>Geode <code>G.MODE G.TUNE G.V G.S G.RUN G.VAL G.TIME G.TONE G.RAMP G.CURV</code> + aliases</td><td class="st w">wired</td><td>trigger/configure Geode voices</td></tr>
+      <tr><td><code>G.O G.BAR G.B G.R</code></td><td class="st p">unsupported</td><td>by design — no live GeodeConfig field; left <code>nullptr</code> → UnsupportedOp</td></tr>
+      <tr><td>MIDI in <code>MI.*</code> — full family (last-note/velocity/cc/clock + counts)</td><td class="st w">wired</td><td>per-track MIDI source filter feeds the runtime</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Out of scope</h2>
+  <div class="note">Upstream i2c hardware-module ops are intentionally not parsed or wired —
+  they target external Eurorack modules TT2 does not bridge: <b>ansible</b>, <b>telex</b>
+  (TELEXi/TELEXo), <b>grid</b>/monome, <b>just&nbsp;friends</b> (<code>JF.*</code>),
+  <b>white whale</b> (<code>WW.*</code>), <b>disting EX</b>. Multi-scene
+  (<code>SCENE</code>/<code>PRESET</code>) is also out of scope (Performer uses its own
+  project/pattern model).</div>
+
+  <footer>Source: native op table in
+  <code>src/apps/sequencer/engine/TeletypeNativeOps.cpp</code> (handler registrations) vs
+  <code>teletype/src/ops/*.c</code> (upstream). Family status reflects table coverage +
+  passing <code>TestTeletypeV2*</code> suites as of branch <code>feat/tt2-v2-native</code>.</footer>
+</main>
+</body>
+</html>

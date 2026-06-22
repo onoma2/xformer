@@ -566,20 +566,10 @@ void CurveSequenceEditPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
     auto &sequence = _project.selectedCurveSequence();
 
-    if (key.isContextMenu()) {
-        contextShow();
-        event.consume();
-        return;
-    }
+    if (handleContextMenuKey(event)) return;
 
     // Check page modifier shortcuts BEFORE quick edit
     // (quick edit catches Page + Step 8-15, so we need to intercept first)
-
-    if (key.pageModifier() && event.count() == 2) {
-        contextShow(true);
-        event.consume();
-        return;
-    }
 
     if (key.pageModifier() && key.is(Key::Step5)) {
         lfoContextShow();
@@ -1312,6 +1302,14 @@ void CurveSequenceEditPage::duplicateSequence() {
     showMessage("STEPS DUPLICATED");
 }
 
+static const Generator::Mode curveGeneratorModes[] = {
+    Generator::Mode::InitLayer,
+    Generator::Mode::InitSteps,
+    Generator::Mode::Euclidean,
+    Generator::Mode::Random,
+    Generator::Mode::Algo,
+};
+
 void CurveSequenceEditPage::generateSequence() {
     _manager.pages().generatorSelect.show([this] (bool success, Generator::Mode mode) {
         if (success) {
@@ -1321,7 +1319,7 @@ void CurveSequenceEditPage::generateSequence() {
                 _manager.pages().generator.show(generator, &_stepSelection);
             }
         }
-    });
+    }, curveGeneratorModes, int(sizeof(curveGeneratorModes) / sizeof(curveGeneratorModes[0])));
 }
 
 void CurveSequenceEditPage::quickEdit(int index) {
@@ -1558,9 +1556,4 @@ void CurveSequenceEditPage::gatePresetsContextAction(int index) {
             step.setGateParameter(parameter);
         }
     }
-}
-
-void CurveSequenceEditPage::keyboard(KeyboardEvent &event) {
-    if (handleFunctionKeys(event)) return;
-    BasePage::keyboard(event);
 }

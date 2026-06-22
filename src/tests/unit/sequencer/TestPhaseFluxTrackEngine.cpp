@@ -11,7 +11,7 @@
 UNIT_TEST("PhaseFluxTrackEngine") {
 
 CASE("track_mode_constant") {
-    expectEqual(static_cast<int>(Track::TrackMode::PhaseFlux), 8, "PhaseFlux serialize id is 8");
+    expectEqual(static_cast<int>(Track::TrackMode::PhaseFlux), 7, "PhaseFlux serialize id is 7 (compacted after TT1 removal)");
 }
 
 CASE("stage_count_parity") {

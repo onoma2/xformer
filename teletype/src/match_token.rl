@@ -4,9 +4,8 @@
 #include <stdlib.h>  // rand, strtol
 #include <stdio.h>
 
-#include "ops/op.h"
 #include "ops/op_enum.h"
-#include "helpers.h"
+#include "tt_parser.h"
 
 %%{
     machine match_token; # declare our ragel machine
@@ -85,6 +84,7 @@
         "M.ACT.A"     => { MATCH_OP(E_OP_M_ACT_A); };
         "M.RESET"     => { MATCH_OP(E_OP_M_RESET); };
         "M.RESET.A"   => { MATCH_OP(E_OP_M_RESET_A); };
+        "M.C"         => { MATCH_OP(E_OP_M_C); };
 
         # patterns
         "P.N"         => { MATCH_OP(E_OP_P_N); };
@@ -250,6 +250,7 @@
         "LFO.F"       => { MATCH_OP(E_OP_LFO_F); };
         "LFO.O"       => { MATCH_OP(E_OP_LFO_O); };
         "LFO.S"       => { MATCH_OP(E_OP_LFO_S); };
+        "LFO.C"       => { MATCH_OP(E_OP_LFO_C); };
         "G.TIME"      => { MATCH_OP(E_OP_G_TIME); };
         "G.TONE"      => { MATCH_OP(E_OP_G_TONE); };
         "G.RAMP"      => { MATCH_OP(E_OP_G_RAMP); };
@@ -271,6 +272,22 @@
         "G.B"         => { MATCH_OP(E_OP_G_B); };
         "G.L"         => { MATCH_OP(E_OP_G_L); };
         "G.S"         => { MATCH_OP(E_OP_G_S); };
+
+        # modulator (Performer, MO.*)
+        "MO"          => { MATCH_OP(E_OP_MO); };
+        "MO.P"        => { MATCH_OP(E_OP_MO_P); };
+        "MO.SHAPE"    => { MATCH_OP(E_OP_MO_SHAPE); };
+        "MO.RATE"     => { MATCH_OP(E_OP_MO_RATE); };
+        "MO.DEPTH"    => { MATCH_OP(E_OP_MO_DEPTH); };
+        "MO.MODE"     => { MATCH_OP(E_OP_MO_MODE); };
+        "MO.OFF"      => { MATCH_OP(E_OP_MO_OFF); };
+        "MO.TRIG"     => { MATCH_OP(E_OP_MO_TRIG); };
+        "MO.S"        => { MATCH_OP(E_OP_MO_S); };
+        "MO.R"        => { MATCH_OP(E_OP_MO_R); };
+        "MO.D"        => { MATCH_OP(E_OP_MO_D); };
+        "MO.M"        => { MATCH_OP(E_OP_MO_M); };
+        "MO.O"        => { MATCH_OP(E_OP_MO_O); };
+        "MO.T"        => { MATCH_OP(E_OP_MO_T); };
 
         # maths
         "ADD"         => { MATCH_OP(E_OP_ADD); };

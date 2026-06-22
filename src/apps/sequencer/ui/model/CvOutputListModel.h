@@ -5,7 +5,6 @@
 #include "ListModel.h"
 
 #include "model/Project.h"
-#include "model/TeletypeTrack.h"
 
 #include <array>
 
@@ -37,13 +36,7 @@ public:
             } else {
                 str("Track%d:", trackIndex + 1);
                 const auto &track = _project.track(trackIndex);
-                if (track.trackMode() == Track::TrackMode::Teletype &&
-                    outputIndex < TeletypeTrack::CvOutputCount) {
-                    int dest = int(track.teletypeTrack().cvOutputDest(outputIndex)) + 1;
-                    str(" TT CV%d", dest);
-                } else {
-                    track.cvOutputName(outputIndex, str);
-                }
+                track.cvOutputName(outputIndex, str);
             }
         }
     }

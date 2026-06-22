@@ -3,6 +3,7 @@
 #include "Config.h"
 #include "MidiUtils.h"
 #include "GateRotation.h"
+#include "Tt2OutputMix.h"
 
 #include "core/Debug.h"
 #include "core/midi/MidiMessage.h"
@@ -64,6 +65,18 @@ void Engine::init() {
 }
 
 void Engine::update() {
+    _updateTicks = 0;
+    uint32_t start = _wallClock.now();
+    updateImpl();
+    uint32_t elapsed = _wallClock.now() - start;
+    _updateLastUs = elapsed;
+    if (elapsed > _updateMaxUs) {
+        _updateMaxUs = elapsed;
+        _updateMaxTicks = _updateTicks;
+    }
+}
+
+void Engine::updateImpl() {
     // locking
     _locked = _requestLock;
     if (_locked) {
@@ -161,6 +174,7 @@ void Engine::update() {
     uint32_t tick;
     while (_clock.checkTick(&tick)) {
         _tick = tick;
+        ++_updateTicks;
 
         // update play state
         updatePlayState(true);
@@ -432,37 +446,6 @@ void Engine::selectTrackPattern(int trackIndex, int patternIndex) {
     _model.project().playState().selectTrackPattern(trackIndex, patternIndex, PlayState::ExecuteType::Immediate);
 }
 
-void Engine::panicTeletype() {
-    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
-        if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
-            static_cast<TeletypeTrackEngine &>(*_trackEngines[trackIndex]).panic();
-        }
-    }
-}
-
-void Engine::setTeletypeMetroAll(int16_t periodMs) {
-    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
-        if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
-            static_cast<TeletypeTrackEngine &>(*_trackEngines[trackIndex]).setMetroPeriod(periodMs);
-        }
-    }
-}
-
-void Engine::setTeletypeMetroActiveAll(bool active) {
-    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
-        if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
-            static_cast<TeletypeTrackEngine &>(*_trackEngines[trackIndex]).setMetroActive(active);
-        }
-    }
-}
-
-void Engine::resetTeletypeMetroAll() {
-    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
-        if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
-            static_cast<TeletypeTrackEngine &>(*_trackEngines[trackIndex]).resetMetroTimer();
-        }
-    }
-}
 
 uint32_t Engine::noteDivisor() const {
     return _project.timeSignature().noteDivisor();
@@ -621,14 +604,14 @@ void Engine::updateTrackSetups() {
             case Track::TrackMode::Indexed:
                 trackEngine = trackContainer.create<IndexedTrackEngine>(*this, _model, track);
                 break;
-            case Track::TrackMode::Teletype:
-                trackEngine = trackContainer.create<TeletypeTrackEngine>(*this, _model, track);
-                break;
             case Track::TrackMode::Stochastic:
                 trackEngine = trackContainer.create<StochasticTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::PhaseFlux:
                 trackEngine = trackContainer.create<PhaseFluxTrackEngine>(*this, _model, track);
+                break;
+            case Track::TrackMode::TeletypeV2:
+                trackEngine = trackContainer.create<TT2TrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::Last:
                 break;
@@ -640,6 +623,15 @@ void Engine::updateTrackSetups() {
 void Engine::updateTrackOutputs() {
     const auto &gateOutputTracks = _project.gateOutputTracks();
     const auto &cvOutputTracks = _project.cvOutputTracks();
+
+    // TT2 tracks emit to jacks only via the auto-index layer below; they are
+    // excluded from the legacy Layout source path and the rotation pools.
+    bool isTt2[CONFIG_TRACK_COUNT];
+    bool anyTt2 = false;
+    for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
+        isTt2[t] = _project.track(t).trackMode() == Track::TrackMode::TeletypeV2;
+        anyTt2 = anyTt2 || isTt2[t];
+    }
 
     int trackGateIndex[CONFIG_TRACK_COUNT];
     int trackCvIndex[CONFIG_TRACK_COUNT];
@@ -667,6 +659,7 @@ void Engine::updateTrackOutputs() {
     for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
         int trackIndex = gateOutputTracks[i];
         if (trackIndex < CONFIG_TRACK_COUNT &&
+            !isTt2[trackIndex] &&
             (gateRotateMask & (1 << trackIndex))) {
             gatePool[gatePoolSize++] = i;
         }
@@ -682,6 +675,7 @@ void Engine::updateTrackOutputs() {
     for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
         int trackIndex = cvOutputTracks[i];
         if (trackIndex < CONFIG_TRACK_COUNT &&
+            !isTt2[trackIndex] &&
             (cvRotateMask & (1 << trackIndex))) {
             cvPool[cvPoolSize++] = i;
         }
@@ -714,7 +708,15 @@ void Engine::updateTrackOutputs() {
 
         int gateOutputTrack = gateOutputTracks[gateSourceOutputIndex];
         if (!_gateOutputOverride && gateOutputTrack < CONFIG_TRACK_COUNT) {
-            _gateOutput.setGate(i, _trackEngines[gateOutputTrack]->gateOutput(trackGateIndex[gateOutputTrack]++));
+            // Legacy gate skips a TT2 source (resolves false); TT2 reaches the jack
+            // only via the OR layer below, fixed to physical gate jack index.
+            bool g = isTt2[gateOutputTrack] ? false
+                : _trackEngines[gateOutputTrack]->gateOutput(trackGateIndex[gateOutputTrack]++);
+            bool gateAtJack[CONFIG_TRACK_COUNT];
+            for (int t = 0; t < CONFIG_TRACK_COUNT; ++t)
+                gateAtJack[t] = isTt2[t] ? _trackEngines[t]->gateOutput(i) : false;
+            g = g || Tt2OutputMix::anyGate(gateAtJack, isTt2, CONFIG_TRACK_COUNT);
+            _gateOutput.setGate(i, g);
         }
 
         // CV Output
@@ -733,14 +735,30 @@ void Engine::updateTrackOutputs() {
         if (_cvOutputOverride) {
             continue;
         }
+        // Legacy base (modulator-offset applied): a TT2-assigned jack resolves to 0
+        // here, then receives its TT2 value through the auto-index layer below.
+        float cvBase = 0.f;
+        bool writeJack = anyTt2;
         if (cvOutputTrack < CONFIG_TRACK_COUNT) {
-            int cvSlot = cvOutputTrackSlot[cvSourceOutputIndex];
-            _cvOutput.setChannel(i, applyModulatorOffset(i, _trackEngines[cvOutputTrack]->cvOutput(cvSlot)));
+            if (!isTt2[cvOutputTrack]) {
+                int cvSlot = cvOutputTrackSlot[cvSourceOutputIndex];
+                cvBase = _trackEngines[cvOutputTrack]->cvOutput(cvSlot);
+            }
+            writeJack = true;
         } else if (cvOutputTrack == CONFIG_TRACK_COUNT) {
             int lane = cvOutputCvRouteLane[cvSourceOutputIndex];
             if (lane >= 0 && lane < int(_cvRouteOutputs.size())) {
-                _cvOutput.setChannel(i, applyModulatorOffset(i, _cvRouteOutputs[lane]));
+                cvBase = _cvRouteOutputs[lane];
+                writeJack = true;
             }
+        }
+        if (writeJack) {
+            float v = applyModulatorOffset(i, cvBase);
+            float cvAtJack[CONFIG_TRACK_COUNT];
+            for (int t = 0; t < CONFIG_TRACK_COUNT; ++t)
+                cvAtJack[t] = isTt2[t] ? _trackEngines[t]->cvOutput(i) : 0.f;
+            v = clamp(v + Tt2OutputMix::sumCv(cvAtJack, isTt2, CONFIG_TRACK_COUNT), -5.f, 5.f);
+            _cvOutput.setChannel(i, v);
         }
     }
 }

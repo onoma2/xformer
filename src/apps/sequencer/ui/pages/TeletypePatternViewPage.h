@@ -27,7 +27,9 @@ private:
     void setLength();
     void setStart();
     void setEnd();
-    void syncPattern();
+    void commitField();
+
+    enum class FieldEdit { None, Length, Start, End };
 
     int _patternIndex = 0;
     int _row = 0;   // absolute row 0..63
@@ -35,4 +37,6 @@ private:
     bool _editingNumber = false;
     int32_t _editBuffer = 0;
     int16_t _valueCopyBuffer = 0;
+    FieldEdit _fieldEdit = FieldEdit::None;
+    int _fieldBuffer = 0;
 };
