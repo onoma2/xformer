@@ -40,6 +40,9 @@ public:
     virtual Mode mode() const = 0;
     const char *name() const { return modeName(mode()); }
 
+    // physical step capacity of the target sequence (drives the page grid/bank nav)
+    int capacity() const { return _builder.capacity(); }
+
     // parameters
 
     virtual int paramCount() const = 0;

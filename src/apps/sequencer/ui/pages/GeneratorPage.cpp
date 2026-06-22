@@ -148,7 +148,7 @@ GeneratorPage::GeneratorPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context)
 {}
 
-void GeneratorPage::show(Generator *generator, StepSelection<CONFIG_STEP_COUNT> *stepSelection) {
+void GeneratorPage::show(Generator *generator, StepSelectionView *stepSelection) {
     _generator = generator;
     _stepSelection = stepSelection;
     _previewArmed = false;
@@ -342,8 +342,8 @@ void GeneratorPage::updateLeds(Leds &leds) {
             currentStep = trackEngine.isActiveSequence(sequence) ? trackEngine.currentStep() : -1;
             for (int i = 0; i < 16; ++i) {
                 int stepIndex = stepOffset() + i;
-                bool red = (stepIndex == currentStep) || (_stepSelection && _stepSelection->selected()[stepIndex]);
-                bool green = (stepIndex != currentStep) && (sequence.step(stepIndex).gate() || (_stepSelection && _stepSelection->selected()[stepIndex]));
+                bool red = (stepIndex == currentStep) || (_stepSelection && _stepSelection->selected(stepIndex));
+                bool green = (stepIndex != currentStep) && (sequence.step(stepIndex).gate() || (_stepSelection && _stepSelection->selected(stepIndex)));
                 leds.set(MatrixMap::fromStep(i), red, green);
             }
         }
@@ -354,8 +354,8 @@ void GeneratorPage::updateLeds(Leds &leds) {
             currentStep = trackEngine.isActiveSequence(sequence) ? trackEngine.currentStep() : -1;
             for (int i = 0; i < 16; ++i) {
                 int stepIndex = stepOffset() + i;
-                bool red = (stepIndex == currentStep) || (_stepSelection && _stepSelection->selected()[stepIndex]);
-                bool green = (stepIndex != currentStep) && (sequence.step(stepIndex).gate() || (_stepSelection && _stepSelection->selected()[stepIndex]));
+                bool red = (stepIndex == currentStep) || (_stepSelection && _stepSelection->selected(stepIndex));
+                bool green = (stepIndex != currentStep) && (sequence.step(stepIndex).gate() || (_stepSelection && _stepSelection->selected(stepIndex)));
                 leds.set(MatrixMap::fromStep(i), red, green);
             }
         }
@@ -485,14 +485,15 @@ void GeneratorPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
-    // Section navigation with Left/Right buttons
+    // Section navigation with Left/Right buttons (bank count derived from capacity)
+    const int bankCount = _generator ? (_generator->capacity() + StepCount - 1) / StepCount : 1;
     if (key.isLeft()) {
-        _section = (_section + 3) % 4;
+        _section = (_section + bankCount - 1) % bankCount;
         event.consume();
         return;
     }
     if (key.isRight()) {
-        _section = (_section + 1) % 4;
+        _section = (_section + 1) % bankCount;
         event.consume();
         return;
     }
@@ -605,7 +606,7 @@ void GeneratorPage::drawEuclideanGenerator(Canvas &canvas, const EuclideanGenera
 }
 
 void GeneratorPage::drawValueGenerator(Canvas &canvas, const Generator &generator) const {
-    const int steps = CONFIG_STEP_COUNT;
+    const int steps = generator.capacity();
     const int baselineY = PlotArea::Top + PlotArea::Height / 2;
     const int amplitude = PlotArea::Height / 2;
 
