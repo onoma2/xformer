@@ -106,7 +106,7 @@ enum class ContextAction {
 };
 
 static bool seedDrivenGenerator(Generator::Mode mode) {
-    return mode == Generator::Mode::Random || mode == Generator::Mode::Algo;
+    return mode == Generator::Mode::Random || mode == Generator::Mode::Algo || mode == Generator::Mode::Helical;
 }
 
 static bool abPreviewGenerator(Generator::Mode mode) {
@@ -328,6 +328,7 @@ void GeneratorPage::draw(Canvas &canvas) {
         break;
     case Generator::Mode::Random:
     case Generator::Mode::Algo:
+    case Generator::Mode::Helical:
         drawValueGenerator(canvas, *_generator);
         break;
     case Generator::Mode::Last:

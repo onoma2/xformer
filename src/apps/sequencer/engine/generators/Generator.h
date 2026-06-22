@@ -18,6 +18,7 @@ public:
         Euclidean,
         Random,
         Algo,
+        Helical,
         Last
     };
 
@@ -28,6 +29,7 @@ public:
         case Mode::Euclidean:   return "Euclidean";
         case Mode::Random:      return "Random";
         case Mode::Algo:        return "Algo";
+        case Mode::Helical:     return "Helical";
         case Mode::Last:        break;
         }
         return nullptr;

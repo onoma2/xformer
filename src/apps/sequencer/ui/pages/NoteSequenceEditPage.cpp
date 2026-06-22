@@ -1155,6 +1155,14 @@ void NoteSequenceEditPage::duplicateSequence() {
     showMessage("STEPS DUPLICATED");
 }
 
+static const Generator::Mode noteGeneratorModes[] = {
+    Generator::Mode::InitLayer,
+    Generator::Mode::InitSteps,
+    Generator::Mode::Euclidean,
+    Generator::Mode::Random,
+    Generator::Mode::Algo,
+};
+
 void NoteSequenceEditPage::generateSequence() {
     if (!isActiveForSelectedTrack()) {
         return;
@@ -1168,7 +1176,7 @@ void NoteSequenceEditPage::generateSequence() {
                 _manager.pages().generator.show(generator, &_stepSelection);
             }
         }
-    });
+    }, noteGeneratorModes, int(sizeof(noteGeneratorModes) / sizeof(noteGeneratorModes[0])));
 }
 
 void NoteSequenceEditPage::quickEdit(int index) {

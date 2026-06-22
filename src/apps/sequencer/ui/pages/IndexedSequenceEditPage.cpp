@@ -57,6 +57,7 @@ static const Generator::Mode indexedGeneratorModes[] = {
     Generator::Mode::InitSteps,
     Generator::Mode::Euclidean,
     Generator::Mode::Random,
+    Generator::Mode::Helical,
 };
 
 static const ContextMenuModel::Item stepContextMenuItems[] = {

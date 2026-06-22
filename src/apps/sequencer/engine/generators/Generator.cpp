@@ -3,13 +3,16 @@
 #include "EuclideanGenerator.h"
 #include "RandomGenerator.h"
 #include "AlgoGenerator.h"
+#include "HelicalGenerator.h"
+#include "IndexedSequenceBuilder.h"
 
 #include "core/utils/Container.h"
 
-static Container<EuclideanGenerator, RandomGenerator, AlgoGenerator> generatorContainer;
+static Container<EuclideanGenerator, RandomGenerator, AlgoGenerator, HelicalGenerator> generatorContainer;
 static EuclideanGenerator::Params euclideanParams;
 static RandomGenerator::Params randomParams;
 static AlgoGenerator::Params algoParams;
+static HelicalGenerator::Params helicalParams;
 
 static void initLayer(SequenceBuilder &builder) {
     builder.clearLayer();
@@ -38,6 +41,14 @@ Generator *Generator::execute(Generator::Mode mode, SequenceBuilder &builder) {
             return nullptr;
         }
         return generatorContainer.create<AlgoGenerator>(builder, algoParams);
+    }
+    case Mode::Helical: {
+        // Guard: Helical mode only works with IndexedSequenceBuilder
+        auto *indexedBuilder = dynamic_cast<IndexedSequenceBuilder *>(&builder);
+        if (!indexedBuilder) {
+            return nullptr;
+        }
+        return generatorContainer.create<HelicalGenerator>(builder, helicalParams);
     }
     case Mode::Last:
         break;
