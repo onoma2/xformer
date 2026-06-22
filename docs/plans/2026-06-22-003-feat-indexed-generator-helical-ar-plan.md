@@ -161,7 +161,7 @@ helical map (U6) + generator (U7).
 - `src/apps/sequencer/CMakeLists.txt` (add the source)
 - possibly `src/apps/sequencer/model/IndexedSequence.h` (additive accessors only; not firstStep/lastStep)
 
-**Approach:** Implement every `SequenceBuilder` virtual against Indexed. Member shape mirrors `SequenceBuilderImpl`: **`IndexedSequence &_edit` is a live reference to the track's sequence** (so `apply()` commits to the model), `IndexedSequence _original` is a copy (revert), `IndexedSequence *_preview` a heap copy — a copy for `_edit` would pass local tests but never reach the track. Range = active length / passed range (**not** rotation `firstStep`); `editSequence()` returns `_edit` for whole-step writers; `value()/setValue()` map a chosen layer (single-layer modes). Carry the **resolved** scale (`const Scale&`) + root with accessors, set at construction (U5) via sequence-override-first resolution — not the raw project scale. Verify copy semantics for the preview clone.
+**Approach:** Implement every `SequenceBuilder` virtual against Indexed. Member shape mirrors `SequenceBuilderImpl`: **`IndexedSequence &_edit` is a live reference to the track's sequence** (so `apply()` commits to the model), `IndexedSequence _original` is a copy (revert), `IndexedSequence *_preview` a heap copy — a copy for `_edit` would pass local tests but never reach the track. Range = active length / passed range (**not** rotation `firstStep`); `editSequence()` returns `_edit` for whole-step writers; `value()/setValue()` map a chosen layer (single-layer modes); `capacity()` returns `IndexedSequence::MaxSteps` (48) for U8. Carry the **resolved** scale (`const Scale&`) + root with accessors, set at construction (U5) via sequence-override-first resolution — not the raw project scale. Verify copy semantics for the preview clone.
 
 **Execution note:** Characterization-first — pin preview/apply/revert before tenants depend on it.
 
@@ -233,7 +233,7 @@ helical map (U6) + generator (U7).
 - `src/apps/sequencer/CMakeLists.txt` (add the source)
 - `src/apps/sequencer/engine/generators/Generator.cpp` / `.h` (`Mode::Helical`, `modeName`, add to `Container<…>`, static `helicalParams`, guarded `execute` case)
 
-**Approach:** Mirror `AlgoGenerator`: take the builder, `editSequence()`, seed from `seed`, read project scale/root from the `IndexedSequenceBuilder` (cast), run `helicalArStep` per step writing `setNoteIndex`/`setDuration`/`setGateLength`. `Params` = octave range, base, law direction, seed (+ `randomizeSeed`) via `paramName`/`printParam`/`editParam`. Add to the factory container + a `case Mode::Helical:` guarded by `dynamic_cast<IndexedSequenceBuilder*>(&builder)`; add Helical to the Indexed visible-`Mode[]` (U5). Grep for other `int(Mode::Last)`/`Mode(...)` casts when adding the enum.
+**Approach:** Mirror `AlgoGenerator`: take the builder, `editSequence()`, seed from `seed`, read the **resolved** scale/root (sequence-override-first, set at launch) from the `IndexedSequenceBuilder` (cast), run `helicalArStep` per step writing `setNoteIndex`/`setDuration`/`setGateLength`. `Params` = octave range, base, law direction, seed (+ `randomizeSeed`) via `paramName`/`printParam`/`editParam`. Add to the factory container + a `case Mode::Helical:` guarded by `dynamic_cast<IndexedSequenceBuilder*>(&builder)`; add Helical to the Indexed visible-`Mode[]` (U5). Grep for other `int(Mode::Last)`/`Mode(...)` casts when adding the enum.
 
 **Test scenarios:**
 - same params+seed → identical generated Indexed sequence; octave-range/base change span/timing.
@@ -251,18 +251,21 @@ helical map (U6) + generator (U7).
 **Dependencies:** none.
 
 **Files:**
-- `src/apps/sequencer/engine/generators/EuclideanGenerator.cpp`, `RandomGenerator.cpp` (audit `InitLayer`/`InitSteps` paths too)
+- `src/apps/sequencer/engine/generators/SequenceBuilder.h` (add a `capacity()` accessor; Note/Curve impls return `CONFIG_STEP_COUNT`)
+- `src/apps/sequencer/engine/generators/EuclideanGenerator.h` / `.cpp`, `RandomGenerator.h` / `.cpp` (clamp params + write loops to the builder; audit `InitLayer`/`InitSteps`)
 
-**Approach:** Replace the `CONFIG_STEP_COUNT` / fixed-64 write bounds with `_builder.length()` (after any `setLength`). For Note/Curve, `length()` drives the meaningful range; confirm output is unchanged for full-length sequences (and that a previously over-writing generator now correctly respects the active length). This is a Note/Curve-touching change — regression check required.
+**Approach:** Two coupled fixes, both off the builder so any-width works:
+1. **Write loops** use `_builder.length()` instead of `CONFIG_STEP_COUNT` / fixed-64.
+2. **Length/capacity-bearing params** clamp to `_builder.capacity()` instead of `CONFIG_STEP_COUNT`: Euclidean's `setSteps`/`setBeats`/`setOffset` clamp to capacity, and `update()`'s `setLength` is bounded by it; Random's pattern is bounded to capacity. Add `int capacity() const` to the `SequenceBuilder` base — Note/Curve return `CONFIG_STEP_COUNT` (64), the Indexed builder returns `IndexedSequence::MaxSteps` (48, provided in U4). Without this, `Steps=64` on Indexed either overflows (if `setLength(64)` is accepted) or silently truncates (UI says 64, output 48). For Note/Curve `capacity()==64` → behavior-neutral.
 
-**Execution note:** Behavior-neutral for Note/Curve where `length()` equals the prior bound; treat any difference as an intentional length-respect fix and confirm with a Note check.
+**Execution note:** Behavior-neutral for Note/Curve (capacity stays 64); treat any output difference as an intentional length-respect fix and confirm with a Note check.
 
 **Test scenarios:**
-- Indexed (48): Euclidean/Random issue no `setValue` past index 47 (no overflow, no `StepSelection` index ≥48).
-- Note (full length): Euclidean/Random output identical to before.
+- Indexed (48): editing Euclidean `Steps` above 48 clamps to 48; no `setLength`/`setValue` beyond index 47 (no overflow, no `StepSelection` index ≥48); Random likewise.
+- Note (64): Euclidean params still reach 64; Euclidean/Random output identical to before.
 - Test expectation: build + manual sim, both track types.
 
-**Verification:** Generic generators write within `0..length-1` on Indexed; Note/Curve output unchanged for full-length sequences.
+**Verification:** On Indexed, params clamp to 48 and no write/setLength exceeds 48; Note/Curve params reach 64 and output is unchanged.
 
 ---
 
