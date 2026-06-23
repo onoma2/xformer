@@ -196,7 +196,7 @@ void Project::clear() {
     track(7).phaseFluxTrack().setOctave(+1);
 
     setTempo(80.f);
-    setScale(2); // 2 corresponds to Minor scale
+    setScale(2); // 2 corresponds to H.Minor scale
 #endif
 
     _observable.notify(ProjectCleared);

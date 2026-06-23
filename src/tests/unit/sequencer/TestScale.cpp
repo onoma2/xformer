@@ -99,6 +99,14 @@ UNIT_TEST("Scale") {
 
 #endif // PLATFORM_SIM
 
+    CASE("built-in index 2 is H.Minor (harmonic minor)") {
+        expectTrue(strcmp(Scale::name(2), "H.Minor") == 0, "index 2 named H.Minor");
+        const auto &scale = Scale::get(2);
+        const int expect[7] = {0,2,3,5,7,8,11};
+        for (int n = 0; n < 7; ++n)
+            expectEqual(int(scale.noteToVolts(n) * 12.f + 0.5f), expect[n], "harmonic minor semitone");
+    }
+
     CASE("supportsRotation: note scales rotate, Voltage built-in does not") {
         expectTrue(Scale::get(1).supportsRotation(), "Major rotates");   // index 1 == Major
         int voltIdx = -1;

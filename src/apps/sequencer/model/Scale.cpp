@@ -9,7 +9,7 @@ static const NoteScale _name_(_title_, _chromatic_, ARRAY_SIZE(_name_##_notes), 
 NOTE_SCALE(semitoneScale, "Semitones", true, 0, 128, 256, 384, 512, 640, 768, 896, 1024, 1152, 1280, 1408)
 
 NOTE_SCALE(majorScale, "Major", true, 0, 256, 512, 640, 896, 1152, 1408)
-NOTE_SCALE(minorScale, "Minor", true, 0, 256, 384, 640, 896, 1024, 1280)
+NOTE_SCALE(minorScale, "H.Minor", true, 0, 256, 384, 640, 896, 1024, 1408)
 
 NOTE_SCALE(majorBluesScale, "Major Blues", true, 0, 384, 512, 896, 1152, 1280)
 NOTE_SCALE(minorBluesScale, "Minor Blues", true, 0, 384, 640, 768, 896, 1280)
