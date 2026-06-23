@@ -317,24 +317,30 @@ public:
     void setTrackIndex(int v) { _trackIndex = v; }
 
     // scale — −1 = inherit
-    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, _scale, 0, 23); }
-    void setScale(int v) { _scale = clamp(v, -1, Scale::Count - 1); }
+    int rawScale() const { return int(_scaleGroup.scale) - 1; }
+    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, rawScale(), 0, 23); }
+    void setScale(int v) { _scaleGroup.scale = clamp(v, -1, Scale::Count - 1) + 1; }
     const Scale &selectedScale(int defaultScale) const {
         return Scale::get(scale() != -1 ? scale() : defaultScale);
     }
-    void editScale(int value, bool) { setScale(_scale + value); }
+    void editScale(int value, bool) { setScale(rawScale() + value); }
     void printScale(StringBuilder &str) const {
         printRouted(str, Routing::Target::Scale);
         str(scale() < 0 ? "Default" : Scale::name(scale()));
     }
 
     // rootNote — −1 = inherit
-    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, _rootNote, 0, 11); }
-    void setRootNote(int v) { _rootNote = clamp(v, -1, 11); }
+    int rawRootNote() const { return int(_scaleGroup.rootNote) - 1; }
+    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, rawRootNote(), 0, 11); }
+    void setRootNote(int v) { _scaleGroup.rootNote = clamp(v, -1, 11) + 1; }
     int selectedRootNote(int defaultRootNote) const {
         return rootNote() != -1 ? rootNote() : defaultRootNote;
     }
-    void editRootNote(int value, bool) { setRootNote(_rootNote + value); }
+    void editRootNote(int value, bool) { setRootNote(rawRootNote() + value); }
+
+    // scaleRotate
+    int scaleRotate() const { return int(_scaleGroup.scaleRotate) - 1; }
+    void setScaleRotate(int v) { _scaleGroup.scaleRotate = clamp(v, -1, 31) + 1; }
     void printRootNote(StringBuilder &str) const {
         printRouted(str, Routing::Target::RootNote);
         if (rootNote() < 0) { str("Default"); } else { Types::printNote(str, rootNote()); }
@@ -585,9 +591,13 @@ public:
 
 private:
     int8_t _trackIndex = -1;
-    int8_t _scale = -1;
-    int8_t _rootNote = -1;
     uint8_t _resetMeasure = 0;
+    union {
+        uint16_t raw;
+        BitField<uint16_t, 0, 5> scale;       // scale + 1   (-1..23 -> 0..24)
+        BitField<uint16_t, 5, 4> rootNote;    // rootNote + 1 (-1..11 -> 0..12)
+        BitField<uint16_t, 9, 6> scaleRotate; // scaleRotate + 1 (-1..31 -> 0..32)
+    } _scaleGroup = { 0 };
     uint8_t _edited = 0;
     uint8_t _pitchRate = 0;  // set to defaultPitchRateIndex() in clear()
     PitchMode _pitchMode = PitchMode::Cell;

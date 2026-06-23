@@ -44,8 +44,10 @@ void DiscreteMapSequence::clear() {
     _loop = true;
     _resetMeasure = 8;
     _thresholdMode = ThresholdMode::Position;
-    _scale = -1;
-    _rootNote = 0;
+    _scaleGroup.raw = 0;
+    setScale(-1);
+    setRootNote(0);
+    setScaleRotate(-1);
     setSlewTime(0);
     _pluck = 0;
     _octave = 0;
@@ -168,8 +170,12 @@ void DiscreteMapSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_loop);
     writer.write(_resetMeasure);
     writer.write(static_cast<uint8_t>(_thresholdMode));
-    writer.write(_scale);
-    writer.write(_rootNote);
+    int8_t scaleField = rawScale();
+    int8_t rootNoteField = rawRootNote();
+    int8_t scaleRotateField = int8_t(scaleRotate());
+    writer.write(scaleField);
+    writer.write(rootNoteField);
+    writer.write(scaleRotateField);
     writer.write(_slewTime);
     writer.write(_pluck);
     writer.write(_octave);
@@ -203,9 +209,15 @@ void DiscreteMapSequence::read(VersionedSerializedReader &reader) {
     reader.read(thresholdMode);
     _thresholdMode = static_cast<ThresholdMode>(thresholdMode);
 
-    reader.read(_scale);
-
-    reader.read(_rootNote);
+    int8_t scaleField = 0;
+    int8_t rootNoteField = 0;
+    int8_t scaleRotateField = 0;
+    reader.read(scaleField);
+    reader.read(rootNoteField);
+    reader.read(scaleRotateField);
+    setScale(scaleField);
+    setRootNote(rootNoteField);
+    setScaleRotate(scaleRotateField);
     reader.read(_slewTime);
     reader.read(_pluck);
     reader.read(_octave);

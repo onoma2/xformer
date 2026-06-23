@@ -6,6 +6,7 @@
 #include "ModelUtils.h"
 #include "Scale.h"
 #include "Routing.h"
+#include "Bitfield.h"
 #include "RouteParamKey.h"
 
 #include "core/math/Math.h"
@@ -316,13 +317,14 @@ public:
     // Note: Scale 0 is "Semitones" (chromatic) - quantizes to all 12 semitones
     // This controls OUTPUT quantization, not algorithm behavior
 
-    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, _scale, 0, 23); }
+    int rawScale() const { return int(_scaleGroup.scale) - 1; }
+    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, rawScale(), 0, 23); }
     void setScale(int scale) {
-        _scale = clamp(scale, -1, Scale::Count - 1);
+        _scaleGroup.scale = clamp(scale, -1, Scale::Count - 1) + 1;
     }
 
     void editScale(int value, bool shift) {
-        setScale(_scale + value);
+        setScale(rawScale() + value);
     }
 
     void printScale(StringBuilder &str) const {
@@ -335,13 +337,21 @@ public:
 
     // rootNote (-1 = Default, 0-11 = C to B)
 
-    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, _rootNote, 0, 11); }
+    int rawRootNote() const { return int(_scaleGroup.rootNote) - 1; }
+    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, rawRootNote(), 0, 11); }
     void setRootNote(int rootNote) {
-        _rootNote = clamp(rootNote, -1, 11);
+        _scaleGroup.rootNote = clamp(rootNote, -1, 11) + 1;
     }
 
     void editRootNote(int value, bool shift) {
-        setRootNote(_rootNote + value);
+        setRootNote(rawRootNote() + value);
+    }
+
+    // scaleRotate
+
+    int scaleRotate() const { return int(_scaleGroup.scaleRotate) - 1; }
+    void setScaleRotate(int scaleRotate) {
+        _scaleGroup.scaleRotate = clamp(scaleRotate, -1, 31) + 1;
     }
 
     void printRootNote(StringBuilder &str) const {
@@ -541,8 +551,12 @@ private:
     uint16_t _divisor;  // Default: 1/16 note
     uint8_t _clockMultiplier;
     uint8_t _resetMeasure = 8;  // Default: 8 bars
-    int8_t _scale = -1;  // Default: -1 (Project Scale)
-    int8_t _rootNote = -1;  // Default: -1 (use project root)
+    union {
+        uint16_t raw;
+        BitField<uint16_t, 0, 5> scale;       // scale + 1   (-1..23 -> 0..24)
+        BitField<uint16_t, 5, 4> rootNote;    // rootNote + 1 (-1..11 -> 0..12)
+        BitField<uint16_t, 9, 6> scaleRotate; // scaleRotate + 1 (-1..31 -> 0..32)
+    } _scaleGroup = { 0 };  // Default: -1/-1/-1 (Project scale, project root, inherit)
     int8_t _rotate;  // Default: 0 (no rotation)
     uint8_t _gateLength; // Default: 50% (Standard)
     uint8_t _gateOffset;  // Default: 0% (no gate timing offset)

@@ -7,6 +7,7 @@
 #include "Scale.h"
 #include "Routing.h"
 #include "RouteParamKey.h"
+#include "Bitfield.h"
 
 #include "core/math/Math.h"
 #include "core/utils/StringBuilder.h"
@@ -194,12 +195,13 @@ public:
     //----------------------------------------
 
     // Track-scale selection (-1 = Default/Project, 0..N = Track Scale)
-    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, _scale, 0, 23); }
+    int rawScale() const { return int(_scaleGroup.scale) - 1; }
+    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, rawScale(), 0, 23); }
     void setScale(int scale) {
-        _scale = clamp(scale, -1, Scale::Count - 1);
+        _scaleGroup.scale = clamp(scale, -1, Scale::Count - 1) + 1;
     }
     void editScale(int value, bool shift) {
-        setScale(_scale + value);
+        setScale(rawScale() + value);
     }
     void printScale(StringBuilder &str) const {
         if (scale() < 0) {
@@ -210,9 +212,16 @@ public:
     }
 
     // Root note (0-11: C-B)
-    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, _rootNote, 0, 11); }
+    int rawRootNote() const { return int(_scaleGroup.rootNote) - 1; }
+    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, rawRootNote(), 0, 11); }
     void setRootNote(int root) {
-        _rootNote = clamp(root, 0, 11);
+        _scaleGroup.rootNote = clamp(root, 0, 11) + 1;
+    }
+
+    // scaleRotate
+    int scaleRotate() const { return int(_scaleGroup.scaleRotate) - 1; }
+    void setScaleRotate(int scaleRotate) {
+        _scaleGroup.scaleRotate = clamp(scaleRotate, -1, 31) + 1;
     }
 
     // Slew rate percent (0 = off, 1-100)
@@ -394,7 +403,7 @@ public:
         }
     }
     void printThresholdMode(StringBuilder &str) const { str(_thresholdMode == ThresholdMode::Position ? "Position" : "Length"); }
-    void editRootNote(int value, bool shift) { setRootNote(_rootNote + value); }
+    void editRootNote(int value, bool shift) { setRootNote(rawRootNote() + value); }
     void printRootNote(StringBuilder &str) const { Types::printNote(str, rootNote()); }
     void printSlew(StringBuilder &str) const { printSlewTime(str); }
     void printLoop(StringBuilder &str) const { str(loop() ? "Loop" : "Once"); }
@@ -410,9 +419,13 @@ private:
 
     ThresholdMode _thresholdMode = ThresholdMode::Position;
 
-    int8_t _scale = -1;
-    int8_t _rootNote = 0;       // C
     uint8_t _slewTime;
+    union {
+        uint16_t raw;
+        BitField<uint16_t, 0, 5> scale;       // scale + 1   (-1..23 -> 0..24)
+        BitField<uint16_t, 5, 4> rootNote;    // rootNote + 1 (-1..11 -> 0..12)
+        BitField<uint16_t, 9, 6> scaleRotate; // scaleRotate + 1 (-1..31 -> 0..32)
+    } _scaleGroup = { 0 };
     int8_t _pluck = 0;
     int8_t _octave = 0;
     int8_t _transpose = 0;

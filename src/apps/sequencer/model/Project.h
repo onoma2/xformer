@@ -11,6 +11,7 @@
 #include "UserScale.h"
 #include "Routing.h"
 #include "RouteParamKey.h"
+#include "Bitfield.h"
 #include "CvRoute.h"
 #include "MidiOutput.h"
 #include "Modulator.h"
@@ -158,9 +159,16 @@ public:
 
     // scale
 
-    int scale() const { return _scale; }
+    int scale() const { return int(_scaleGroup.scale) - 1; }
     void setScale(int scale) {
-        _scale = clamp(scale, 0, Scale::Count - 1);
+        _scaleGroup.scale = clamp(scale, 0, Scale::Count - 1) + 1;
+    }
+
+    // scaleRotate (0..31, no inherit sentinel)
+
+    int scaleRotate() const { return int(_scaleGroup.scaleRotate) - 1; }
+    void setScaleRotate(int scaleRotate) {
+        _scaleGroup.scaleRotate = clamp(scaleRotate, 0, 31) + 1;
     }
 
     void editScale(int value, bool shift) {
@@ -177,9 +185,9 @@ public:
 
     // rootNote
 
-    int rootNote() const { return _rootNote; }
+    int rootNote() const { return int(_scaleGroup.rootNote) - 1; }
     void setRootNote(int rootNote) {
-        _rootNote = clamp(rootNote, 0, 11);
+        _scaleGroup.rootNote = clamp(rootNote, 0, 11) + 1;
     }
 
     void editRootNote(int value, bool shift) {
@@ -187,7 +195,7 @@ public:
     }
 
     void printRootNote(StringBuilder &str) const {
-        Types::printNote(str, _rootNote);
+        Types::printNote(str, rootNote());
     }
 
     // monitorMode
@@ -593,8 +601,12 @@ private:
     TimeSignature _timeSignature;
     uint8_t _syncMeasure;
     bool _alwaysSyncPatterns;
-    uint8_t _scale;
-    uint8_t _rootNote;
+    union {
+        uint16_t raw;
+        BitField<uint16_t, 0, 5> scale;       // scale + 1   (0..23 -> 1..24)
+        BitField<uint16_t, 5, 4> rootNote;    // rootNote + 1 (0..11 -> 1..12)
+        BitField<uint16_t, 9, 6> scaleRotate; // scaleRotate + 1 (0..31 -> 1..32)
+    } _scaleGroup;
     Types::RecordMode _recordMode;
     Types::MonitorMode _monitorMode;
     Types::MidiInputMode _midiInputMode;

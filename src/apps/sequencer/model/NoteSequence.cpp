@@ -247,8 +247,10 @@ void NoteSequence::Step::read(VersionedSerializedReader &reader) {
 }
 
 void NoteSequence::clear() {
+    _scaleGroup.raw = 0;
     setScale(-1);
     setRootNote(-1);
+    setScaleRotate(-1);
     setDivisor(12);
     setDivisorY(12);
     setDivisorYSource(DivYSource::Divisor);
@@ -319,8 +321,12 @@ void NoteSequence::duplicateSteps() {
 }
 
 void NoteSequence::write(VersionedSerializedWriter &writer) const {
-    writer.write(_scale);
-    writer.write(_rootNote);
+    int8_t scaleField = rawScale();
+    int8_t rootNoteField = rawRootNote();
+    int8_t scaleRotateField = int8_t(scaleRotate());
+    writer.write(scaleField);
+    writer.write(rootNoteField);
+    writer.write(scaleRotateField);
     writer.write(_divisor);
     writer.write(_divisorY);
     writer.write(static_cast<uint8_t>(_divisorYSource));
@@ -356,8 +362,15 @@ void NoteSequence::write(VersionedSerializedWriter &writer) const {
 }
 
 void NoteSequence::read(VersionedSerializedReader &reader) {
-    reader.read(_scale);
-    reader.read(_rootNote);
+    int8_t scaleField = 0;
+    int8_t rootNoteField = 0;
+    int8_t scaleRotateField = 0;
+    reader.read(scaleField);
+    reader.read(rootNoteField);
+    reader.read(scaleRotateField);
+    setScale(scaleField);
+    setRootNote(rootNoteField);
+    setScaleRotate(scaleRotateField);
     if (reader.dataVersion() < ProjectVersion::Version10) {
         reader.readAs<uint8_t>(_divisor);
     } else {

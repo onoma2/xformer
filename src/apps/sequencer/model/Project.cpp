@@ -85,8 +85,10 @@ void Project::clear() {
     setTimeSignature(TimeSignature());
     setSyncMeasure(1);
     setAlwaysSyncPatterns(false);
+    _scaleGroup.raw = 0;
     setScale(0);
     setRootNote(0);
+    setScaleRotate(0);
     setMonitorMode(Types::MonitorMode::Always);
     setRecordMode(Types::RecordMode::Overdub);
     setMidiInputMode(Types::MidiInputMode::All);
@@ -220,8 +222,12 @@ void Project::write(VersionedSerializedWriter &writer) const {
     _timeSignature.write(writer);
     writer.write(_syncMeasure);
     writer.write(_alwaysSyncPatterns);
-    writer.write(_scale);
-    writer.write(_rootNote);
+    uint8_t scaleField = scale();
+    uint8_t rootNoteField = rootNote();
+    uint8_t scaleRotateField = uint8_t(scaleRotate());
+    writer.write(scaleField);
+    writer.write(rootNoteField);
+    writer.write(scaleRotateField);
     writer.write(_monitorMode);
     writer.write(_recordMode);
     writer.write(_midiInputMode);
@@ -273,8 +279,15 @@ bool Project::read(VersionedSerializedReader &reader) {
     if (reader.dataVersion() >= ProjectVersion::Version32) {
         reader.read(_alwaysSyncPatterns);
     }
-    reader.read(_scale);
-    reader.read(_rootNote);
+    uint8_t scaleField = 0;
+    uint8_t rootNoteField = 0;
+    uint8_t scaleRotateField = 0;
+    reader.read(scaleField);
+    reader.read(rootNoteField);
+    reader.read(scaleRotateField);
+    setScale(scaleField);
+    setRootNote(rootNoteField);
+    setScaleRotate(scaleRotateField);
     reader.read(_monitorMode, ProjectVersion::Version30);
     reader.read(_recordMode);
     if (reader.dataVersion() >= ProjectVersion::Version29) {

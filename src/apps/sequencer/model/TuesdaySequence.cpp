@@ -65,8 +65,10 @@ void TuesdaySequence::clear() {
     _divisor = 12; // 1/16
     _clockMultiplier = 100;
     _resetMeasure = 0;
-    _scale = -1;  // Project
-    _rootNote = -1;
+    _scaleGroup.raw = 0;
+    setScale(-1);  // Project
+    setRootNote(-1);
+    setScaleRotate(-1);
     _rotate = 0;
     _gateLength = 50;
     _gateOffset = 0; // Default 0% (Quantized)
@@ -92,8 +94,12 @@ void TuesdaySequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_divisor);
     writer.write(_clockMultiplier);
     writer.write(_resetMeasure);
-    writer.write(_scale);
-    writer.write(_rootNote);
+    int8_t scaleField = rawScale();
+    int8_t rootNoteField = rawRootNote();
+    int8_t scaleRotateField = int8_t(scaleRotate());
+    writer.write(scaleField);
+    writer.write(rootNoteField);
+    writer.write(scaleRotateField);
     writer.write(_rotate);
     writer.write(_gateLength);
     writer.write(_gateOffset);
@@ -120,8 +126,15 @@ void TuesdaySequence::read(VersionedSerializedReader &reader) {
     reader.read(_divisor);
     reader.read(_clockMultiplier);
     reader.read(_resetMeasure);
-    reader.read(_scale);
-    reader.read(_rootNote);
+    int8_t scaleField = 0;
+    int8_t rootNoteField = 0;
+    int8_t scaleRotateField = 0;
+    reader.read(scaleField);
+    reader.read(rootNoteField);
+    reader.read(scaleRotateField);
+    setScale(scaleField);
+    setRootNote(rootNoteField);
+    setScaleRotate(scaleRotateField);
     reader.read(_rotate);
     reader.read(_gateLength);
     reader.read(_gateOffset);

@@ -5,6 +5,7 @@
 #include "ModelUtils.h"
 #include "Types.h"
 #include "Scale.h"
+#include "Bitfield.h"
 #include "ProjectVersion.h"
 #include "Routing.h"
 #include "RouteParamKey.h"
@@ -317,9 +318,16 @@ public:
     }
 
     // scale selection (-1 = Project scale, 0..N = Track scale)
-    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, _scale, 0, 23); }
+    int rawScale() const { return int(_scaleGroup.scale) - 1; }
+    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, rawScale(), 0, 23); }
     void setScale(int scale) {
-        _scale = clamp(scale, -1, Scale::Count - 1);
+        _scaleGroup.scale = clamp(scale, -1, Scale::Count - 1) + 1;
+    }
+
+    // scaleRotate
+    int scaleRotate() const { return int(_scaleGroup.scaleRotate) - 1; }
+    void setScaleRotate(int scaleRotate) {
+        _scaleGroup.scaleRotate = clamp(scaleRotate, -1, 31) + 1;
     }
 
     // syncMode
@@ -346,13 +354,14 @@ public:
     }
 
     // root note (0-11: C-B)
-    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, _rootNote, 0, 11); }
+    int rawRootNote() const { return int(_scaleGroup.rootNote) - 1; }
+    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, rawRootNote(), 0, 11); }
     void setRootNote(int rootNote) {
-        _rootNote = clamp(rootNote, -1, 11);
+        _scaleGroup.rootNote = clamp(rootNote, -1, 11) + 1;
     }
 
     void editRootNote(int value, bool shift) {
-        setRootNote(_rootNote + value);
+        setRootNote(rawRootNote() + value);
     }
 
     void printRootNote(StringBuilder &str) const {
@@ -551,8 +560,10 @@ public:
         _clockMultiplier = 100;
         _loop = true;
         _activeLength = 5;
-        _scale = -1;  // Use project scale
-        _rootNote = 0;
+        _scaleGroup.raw = 0;
+        setScale(-1);  // Use project scale
+        setRootNote(0);
+        setScaleRotate(-1);
         _firstStep = 0;
         setRunMode(Types::RunMode::Forward);
         _syncMode = SyncMode::Off;
@@ -584,11 +595,15 @@ public:
         writer.write(_loop);
         writer.write(_runMode);
         writer.write(_activeLength);
-        writer.write(_scale);
+        int8_t scaleField = rawScale();
+        int8_t rootNoteField = rawRootNote();
+        int8_t scaleRotateField = int8_t(scaleRotate());
+        writer.write(scaleField);
         // rootNote historically serialized as a 2-byte Routable<int8_t> (base +
         // routed mirror). Keep both bytes so existing patches load unchanged.
-        writer.write(_rootNote);
-        writer.write(_rootNote);
+        writer.write(rootNoteField);
+        writer.write(rootNoteField);
+        writer.write(scaleRotateField);
         writer.write(static_cast<uint8_t>(_syncMode));
         writer.write(_resetMeasure);
         writer.write(_firstStep);
@@ -608,11 +623,18 @@ public:
         reader.read(_loop);
         reader.read(_runMode);
         reader.read(_activeLength);
-        reader.read(_scale);
+        int8_t scaleField = 0;
+        reader.read(scaleField);
+        setScale(scaleField);
         // rootNote historically serialized as a 2-byte Routable<int8_t> (base +
         // routed mirror); read the value, then consume the duplicate byte.
-        reader.read(_rootNote);
+        int8_t rootNoteField = 0;
+        reader.read(rootNoteField);
+        setRootNote(rootNoteField);
         { int8_t routedMirror; reader.read(routedMirror); }
+        int8_t scaleRotateField = 0;
+        reader.read(scaleRotateField);
+        setScaleRotate(scaleRotateField);
 
         uint8_t sync;
         reader.read(sync);
@@ -658,7 +680,7 @@ public:
     }
 
     void editScale(int value, bool shift) {
-        setScale(_scale + value);
+        setScale(rawScale() + value);
     }
 
     void printScale(StringBuilder &str) const {
@@ -681,8 +703,12 @@ private:
     bool _loop = true;            // Loop mode
     Types::RunMode _runMode;
     uint8_t _activeLength = 16;   // Dynamic step count (1-32)
-    int8_t _scale = -1;           // Scale selection
-    int8_t _rootNote;             // Root note (C)
+    union {
+        uint16_t raw;
+        BitField<uint16_t, 0, 5> scale;       // scale + 1   (-1..23 -> 0..24)
+        BitField<uint16_t, 5, 4> rootNote;    // rootNote + 1 (-1..11 -> 0..12)
+        BitField<uint16_t, 9, 6> scaleRotate; // scaleRotate + 1 (-1..31 -> 0..32)
+    } _scaleGroup = { 0 };        // Scale selection + root note + rotation
     uint8_t _firstStep;           // Rotation offset (0-31)
     SyncMode _syncMode = SyncMode::Off;
     uint8_t _resetMeasure = 0;    // Bars (0 = off)

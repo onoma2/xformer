@@ -25,16 +25,22 @@ public:
     void setTrackIndex(int trackIndex) { _trackIndex = trackIndex; }
 
     // scale
-    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, _scale, 0, 23); }
-    void setScale(int scale) { _scale = clamp(scale, -1, Scale::Count - 1); }
+    int rawScale() const { return int(_scaleGroup.scale) - 1; }
+    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, rawScale(), 0, 23); }
+    void setScale(int scale) { _scaleGroup.scale = clamp(scale, -1, Scale::Count - 1) + 1; }
     const Scale &selectedScale(int defaultScale) const {
         int s = scale();
         return Scale::get(s != -1 ? s : defaultScale);
     }
 
     // rootNote
-    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, _rootNote, 0, 11); }
-    void setRootNote(int rootNote) { _rootNote = clamp(rootNote, -1, 11); }
+    int rawRootNote() const { return int(_scaleGroup.rootNote) - 1; }
+    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, rawRootNote(), 0, 11); }
+    void setRootNote(int rootNote) { _scaleGroup.rootNote = clamp(rootNote, -1, 11) + 1; }
+
+    // scaleRotate
+    int scaleRotate() const { return int(_scaleGroup.scaleRotate) - 1; }
+    void setScaleRotate(int scaleRotate) { _scaleGroup.scaleRotate = clamp(scaleRotate, -1, 31) + 1; }
     int selectedRootNote(int defaultRootNote) const {
         int r = rootNote();
         return r != -1 ? r : defaultRootNote;
@@ -90,7 +96,7 @@ public:
     }
 
     void editScale(int value, bool shift) {
-        setScale(_scale + value);
+        setScale(rawScale() + value);
     }
 
 
@@ -454,7 +460,7 @@ public:
     }
 
     void editRootNote(int value, bool shift) {
-        setRootNote(_rootNote + value);
+        setRootNote(rawRootNote() + value);
     }
 
     // Pattern window. last() resolves to size-1 — Last is collapsed into Size.
@@ -503,8 +509,12 @@ public:
     }
 
     void write(VersionedSerializedWriter &writer) const {
-        writer.write(_scale);
-        writer.write(_rootNote);
+        int8_t scaleField = rawScale();
+        int8_t rootNoteField = rawRootNote();
+        int8_t scaleRotateField = int8_t(scaleRotate());
+        writer.write(scaleField);
+        writer.write(rootNoteField);
+        writer.write(scaleRotateField);
         writer.write(_divisor);
         writer.write(_resetMeasure);
         writer.write(_clockMultiplier);
@@ -564,8 +574,15 @@ public:
     }
 
     void read(VersionedSerializedReader &reader) {
-        reader.read(_scale);
-        reader.read(_rootNote);
+        int8_t scaleField = 0;
+        int8_t rootNoteField = 0;
+        int8_t scaleRotateField = 0;
+        reader.read(scaleField);
+        reader.read(rootNoteField);
+        reader.read(scaleRotateField);
+        setScale(scaleField);
+        setRootNote(rootNoteField);
+        setScaleRotate(scaleRotateField);
         reader.read(_divisor);
         _divisor = ModelUtils::clampDivisor(_divisor);
         reader.read(_resetMeasure);
@@ -711,8 +728,8 @@ public:
     void captureContentTo(ContentSnapshot &snap) const {
         snap.rhythmSeed = _rhythmSeed;
         snap.melodySeed = _melodySeed;
-        snap.scale = _scale;
-        snap.rootNote = _rootNote;
+        snap.scale = rawScale();
+        snap.rootNote = rawRootNote();
         snap.divisor = _divisor;
         snap.resetMeasure = _resetMeasure;
         snap.clockMultiplier = _clockMultiplier;
@@ -759,8 +776,8 @@ public:
     void restoreContentFrom(const ContentSnapshot &snap) {
         _rhythmSeed = snap.rhythmSeed;
         _melodySeed = snap.melodySeed;
-        _scale = snap.scale;
-        _rootNote = snap.rootNote;
+        setScale(snap.scale);
+        setRootNote(snap.rootNote);
         _divisor = snap.divisor;
         _resetMeasure = snap.resetMeasure;
         _clockMultiplier = snap.clockMultiplier;
@@ -812,8 +829,10 @@ private:
     // sanitizeAfterRead(). Touches all model fields except _steps (callers
     // decide whether to wipe events too).
     void setDefaults() {
-        _scale = -1;
-        _rootNote = -1;
+        _scaleGroup.raw = 0;
+        setScale(-1);
+        setRootNote(-1);
+        setScaleRotate(-1);
         _divisor = 12;
         _resetMeasure = 0;
         _clockMultiplier = 100;
@@ -866,8 +885,8 @@ private:
     }
 
     void sanitizeAfterRead() {
-        _scale = clamp(int(_scale), -1, Scale::Count - 1);
-        _rootNote = clamp(int(_rootNote), -1, 11);
+        setScale(rawScale());
+        setRootNote(rawRootNote());
         _divisor = ModelUtils::clampDivisor(_divisor);
         _resetMeasure = clamp(int(_resetMeasure), 0, 128);
 
@@ -887,8 +906,12 @@ private:
     }
 
     int8_t _trackIndex = -1;
-    int8_t _scale = -1;
-    int8_t _rootNote = -1;
+    union {
+        uint16_t raw;
+        BitField<uint16_t, 0, 5> scale;       // scale + 1   (-1..23 -> 0..24)
+        BitField<uint16_t, 5, 4> rootNote;    // rootNote + 1 (-1..11 -> 0..12)
+        BitField<uint16_t, 9, 6> scaleRotate; // scaleRotate + 1 (-1..31 -> 0..32)
+    } _scaleGroup = { 0 };
     uint8_t _divisor = 12;
     uint8_t _resetMeasure = 0;
     uint8_t _clockMultiplier;

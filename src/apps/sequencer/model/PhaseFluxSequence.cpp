@@ -121,8 +121,10 @@ void PhaseFluxSequence::snapToGrid(int beatTicks) {
 }
 
 void PhaseFluxSequence::clear() {
-    _scale = -1;
-    _rootNote = -1;
+    _scaleGroup.raw = 0;
+    setScale(-1);
+    setRootNote(-1);
+    setScaleRotate(-1);
     _resetMeasure = 0;
     _edited = 0;
     _pitchRate = uint8_t(defaultPitchRateIndex());
@@ -160,8 +162,12 @@ void PhaseFluxSequence::clear() {
 }
 
 void PhaseFluxSequence::write(VersionedSerializedWriter &writer) const {
-    writer.write(_scale);
-    writer.write(_rootNote);
+    int8_t scaleField = rawScale();
+    int8_t rootNoteField = rawRootNote();
+    int8_t scaleRotateField = int8_t(scaleRotate());
+    writer.write(scaleField);
+    writer.write(rootNoteField);
+    writer.write(scaleRotateField);
     writer.write(_resetMeasure);
     // _pitchRate is 0..16 (5 bits). Pack cycleLength flag into bit 5 for
     // forward-compatible storage — old files read bit 5 = 0 = Adaptive,
@@ -191,8 +197,15 @@ void PhaseFluxSequence::write(VersionedSerializedWriter &writer) const {
 }
 
 void PhaseFluxSequence::read(VersionedSerializedReader &reader) {
-    reader.read(_scale);
-    reader.read(_rootNote);
+    int8_t scaleField = 0;
+    int8_t rootNoteField = 0;
+    int8_t scaleRotateField = 0;
+    reader.read(scaleField);
+    reader.read(rootNoteField);
+    reader.read(scaleRotateField);
+    setScale(scaleField);
+    setRootNote(rootNoteField);
+    setScaleRotate(scaleRotateField);
     reader.read(_resetMeasure);
     // _pitchRate packs cycleLength in bit 5 (see write()). Old files have
     // bit 5 == 0 → Adaptive (preserves prior playback exactly).
@@ -221,8 +234,8 @@ void PhaseFluxSequence::read(VersionedSerializedReader &reader) {
     _noteAccumConfig.read(reader);
     _pulseAccumConfig.read(reader);
     _pitchRate = clamp(int(_pitchRate), 0, kPitchRateCount - 1);
-    _scale = clamp(int(_scale), -1, Scale::Count - 1);
-    _rootNote = clamp(int(_rootNote), -1, 11);
+    setScale(rawScale());
+    setRootNote(rawRootNote());
     _resetMeasure = clamp(int(_resetMeasure), 0, 128);
     uint16_t d = _divisor;
     _divisor = ModelUtils::clampDivisor(d);
