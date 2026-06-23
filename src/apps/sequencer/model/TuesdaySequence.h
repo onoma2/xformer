@@ -38,7 +38,7 @@ public:
     void editAlgorithm(int value, bool shift) {
         // Cycle only through valid algorithms: 0-15 (consecutive)
         static const int VALID_ALGORITHMS[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-        const int VALID_COUNT = 15;
+        const int VALID_COUNT = int(sizeof(VALID_ALGORITHMS) / sizeof(VALID_ALGORITHMS[0]));
 
         // Find current algorithm position in valid array
         int currentIdx = -1;
