@@ -684,6 +684,7 @@ public:
         uint32_t melodySeed = 0;
         int8_t   scale = -1;
         int8_t   rootNote = -1;
+        int8_t   scaleRotate = -1;
         uint8_t  divisor = 12;
         uint8_t  resetMeasure = 0;
         uint8_t  clockMultiplier = 100;
@@ -732,6 +733,7 @@ public:
         snap.melodySeed = _melodySeed;
         snap.scale = rawScale();
         snap.rootNote = rawRootNote();
+        snap.scaleRotate = scaleRotate();
         snap.divisor = _divisor;
         snap.resetMeasure = _resetMeasure;
         snap.clockMultiplier = _clockMultiplier;
@@ -780,6 +782,7 @@ public:
         _melodySeed = snap.melodySeed;
         setScale(snap.scale);
         setRootNote(snap.rootNote);
+        setScaleRotate(snap.scaleRotate);
         _divisor = snap.divisor;
         _resetMeasure = snap.resetMeasure;
         _clockMultiplier = snap.clockMultiplier;

@@ -141,6 +141,7 @@ CASE("content_snapshot_roundtrip") {
     src.setDurationTicket(4, -1);
     src.setRhythmMode(StochasticSourceMode::Loop);
     src.setBurstHold(StochasticBurstHold::RollFit);
+    src.setScaleRotate(5);
     // Touch a stored step so we can verify steps[] is preserved (not wiped
     // by the snapshot restore).
     src.steps()[3].setDegree(11);
@@ -156,6 +157,7 @@ CASE("content_snapshot_roundtrip") {
     // leave it alone (Tier 4 contract: events come from a separate regen pass).
     dst.steps()[3].setDegree(99);
     dst.steps()[3].setOctave(0);
+    dst.setScaleRotate(2); // different from src's 5 — restore must overwrite it
     dst.restoreContentFrom(snap);
 
     expectEqual(int(dst.rhythmSeed()), int(0xCAFEF00Du));
@@ -173,6 +175,7 @@ CASE("content_snapshot_roundtrip") {
     expectEqual(dst.rest(), 22);
     expectEqual(int(dst.size()), 24);
     expectEqual(int(dst.first()), 5);
+    expectEqual(int(dst.scaleRotate()), 5);
     expectEqual(dst.degreeTicket(0), 90);
     expectEqual(dst.degreeTicket(5), -1);
     expectEqual(dst.degreeTicket(7), 33);
