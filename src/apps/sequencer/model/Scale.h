@@ -24,6 +24,8 @@ public:
 
     virtual bool isChromatic() const = 0;
 
+    virtual bool supportsRotation() const { return true; }
+
     virtual void noteName(StringBuilder &str, int note, int rootNote, Format format = Long) const = 0;
     virtual float noteToVolts(int note) const = 0;
     virtual int noteFromVolts(float volts) const = 0;
@@ -133,6 +135,8 @@ public:
     bool isChromatic() const override {
         return false;
     }
+
+    bool supportsRotation() const override { return false; }
 
     void noteName(StringBuilder &str, int note, int rootNote, Format format) const override {
         switch (format) {

@@ -151,6 +151,8 @@ public:
         return mode() == Mode::Chromatic;
     }
 
+    bool supportsRotation() const override { return _mode != Mode::Voltage; }
+
     void noteName(StringBuilder &str, int note, int rootNote, Format format) const override {
         switch (_mode) {
         case Mode::Chromatic:

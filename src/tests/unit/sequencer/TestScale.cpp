@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstring>
 
 UNIT_TEST("Scale") {
 
@@ -97,5 +98,14 @@ UNIT_TEST("Scale") {
     }
 
 #endif // PLATFORM_SIM
+
+    CASE("supportsRotation: note scales rotate, Voltage built-in does not") {
+        expectTrue(Scale::get(1).supportsRotation(), "Major rotates");   // index 1 == Major
+        int voltIdx = -1;
+        for (int i = 0; i < Scale::Count; ++i)
+            if (strcmp(Scale::name(i), "Voltage") == 0) { voltIdx = i; break; }
+        expectTrue(voltIdx >= 0, "Voltage built-in present");
+        expectTrue(!Scale::get(voltIdx).supportsRotation(), "Voltage scale does not rotate");
+    }
 
 }
