@@ -421,7 +421,7 @@ void NoteTrackEngine::update(float dt) {
     bool recording = _engine.state().recording();
 
     const auto &sequence = *_sequence;
-    const auto &scale = sequence.selectedScale(_model.project().scale());
+    const auto &scale = sequence.selectedScale(_model.project().scale(), _model.project().scaleRotate());
     int rootNote = sequence.selectedRootNote(_model.project().rootNote());
     int octave = _noteTrack.octave();
     int transpose = _noteTrack.transpose();
@@ -721,7 +721,7 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 uint8_t seqId = useFillSequence ? NoteTrackEngine::FillSequenceId : NoteTrackEngine::MainSequenceId;
 
                 // Pre-calculate base CV for accumulator-driven retriggers
-                const auto &scale = evalSequence.selectedScale(_model.project().scale());
+                const auto &scale = evalSequence.selectedScale(_model.project().scale(), _model.project().scaleRotate());
                 int rootNote = evalSequence.selectedRootNote(_model.project().rootNote());
                 float baseCv = 0.f;
                 int retrigIndex = 0;
@@ -790,7 +790,7 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 // Calculate CV for single retrigger
                 float retrigCv = 0.f;
                 if (shouldTickAccum) {
-                    const auto &scale = evalSequence.selectedScale(_model.project().scale());
+                    const auto &scale = evalSequence.selectedScale(_model.project().scale(), _model.project().scaleRotate());
                     int rootNote = evalSequence.selectedRootNote(_model.project().rootNote());
                     // Evaluate base note
                     float baseNote = evalStepNote(step, _noteTrack.noteProbabilityBias(), scale, rootNote, octave, transpose, evalSequence);
@@ -808,7 +808,7 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     }
 
     if (stepGate || _noteTrack.cvUpdateMode() == NoteTrack::CvUpdateMode::Always) {
-        const auto &scale = evalSequence.selectedScale(_model.project().scale());
+        const auto &scale = evalSequence.selectedScale(_model.project().scale(), _model.project().scaleRotate());
         int rootNote = evalSequence.selectedRootNote(_model.project().rootNote());
 
         // Evaluate base note (without harmony)
@@ -890,7 +890,7 @@ void NoteTrackEngine::recordStep(uint32_t tick, uint32_t divisor) {
 }
 
 int NoteTrackEngine::noteFromMidiNote(uint8_t midiNote) const {
-    const auto &scale = _sequence->selectedScale(_model.project().scale());
+    const auto &scale = _sequence->selectedScale(_model.project().scale(), _model.project().scaleRotate());
     int rootNote = _sequence->selectedRootNote(_model.project().rootNote());
 
     if (scale.isChromatic()) {

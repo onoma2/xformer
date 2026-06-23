@@ -827,7 +827,7 @@ void LaunchpadController::drawNoteSequenceNotes(const NoteSequence &sequence, No
     int ofs = _sequence.navigation.row * 8;
 
     // draw octave lines
-    int octave = sequence.selectedScale(_project.scale()).notesPerOctave();
+    int octave = sequence.selectedScale(_project.scale(), _project.scaleRotate()).notesPerOctave();
     for (int row = 0; row < 8; ++row) {
         if (modulo(row + ofs, octave) == 0) {
             for (int col = 0; col < 8; ++col) {

@@ -6,6 +6,7 @@
 #include "ModelUtils.h"
 #include "Types.h"
 #include "Scale.h"
+#include "RotatedScale.h"
 #include "Routing.h"
 #include "RouteParamKey.h"
 #include "Accumulator.h"
@@ -388,7 +389,7 @@ public:
     // scale
 
     int rawScale() const { return int(_scaleGroup.scale) - 1; }
-    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, rawScale(), 0, 23); }
+    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, rawScale(), 0, Scale::Count - 1); }
     void setScale(int scale) {
         _scaleGroup.scale = clamp(scale, -1, Scale::Count - 1) + 1;
     }
@@ -407,8 +408,10 @@ public:
         str(scale() < 0 ? "Default" : Scale::name(scale()));
     }
 
-    const Scale &selectedScale(int defaultScale) const {
-        return Scale::get(scale() < 0 ? defaultScale : scale());
+    RotatedScaleView selectedScale(int projectScale, int projectRotate) const {
+        int idx    = scale()       < 0 ? projectScale  : scale();
+        int rotate = scaleRotate() < 0 ? projectRotate : scaleRotate();
+        return RotatedScaleView(Scale::get(idx), rotate);
     }
 
     // rootNote

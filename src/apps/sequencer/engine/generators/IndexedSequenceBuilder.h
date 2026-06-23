@@ -4,6 +4,7 @@
 
 #include "model/IndexedSequence.h"
 #include "model/Scale.h"
+#include "model/RotatedScale.h"
 
 #include <cmath>
 #include <new>
@@ -21,7 +22,7 @@ public:
         GateLength,
     };
 
-    IndexedSequenceBuilder(IndexedSequence &sequence, Layer layer, const Scale &scale, int rootNote) :
+    IndexedSequenceBuilder(IndexedSequence &sequence, Layer layer, const RotatedScaleView &scale, int rootNote) :
         _edit(sequence),
         _original(sequence),
         _preview(nullptr),
@@ -164,7 +165,7 @@ private:
     IndexedSequence _original;
     IndexedSequence *_preview;
     Layer _layer;
-    const Scale &_scale;
+    RotatedScaleView _scale;
     int _rootNote;
     bool _showingPreview;
 };

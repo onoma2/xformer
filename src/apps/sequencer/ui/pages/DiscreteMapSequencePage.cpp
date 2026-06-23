@@ -332,7 +332,7 @@ void DiscreteMapSequencePage::drawStageInfo(Canvas &canvas) {
         // Row 3: Note
         if (stage.direction() != DiscreteMapSequence::Stage::TriggerDir::Off || selected) {
             FixedStringBuilder<8> name;
-            const Scale &scale = _sequence->selectedScale(_project.selectedScale());
+            const Scale &scale = _sequence->selectedScale(_project.scale(), _project.scaleRotate());
 
             float volts = scale.noteToVolts(stage.noteIndex());
             if (scale.isChromatic()) {
@@ -805,7 +805,7 @@ void DiscreteMapSequencePage::applyVoicing(VoicingBank bank, int voicingIndex) {
     int index = clamp(voicingIndex, 0, count - 1);
     const auto &voicing = voicings[index];
 
-    const Scale &scale = _sequence->selectedScale(_project.selectedScale());
+    const Scale &scale = _sequence->selectedScale(_project.scale(), _project.scaleRotate());
     int rootIndex = _sequence->stage(_selectedStage).noteIndex();
     if (voicing.rootFromC0) {
         rootIndex = scale.isChromatic() ? -_sequence->rootNote() : 0;
@@ -1012,7 +1012,7 @@ void DiscreteMapSequencePage::encoder(EncoderEvent &event) {
         }
         case EditMode::NoteValue: {
             auto &s = _sequence->stage(i);
-            const Scale &scale = _sequence->selectedScale(_project.selectedScale());
+            const Scale &scale = _sequence->selectedScale(_project.scale(), _project.scaleRotate());
             int step = (_shiftHeld && scale.isChromatic()) ? scale.notesPerOctave() : 1;
             s.setNoteIndex(s.noteIndex() + delta * step);
             break;

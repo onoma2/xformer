@@ -9,6 +9,7 @@
 #include "Song.h"
 #include "PlayState.h"
 #include "UserScale.h"
+#include "RotatedScale.h"
 #include "Routing.h"
 #include "RouteParamKey.h"
 #include "Bitfield.h"
@@ -179,8 +180,8 @@ public:
         str(Scale::name(scale()));
     }
 
-    const Scale &selectedScale() const {
-        return Scale::get(scale());
+    RotatedScaleView selectedScale() const {
+        return RotatedScaleView(Scale::get(scale()), scaleRotate());
     }
 
     // rootNote

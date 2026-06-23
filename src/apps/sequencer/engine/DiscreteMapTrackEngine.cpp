@@ -619,7 +619,7 @@ int DiscreteMapTrackEngine::findActiveStage(float input, float prevInput) {
 }
 
 float DiscreteMapTrackEngine::noteIndexToVoltage(int8_t noteIndex, bool useSampled) {
-    const Scale &scale = _sequence->selectedScale(_model.project().selectedScale());
+    const Scale &scale = _sequence->selectedScale(_model.project().scale(), _model.project().scaleRotate());
 
     // Use sampled values in Gate mode, current values in Always mode
     int octave, transpose, rootNote;

@@ -405,7 +405,7 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
 
         // F3: Note
         FixedStringBuilder<8> noteName;
-        const auto &scale = sequence.selectedScale(_project.selectedScale());
+        const auto &scale = sequence.selectedScale(_project.scale(), _project.scaleRotate());
         int rootNote = sequence.rootNote() < 0 ? _project.rootNote() : sequence.rootNote();
         const auto &track = _project.selectedTrack().indexedTrack();
         int shift = track.octave() * scale.notesPerOctave() + track.transpose();
@@ -431,7 +431,7 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
 
         if (trackEngine.currentStep() >= 0 && trackEngine.currentStep() < sequence.activeLength()) {
             const auto &step = sequence.step(trackEngine.currentStep());
-            const auto &scale = sequence.selectedScale(_project.selectedScale());
+            const auto &scale = sequence.selectedScale(_project.scale(), _project.scaleRotate());
             int rootNote = sequence.rootNote() < 0 ? _project.rootNote() : sequence.rootNote();
             const auto &track = _project.selectedTrack().indexedTrack();
             int shift = track.octave() * scale.notesPerOctave() + track.transpose();
@@ -759,7 +759,7 @@ void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
 
     bool shift = globalKeyState()[Key::Shift];
     int selectionCount = _stepSelection.count();
-    const auto &scale = sequence.selectedScale(_project.selectedScale());
+    const auto &scale = sequence.selectedScale(_project.scale(), _project.scaleRotate());
 
     // Gradient Editing: Shift + multiple steps = linear ramp
     if (shift && selectionCount > 1) {
@@ -1089,7 +1089,7 @@ void IndexedSequenceEditPage::generateSequence() {
     _manager.pages().generatorSelect.show([this, layer] (bool success, Generator::Mode mode) {
         if (success) {
             auto &sequence = _project.selectedIndexedSequence();
-            const auto &scale = sequence.selectedScale(_project.selectedScale());
+            const auto &scale = sequence.selectedScale(_project.scale(), _project.scaleRotate());
             int rootNote = sequence.rootNote() < 0 ? _project.rootNote() : sequence.rootNote();
             auto builder = _builderContainer.create<IndexedSequenceBuilder>(sequence, layer, scale, rootNote);
             auto generator = Generator::execute(mode, *builder);
@@ -1586,7 +1586,7 @@ void IndexedSequenceEditPage::applyVoicing(VoicingBank bank, int voicingIndex) {
     int index = clamp(voicingIndex, 0, count - 1);
     const auto &voicing = voicings[index];
 
-    const Scale &scale = sequence.selectedScale(_project.selectedScale());
+    const Scale &scale = sequence.selectedScale(_project.scale(), _project.scaleRotate());
     int rootIndex = sequence.step(firstSelectedIndex).noteIndex();
     if (voicing.rootFromC0) {
         int rootNote = sequence.rootNote();

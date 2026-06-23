@@ -6,6 +6,7 @@
 #include "ModelUtils.h"
 #include "Types.h"
 #include "Scale.h"
+#include "RotatedScale.h"
 
 #include "core/math/Math.h"
 
@@ -26,11 +27,12 @@ public:
 
     // scale
     int rawScale() const { return int(_scaleGroup.scale) - 1; }
-    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, rawScale(), 0, 23); }
+    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, rawScale(), 0, Scale::Count - 1); }
     void setScale(int scale) { _scaleGroup.scale = clamp(scale, -1, Scale::Count - 1) + 1; }
-    const Scale &selectedScale(int defaultScale) const {
-        int s = scale();
-        return Scale::get(s != -1 ? s : defaultScale);
+    RotatedScaleView selectedScale(int projectScale, int projectRotate) const {
+        int idx    = scale()       < 0 ? projectScale  : scale();
+        int rotate = scaleRotate() < 0 ? projectRotate : scaleRotate();
+        return RotatedScaleView(Scale::get(idx), rotate);
     }
 
     // rootNote
@@ -481,9 +483,9 @@ public:
     uint32_t seed() const { return rhythmSeed(); }
     void setSeed(uint32_t seed) { setRhythmSeed(seed); }
 
-    void printNote(StringBuilder &str, int note, int defaultRootNote, int defaultScale) const {
+    void printNote(StringBuilder &str, int note, int defaultRootNote, int defaultScale, int defaultScaleRotate) const {
         int rootNote = selectedRootNote(defaultRootNote);
-        const auto &scale = selectedScale(defaultScale);
+        const auto scale = selectedScale(defaultScale, defaultScaleRotate);
         scale.noteName(str, note, rootNote, Scale::Short1);
     }
 

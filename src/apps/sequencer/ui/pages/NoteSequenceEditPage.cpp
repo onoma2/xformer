@@ -101,7 +101,7 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
     WindowPainter::drawAccumulatorValue(canvas, sequence.accumulator().currentValue(), sequence.accumulator().enabled());
 
     WindowPainter::drawFooter(canvas, functionNames, pageKeyState(), activeFunctionKey());
-    const auto &scale = sequence.selectedScale(_project.scale());
+    const auto &scale = sequence.selectedScale(_project.scale(), _project.scaleRotate());
     int currentStep = trackEngine.isActiveSequence(sequence) ? trackEngine.currentStep() : -1;
     int currentNoteStep = -1;
     if (sequence.mode() == NoteSequence::Mode::Ikra && trackEngine.isActiveSequence(sequence)) {
@@ -500,7 +500,7 @@ void NoteSequenceEditPage::keyPress(KeyPressEvent &event) {
         for (int i = 0; i < StepCount; ++i) {
             if (key.state(MatrixMap::fromStep(i))) {
                 int octave = key.function() + 1;
-                const auto &scale = sequence.selectedScale(_project.scale());
+                const auto &scale = sequence.selectedScale(_project.scale(), _project.scaleRotate());
                 int stepIndex = stepOffset() + i;
                 sequence.step(stepIndex).setNote(scale.notesPerOctave() * octave);
                 event.consume();
@@ -546,7 +546,7 @@ void NoteSequenceEditPage::encoder(EncoderEvent &event) {
     }
 
     auto &sequence = _project.selectedNoteSequence();
-    const auto &scale = sequence.selectedScale(_project.scale());
+    const auto &scale = sequence.selectedScale(_project.scale(), _project.scaleRotate());
 
     if (_stepSelection.any()) {
         _showDetail = true;
@@ -636,7 +636,7 @@ void NoteSequenceEditPage::midi(MidiEvent &event) {
     if (!_engine.recording() && layer() == Layer::Note && _stepSelection.any()) {
         auto &trackEngine = _engine.selectedTrackEngine().as<NoteTrackEngine>();
         auto &sequence = _project.selectedNoteSequence();
-        const auto &scale = sequence.selectedScale(_project.scale());
+        const auto &scale = sequence.selectedScale(_project.scale(), _project.scaleRotate());
         const auto &message = event.message();
 
         if (message.isNoteOn()) {
@@ -846,7 +846,7 @@ void NoteSequenceEditPage::drawDetail(Canvas &canvas, const NoteSequence::Step &
     }
 
     const auto &sequence = _project.selectedNoteSequence();
-    const auto &scale = sequence.selectedScale(_project.scale());
+    const auto &scale = sequence.selectedScale(_project.scale(), _project.scaleRotate());
 
     FixedStringBuilder<16> str;
 

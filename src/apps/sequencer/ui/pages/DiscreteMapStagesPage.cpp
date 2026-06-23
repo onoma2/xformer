@@ -69,7 +69,7 @@ void DiscreteMapStagesPage::StageListModel::cell(int row, int column, StringBuil
             str("%+d", int(stage.threshold()));
         } else if (isNoteRow(row)) {
             if (_project) {
-                const Scale &scale = _sequence->selectedScale(_project->selectedScale());
+                const Scale &scale = _sequence->selectedScale(_project->scale(), _project->scaleRotate());
                 scale.noteName(str, stage.noteIndex(), _sequence->rootNote(), Scale::Format::Short1);
             } else {
                 str("%+d", int(stage.noteIndex()));

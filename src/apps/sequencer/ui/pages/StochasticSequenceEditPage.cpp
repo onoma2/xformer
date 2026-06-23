@@ -850,7 +850,7 @@ bool StochasticSequenceEditPage::handleLoopFunction(int fn, bool shift, int pres
 void StochasticSequenceEditPage::drawPitchPage(Canvas &canvas) {
     auto &track = _project.selectedTrack().stochasticTrack();
     auto &sequence = track.sequence(_project.selectedPatternIndex());
-    auto &scale = sequence.selectedScale(_project.scale());
+    const auto &scale = sequence.selectedScale(_project.scale(), _project.scaleRotate());
     int scaleSize = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
 
     if (_selectedDegree >= scaleSize) {
@@ -1144,7 +1144,7 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
         }
         break;
     case Page::Pitch: {
-        auto &scale = sequence.selectedScale(_project.scale());
+        const auto &scale = sequence.selectedScale(_project.scale(), _project.scaleRotate());
         int scaleSize = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
 
         int activeDegree = -1;
@@ -1236,7 +1236,7 @@ void StochasticSequenceEditPage::handlePitchKeyDown(KeyEvent &event) {
     if (key.isStep() && !key.pageModifier()) {
         auto &track = _project.selectedTrack().stochasticTrack();
         auto &sequence = track.sequence(_project.selectedPatternIndex());
-        auto &scale = sequence.selectedScale(_project.scale());
+        const auto &scale = sequence.selectedScale(_project.scale(), _project.scaleRotate());
         int scaleSize = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
         int degreeIndex = _bank * 16 + key.step();
         if (degreeIndex < scaleSize) {
@@ -1261,7 +1261,7 @@ void StochasticSequenceEditPage::handlePitchKeyDown(KeyEvent &event) {
     {
         auto &track = _project.selectedTrack().stochasticTrack();
         auto &sequence = track.sequence(_project.selectedPatternIndex());
-        auto &scale = sequence.selectedScale(_project.scale());
+        const auto &scale = sequence.selectedScale(_project.scale(), _project.scaleRotate());
         int scaleSize = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
         if (key.isLeft() && scaleSize > 16) {
             _bank = std::max(0, _bank - 1);
@@ -1471,7 +1471,7 @@ void StochasticSequenceEditPage::handlePitchKeyPress(KeyPressEvent &event) {
     if (key.isLeft()) {
         auto &track = _project.selectedTrack().stochasticTrack();
         auto &sequence = track.sequence(_project.selectedPatternIndex());
-        auto &scale = sequence.selectedScale(_project.scale());
+        const auto &scale = sequence.selectedScale(_project.scale(), _project.scaleRotate());
         int scaleSize = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
         if (scaleSize > 16) {
             _bank = std::max(0, _bank - 1);
@@ -1481,7 +1481,7 @@ void StochasticSequenceEditPage::handlePitchKeyPress(KeyPressEvent &event) {
     if (key.isRight()) {
         auto &track = _project.selectedTrack().stochasticTrack();
         auto &sequence = track.sequence(_project.selectedPatternIndex());
-        auto &scale = sequence.selectedScale(_project.scale());
+        const auto &scale = sequence.selectedScale(_project.scale(), _project.scaleRotate());
         int scaleSize = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
         if (scaleSize > 16) {
             _bank = std::min(1, _bank + 1);
@@ -1583,7 +1583,7 @@ void StochasticSequenceEditPage::encoder(EncoderEvent &event) {
 void StochasticSequenceEditPage::handlePitchEncoder(EncoderEvent &event) {
     auto &track = _project.selectedTrack().stochasticTrack();
     auto &sequence = track.sequence(_project.selectedPatternIndex());
-    auto &scale = sequence.selectedScale(_project.scale());
+    const auto &scale = sequence.selectedScale(_project.scale(), _project.scaleRotate());
     int scaleSize = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
 
     switch (_editFocus) {

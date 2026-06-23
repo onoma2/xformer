@@ -6,6 +6,7 @@
 #include "apps/sequencer/model/Project.h"
 #include "apps/sequencer/model/Routing.h"
 #include "apps/sequencer/model/RouteParamKey.h"
+#include "apps/sequencer/model/Scale.h"
 
 #include <cmath>
 
@@ -99,7 +100,13 @@ CASE("PhaseFlux scale: base never mutated (defect fix) + selectedScale uses over
     seq.setScale(5);
     Routing::writeRouteOverride(ParamKey::Scale, kTrack, 3.f);
     expectEqual(seq.scale(), 8, "override read");
-    expectEqual(&seq.selectedScale(0), &Scale::get(8), "selectedScale follows override");
+    {
+        auto view = seq.selectedScale(0, 0);
+        const Scale &expected = Scale::get(8);
+        for (int d : {0, 1, 4, 7}) {
+            expectEqual(view.noteToVolts(d), expected.noteToVolts(d), "selectedScale follows override");
+        }
+    }
     Routing::clearRouteOverrides();
     expectEqual(seq.scale(), 5, "base intact after clear");
 }
@@ -281,7 +288,7 @@ CASE("Curve sequence chaosAmount: base-anchored read + clamp (unipolar 0..100)")
 
 // Tuesday sequence getters migrate onto routedValueInt the same way. Track 0 in
 // Tuesday mode carries trackIndex 0 (set by Project::setTrackMode).
-CASE("Tuesday algorithm: base-anchored read + stale clear (discrete 0..14)") {
+CASE("Tuesday algorithm: base-anchored read + stale clear (discrete 0..15)") {
     Routing::clearRouteOverrides();
     Project p;
     p.setTrackMode(0, Track::TrackMode::Tuesday);
@@ -293,7 +300,7 @@ CASE("Tuesday algorithm: base-anchored read + stale clear (discrete 0..14)") {
     expectEqual(seq.algorithm(), 9, "override -> base + delta");
 
     Routing::writeRouteOverride(ParamKey::Algorithm, 0, 100.f);
-    expectEqual(seq.algorithm(), 14, "clamps hi to 14");
+    expectEqual(seq.algorithm(), 15, "clamps hi to 15");
 
     Routing::clearRouteOverrides();
     expectEqual(seq.algorithm(), 5, "stale clear -> base restored");
@@ -454,6 +461,22 @@ CASE("Stochastic scale: Default(-1) preserved unrouted, clamps to 0..23 under ro
 
     Routing::clearRouteOverrides();
     expectEqual(seq.scale(), 20, "stale clear -> base restored");
+}
+
+// Saturating the Scale route must reach the highest LOADED index, Scale::Count-1
+// (a user-scale slot, beyond the 20 builtins), and never exceed it.
+CASE("Stochastic scale: routed clamp tracks Scale::Count-1, not literal 23") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Stochastic);
+    auto &seq = p.track(0).stochasticTrack().sequence(0);
+
+    seq.setScale(0);
+    Routing::writeRouteOverride(ParamKey::Scale, 0, 1000.f);
+    expectEqual(seq.scale(), Scale::Count - 1, "saturates to highest loaded index");
+    expectTrue(seq.scale() < Scale::Count, "never exceeds loaded scale count");
+
+    Routing::clearRouteOverrides();
 }
 
 // DiscreteMap sequence getters migrate onto routedValueInt/routedValue. Track 0
@@ -657,6 +680,41 @@ CASE("DiscreteMap: a routed param fans out to both a pattern and the snapshot sl
 
     Routing::clearRouteOverrides();
     expectEqual(snap.divisor(), 48, "stale clear -> snapshot base restored");
+}
+
+// selectedScale resolver: rotate inherits the project rotate when scaleRotate is
+// -1, rotates regardless when set; rotate 0 reproduces the base scale's pitch.
+CASE("selectedScale resolves rotation: inherit, override, identity") {
+    Routing::clearRouteOverrides();
+    NoteSequence seq(kTrack);
+    seq.setScale(8);
+    const Scale &base = Scale::get(8);
+
+    seq.setScaleRotate(-1);
+    {
+        auto inherited = seq.selectedScale(8, 3);   // project rotate 3 flows through
+        auto direct    = RotatedScaleView(base, 3);
+        for (int d : {0, 1, 4, 7}) {
+            expectEqual(inherited.noteToVolts(d), direct.noteToVolts(d), "inherit project rotate");
+        }
+    }
+
+    seq.setScaleRotate(2);
+    {
+        auto rotated = seq.selectedScale(8, 0);     // ignores project rotate
+        auto direct  = RotatedScaleView(base, 2);
+        for (int d : {0, 1, 4, 7}) {
+            expectEqual(rotated.noteToVolts(d), direct.noteToVolts(d), "track rotate wins over project");
+        }
+    }
+
+    seq.setScaleRotate(0);
+    {
+        auto identity = seq.selectedScale(8, 0);
+        for (int d : {0, 1, 4, 7}) {
+            expectEqual(identity.noteToVolts(d), base.noteToVolts(d), "rotate 0 == base output");
+        }
+    }
 }
 
 } // UNIT_TEST

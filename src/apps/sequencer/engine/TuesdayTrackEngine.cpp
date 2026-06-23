@@ -1651,11 +1651,8 @@ float TuesdayTrackEngine::scaleToVolts(int noteIndex, int octave) const {
     const auto &sequence = tuesdayTrack().sequence(pattern());
     const auto &project = _model.project();
 
-    // 1. Resolve which Scale to use
-    int trackScaleIdx = sequence.scale();
-    const Scale &scale = (trackScaleIdx < 0)
-        ? project.selectedScale()   // -1 = use project scale
-        : Scale::get(trackScaleIdx); // 0+ = use specific scale (0 = Semitones/chromatic)
+    // 1. Resolve which Scale to use (track override falls back to project, rotation applied)
+    const auto scale = sequence.selectedScale(project.scale(), project.scaleRotate());
 
     // 2. Resolve Root Note
     int trackRoot = sequence.rootNote();

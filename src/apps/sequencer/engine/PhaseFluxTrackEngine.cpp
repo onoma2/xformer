@@ -305,7 +305,7 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
     if (pulseCount < 0) pulseCount = 0;
     if (pulseCount > kMaxPulses) pulseCount = kMaxPulses;
 
-    const Scale &scale = _sequence->selectedScale(_model.project().scale());
+    const Scale &scale = _sequence->selectedScale(_model.project().scale(), _model.project().scaleRotate());
     const int rootNote = _sequence->selectedRootNote(_model.project().rootNote());
     const int octave = _phaseFluxTrack.octave();
     const int transpose = _phaseFluxTrack.transpose();
@@ -673,7 +673,7 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
     if (_phaseFluxTrack.cvUpdateMode() == PhaseFluxTrack::CvUpdateMode::Always) {
         const auto &stage = _sequence->stage(_activeCell);
         if (!stage.skip()) {
-            const Scale &scale = _sequence->selectedScale(_model.project().scale());
+            const Scale &scale = _sequence->selectedScale(_model.project().scale(), _model.project().scaleRotate());
             const int rootNote = _sequence->selectedRootNote(_model.project().rootNote());
             const int octave = _phaseFluxTrack.octave();
             const int transpose = _phaseFluxTrack.transpose();

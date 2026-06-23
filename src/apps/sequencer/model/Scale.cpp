@@ -67,6 +67,7 @@ static const Scale *scales[] = {
 };
 
 static const int BuiltinCount = sizeof(scales) / sizeof(Scale *);
+static_assert(int(sizeof(scales) / sizeof(scales[0])) == Scale::MaxCount - CONFIG_USER_SCALE_COUNT, "Scale::MaxCount drifted from scales[]");
 static const int UserCount = UserScale::userScales.size();
 
 int Scale::Count = BuiltinCount + UserCount;

@@ -1,5 +1,6 @@
 #include "Routing.h"
 
+#include "Scale.h"
 #include "Project.h"
 #include "ProjectVersion.h"
 
@@ -378,7 +379,7 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     [int(Routing::Target::Divisor)]                         = { 1,      768,    6,      24,     1       },
     [int(Routing::Target::ClockMult)]                       = { 50,     150,    50,     150,    10      },
     [int(Routing::Target::Phase)]                           = { 0,      1,      0,      1,      1       },
-    [int(Routing::Target::Scale)]                           = { 0,      23,     0,      23,     1       },
+    [int(Routing::Target::Scale)]                           = { 0,      Scale::MaxCount - 1, 0, Scale::MaxCount - 1, 1 },
     [int(Routing::Target::RootNote)]                        = { 0,      11,     0,      11,     1       },
     // Tuesday targets
     [int(Routing::Target::Algorithm)]                       = { 0,      14,     0,      14,     1       },

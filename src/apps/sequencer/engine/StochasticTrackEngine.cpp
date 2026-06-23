@@ -289,7 +289,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         _stepCacheRefreshPending = false;
     }
 
-    const auto &scale = sequence.selectedScale(_model.project().scale());
+    const auto &scale = sequence.selectedScale(_model.project().scale(), _model.project().scaleRotate());
     int rootNote = sequence.selectedRootNote(_model.project().rootNote());
 
     // Regenerate Loop sources for any domain marked invalid (e.g. patience
@@ -601,7 +601,7 @@ void StochasticTrackEngine::rollPatience() {
 void StochasticTrackEngine::rollCycleEndHooks() {
     auto &sequence = this->sequence();
     auto &track = stochasticTrack();
-    const auto &scale = sequence.selectedScale(_model.project().scale());
+    const auto &scale = sequence.selectedScale(_model.project().scale(), _model.project().scaleRotate());
     int rootNote = sequence.selectedRootNote(_model.project().rootNote());
 
     // Proteus-style octave walk — random ±1 each fire, reflected at the
@@ -661,7 +661,7 @@ void StochasticTrackEngine::renewRhythm() {
 void StochasticTrackEngine::renewMelody() {
     auto &seq = sequence();
     auto &trk = stochasticTrack();
-    const auto &scale = seq.selectedScale(_model.project().scale());
+    const auto &scale = seq.selectedScale(_model.project().scale(), _model.project().scaleRotate());
     int rootNote = seq.selectedRootNote(_model.project().rootNote());
     StochasticGenerator::generateMelody(seq, trk, scale, rootNote, _rng.next());
     seq.setMelodyValid(true);
@@ -716,7 +716,7 @@ bool StochasticTrackEngine::undoRenewMelody() {
     if (!_undoSeedMelodyValid) return false;
     auto &seq = sequence();
     auto &trk = stochasticTrack();
-    const auto &scale = seq.selectedScale(_model.project().scale());
+    const auto &scale = seq.selectedScale(_model.project().scale(), _model.project().scaleRotate());
     int rootNote = seq.selectedRootNote(_model.project().rootNote());
     StochasticGenerator::generateMelody(seq, trk, scale, rootNote, _undoSeedMelody);
     _loopCycleCountMelody = 0;
@@ -729,7 +729,7 @@ bool StochasticTrackEngine::undoRenewMelody() {
 void StochasticTrackEngine::refreshLoopSources() {
     auto &seq = sequence();
     auto &trk = stochasticTrack();
-    const auto &scale = seq.selectedScale(_model.project().scale());
+    const auto &scale = seq.selectedScale(_model.project().scale(), _model.project().scaleRotate());
     int rootNote = seq.selectedRootNote(_model.project().rootNote());
 
     // Regenerate both stored event domains. Loop plays the new pattern; Live
@@ -836,7 +836,7 @@ void StochasticTrackEngine::refreshStepCache() {
     uint32_t divisor = effectiveDivisor();
     // Scale + rootNote are passed so the cache can bake melody-domain picks
     // (anchor pitches in Loop melody, cluster-tail Generate-mode pitches).
-    const auto &scale = seq.selectedScale(_model.project().scale());
+    const auto &scale = seq.selectedScale(_model.project().scale(), _model.project().scaleRotate());
     int rootNote = seq.selectedRootNote(_model.project().rootNote());
     stochastic_cache::rebuildStepCache(
         _stepCache, seq, divisor, seq.rhythmSeed(), &scale, &trk, rootNote,

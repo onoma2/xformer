@@ -5,6 +5,7 @@
 #include "Serialize.h"
 #include "ModelUtils.h"
 #include "Scale.h"
+#include "RotatedScale.h"
 #include "Routing.h"
 #include "Bitfield.h"
 #include "RouteParamKey.h"
@@ -318,7 +319,7 @@ public:
     // This controls OUTPUT quantization, not algorithm behavior
 
     int rawScale() const { return int(_scaleGroup.scale) - 1; }
-    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, rawScale(), 0, 23); }
+    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, rawScale(), 0, Scale::Count - 1); }
     void setScale(int scale) {
         _scaleGroup.scale = clamp(scale, -1, Scale::Count - 1) + 1;
     }
@@ -352,6 +353,12 @@ public:
     int scaleRotate() const { return int(_scaleGroup.scaleRotate) - 1; }
     void setScaleRotate(int scaleRotate) {
         _scaleGroup.scaleRotate = clamp(scaleRotate, -1, 31) + 1;
+    }
+
+    RotatedScaleView selectedScale(int projectScale, int projectRotate) const {
+        int idx    = scale()       < 0 ? projectScale  : scale();
+        int rotate = scaleRotate() < 0 ? projectRotate : scaleRotate();
+        return RotatedScaleView(Scale::get(idx), rotate);
     }
 
     void printRootNote(StringBuilder &str) const {

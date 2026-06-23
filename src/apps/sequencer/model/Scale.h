@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Types.h"
+#include "Config.h"
 
 #include "core/utils/StringBuilder.h"
 #include "core/math/Math.h"
@@ -33,6 +34,7 @@ public:
     virtual int notesPerOctave() const = 0;
 
     static int Count;
+    static constexpr int MaxCount = 20 + CONFIG_USER_SCALE_COUNT;
     static const Scale &get(int index);
     static const char *name(int index);
 

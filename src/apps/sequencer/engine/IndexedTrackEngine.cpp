@@ -371,7 +371,7 @@ void IndexedTrackEngine::triggerStep() {
         const float routeBValue = (routeB.source == IndexedSequence::RouteSource::A) ? cvA : cvB;
 
         // Get scale size for note index routing (100% = 1 octave)
-        const Scale &scale = _sequence->selectedScale(_model.project().selectedScale());
+        const Scale &scale = _sequence->selectedScale(_model.project().scale(), _model.project().scaleRotate());
         int scaleSize = scale.notesPerOctave();
 
         // Check if routes should be combined
@@ -439,7 +439,7 @@ void IndexedTrackEngine::triggerStep() {
 }
 
 float IndexedTrackEngine::noteIndexToVoltage(int8_t noteIndex) const {
-    const Scale &scale = _sequence->selectedScale(_model.project().selectedScale());
+    const Scale &scale = _sequence->selectedScale(_model.project().scale(), _model.project().scaleRotate());
     int rootNote = _sequence->rootNote();
     if (rootNote < 0) {
         rootNote = _model.project().rootNote();

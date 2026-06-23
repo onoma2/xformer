@@ -70,7 +70,7 @@ public:
             switch (Item(row)) {
             case Gate:                          str(step.gate() ? "On" : "Off"); break;
             case GateProbability:               str("%d", step.gateProbability()); break;
-            case Note:                          _sequence->printNote(str, step.note(), _project->rootNote(), _project->scale()); break;
+            case Note:                          _sequence->printNote(str, step.note(), _project->rootNote(), _project->scale(), _project->scaleRotate()); break;
             case NoteVariationProbability:      str("%d", step.noteVariationProbability()); break;
             case NoteOctaveProbability:         str("%d", step.noteOctaveProbability()); break;
             case Length:                        str("%d", step.length()); break;

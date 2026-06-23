@@ -1160,7 +1160,7 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
     }
 
     // Reachable-degree histogram + top 4 by count.
-    const Scale &scale = seq.selectedScale(_model.project().scale());
+    const Scale &scale = seq.selectedScale(_model.project().scale(), _model.project().scaleRotate());
     const int rootNote = seq.selectedRootNote(_model.project().rootNote());
     const int octave = phaseFluxTrack().octave();
     const int transpose = phaseFluxTrack().transpose();
@@ -1736,7 +1736,7 @@ void PhaseFluxEditPage::drawParamList(Canvas &canvas) {
         } else {
             labels[0] = "Note";
             {
-                const Scale &scale = seq.selectedScale(_model.project().scale());
+                const Scale &scale = seq.selectedScale(_model.project().scale(), _model.project().scaleRotate());
                 int rootNote = seq.selectedRootNote(_model.project().rootNote());
                 scale.noteName(values[0], activeStage.basePitch(), rootNote, Scale::Short1);
             }
@@ -1752,7 +1752,7 @@ void PhaseFluxEditPage::drawParamList(Canvas &canvas) {
             labels[2] = "Resp";  values[2]("%+d", activeStage.pitchResponse());
             labels[3] = "Note";
             {
-                const Scale &scale = seq.selectedScale(_model.project().scale());
+                const Scale &scale = seq.selectedScale(_model.project().scale(), _model.project().scaleRotate());
                 int rootNote = seq.selectedRootNote(_model.project().rootNote());
                 scale.noteName(values[3], activeStage.basePitch(), rootNote, Scale::Short1);
             }

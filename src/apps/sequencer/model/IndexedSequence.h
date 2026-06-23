@@ -5,6 +5,7 @@
 #include "ModelUtils.h"
 #include "Types.h"
 #include "Scale.h"
+#include "RotatedScale.h"
 #include "Bitfield.h"
 #include "ProjectVersion.h"
 #include "Routing.h"
@@ -319,7 +320,7 @@ public:
 
     // scale selection (-1 = Project scale, 0..N = Track scale)
     int rawScale() const { return int(_scaleGroup.scale) - 1; }
-    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, rawScale(), 0, 23); }
+    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, rawScale(), 0, Scale::Count - 1); }
     void setScale(int scale) {
         _scaleGroup.scale = clamp(scale, -1, Scale::Count - 1) + 1;
     }
@@ -657,8 +658,10 @@ public:
     }
     void setTrackIndex(int trackIndex) { _trackIndex = trackIndex; }
 
-    const Scale &selectedScale(const Scale &projectScale) const {
-        return scale() < 0 ? projectScale : Scale::get(scale());
+    RotatedScaleView selectedScale(int projectScale, int projectRotate) const {
+        int idx    = scale()       < 0 ? projectScale  : scale();
+        int rotate = scaleRotate() < 0 ? projectRotate : scaleRotate();
+        return RotatedScaleView(Scale::get(idx), rotate);
     }
 
     // UI helper methods

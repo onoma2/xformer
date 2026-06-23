@@ -214,7 +214,7 @@ void IndexedStepsPage::StepListModel::cell(int row, int column, StringBuilder &s
         if (isNoteRow(row)) {
             // Display note index with scale note name if available
             if (_project) {
-                const Scale &scale = _sequence->selectedScale(_project->selectedScale());
+                const Scale &scale = _sequence->selectedScale(_project->scale(), _project->scaleRotate());
                 FixedStringBuilder<8> noteName;
                 int rootNote = _sequence->rootNote() < 0 ? _project->rootNote() : _sequence->rootNote();
                 const auto &track = _project->selectedTrack().indexedTrack();
