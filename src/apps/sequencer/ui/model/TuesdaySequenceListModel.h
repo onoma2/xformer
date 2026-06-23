@@ -101,6 +101,7 @@ private:
         ResetMeasure,
         Scale,
         RootNote,
+        ScaleRotate,
         MaskParameter,
         TimeMode,
         MaskProgression,
@@ -128,6 +129,7 @@ private:
         case ResetMeasure:  return "Reset Measure";
         case Scale:         return "Scale";
         case RootNote:      return "Root Note";
+        case ScaleRotate:   return "Scale Rotate";
         case MaskParameter: return "Mask Param";
         case TimeMode: return "Time Mode";
         case MaskProgression: return "Mask Prog";
@@ -199,6 +201,11 @@ private:
         case RootNote:
             _sequence->printRootNote(str);
             break;
+        case ScaleRotate: {
+            int r = _sequence->scaleRotate();
+            if (r < 0) str("Default"); else str("%d", r);
+            break;
+        }
         case MaskParameter:
             _sequence->printMaskParameter(str);
             break;
@@ -271,6 +278,9 @@ private:
             break;
         case RootNote:
             _sequence->editRootNote(value, shift);
+            break;
+        case ScaleRotate:
+            _sequence->setScaleRotate(_sequence->scaleRotate() + value);
             break;
         case MaskParameter:
             _sequence->editMaskParameter(value, shift);

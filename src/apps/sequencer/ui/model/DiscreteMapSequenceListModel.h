@@ -23,6 +23,7 @@ public:
         RangeLow,
         Scale,
         RootNote,
+        ScaleRotate,
         SlewTime,
         Pluck,
         Octave,
@@ -98,6 +99,7 @@ private:
         case RangeLow:      return "Below";
         case Scale:         return "Scale";
         case RootNote:      return "Root";
+        case ScaleRotate:   return "Scale Rotate";
         case SlewTime:      return "Slew";
         case Pluck:         return "Pluck";
         case Octave:        return "Octave";
@@ -150,6 +152,11 @@ private:
         case RootNote:
             _sequence->printRootNote(str);
             break;
+        case ScaleRotate: {
+            int r = _sequence->scaleRotate();
+            if (r < 0) str("Default"); else str("%d", r);
+            break;
+        }
         case SlewTime:
             _sequence->printSlewTime(str);
             break;
@@ -207,6 +214,9 @@ private:
             break;
         case RootNote:
             _sequence->editRootNote(value, shift);
+            break;
+        case ScaleRotate:
+            _sequence->setScaleRotate(_sequence->scaleRotate() + value);
             break;
         case SlewTime:
             _sequence->editSlewTime(value, shift);

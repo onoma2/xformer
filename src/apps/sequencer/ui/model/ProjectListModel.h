@@ -55,6 +55,7 @@ private:
         AlwaysSync,
         Scale,
         RootNote,
+        ScaleRotate,
         MonitorMode,
         RecordMode,
         MidiInput,
@@ -76,6 +77,7 @@ private:
         case AlwaysSync:            return "Sync Patterns";
         case Scale:                 return "Scale";
         case RootNote:              return "Root Note";
+        case ScaleRotate:           return "Scale Rotate";
         case MonitorMode:           return "Monitor Mode";
         case RecordMode:            return "Record Mode";
         case MidiInput:             return "MIDI Input";
@@ -118,6 +120,9 @@ private:
             break;
         case RootNote:
             _project.printRootNote(str);
+            break;
+        case ScaleRotate:
+            str("%d", _project.scaleRotate());
             break;
         case MonitorMode:
             _project.printMonitorMode(str);
@@ -172,6 +177,9 @@ private:
             break;
         case RootNote:
             _project.editRootNote(value, shift);
+            break;
+        case ScaleRotate:
+            _project.setScaleRotate(_project.scaleRotate() + value);
             break;
         case MonitorMode:
             _project.editMonitorMode(value, shift);

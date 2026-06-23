@@ -53,6 +53,7 @@ private:
         CyclePhaseWarp,
         Scale,
         RootNote,
+        ScaleRotate,
         ResetMeasure,
         Last
     };
@@ -77,6 +78,7 @@ private:
         case CyclePhaseWarp: return "Cycle Warp";
         case Scale:          return "Scale";
         case RootNote:       return "Root";
+        case ScaleRotate:    return "Scale Rotate";
         case ResetMeasure:   return "Reset Measure";
         case Last:           break;
         }
@@ -105,6 +107,11 @@ private:
         case CyclePhaseWarp: _sequence->printCyclePhaseWarp(str); break;
         case Scale:          _sequence->printScale(str); break;
         case RootNote:       _sequence->printRootNote(str); break;
+        case ScaleRotate: {
+            int r = _sequence->scaleRotate();
+            if (r < 0) str("Default"); else str("%d", r);
+            break;
+        }
         case ResetMeasure:   _sequence->printResetMeasure(str); break;
         case Last:           break;
         }
@@ -130,6 +137,7 @@ private:
         case CyclePhaseWarp: _sequence->editCyclePhaseWarp(value, shift); break;
         case Scale:          _sequence->editScale(value, shift); break;
         case RootNote:       _sequence->editRootNote(value, shift); break;
+        case ScaleRotate:    _sequence->setScaleRotate(_sequence->scaleRotate() + value); break;
         case ResetMeasure:   _sequence->editResetMeasure(value, shift); break;
         case Last:           break;
         }

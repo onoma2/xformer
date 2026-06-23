@@ -24,6 +24,7 @@ public:
         ResetMeasure,
         Scale,
         RootNote,
+        ScaleRotate,
         Last
     };
 
@@ -108,6 +109,7 @@ private:
         case ResetMeasure:      return "Reset Measure";
         case Scale:             return "Scale";
         case RootNote:          return "Root Note";
+        case ScaleRotate:       return "Scale Rotate";
         case Last:              break;
         }
         return nullptr;
@@ -161,6 +163,11 @@ private:
         case RootNote:
             _sequence->printRootNote(str);
             break;
+        case ScaleRotate: {
+            int r = _sequence->scaleRotate();
+            if (r < 0) str("Default"); else str("%d", r);
+            break;
+        }
         case Last:
             break;
         }
@@ -210,6 +217,9 @@ private:
         case RootNote:
             _sequence->editRootNote(value, shift);
             break;
+        case ScaleRotate:
+            _sequence->setScaleRotate(_sequence->scaleRotate() + value);
+            break;
         case Last:
             break;
         }
@@ -240,6 +250,8 @@ private:
             return Scale::Count + 1;
         case RootNote:
             return 12 + 1;
+        case ScaleRotate:
+            return -1;
         case Last:
             break;
         }
@@ -276,6 +288,8 @@ private:
             return _sequence->indexedScale();
         case RootNote:
             return _sequence->indexedRootNote();
+        case ScaleRotate:
+            return -1;
         case Last:
             break;
         }
@@ -312,6 +326,8 @@ private:
             return _sequence->setIndexedScale(index);
         case RootNote:
             return _sequence->setIndexedRootNote(index);
+        case ScaleRotate:
+            return;
         case Last:
             break;
         }

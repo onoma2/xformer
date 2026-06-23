@@ -10,6 +10,7 @@ const NoteSequenceListModel::Item NoteSequenceListModel::linearItems[] = {
     ResetMeasure,
     Scale,
     RootNote,
+    ScaleRotate,
     Last
 };
 
@@ -26,6 +27,7 @@ const NoteSequenceListModel::Item NoteSequenceListModel::reneItems[] = {
     ResetMeasure,
     Scale,
     RootNote,
+    ScaleRotate,
     Last
 };
 
@@ -42,5 +44,6 @@ const NoteSequenceListModel::Item NoteSequenceListModel::ikraItems[] = {
     ResetMeasure,
     Scale,
     RootNote,
+    ScaleRotate,
     Last
 };

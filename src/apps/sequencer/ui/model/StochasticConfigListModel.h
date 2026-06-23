@@ -15,6 +15,7 @@ public:
         ResetMeasure,
         Scale,
         RootNote,
+        ScaleRotate,
         Octave,
         Transpose,
         CvUpdateMode,
@@ -49,6 +50,7 @@ public:
             case ResetMeasure:  str("Reset Measure"); break;
             case Scale:         str("Scale"); break;
             case RootNote:      str("Root Note"); break;
+            case ScaleRotate:   str("Scale Rotate"); break;
             case Octave:        str("Octave"); break;
             case Transpose:     str("Transpose"); break;
             case CvUpdateMode:  str("CV Update"); break;
@@ -65,6 +67,11 @@ public:
             case ResetMeasure:  sequence.printResetMeasure(str); break;
             case Scale:         sequence.printScale(str); break;
             case RootNote:      sequence.printRootNote(str); break;
+            case ScaleRotate: {
+                int r = sequence.scaleRotate();
+                if (r < 0) str("Default"); else str("%d", r);
+                break;
+            }
             case Octave:        _track->printOctave(str); break;
             case Transpose:     _track->printTranspose(str); break;
             case CvUpdateMode:  _track->printCvUpdateMode(str); break;
@@ -86,6 +93,7 @@ public:
             case ResetMeasure:  sequence.editResetMeasure(value, shift); break;
             case Scale:         sequence.editScale(value, shift); break;
             case RootNote:      sequence.editRootNote(value, shift); break;
+            case ScaleRotate:   sequence.setScaleRotate(sequence.scaleRotate() + value); break;
             case Octave:        _track->editOctave(value, shift); break;
             case Transpose:     _track->editTranspose(value, shift); break;
             case CvUpdateMode:  _track->editCvUpdateMode(value, shift); break;

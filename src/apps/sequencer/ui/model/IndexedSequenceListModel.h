@@ -17,6 +17,7 @@ public:
         RunMode,
         Scale,
         RootNote,
+        ScaleRotate,
         FirstStep,
         SyncMode,
         ResetMeasure,
@@ -101,6 +102,7 @@ private:
         case RunMode:       return "Run Mode";
         case Scale:         return "Scale";
         case RootNote:      return "Root Note";
+        case ScaleRotate:   return "Scale Rotate";
         case FirstStep:     return "First Step";
         case SyncMode:      return "Sync";
         case ResetMeasure:  return "Reset Measure";
@@ -139,6 +141,11 @@ private:
         case RootNote:
             _sequence->printRootNote(str);
             break;
+        case ScaleRotate: {
+            int r = _sequence->scaleRotate();
+            if (r < 0) str("Default"); else str("%d", r);
+            break;
+        }
         case FirstStep:
             _sequence->printFirstStep(str);
             break;
@@ -182,6 +189,9 @@ private:
             break;
         case RootNote:
             _sequence->editRootNote(value, shift);
+            break;
+        case ScaleRotate:
+            _sequence->setScaleRotate(_sequence->scaleRotate() + value);
             break;
         case FirstStep:
             _sequence->editFirstStep(value, shift);
