@@ -101,7 +101,7 @@ void MidiOutputEngine::update(bool forceSendCC) {
 
         // send pitch bend requests (value 0..127 -> 14-bit, modulator center 64 = no bend)
         if (sendCC && outputState.hasRequest(OutputState::PitchBend)) {
-            int bend = clamp((int(outputState.control) - 64) * 128 + 8192, 0, 16383);
+            int bend = clamp((int(outputState.control) - 64) * 128, -8192, 8191);
             sendMidi(port, MidiMessage::makePitchBend(channel, bend));
             outputState.clearRequest(OutputState::PitchBend);
         }
