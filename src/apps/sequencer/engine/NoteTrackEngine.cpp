@@ -12,6 +12,8 @@
 #include "model/Scale.h"
 #include "model/HarmonyEngine.h"
 
+#include "os/os.h"
+
 #include <cmath>
 
 static Random rng;
@@ -123,6 +125,7 @@ void NoteTrackEngine::reset() {
     _pulseCounter = 0;
     _activity = false;
     _gateOutput = false;
+    _trigGateActive = false;
     _cvOutput = 0.f;
     _cvOutputTarget = 0.f;
     _slideActive = false;
@@ -365,6 +368,12 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
             _activity = event.gate;
             _gateOutput = (!mute() || fill()) && _activity;
             midiOutputEngine.sendGate(_track.trackIndex(), _gateOutput);
+
+            // Length-0 trig: arm a fixed 6 ms wall-clock gate-off (tempo-independent).
+            if (event.gate && event.trig) {
+                _trigGateActive = true;
+                _trigGateOffTicks = os::ticks() + os::time::ms(6);
+            }
         }
 
 #if CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
@@ -417,6 +426,14 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
 }
 
 void NoteTrackEngine::update(float dt) {
+    // Length-0 trig: drop the gate once the 6 ms wall-clock deadline passes.
+    if (_trigGateActive && int32_t(os::ticks() - _trigGateOffTicks) >= 0) {
+        _gateOutput = false;
+        _activity = false;
+        _engine.midiOutputEngine().sendGate(_track.trackIndex(), false);
+        _trigGateActive = false;
+    }
+
     bool running = _engine.state().running();
     bool recording = _engine.state().recording();
 
@@ -657,6 +674,14 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 }
             }
 
+            // Length-0 trig sentinel: single fixed-6ms pulse, overrides retrigger and HOLD.
+            if (step.length() == 0) {
+#if CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
+                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset, swing()), true, false, MainSequenceId, 0.f, true });
+#else
+                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset, swing()), true, true });
+#endif
+            } else {
             uint32_t stepLength = (divisor * evalStepLength(step, _noteTrack.lengthBias())) / NoteSequence::Length::Range;
 
             // HOLD mode: extend gate length to cover all pulses
@@ -752,12 +777,12 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                     }
 
                     // Schedule gates with metadata (tick accumulator when gate fires)
-                    _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset, swing()), true, shouldTickAccum, seqId, retrigCv });
-                    _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset + retriggerLength / 2, swing()), false, false, seqId, 0.f });
+                    _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset, swing()), true, shouldTickAccum, seqId, retrigCv, false });
+                    _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset + retriggerLength / 2, swing()), false, false, seqId, 0.f, false });
 #else
                     // BURST MODE: Schedule gates without metadata (accumulator already ticked)
-                    _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset, swing()), true });
-                    _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset + retriggerLength / 2, swing()), false });
+                    _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset, swing()), true, false });
+                    _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset + retriggerLength / 2, swing()), false, false });
 #endif
                     retriggerOffset += retriggerLength;
 #if CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
@@ -775,8 +800,8 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                     }
                 }
 
-                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset, swing()), true });
-                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + stepLength, swing()), false });
+                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset, swing()), true, false });
+                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + stepLength, swing()), false, false });
 #else
                 // SPREAD MODE (flag=1): Schedule gates with metadata for retrigger=1
                 const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
@@ -800,9 +825,10 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                     retrigCv += scale.noteToVolts(targetSequence.accumulator().currentValue());
                 }
 
-                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset, swing()), true, shouldTickAccum, seqId, retrigCv });
-                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + stepLength, swing()), false, false, seqId, 0.f });
+                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset, swing()), true, shouldTickAccum, seqId, retrigCv, false });
+                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + stepLength, swing()), false, false, seqId, 0.f, false });
 #endif
+            }
             }
         }
     }

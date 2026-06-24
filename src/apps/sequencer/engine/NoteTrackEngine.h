@@ -25,6 +25,8 @@ public:
         uint8_t sequenceId;           // Which sequence's accumulator (0=main, 1=fill)
         float cvTarget;               // Pre-calculated CV for this gate (for accumulator-driven CV)
 #endif
+        // Length-0 "trig" sentinel: gate-off is wall-clock, not from this queue.
+        bool trig;
     };
 
     struct GateCompare {
@@ -108,6 +110,8 @@ private:
 
     bool _activity;
     bool _gateOutput;
+    bool _trigGateActive = false;
+    uint32_t _trigGateOffTicks = 0;
     float _cvOutput;
     float _cvOutputTarget;
     bool _slideActive;

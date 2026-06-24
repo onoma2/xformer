@@ -298,11 +298,18 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
             break;
         }
         case Layer::Length:
-            SequencePainter::drawLength(
-                canvas,
-                x + 2, y + 18, stepWidth - 4, 6,
-                step.length() + 1, NoteSequence::Length::Range
-            );
+            if (step.length() == 0) {
+                canvas.setFont(Font::Tiny);
+                canvas.setColor(Color::Bright);
+                FixedStringBuilder<8> str("T");
+                canvas.drawText(x + (stepWidth - canvas.textWidth(str) + 1) / 2, y + 20, str);
+            } else {
+                SequencePainter::drawLength(
+                    canvas,
+                    x + 2, y + 18, stepWidth - 4, 6,
+                    step.length() + 1, NoteSequence::Length::Range
+                );
+            }
             break;
         case Layer::LengthVariationRange:
             SequencePainter::drawLengthRange(
@@ -984,15 +991,22 @@ void NoteSequenceEditPage::drawDetail(Canvas &canvas, const NoteSequence::Step &
         break;
     }
     case Layer::Length:
-        SequencePainter::drawLength(
-            canvas,
-            64 + 32 + 8, 32 - 4, 64 - 16, 8,
-            step.length() + 1, NoteSequence::Length::Range
-        );
-        str.reset();
-        str("%.1f%%", 100.f * (step.length() + 1.f) / NoteSequence::Length::Range);
-        canvas.setColor(Color::Bright);
-        canvas.drawTextCentered(64 + 32 + 64, 32 - 4, 32, 8, str);
+        if (step.length() == 0) {
+            str.reset();
+            str("T");
+            canvas.setColor(Color::Bright);
+            canvas.drawTextCentered(64 + 32, 16, 128, 32, str);
+        } else {
+            SequencePainter::drawLength(
+                canvas,
+                64 + 32 + 8, 32 - 4, 64 - 16, 8,
+                step.length() + 1, NoteSequence::Length::Range
+            );
+            str.reset();
+            str("%.1f%%", 100.f * (step.length() + 1.f) / NoteSequence::Length::Range);
+            canvas.setColor(Color::Bright);
+            canvas.drawTextCentered(64 + 32 + 64, 32 - 4, 32, 8, str);
+        }
         break;
     case Layer::LengthVariationRange:
         SequencePainter::drawLengthRange(
