@@ -6,7 +6,7 @@ gains a sequencer identity — per-step chord *recipes*, per-pattern progression
 routable params. It reads a **raw CV source**, quantizes it to a selectable root/scale, harmonises
 it into up to four voices, and re-samples on a Rings-style sample-and-hold trigger.
 
-**Decision (v0.2):** this is a **Track**, not a global engine. The instrument is a sequencer;
+This is a **Track**, not a global engine. The instrument is a sequencer;
 harmony belongs as a track. Reuse `model/HarmonyEngine.h`'s inversion/voicing/interval-apply math;
 its quality enum + diatonic table are a reduced stub (see §2) and get **replaced**, not reused. The
 track is the shell that adds sequencing, patterns, and routing. (Engine-vs-track was weighed; RAM
@@ -33,8 +33,7 @@ quantizes it against its **own** harmonic context — exactly the harmonàig inp
 - **Quantise:** snap the raw CV to the **nearest enabled chromatic step** (§2g mask), over the
   tuning's full chromatic axis (12 for 12-TET, `notesPerOctave()` for n-TET). The landed step is the
   **root**; its chromatic **degree** relative to the track root indexes the chord preset (§2).
-- Works with any source, quantised or not — the track always quantises into its own scale (no
-  "assumes source pre-quantised" hedge from v0.1).
+- Works with any source, quantised or not — the track always quantises into its own scale.
 
 ---
 
@@ -95,7 +94,7 @@ where a pure rotation gives Δ7. Those live in the alt table (§2c).
 
 The chromatic-passing chords are authored per mode, not derivable from the rotation. Each mode
 overrides **~2–4** of its off-scale slots vs the CANON rotation (measured so far: Phrygian 3, Lydian 2,
-Aeolian 3, Locrian 4) — so the major bank alone is **~20 overrides, not the 3** first assumed. Store as
+Aeolian 3, Locrian 4) — so the major bank alone is **~20 overrides**. Store as
 a sparse `alt` table keyed on `(bank, scaleRotate, degree) → quality`; at resolve time it replaces the
 CANON-rotation result at that cell.
 
@@ -184,7 +183,7 @@ Octave-shift math on the four 1V/oct values (reuse `HarmonyEngine.h`):
 ### 3a. Transpose controls — three (one is just Performer's)
 
 Three offsets, always-on (digital — no Mode toggle or auto-timeout; those are one-fader hardware
-affordances). Fine-tune is dropped — a digital track outputs quantised CV, DAC calibration handles tuning.
+affordances). No fine-tune — a digital track outputs quantised CV, DAC calibration handles tuning.
 
 - **Degree Rotate** — *per-step + routable*. Rotates the harmonised degree over the **12 chromatic
   CANON degrees** → **re-harmonises** to a different chord (incl. off-scale interchange). The
@@ -282,7 +281,9 @@ a free clock unless the internal-counter source is assigned).
 Add a `Routing::Target` block (`HarmonyFirst..HarmonyLast`) mirroring `TuesdayFirst..TuesdayLast`:
 **Inversion, Voicing, Quality, Degree Rotate, Strum, Mask Rotate** (§2g) (the overall Transpose rides the
 standard track-transpose routing, not this block). A routed value **offsets the per-step base** (same convention as other tracks), so a CurveTrack/CV can
-modulate harmony live without fighting the step locks. **Quality** offsets as a wrapping index into
+modulate harmony live without fighting the step locks. Routed **depth scales to the destination's
+range** — full depth sweeps the param's full span, so wide targets (Strum-Time, Quality) modulate
+full-scale, not by a token step. **Quality** offsets as a wrapping index into
 the ordered quality enum (`Auto` + 8 canon + 5 extras = 14, §2a) — a routed sweep walks
 `Auto → canon → extras`.
 
@@ -342,7 +343,7 @@ the ordered quality enum (`Auto` + 8 canon + 5 extras = 14, §2a) — a routed s
 
 - **Trio:** `model/HarmonyTrack.h`, `model/HarmonySequence.h`, `engine/HarmonyTrackEngine.h` —
   standard NoteTrack/CurveTrack precedent. Reuses `model/HarmonyEngine.h` for the math.
-- **RAM (corrected from v0.1 — it is a *fit-check*, not an automatic ×8):** the model/engine
+- **RAM (a *fit-check*, not an automatic ×8):** the model/engine
   containers are sized to their *largest* variant, so a new TrackMode adds RAM **only for bytes it
   exceeds the cap by**. Fit checks: `sizeof(HarmonySequence) ≤ NoteSequence` (model cap ≈ 9544 B)
   and `sizeof(HarmonyTrackEngine) ≤ largest engine variant (≈ 912 B)`. A 16-step recipe grid + a
@@ -350,7 +351,7 @@ the ordered quality enum (`Auto` + 8 canon + 5 extras = 14, §2a) — a routed s
   RAM. **Measure** both against the caps in `PROJECT.md`; only excess costs ×8.
 - **No ProjectVersion bump.** Per `PROJECT.md` dev rule — adding a `TrackMode` enum value is
   acceptable (old projects read unknown → default); do **not** bump `ProjectVersion.h` or add
-  migration. (v0.1's "add to ProjectVersion.h" is struck.)
+  migration.
 
 ---
 
@@ -436,9 +437,7 @@ follows whatever `HarmonyEngine` becomes.
 
 ## 12. Open questions
 
-- **Q-rest:** confirm the v0.2 Rest default (hold-voices + advance-cursor) vs hold-without-advance
-  vs gate-off — settle by ear.
-- **Q-strum-overlap:** within the inhibit window a new trigger is dropped (v0.2); confirm vs
+- **Q-strum-overlap:** within the inhibit window a new trigger is dropped; confirm vs
   cancel-restart by ear.
 - **Q-per-pattern-config — RESOLVED.** Per-pattern (SequencePage): Root/Scale/Mode, CV Source,
   Trigger Source, Gate Length. Track-global (TrackPage): Transpose, Tuning. Per-step: Octave + the recipe.
