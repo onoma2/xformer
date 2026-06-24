@@ -370,9 +370,9 @@ public:
         return MidiMessage(ChannelPressure | channel, pressure);
     }
 
-    static MidiMessage makePitchBend(uint8_t channel, int pitchBend) {
-        pitchBend = std::min(0, std::max(0x3fff, pitchBend + 0x2000));
-        return MidiMessage(PitchBend | channel, pitchBend & 0x7f, (pitchBend >> 7) & 0x7f);
+    static MidiMessage makePitchBend(uint8_t channel, int pitchBend) {  // signed −8192..+8191
+        int v = std::max(0, std::min(0x3fff, pitchBend + 0x2000));
+        return MidiMessage(PitchBend | channel, v & 0x7f, (v >> 7) & 0x7f);
     }
 
     static MidiMessage makeSystemExclusive(const uint8_t *data, size_t length) {
