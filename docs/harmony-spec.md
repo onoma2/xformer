@@ -105,11 +105,17 @@ CANON-rotation result at that cell.
 > Still need: major **Dorian, Mixolydian**; HM modes **2/4/5/6/7**. Then validate against rachim's
 > `giHarmonyQual` (the prior decode). **Do not implement the LUT until `alt` is complete.**
 
-### 2d. Per-step quality — `Auto` or absolute
+### 2d. Per-step quality — `Follow`, `Auto`, or absolute
 
-Each step's **Quality** (§5) is either `Auto` — the §2b LUT (or §2e generative) picks the chord for the
-quantised degree — or an **absolute quality** (any of the 8 canon + 5 extras) applied regardless of
-degree. The root still quantises to the scale in both cases.
+Each step's **Quality** (§5) is one of three:
+- **`Follow`** (default) — defer to the **live Quality** (the Chord-page override, §11), so the step
+  inherits whatever's set globally. Mirrors the Inversion/Voicing/Strum per-step convention.
+- **`Auto`** — the §2b LUT (or §2e generative) picks the chord for the quantised degree, ignoring the
+  live value.
+- an **absolute quality** (any of the 8 canon + 5 extras) applied regardless of degree.
+
+The root still quantises to the scale in all cases. `Follow` and `Auto` coincide when the live Quality
+is itself `Auto`; they diverge when it is an absolute (Follow inherits it, Auto recomputes from scale).
 
 ### 2e. Non-curated scales — generative scale-step stacking
 
@@ -249,8 +255,8 @@ A standard 16-step grid, but each step is a harmony **recipe**, not a note. The 
 advances the recipe cursor **accumulator-style** (the advance is event-driven by the trigger, *not*
 a free clock unless the internal-counter source is assigned).
 
-- **Per-step record (bit-packed `HarmonySequence::Step`):** Quality (6b: `Auto`, or one of the 8 canon
-  + 5 extras — §2), Inversion (2b), Voicing (2b), Degree Rotate (signed — the §3a re-harmonise offset
+- **Per-step record (bit-packed `HarmonySequence::Step`):** Quality (6b: `Follow` / `Auto` / one of the
+  8 canon + 5 extras — §2d), Inversion (2b), Voicing (2b), Degree Rotate (signed — the §3a re-harmonise offset
   over 12 chromatic degrees), Strum (direction up/down/alt + time + curve, ~7b — §7), Octave (signed,
   ~4b — §3a), Gate (1b, pass/choke), **Rest (1b)**. ~29 bits — fits a 32-bit word.
 - **Advance:** on a trigger, the cursor steps to the next recipe and applies it to the freshly
@@ -296,7 +302,8 @@ the ordered quality enum (`Auto` + 8 canon + 5 extras = 14, §2a) — a routed s
 - **Strum (per-step, §5):** one trigger fans the voice onsets out over time. **Three core controls:**
   - **direction** — up (V1→VN) / down (VN→V1) / alternate (flip each trigger);
   - **strum-time** — the delay between onsets, **wall-clock ms** via `os::ticks()` (tempo-independent,
-    like a real guitar; reuses the Length-0 trig path);
+    like a real guitar; reuses the Length-0 trig path). Range ~**0–240 ms**: NYSTHI's 10 ms is a tight
+    flam, the upper end is a slow arpeggiated spread;
   - **curve** — the onset *spacing* shape (signed: 0 = linear, + accelerate toward the end, −
     decelerate) — a real strum isn't evenly spaced.
 
