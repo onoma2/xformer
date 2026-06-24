@@ -18,6 +18,8 @@ public:
         GateSource = Last,
         NoteSource,
         VelocitySource,
+        Microtune,
+        BendRange,
         LastNoteItem,
     };
 
@@ -75,6 +77,8 @@ private:
             case GateSource:    return "Gate Source";
             case NoteSource:    return "Note Source";
             case VelocitySource:return "Vel. Source";
+            case Microtune:     return "Microtune";
+            case BendRange:     return "Bend Range";
             case LastNoteItem:  break;
             }
         } else if (_output.isControlChangeEvent()) {
@@ -115,6 +119,12 @@ private:
             case VelocitySource:
                 _output.printVelocitySource(str);
                 break;
+            case Microtune:
+                str(_output.microtune() ? "On" : "Off");
+                break;
+            case BendRange:
+                str("%d st", _output.bendRange());
+                break;
             case LastNoteItem:
             break;
             }
@@ -154,6 +164,12 @@ private:
                 break;
             case VelocitySource:
                 _output.editVelocitySource(value, shift);
+                break;
+            case Microtune:
+                _output.setMicrotune(value > 0);
+                break;
+            case BendRange:
+                _output.editBendRange(value, shift);
                 break;
             case LastNoteItem:
             break;
