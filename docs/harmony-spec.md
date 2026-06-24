@@ -27,10 +27,9 @@ quantizes it against its **own** harmonic context — exactly the harmonàig inp
 - **Source:** any raw-volt signal — another track's `cvOutput()` *or* a physical CV-input jack
   (both are `float channel(i)`, 1V/oct). Selectable: `Track 1–8 | CV In 1–4`.
 - **Context (owned by the harmony track):** selectable **Root/Key** + **Scale** (any Performer scale,
-  incl. user scales) + **scaleRotate** (the mode — a scale-system rotation, §2f) + a
-  **Diatonic ↔ Manual** toggle, all stored in the bias-packed scale group (§2f). The 14 harmonàig
-  modes = base scale (**Major** or **H.Minor**, built-in index 2) × `scaleRotate` 0–6 — no bespoke
-  "mode" list.
+  incl. user scales) + **scaleRotate** (the mode — a scale-system rotation, §2f), stored in the
+  bias-packed scale group (§2f). The 14 harmonàig modes = base scale (**Major** or **H.Minor**,
+  built-in index 2) × `scaleRotate` 0–6 — no bespoke "mode" list.
 - **Quantise:** `note = scale.noteFromVolts(rawCV)` (`Scale` provides `noteFromVolts` /
   `noteToVolts`). The quantised note is the **root**; its chromatic **degree** relative to the track's
   root indexes the harmonisation (§2).
@@ -62,14 +61,17 @@ labels carry many typos) and confirmed by ear.
 | 6 | Augmented-Major 7 | +Δ7 | 0 4 8 11 |
 | 7 | Augmented-Dominant 7 | +7 | 0 4 8 10 |
 
-**4 Manual-mode-only extras** (selectable when Diatonic is off; never produced by the LUT):
-Sus2 `0 2 7`, Sus4 `0 5 7`, 6th `0 4 7 9`, add9 `0 4 7 14`.
+**5 extra qualities** (selectable per step; never produced by `Auto`):
+Sus2 `0 2 7`, Sus4 `0 5 7`, 6th `0 4 7 9`, add9 `0 4 7 14`, **Q4 (open 4ths)** `0 5 10 15` — a quartal
+"So What" stack, also reachable generatively on pentatonic scales (§2e).
 
 ### 2b. Diatonic LUT — two canonical sets, rotated
 
-Each of the 14 modes is one canonical 12-chord chromatic harmonization read from a rotation offset —
-*not* a `[14][12]` grid. Index by **chromatic degree** `d = (quantisedNote − root) mod 12` (this
-kills the `%7` hack). `quality = CANON[(modeOffset + d) mod 12]`, then apply §2c overrides.
+**Storage = CANON + rotation + alt.** Index by **chromatic degree** `d = (quantisedNote − root) mod 12`
+(kills the `%7` hack). Resolve in two steps: `quality = CANON[(modeOffset + d) mod 12]` gives the
+**diatonic backbone** — verified: every mode's *in-scale* chords are a clean rotation of one canon per
+bank — then **`alt[mode][d]` overrides the off-scale (chromatic-passing) chord** wherever the manual
+hand-picks it (§2c). Not a `[14][12]` grid: one CANON per bank + the offsets + a sparse alt table.
 
 **CANON_MAJ** (major bank — quality symbol per degree 0…11):
 `Δ7 · Δ7 · −7 · Δ7 · −7 · Δ7 · ø · 7 · Δ7 · −7 · Δ7 · ø`
@@ -84,29 +86,35 @@ as-built reference **`docs/scale-rotate-modes.md`** — cite it rather than re-d
 - H.Minor: Harmonic-Minor 0 · Locrian♮6 2 · Ionian♯5 3 · Dorian♯4 5 · Phrygian-Dominant 7 · Lydian♯2 8 ·
   Ultralocrian 11.
 
-The in-scale degrees of each mode fall out of this automatically and match the present code's
-correct Ionian column; the off-scale degrees are the manual's chromatic "modal-interchange" chords.
+The in-scale degrees of each mode fall out of the rotation automatically (`CANON` is the base mode's
+column — Ionian for MAJ, Harmonic-Minor for HM). The **off-scale (chromatic-passing) degrees are
+hand-picked per mode** and are *not* the rotation's prediction — the manual reaches for °7 / −7 / ø
+where a pure rotation gives Δ7. Those live in the alt table (§2c).
 
-### 2c. Per-mode overrides (3 cells — kept true to hardware)
+### 2c. Alt — per-mode off-scale overrides
 
-Two canonical slots are notated as a different chord in specific modes; honoured as printed (not
-normalised):
-- **Major bank, `CANON_MAJ[8]` slot** → **°7** (G♯dim7) in **Lydian** & **Mixolydian** — i.e.
-  `scaleRotate ∈ {3, 4}` (Δ7 elsewhere).
-- **Harm-min bank, `CANON_HM[6]` slot** → **ø** (D♯m7♭5) in **Dorian♯4** — i.e. `scaleRotate 3`
-  (Δ7 elsewhere).
+The chromatic-passing chords are authored per mode, not derivable from the rotation. Each mode
+overrides **~2–4** of its off-scale slots vs the CANON rotation (measured so far: Phrygian 3, Lydian 2,
+Aeolian 3, Locrian 4) — so the major bank alone is **~20 overrides, not the 3** first assumed. Store as
+a sparse `alt` table keyed on `(bank, scaleRotate, degree) → quality`; at resolve time it replaces the
+CANON-rotation result at that cell.
 
-Store as a 3-entry override keyed on `(bank, scaleRotate, canonical-slot)` — all plain ints now.
+> **‼️ EXACT ALT VALUES ARE TO BE ADDED.** Transcribe them cell-by-cell from the manual's **parallel**
+> per-mode tables (every example transposed to Middle C — this is the read that finally matched).
+> Have: 5/7 major (Ionian, Phrygian, Lydian, Aeolian, Locrian) + 2/7 HM (Harmonic-Minor, Ionian♯5).
+> Still need: major **Dorian, Mixolydian**; HM modes **2/4/5/6/7**. Then validate against rachim's
+> `giHarmonyQual` (the prior decode). **Do not implement the LUT until `alt` is complete.**
 
-### 2d. Manual mode
+### 2d. Per-step quality — `Auto` or absolute
 
-Diatonic off → quality is fixed to the user's selection (any of the 8, or the 4 extras), regardless
-of degree; the root still quantises to the scale.
+Each step's **Quality** (§5) is either `Auto` — the §2b LUT (or §2e generative) picks the chord for the
+quantised degree — or an **absolute quality** (any of the 8 canon + 5 extras) applied regardless of
+degree. The root still quantises to the scale in both cases.
 
 ### 2e. Non-curated scales — generative scale-step stacking
 
 The curated LUT (§2b) covers the 14 harmonàig modes. For **any other scale** — whole-tone,
-pentatonic, n-tet, or a 32-degree user scale — Diatonic-auto harmonises by **stacking the
+pentatonic, n-tet, or a 32-degree user scale — `Auto` harmonises by **stacking the
 1st/3rd/5th/7th scale-tones** from the quantised degree (the same skip-one rule that derives the
 diatonic in-scale chords). No table needed. Results are the scale's native harmony: augmented triads
 (whole-tone), open quartal voicings (pentatonic), dense clusters (arbitrary user scales). **Ungated**
@@ -154,6 +162,39 @@ affordances). Fine-tune is dropped — a digital track outputs quantised CV, DAC
   whole output, stays in scale. **Reuse the standard track `transpose`/`octave`**, not a bespoke
   harmony param. (Trade: harmonàig's Global Offset was *chromatic*; this is *diatonic/in-scale*.)
 
+### 3b. Tuning — ET / JI
+
+A per-track **Tuning** setup field: `ET` (default) or `JI`. In `JI`, the four output voices are
+retuned to just intervals against the sounding bass. Note *selection* stays equal-tempered (all of §2's
+table work is ET); JI is a **tuning layer on the final CV** — orthogonal to the chord LUT, so it does
+**not** depend on the `alt` table being complete.
+
+**Layout-resolved** (lay the chord out in ET, then retune what's actually sounding — the approach that
+tunes real intervals, not abstract ones):
+1. Build the chord and apply Inversion/Voicing (§3) in ET.
+2. Voice 1 (lowest after voicing) is the ET **anchor** — it carries the quantised root.
+3. For each upper voice: split its interval above the anchor into `octaves + semitone (0–11)`, look up
+   the semitone's just ratio, retune `volts = anchorVolts + octaves + log2(ratio)`. Octaves stay pure
+   2/1; the within-octave interval goes just.
+4. Emit as CV (§7).
+
+**JI ratio table** (semitone above bass → ratio; 5-limit + septimal tritone):
+
+| semis | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| ratio | 16/15 | 9/8 | 6/5 | 5/4 | 4/3 | 7/5 | 3/2 | 8/5 | 5/3 | 9/5 | 15/8 |
+
+`0`/`12` = `1/1`. **Precompute** the eleven `log2(ratio)` values as volt offsets at init — runtime is a
+table lookup + add per voice, **no per-sample math, no runtime `log`**. Four voices retuned once per
+trigger; cost is negligible on the F405 FPU.
+
+**Source:** `Nebulae2/my-good/rachim_hw.instr` — `JIIntervalRatio` (the table) + `ResolveJIMidiFromBass`
+(the retune). Layout-resolved is chosen over the member-stable variant (`HarmonyVoicesJIMemberStable`,
+which tunes pure from the root *before* voicing): voicing then displaces notes by octaves and smears
+those pure intervals, whereas retuning from the sounding bass tunes the intervals you actually hear.
+
+**Deferred:** selectable temperaments (other ratio tables) — ship the 5-limit set first.
+
 ---
 
 ## 4. Sample-and-hold trigger model (Rings-grounded)
@@ -184,8 +225,8 @@ A standard 16-step grid, but each step is a harmony **recipe**, not a note. The 
 advances the recipe cursor **accumulator-style** (the advance is event-driven by the trigger, *not*
 a free clock unless the internal-counter source is assigned).
 
-- **Per-step record (bit-packed `HarmonySequence::Step`):** Quality Override (6b: `Auto` or an
-  absolute quality), Mode (3b), Inversion (2b), Voicing (2b), Degree Rotate (signed — the §3a
+- **Per-step record (bit-packed `HarmonySequence::Step`):** Quality (6b: `Auto`, or one of the 8 canon
+  + 5 extras — §2), Mode (3b), Inversion (2b), Voicing (2b), Degree Rotate (signed — the §3a
   re-harmonise offset over 12 chromatic degrees), Gate (1b, pass/choke), **Rest (1b)**.
   ~22 bits — fits a 32-bit word.
 - **Advance:** on a trigger, the cursor steps to the next recipe and applies it to the freshly
@@ -216,6 +257,9 @@ modulate harmony live without fighting the step locks.
   at staggered absolute-tick offsets (Up-strum: V1 @ tick+0, V2 @ tick+Δ, …). Bipolar Up/Down +
   amount. A new trigger inside the inhibit window (§4) is dropped, so strums don't pile up.
 - Output mapping reuses the existing track-output / `cvOutput` path; no new DAC plumbing.
+- **MIDI out** (polyphonic + microtuned chord) is handled by the **global** MIDI-output layer — see
+  `docs/midi-output-spec.md` (Phase 1 microtuning, Phase 2 polyphony). The chord is a poly source; no
+  bespoke harmony MIDI.
 
 ---
 
@@ -254,8 +298,8 @@ modulate harmony live without fighting the step locks.
   swap, all landed. Harmony consumes the as-built API (§2f); mode→offset table in
   `docs/scale-rotate-modes.md`. Six worked precedents now exist to copy — the scale group, the
   resolver migration, and the "Scale Rotate" list-model row (every sequence + Project have them).
-- Expand `ChordQuality` 4 → 8 (the §2a set, manual order) + the 4 Manual-only extras; widen
-  `ChordIntervalsTable` to match.
+- Expand `ChordQuality` 4 → 8 (the §2 canon set, manual order) + the 5 extras (Sus2/Sus4/6th/add9/Q4);
+  widen `ChordIntervalsTable` to match.
 - Replace `DiatonicChords[7][7]` with `CANON_MAJ[12]` + `CANON_HM[12]` + the 14 rotation offsets +
   the 3-cell override table (§2b/§2c). Lookup by chromatic degree, not `% 7`.
 - Kill the `note % 7` degree hack in `NoteTrackEngine.cpp:967` — compute `(note − root) mod 12`.
@@ -274,7 +318,7 @@ modulate harmony live without fighting the step locks.
 - **EditPage:** 16-step grid; encoder edits the selected step's Inversion / Voicing / Quality /
   Transpose; per-step Rest + Gate toggles.
 - **SequencePage:** list view of the sequence params.
-- **TrackPage (setup):** `CV Source` (Track 1–8 / CV In 1–4), Root/Scale/Mode, Diatonic toggle,
+- **TrackPage (setup):** `CV Source` (Track 1–8 / CV In 1–4), Root/Scale/Mode,
   `Trigger Source` (Off=delta-auto / a gate source / Internal counter), `Transpose` (standard
   diatonic, §3a), `Output Map` (Voice→CV), `Strum` (bipolar Up/Down + amount).
   (Degree Rotate is per-step, so it lives on the EditPage, not here.)
@@ -292,8 +336,8 @@ modulate harmony live without fighting the step locks.
 - **Q-scale-vs-mode — RESOLVED (hybrid, ungated).** Scale = any Performer scale (incl. 32-degree user
   scales). Harmonisation: **curated CANON LUT** for the 14 harmonàig modes (§2b–2c); **generative
   scale-step stacking** (§2e) for every other scale — augmented (whole-tone), quartal (pentatonic),
-  clusters (arbitrary) — ungated (modular: dissonance is a patch away anyway). Manual = fixed quality
-  always. The scale-degree page keeps the broad Scale LUT selector.
+  clusters (arbitrary) — ungated (modular: dissonance is a patch away anyway). A step may override the
+  harmonisation with an absolute quality (§2d). The scale-degree page keeps the broad Scale LUT selector.
 
 ---
 
@@ -309,7 +353,7 @@ modulate harmony live without fighting the step locks.
 ## 14. MVP acceptance
 
 - **A — Compiles & fits.** `HarmonyTrack`/engine fit under the container caps (§9).
-- **B — Passthrough.** Source CV in → quantised root out on Voice 1 unaltered (Manual, root-only).
+- **B — Passthrough.** Source CV in → quantised root out on Voice 1 unaltered (root-only: one voice, no harmonisation).
 - **C — Harmonise.** C4 in → C4/E4/G4/B4 out across four CVs per the step recipe (diatonic).
 - **D — S&H.** Delta-auto trigger fires once per note change on a *glided* source (hysteresis
   proven); assigning a gate source switches to gate-edge triggering.
