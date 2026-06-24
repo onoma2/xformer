@@ -1,6 +1,7 @@
 #include "MidiOutputEngine.h"
 #include "Engine.h"
 #include "WallClock.h"
+#include "MidiTuning.h"
 
 #include "model/Model.h"
 #include "model/MidiOutput.h"
@@ -67,30 +68,42 @@ void MidiOutputEngine::update(bool forceSendCC) {
                 outputState.velocity :
                 int(output.velocitySource()) - int(MidiOutput::Output::VelocitySource::FirstVelocity);
 
-            // ignore note on/off if same note is played (tied notes)
-            if (outputState.hasRequest(OutputState::NoteOn) && outputState.hasRequest(OutputState::NoteOff) && note == outputState.activeNote) {
+            bool mt = output.microtune();
+            bool bendChanged = mt && outputState.signedBend != outputState.activeBend;
+
+            if (mt && bendChanged && outputState.hasRequest(OutputState::NoteOn) &&
+                    note == outputState.activeNote && outputState.activeNote != -1) {
+                // same nearest note, new bend: off -> bend -> on (one MIDI number can't overlap itself)
+                sendMidi(port, MidiMessage::makeNoteOff(channel, outputState.activeNote));
+                sendMidi(port, MidiMessage::makePitchBend(channel, outputState.signedBend));
+                sendMidi(port, MidiMessage::makeNoteOn(channel, note, velocity));
+                outputState.activeNote = note;
+                outputState.activeBend = outputState.signedBend;
+                outputState.clearRequest(OutputState::NoteOn | OutputState::NoteOff);
+            } else {
+                if (outputState.hasRequest(OutputState::NoteOn) && outputState.hasRequest(OutputState::NoteOff) && note == outputState.activeNote) {
+                    outputState.clearRequest(OutputState::NoteOn | OutputState::NoteOff);
+                }
+                if (outputState.hasRequest(OutputState::NoteOn) && outputState.activeNote != note) {
+                    if (mt) {
+                        sendMidi(port, MidiMessage::makePitchBend(channel, outputState.signedBend));
+                    }
+                    sendMidi(port, MidiMessage::makeNoteOn(channel, note, velocity));
+                }
+                if (outputState.hasRequest(OutputState::NoteOff) && outputState.activeNote != -1) {
+                    sendMidi(port, MidiMessage::makeNoteOff(channel, outputState.activeNote));
+                    outputState.activeNote = -1;
+                }
+                if (outputState.hasRequest(OutputState::NoteOn) && outputState.activeNote != -1 && outputState.activeNote != note) {
+                    sendMidi(port, MidiMessage::makeNoteOff(channel, outputState.activeNote));
+                    outputState.activeNote = -1;
+                }
+                if (outputState.hasRequest(OutputState::NoteOn)) {
+                    outputState.activeNote = note;
+                    outputState.activeBend = outputState.signedBend;
+                }
                 outputState.clearRequest(OutputState::NoteOn | OutputState::NoteOff);
             }
-
-            if (outputState.hasRequest(OutputState::NoteOn) && outputState.activeNote != note) {
-                sendMidi(port, MidiMessage::makeNoteOn(channel, note, velocity));
-            }
-
-            if (outputState.hasRequest(OutputState::NoteOff) && outputState.activeNote != -1) {
-                sendMidi(port, MidiMessage::makeNoteOff(channel, outputState.activeNote));
-                outputState.activeNote = -1;
-            }
-
-            if (outputState.hasRequest(OutputState::NoteOn) && outputState.activeNote != -1 && outputState.activeNote != note) {
-                sendMidi(port, MidiMessage::makeNoteOff(channel, outputState.activeNote));
-                outputState.activeNote = -1;
-            }
-
-            if (outputState.hasRequest(OutputState::NoteOn)) {
-                outputState.activeNote = note;
-            }
-
-            outputState.clearRequest(OutputState::NoteOn | OutputState::NoteOff);
         }
 
         // send control change requests
@@ -145,7 +158,14 @@ void MidiOutputEngine::sendCv(int trackIndex, float cv) {
         auto &outputState = _outputStates[outputIndex];
 
         if (output.takesNoteFromTrack(trackIndex)) {
-            outputState.note = clamp(60 + int(std::floor(cv * 12.f + 0.01f)), 0, 127);
+            if (output.event() == MidiOutput::Output::Event::Note && output.microtune()) {
+                int note, bend;
+                cvToNoteBend(cv, output.bendRange(), note, bend);
+                outputState.note = note;
+                outputState.signedBend = bend;
+            } else {
+                outputState.note = clamp(60 + int(std::floor(cv * 12.f + 0.01f)), 0, 127);
+            }
         }
 
         if (output.takesVelocityFromTrack(trackIndex)) {

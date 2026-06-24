@@ -52,6 +52,9 @@ private:
         int8_t velocity;
         int8_t control;
 
+        int16_t signedBend;
+        int16_t activeBend;
+
         int8_t activeNote;
 
         OutputState() { reset(); }
@@ -62,6 +65,9 @@ private:
             slide = 0;
             velocity = 100;
             control = 0;
+
+            signedBend = 0;
+            activeBend = 0;
 
             activeNote = -1;
         };
