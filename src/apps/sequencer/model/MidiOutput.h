@@ -95,6 +95,8 @@ public:
                     break;
                 case Event::Note:
                     _data.note.velocitySource = VelocitySource(int(VelocitySource::FirstVelocity) + 100);
+                    _data.note.microtune = false;
+                    _data.note.bendRange = 2;
                     break;
                 case Event::ControlChange:
                 case Event::PitchBend:
@@ -162,6 +164,17 @@ public:
                 str("%d", int(velocitySource()) - int(VelocitySource::FirstVelocity));
             }
         }
+
+        // microtune
+
+        bool microtune() const { return _data.note.microtune; }
+        void setMicrotune(bool v) { _data.note.microtune = v; }
+
+        // bendRange
+
+        uint8_t bendRange() const { return _data.note.bendRange; }
+        void setBendRange(int v) { _data.note.bendRange = clamp(v, 1, 48); }
+        void editBendRange(int value, bool shift) { setBendRange(bendRange() + value); }
 
         // controlNumber
 
@@ -273,8 +286,11 @@ public:
                 GateSource gateSource;
                 NoteSource noteSource;
                 VelocitySource velocitySource;
+                bool microtune;
+                uint8_t bendRange;
                 bool operator==(const Note &other) const {
-                    return gateSource == other.gateSource && noteSource == other.noteSource && velocitySource == other.velocitySource;
+                    return gateSource == other.gateSource && noteSource == other.noteSource && velocitySource == other.velocitySource &&
+                           microtune == other.microtune && bendRange == other.bendRange;
                 }
             } note;
             struct ControlChange {

@@ -21,6 +21,8 @@ void MidiOutput::Output::write(VersionedSerializedWriter &writer) const {
         writer.write(_data.note.gateSource);
         writer.write(_data.note.noteSource);
         writer.write(_data.note.velocitySource);
+        writer.write(_data.note.microtune);
+        writer.write(_data.note.bendRange);
         break;
     case MidiOutput::Output::Event::ControlChange:
     case MidiOutput::Output::Event::PitchBend:
@@ -44,6 +46,8 @@ void MidiOutput::Output::read(VersionedSerializedReader &reader) {
         reader.read(_data.note.gateSource);
         reader.read(_data.note.noteSource);
         reader.read(_data.note.velocitySource);
+        reader.read(_data.note.microtune);
+        reader.read(_data.note.bendRange);
         break;
     case MidiOutput::Output::Event::ControlChange:
     case MidiOutput::Output::Event::PitchBend:
