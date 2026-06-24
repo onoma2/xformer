@@ -26,13 +26,13 @@ quantizes it against its **own** harmonic context — exactly the harmonàig inp
 
 - **Source:** any raw-volt signal — another track's `cvOutput()` *or* a physical CV-input jack
   (both are `float channel(i)`, 1V/oct). Selectable: `Track 1–8 | CV In 1–4`.
-- **Context (owned by the harmony track):** selectable **Root/Key** + **Scale** (any Performer scale,
-  incl. user scales) + **scaleRotate** (the mode — a scale-system rotation, §2f), stored in the
-  bias-packed scale group (§2f). The 14 harmonàig modes = base scale (**Major** or **H.Minor**,
-  built-in index 2) × `scaleRotate` 0–6 — no bespoke "mode" list.
-- **Quantise:** `note = scale.noteFromVolts(rawCV)` (`Scale` provides `noteFromVolts` /
-  `noteToVolts`). The quantised note is the **root**; its chromatic **degree** relative to the track's
-  root indexes the harmonisation (§2).
+- **Context — two orthogonal axes (§2g):** **Root/Key** + a **named scale + `scaleRotate`** (the
+  *chord preset* — the mode picks the CANON quality table, §2b/§2f) and a **chromatic note mask**
+  (the *quantise note-set* — which of the tuning's chromatic steps CV may land on, §2g). The 14
+  harmonàig modes = base scale (**Major** or **H.Minor**, built-in index 2) × `scaleRotate` 0–6.
+- **Quantise:** snap the raw CV to the **nearest enabled chromatic step** (§2g mask), over the
+  tuning's full chromatic axis (12 for 12-TET, `notesPerOctave()` for n-TET). The landed step is the
+  **root**; its chromatic **degree** relative to the track root indexes the chord preset (§2).
 - Works with any source, quantised or not — the track always quantises into its own scale (no
   "assumes source pre-quantised" hedge from v0.1).
 
@@ -137,6 +137,28 @@ Banks are exactly **Major** and **H.Minor** (built-in index 2); pick `CANON_MAJ`
 whether the resolved base scale is index 2. Natural-minor harmony is **not** a third bank — it's
 `CANON_MAJ` at `scaleRotate 5` (Aeolian).
 
+### 2g. Degree availability — the chromatic note mask (keyboard)
+
+The harmonic context is **two orthogonal axes** — conflating them is the trap:
+
+- **Named scale + `scaleRotate` (§2f) = the chord preset.** The mode selects the CANON quality table
+  (§2b) — *what chord* is built on each degree. It does **not** decide which notes are playable.
+- **The note mask = the quantise note-set.** A bitmask over the tuning's **full chromatic** axis —
+  12 steps for 12-TET, `notesPerOctave()` for an n-TET `VoltScale`, up to `CONFIG_USER_SCALE_SIZE`
+  (32). Incoming CV snaps to the nearest **enabled** step.
+
+The keyboard always shows **every** chromatic step; lit = enabled. The mask is the only thing that
+dims a step — the named scale never does. A fully-chromatic mask lights all 12. Enabling an
+off-diatonic step makes it a **passing** degree: it lands, and its chord comes from the preset's
+passing / `alt` entry (12-TET, §2c) or generative stacking (n-TET, §2e).
+
+The named NoteScales (`majorScale` = 7 notes, `majorPentatonicScale` = 5) are **chord presets only**,
+never the note axis — the keyboard axis is always the full chromatic, so their reduced
+`notesPerOctave()` is irrelevant to playability.
+
+**Storage:** a 32-bit `noteMask` on the harmony track (covers every tuning's chromatic width).
+**Tuning change:** clamp mask + cursor to the new chromatic width.
+
 ---
 
 ## 3. Transformation — inversion, voicing, transpose
@@ -227,8 +249,8 @@ a free clock unless the internal-counter source is assigned).
 
 - **Per-step record (bit-packed `HarmonySequence::Step`):** Quality (6b: `Auto`, or one of the 8 canon
   + 5 extras — §2), Inversion (2b), Voicing (2b), Degree Rotate (signed — the §3a re-harmonise offset
-  over 12 chromatic degrees), Strum (signed direction + amount, ~5b — §7), Gate (1b, pass/choke),
-  **Rest (1b)**. ~22 bits — fits a 32-bit word.
+  over 12 chromatic degrees), Strum (direction up/down/alt + time + curve, ~7b — §7), Gate (1b,
+  pass/choke), **Rest (1b)**. ~25 bits — fits a 32-bit word.
 - **Advance:** on a trigger, the cursor steps to the next recipe and applies it to the freshly
   quantised root.
 - **Rest semantics (v0.2 default):** a Rest step **holds the previous chord's voices through this
@@ -262,9 +284,25 @@ the ordered quality enum (`Auto` + 8 canon + 5 extras = 14, §2a) — a routed s
   note moves when the voicing changes — consistent with the layout-resolved JI (§3b). No new DAC plumbing.
 - **Per-voice gate:** each voice gates independently — strum staggers them, and a chord with fewer than
   four notes leaves the unused voices' gates low. The per-step `Gate` bit chokes the whole step.
-- **Strum:** when active, voice gate/CV updates are pushed into a `SortedQueue` (exists; `TestSortedQueue`)
-  at staggered absolute-tick offsets (Up-strum: V1 @ tick+0, V2 @ tick+Δ, …). Per-step signed direction +
-  amount (§5). A new trigger inside the inhibit window (§4) is dropped, so strums don't pile up.
+- **Gate length (global, §11):** how long each voice gate stays high. `0` = **"T"** — a fixed
+  wall-clock trig (the Length-0 trig path), gap-independent. `1–100` = % of the **last measured
+  inter-trigger gap** (covers every trigger mode — internal divisor, external gate, delta-auto). The
+  first trigger after start/reset has no prior gap → **hold** the gate until the next trigger
+  (idle-hold, §4); % applies from the second trigger on. One value for all voices, mirroring
+  DiscreteMap's `gateLength` (`DiscreteMapSequence`, 0 → "T"). Strum sets onset *spacing*; gate length
+  sets each onset's *duration*; the per-step `Gate` bit still chokes.
+- **Strum (per-step, §5):** one trigger fans the voice onsets out over time. **Three core controls:**
+  - **direction** — up (V1→VN) / down (VN→V1) / alternate (flip each trigger);
+  - **strum-time** — the delay between onsets, **wall-clock ms** via `os::ticks()` (tempo-independent,
+    like a real guitar; reuses the Length-0 trig path);
+  - **curve** — the onset *spacing* shape (signed: 0 = linear, + accelerate toward the end, −
+    decelerate) — a real strum isn't evenly spaced.
+
+  Voice onsets are scheduled on per-voice **wall-clock deadlines**, evaluated in `update()` (the
+  trig-sentinel pattern) — **not** the musical-tick `_gateQueue`, since the strum feel must not scale
+  with tempo. A new trigger inside the inhibit window (§4) is dropped, so strums don't pile up. Models
+  **NYSTHI Strummer** (VCV): trigger → sequential voice gates, up/down/alternate, strum-time 10 ms
+  default; a tapped subset ≈ a sub-four-voice chord.
 - **MIDI out** (polyphonic + microtuned chord) is handled by the **global** MIDI-output layer — see
   `docs/midi-output-spec.md` (Phase 1 microtuning, Phase 2 polyphony). The chord is a poly source; no
   bespoke harmony MIDI.
@@ -291,7 +329,7 @@ the ordered quality enum (`Auto` + 8 canon + 5 extras = 14, §2a) — a routed s
   containers are sized to their *largest* variant, so a new TrackMode adds RAM **only for bytes it
   exceeds the cap by**. Fit checks: `sizeof(HarmonySequence) ≤ NoteSequence` (model cap ≈ 9544 B)
   and `sizeof(HarmonyTrackEngine) ≤ largest engine variant (≈ 912 B)`. A 16-step recipe grid + a
-  small engine (quantiser state, prev-note, strum `SortedQueue`) almost certainly fit → ~zero added
+  small engine (quantiser state, prev-note, per-voice strum onset deadlines) almost certainly fit → ~zero added
   RAM. **Measure** both against the caps in `PROJECT.md`; only excess costs ×8.
 - **No ProjectVersion bump.** Per `PROJECT.md` dev rule — adding a `TrackMode` enum value is
   acceptable (old projects read unknown → default); do **not** bump `ProjectVersion.h` or add
@@ -300,6 +338,30 @@ the ordered quality enum (`Auto` + 8 canon + 5 extras = 14, §2a) — a routed s
 ---
 
 ## 10. Engineering punch list
+
+### Legacy teardown — remove the old NoteTrack cross-track harmony
+
+The current harmony is a **cross-track master/follower** system on NoteTrack: one NoteTrack is the
+`HarmonyMaster`; other tracks set `harmonyRole` to `FollowerRoot/3rd/5th/7th` and read the master's
+active sequence (`masterTrackIndex`) to play their assigned chord-tone, with a per-step role override
+and a dedicated page. The self-contained harmony track replaces it whole. Remove:
+
+- **`model/NoteSequence.h`:** the `HarmonyRole` enum, `HarmonyRoleOverride` / `HarmonyRoleOverrideType`,
+  the `harmonyRole()` / `masterTrackIndex()` fields + accessors + their serialize, and the per-step
+  `harmonyRoleOverride` layer (dev break is fine — no migration).
+- **`engine/NoteTrackEngine.cpp`:** `applyHarmony()` (~`:929`) + its three call sites
+  (~`:758/:823/:844`), the `#include "model/HarmonyEngine.h"`, and the `% 7` degree hack (~`:967`).
+- **`ui/pages/NoteSequenceEditPage.cpp`** + **`ui/model/NoteSequenceListModel.h`:** the
+  `Layer::HarmonyRoleOverride` row + rendering.
+- **`ui/pages/HarmonyPage.{h,cpp}`** + its wiring (`Pages.h:37,85`, PageManager/TopPage) — the
+  master/follower setup page.
+- **Tests:** delete the follower-behaviour suites (`TestHarmonyIntegration`,
+  `TestHarmonyInversionBug`, `TestHarmonyInversionIssue`); **port** the math suites
+  (`TestHarmonyEngine`, `TestHarmonyVoicing`) to the harmony track — don't lose the coverage.
+
+**Keep:** `model/HarmonyEngine.{h,cpp}` inversion/voicing/interval math — the harmony track reuses it
+(§9); only its quality enum + `DiatonicChords` table are replaced (§2). `model/Model.h`'s reference
+follows whatever `HarmonyEngine` becomes.
 
 - **Foundation — `docs/scale-rotate-spec.md` — DONE (shipped):** `scaleRotate` +
   `selectedScale(int,int)`→`RotatedScaleView` resolver + bias-packed scale group + `Minor`→`H.Minor`
@@ -310,14 +372,13 @@ the ordered quality enum (`Auto` + 8 canon + 5 extras = 14, §2a) — a routed s
   widen `ChordIntervalsTable` to match.
 - Replace `DiatonicChords[7][7]` with `CANON_MAJ[12]` + `CANON_HM[12]` + the 14 rotation offsets +
   the sparse `alt` override table (§2b/§2c). Lookup by chromatic degree, not `% 7`.
-- Kill the `note % 7` degree hack in `NoteTrackEngine.cpp:967` — compute `(note − root) mod 12`.
-- Rip the `HarmonyEngine` instantiation + per-output application out of `NoteTrackEngine.cpp`.
-- Remove harmony fields/enums from `NoteSequence.h` (dev-stage break is fine — no migration).
+- Legacy teardown of the old NoteTrack harmony — see the subsection above.
 - Create the trio; add `TrackMode::Harmony` to `Config.h` (enum value only).
+- Add the 32-bit chromatic `noteMask` (§2g) + the ScalePage keyboard (§11) — quantise snaps to the
+  nearest enabled step.
 - Add the `Routing::Target` harmony block.
 - Wire `setSequenceEditPage` / `setSequenceView` in `TopPage.cpp`; route stale-page safety.
-- Rewrite the existing NoteTrack harmony tests to drive `HarmonyTrackEngine`; add LUT coverage
-  (every mode's in-scale degrees + the 3 override cells).
+- LUT coverage for the ported harmony tests: every mode's in-scale degrees + the `alt` override cells.
 
 ---
 
@@ -325,7 +386,12 @@ the ordered quality enum (`Auto` + 8 canon + 5 extras = 14, §2a) — a routed s
 
 - **EditPage:** 16-step grid; encoder edits the selected step's Quality / Inversion / Voicing /
   Degree Rotate / Strum; per-step Rest + Gate toggles.
-- **SequencePage:** list view of the sequence params.
+- **SequencePage:** list view of the sequence params, incl. **Gate Length** (`0` = T trig, `1–100%`
+  of the trigger interval; mirrors DiscreteMap).
+- **ScalePage (keyboard mask, §2g):** the tuning's chromatic steps (12 / n) as a reflowing bar row —
+  reuse `StochasticSequenceEditPage::drawPitchPage` (degree count from the tuning, 3-state
+  Bright/Medium/Low = sounding / enabled / off, 32-bit mask, cursor clamp). Toggles the `noteMask`;
+  named-scale select seeds it.
 - **TrackPage (setup):** `CV Source` (Track 1–8 / CV In 1–4), Root/Scale/Mode (`scaleRotate`),
   `Trigger Source` (Off=delta-auto / a gate source / Internal counter), `Transpose` (standard
   diatonic, §3a), `Tuning` (ET/JI, §3b). Voice→CV uses the standard CV/Gate-output routing (§7).
@@ -355,6 +421,8 @@ the ordered quality enum (`Auto` + 8 canon + 5 extras = 14, §2a) — a routed s
 - Arpeggiator integration (arpeggiate the chord across the outputs/time).
 - Per-step override commands beyond Rest/Gate.
 - `External` reset via a routed input.
+- Strum **humanize** (random timing/onset jitter) and **velocity ramp / accent** across the strum
+  (MIDI-out only — the CV/gate path has no velocity). Core strum is direction + time + curve (§7).
 
 ---
 
