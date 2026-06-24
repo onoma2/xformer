@@ -1,4 +1,4 @@
-# PEW|FORMER Sequencer Firmware Resource Analysis for IndexedTrackEngine Implementation - December 16, 2025
+# xformer Sequencer Firmware Resource Analysis for IndexedTrackEngine Implementation - December 16, 2025
 
 ## Hardware Specifications
 - **Microcontroller**: STM32F405RGT6
@@ -279,7 +279,7 @@ Based on RES-indexed.md research document:
 
 ### 10. Conclusion
 
-The current PEW|FORMER firmware implementation of IndexedTrack is **memory-efficient** and well within RAM constraints at ~26.7KB total for 8 tracks. The implementation provides a good balance of features and memory usage, making it a viable addition to the firmware alongside other track types.
+The current xformer firmware implementation of IndexedTrack is **memory-efficient** and well within RAM constraints at ~26.7KB total for 8 tracks. The implementation provides a good balance of features and memory usage, making it a viable addition to the firmware alongside other track types.
 
 **Updated Insights on Track Type Memory Efficiency** (from actual code analysis):
 - **Discrete Track**: ~2,314 bytes per track (most efficient) - sequence (~1,955) + engine (~359)

@@ -9,7 +9,7 @@ This file (`PROJECT.md`) covers the higher-level architecture, build, and conven
 
 ## Project Overview
 
-**PEW|FORMER** is a fork of the original PER|FORMER eurorack sequencer firmware. This fork maintains the known-good master branch while carefully integrating improvements from other forks, notably jackpf's noise reduction, shape improvements, and MIDI improvements. The firmware has been updated to gcc 14.2 and libopencm3 (October 2024).
+**xformer** is a fork of the original PER|FORMER eurorack sequencer firmware. This fork maintains the known-good master branch while carefully integrating improvements from other forks, notably jackpf's noise reduction, shape improvements, and MIDI improvements. The firmware has been updated to gcc 14.2 and libopencm3 (October 2024).
 
 The project is a dual-platform embedded system running on both STM32 hardware and a desktop simulator, using FreeRTOS for task management.
 

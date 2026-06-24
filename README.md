@@ -54,7 +54,7 @@ helpers, that you can by for couple of dollars a month.
 - I have tested it on my unit and it seems that everything that I care about works. The firmware is provided AS IS, I'd appreciate feedback, but not sure if will be able to fix many things.
 
 
-# PEW|FORMER
+# xformer
 
 _From [Phazerville](https://phazerville.com) with Love <3_
 
@@ -214,7 +214,7 @@ make -j flash_sequencer
 
 ### Accumulator
 
-The PEW|FORMER firmware now includes an advanced accumulator feature that provides powerful parameter modulation capabilities:
+The xformer firmware now includes an advanced accumulator feature that provides powerful parameter modulation capabilities:
 
 #### Core Features:
 - **Stateful Counter**: Increments/decrements based on configurable parameters

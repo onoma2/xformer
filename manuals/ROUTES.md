@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-The routing system in PEW|FORMER provides sophisticated per-track modulation capabilities using Bias, Depth, and Shaper parameters. Understanding the signal flow is crucial for creating dynamic and expressive patches.
+The routing system in xformer provides sophisticated per-track modulation capabilities using Bias, Depth, and Shaper parameters. Understanding the signal flow is crucial for creating dynamic and expressive patches.
 
 **Key Concepts:**
 - **Bias**: Offset applied to source signal (±100%)
