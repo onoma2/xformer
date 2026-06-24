@@ -226,9 +226,9 @@ advances the recipe cursor **accumulator-style** (the advance is event-driven by
 a free clock unless the internal-counter source is assigned).
 
 - **Per-step record (bit-packed `HarmonySequence::Step`):** Quality (6b: `Auto`, or one of the 8 canon
-  + 5 extras — §2), Mode (3b), Inversion (2b), Voicing (2b), Degree Rotate (signed — the §3a
-  re-harmonise offset over 12 chromatic degrees), Gate (1b, pass/choke), **Rest (1b)**.
-  ~22 bits — fits a 32-bit word.
+  + 5 extras — §2), Inversion (2b), Voicing (2b), Degree Rotate (signed — the §3a re-harmonise offset
+  over 12 chromatic degrees), Strum (signed direction + amount, ~5b — §7), Gate (1b, pass/choke),
+  **Rest (1b)**. ~22 bits — fits a 32-bit word.
 - **Advance:** on a trigger, the cursor steps to the next recipe and applies it to the freshly
   quantised root.
 - **Rest semantics (v0.2 default):** a Rest step **holds the previous chord's voices through this
@@ -244,19 +244,27 @@ a free clock unless the internal-counter source is assigned).
 Add a `Routing::Target` block (`HarmonyFirst..HarmonyLast`) mirroring `TuesdayFirst..TuesdayLast`:
 **Inversion, Voicing, Quality, Degree Rotate, Strum** (the overall Transpose rides the
 standard track-transpose routing, not this block). A routed value **offsets the per-step base** (same convention as other tracks), so a CurveTrack/CV can
-modulate harmony live without fighting the step locks.
+modulate harmony live without fighting the step locks. **Quality** offsets as a wrapping index into
+the ordered quality enum (`Auto` + 8 canon + 5 extras = 14, §2a) — a routed sweep walks
+`Auto → canon → extras`.
 
 ---
 
 ## 7. Outputs
 
-- **Up to 4 CV/Gate voice pairs** (1V/oct). User maps Voice 1–4 → physical CV outputs (generic
-  "Voice", not Root/3rd/5th/7th, to accommodate non-tertiary extended/sus chords).
-- **Gate:** copy the source/master gate to the voices; the per-step `Gate` bit can choke a step.
-- **Strum:** when active, voice updates are pushed into a `SortedQueue` (exists; `TestSortedQueue`)
-  at staggered absolute-tick offsets (Up-strum: V1 @ tick+0, V2 @ tick+Δ, …). Bipolar Up/Down +
-  amount. A new trigger inside the inhibit window (§4) is dropped, so strums don't pile up.
-- Output mapping reuses the existing track-output / `cvOutput` path; no new DAC plumbing.
+- **Per-voice output — up to 4 voices, each its own CV + gate** (1V/oct). Voices are generic
+  ("Voice", not Root/3rd/5th/7th) to accommodate non-tertiary extended/sus chords. The engine exposes
+  the **final** voiced/inverted/JI-retuned chord as indexed `cvOutput(v)` / `gateOutput(v)` (`v`=0..3).
+- **Voice→jack mapping is the existing CV/Gate-output routing.** Point physical CV/gate jacks at the
+  harmony track on the standard output routing (`Project::setCvOutputTrack` / `setGateOutputTrack`); the
+  engine's per-track output index fans voices onto them in **ascending jack order** (voice 0 = lowest
+  routed jack). Voicing/Inversion rotate voices *inside* the engine, so a jack tracks a **slot** and its
+  note moves when the voicing changes — consistent with the layout-resolved JI (§3b). No new DAC plumbing.
+- **Per-voice gate:** each voice gates independently — strum staggers them, and a chord with fewer than
+  four notes leaves the unused voices' gates low. The per-step `Gate` bit chokes the whole step.
+- **Strum:** when active, voice gate/CV updates are pushed into a `SortedQueue` (exists; `TestSortedQueue`)
+  at staggered absolute-tick offsets (Up-strum: V1 @ tick+0, V2 @ tick+Δ, …). Per-step signed direction +
+  amount (§5). A new trigger inside the inhibit window (§4) is dropped, so strums don't pile up.
 - **MIDI out** (polyphonic + microtuned chord) is handled by the **global** MIDI-output layer — see
   `docs/midi-output-spec.md` (Phase 1 microtuning, Phase 2 polyphony). The chord is a poly source; no
   bespoke harmony MIDI.
@@ -301,7 +309,7 @@ modulate harmony live without fighting the step locks.
 - Expand `ChordQuality` 4 → 8 (the §2 canon set, manual order) + the 5 extras (Sus2/Sus4/6th/add9/Q4);
   widen `ChordIntervalsTable` to match.
 - Replace `DiatonicChords[7][7]` with `CANON_MAJ[12]` + `CANON_HM[12]` + the 14 rotation offsets +
-  the 3-cell override table (§2b/§2c). Lookup by chromatic degree, not `% 7`.
+  the sparse `alt` override table (§2b/§2c). Lookup by chromatic degree, not `% 7`.
 - Kill the `note % 7` degree hack in `NoteTrackEngine.cpp:967` — compute `(note − root) mod 12`.
 - Rip the `HarmonyEngine` instantiation + per-output application out of `NoteTrackEngine.cpp`.
 - Remove harmony fields/enums from `NoteSequence.h` (dev-stage break is fine — no migration).
@@ -315,13 +323,13 @@ modulate harmony live without fighting the step locks.
 
 ## 11. UI surfaces
 
-- **EditPage:** 16-step grid; encoder edits the selected step's Inversion / Voicing / Quality /
-  Transpose; per-step Rest + Gate toggles.
+- **EditPage:** 16-step grid; encoder edits the selected step's Quality / Inversion / Voicing /
+  Degree Rotate / Strum; per-step Rest + Gate toggles.
 - **SequencePage:** list view of the sequence params.
-- **TrackPage (setup):** `CV Source` (Track 1–8 / CV In 1–4), Root/Scale/Mode,
+- **TrackPage (setup):** `CV Source` (Track 1–8 / CV In 1–4), Root/Scale/Mode (`scaleRotate`),
   `Trigger Source` (Off=delta-auto / a gate source / Internal counter), `Transpose` (standard
-  diatonic, §3a), `Output Map` (Voice→CV), `Strum` (bipolar Up/Down + amount).
-  (Degree Rotate is per-step, so it lives on the EditPage, not here.)
+  diatonic, §3a), `Tuning` (ET/JI, §3b). Voice→CV uses the standard CV/Gate-output routing (§7).
+  (Degree Rotate and Strum are per-step → EditPage, not here.)
 
 ---
 
