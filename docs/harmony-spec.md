@@ -386,14 +386,26 @@ follows whatever `HarmonyEngine` becomes.
 
 ## 11. UI surfaces
 
-- **HarmonySequenceEditPage — hero pages, F5 = NEXT** (Stochastic pattern: internal `Page` enum,
-  `nextPage()` wraps `% Page::Count`, F5 footer cycles; F1–F4 page-local):
-  - **Recipe** — 16-step grid; layer-select F-keys edit the selected step's Quality / Inversion /
-    Voicing / Degree Rotate / Octave / Strum; per-step Rest + Gate toggles.
-  - **Scale** — the chromatic keyboard mask (§2g): the tuning's steps (12 / n) as a reflowing bar row,
-    reuse `StochasticSequenceEditPage::drawPitchPage` (3-state Bright/Medium/Low = sounding / enabled /
-    off, 32-bit `noteMask`, cursor clamp). Named-scale select seeds it.
-  - **Chord** — live readout of the sounding chord / per-voice monitor.
+- **HarmonySequenceEditPage — three hero pages, F5 = NEXT** (Stochastic ring: internal `Page` enum,
+  `nextPage()` wraps `% Page::Count`; F5 cycles Recipe → Scale → Chord):
+  - **Recipe** — 16-step grid in **note-edit geometry** (`stepWidth = Width/16`, square
+    `drawRect(x+2, y+2, stepWidth-4, stepWidth-4)`, gate-on `fillRect(x+4, y+4, stepWidth-8, …)`,
+    current step `Bright`/others `Medium`, layer value centred at `y+20` — mirror `NoteSequenceEditPage`).
+    F1–F4 are **layer groups** that cycle their sub-layers on repeat press (NoteTrack `switchLayer`,
+    `shift` reverses; active layer name shown up top via `drawActiveFunction`):
+    - **CHORD** — Quality → Inversion → Voicing
+    - **PITCH** — Degree Rotate → Octave
+    - **STRUM** — Dir → Time → Curve
+    - **GATE** — Gate → Rest
+
+    Footer `CHORD · PITCH · STRUM · GATE · NEXT`. No param-paging — the 10 sub-layers fit 4 cycling
+    groups, so F5 stays free for the hero ring.
+  - **Scale** — chromatic keyboard mask (§2g): tuning steps (12 / n) as a reflowing bar row, reuse
+    `StochasticSequenceEditPage::drawPitchPage` (3-state Bright/Medium/Low = sounding / enabled / off,
+    32-bit `noteMask`, cursor clamp). Footer `MODE · ROOT · ALL · NONE · NEXT`.
+  - **Chord** — sounding-chord monitor (symbol + V1..V4 notes/gates) **and live override**: F1–F4
+    `QUAL · INV · VOIC · ROT` set the sounding chord, bypassing the recipe — **latched** until shift+F
+    releases that param back to recipe-follow. Footer `QUAL · INV · VOIC · ROT · NEXT`.
 - **SequencePage (list, per-pattern):** Root / Scale / Mode (`scaleRotate`), **CV Source** (Track 1–8 /
   CV In 1–4), **Trigger Source** (delta-auto / gate / internal counter), **Gate Length** (`0` = T,
   `1–100%`), divisor, runMode, first/last step.
