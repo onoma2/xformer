@@ -162,6 +162,12 @@ The named NoteScales (`majorScale` = 7 notes, `majorPentatonicScale` = 5) are **
 never the note axis — the keyboard axis is always the full chromatic, so their reduced
 `notesPerOctave()` is irrelevant to playability.
 
+**Mask rotate (routable, §6):** a `maskRotate` offset spins the enabled set by N degrees (mod
+`notesPerOctave`) — the **automation of pressing the keyboard buttons**. Mirrors Stochastic's **MROT**
+(`StochasticSequenceEditPage` pitch page, alongside DROT). Route a CV/LFO to it to walk the playable
+scale live. Orthogonal to the chord table: it changes *which* degrees land, not their CANON coloring
+(that stays on `scaleRotate`/mode), so it can intentionally desync the playable notes from the mode.
+
 **Storage:** a 32-bit `noteMask` on the harmony track (covers every tuning's chromatic width).
 **Tuning change:** clamp mask + cursor to the new chromatic width.
 
@@ -258,13 +264,15 @@ a free clock unless the internal-counter source is assigned).
 - **Per-step record (bit-packed `HarmonySequence::Step`):** Quality (6b: `Follow` / `Auto` / one of the
   8 canon + 5 extras — §2d), Inversion (2b), Voicing (2b), Degree Rotate (signed — the §3a re-harmonise offset
   over 12 chromatic degrees), Strum (direction up/down/alt + time + curve, ~7b — §7), Octave (signed,
-  ~4b — §3a), Gate (1b, pass/choke), **Rest (1b)**. ~29 bits — fits a 32-bit word.
+  ~4b — §3a), Gate (1b, pass/choke), **Sleep (3b, 0–7)**. ~31 bits — fits a 32-bit word.
 - **Advance:** on a trigger, the cursor steps to the next recipe and applies it to the freshly
   quantised root.
-- **Rest semantics (v0.2 default):** a Rest step **holds the previous chord's voices through this
-  trigger** (no re-voice) and the cursor **still advances** — i.e., it inserts a "stay put" beat in
-  the progression while a root change passes underneath. (Adjustable later: hold-without-advancing,
-  or gate-off, are the alternatives.)
+- **Sleep semantics (Stochastic `sleep` model, `StochasticTrackEngine.cpp:224`):** a step's **`Sleep`**
+  count is how many incoming triggers it **absorbs after firing** before the cursor advances. The step
+  fires its chord, then the next `Sleep` triggers are dropped — no re-quantise, no re-voice, no advance
+  — so the chord **sustains** across them; then the cursor steps on. `Sleep 0` = one trigger per step
+  (normal); `Sleep N` = that chord lasts N+1 triggers, giving the progression per-chord duration. Silence
+  is separate — the `Gate` choke bit mutes a step.
 - Standard shift/rotate transforms apply to the grid.
 
 ---
@@ -272,7 +280,7 @@ a free clock unless the internal-counter source is assigned).
 ## 6. Routable params (Tuesday-style)
 
 Add a `Routing::Target` block (`HarmonyFirst..HarmonyLast`) mirroring `TuesdayFirst..TuesdayLast`:
-**Inversion, Voicing, Quality, Degree Rotate, Strum** (the overall Transpose rides the
+**Inversion, Voicing, Quality, Degree Rotate, Strum, Mask Rotate** (§2g) (the overall Transpose rides the
 standard track-transpose routing, not this block). A routed value **offsets the per-step base** (same convention as other tracks), so a CurveTrack/CV can
 modulate harmony live without fighting the step locks. **Quality** offsets as a wrapping index into
 the ordered quality enum (`Auto` + 8 canon + 5 extras = 14, §2a) — a routed sweep walks
@@ -407,15 +415,20 @@ follows whatever `HarmonyEngine` becomes.
 
     Footer `CHORD · PITCH · STRUM · GATE · NEXT`. No param-paging — the 10 sub-layers fit 4 cycling
     groups, so F5 stays free for the hero ring.
-  - **Scale** — chromatic keyboard mask (§2g): tuning steps (12 / n) as a reflowing bar row, reuse
-    `StochasticSequenceEditPage::drawPitchPage` (3-state Bright/Medium/Low = sounding / enabled / off,
-    32-bit `noteMask`, cursor clamp). Footer `MODE · ROOT · ALL · NONE · NEXT`.
+  - **Scale** — chromatic keyboard mask (§2g): tuning steps (12 / n) as **NoteTrack-style squares**
+    (the Recipe geometry — `stepWidth = Width/16`, 16 per row, **wrapping to a 2nd row** for n > 16),
+    3-state Bright/Medium/Low = sounding / enabled / off, **derived note names** beneath (scale
+    `noteName` from root + degree — actual pitch names, any tuning), 32-bit `noteMask`, cursor clamp.
+    The 16 **step buttons** toggle the degrees — LEDs light for **enabled**, a distinct colour on the
+    **sounding** degree (NoteTrack gate-layer LED idiom); **prev/next** pages the degree bank when
+    n > 16. F1–F3 pick the **encoder target** — `MODE` (`scaleRotate`), `ROOT`, `MROT` (spin the mask,
+    §2g). Footer `MODE · ROOT · MROT · — · NEXT`.
   - **Chord** — sounding-chord monitor (symbol + V1..V4 notes/gates) **and live override**: F1–F4
     `QUAL · INV · VOIC · ROT` set the sounding chord, bypassing the recipe — **latched** until shift+F
     releases that param back to recipe-follow. Footer `QUAL · INV · VOIC · ROT · NEXT`.
 - **SequencePage (list, per-pattern):** Root / Scale / Mode (`scaleRotate`), **CV Source** (Track 1–8 /
   CV In 1–4), **Trigger Source** (delta-auto / gate / internal counter), **Gate Length** (`0` = T,
-  `1–100%`), divisor, runMode, first/last step.
+  `1–100%`), **Mask Rotate** (§2g, routable), divisor, runMode, first/last step.
 - **TrackPage (setup, track-global):** `Transpose` (standard diatonic, §3a), `Tuning` (ET/JI, §3b).
   Voice→CV uses the standard CV/Gate-output routing (§7).
 
