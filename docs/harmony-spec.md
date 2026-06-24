@@ -169,9 +169,9 @@ Octave-shift math on the four 1V/oct values (reuse `HarmonyEngine.h`):
 - **Voicing** (Close / Drop2 / Drop3 / Open): displace specific notes down an octave to spread the
   chord. Drop2 = 2nd-highest down 8ve; Drop3 = 3rd-highest down; Open = Drop2 variant widened.
 
-### 3a. Transpose controls — two (one is just Performer's)
+### 3a. Transpose controls — three (one is just Performer's)
 
-Two offsets, always-on (digital — no Mode toggle or auto-timeout; those are one-fader hardware
+Three offsets, always-on (digital — no Mode toggle or auto-timeout; those are one-fader hardware
 affordances). Fine-tune is dropped — a digital track outputs quantised CV, DAC calibration handles tuning.
 
 - **Degree Rotate** — *per-step + routable*. Rotates the harmonised degree over the **12 chromatic
@@ -179,10 +179,12 @@ affordances). Fine-tune is dropped — a digital track outputs quantised CV, DAC
   harmony-specific transpose Performer can't do; this is the per-step recipe field (§5). Named after
   Stochastic's `degreeRotation` (`StochasticSequence.h:235`) — but that rotates modulo *active scale
   notes* (diatonic), whereas harmony rotates over all 12 chromatic degrees.
-- **Transpose** — *track-level*. This **is** Performer's diatonic scale-step transpose
-  (`evalTransposition`, `NoteTrackEngine.cpp:69`) — the harmonàig "Global Offset" role. Shifts the
-  whole output, stays in scale. **Reuse the standard track `transpose`/`octave`**, not a bespoke
-  harmony param. (Trade: harmonàig's Global Offset was *chromatic*; this is *diatonic/in-scale*.)
+- **Transpose** — *track-level*. Performer's diatonic scale-step transpose (`evalTransposition`,
+  `NoteTrackEngine.cpp:69`) — the harmonàig "Global Offset" role. Shifts the whole output, stays in
+  scale. Reuse the standard track `transpose`. (Trade: harmonàig's Global Offset was *chromatic*;
+  this is *diatonic/in-scale*.)
+- **Octave** — *per-step*. A signed octave shift in the recipe (§5), **not** the track octave — lets a
+  progression leap registers per chord.
 
 ### 3b. Tuning — ET / JI
 
@@ -249,8 +251,8 @@ a free clock unless the internal-counter source is assigned).
 
 - **Per-step record (bit-packed `HarmonySequence::Step`):** Quality (6b: `Auto`, or one of the 8 canon
   + 5 extras — §2), Inversion (2b), Voicing (2b), Degree Rotate (signed — the §3a re-harmonise offset
-  over 12 chromatic degrees), Strum (direction up/down/alt + time + curve, ~7b — §7), Gate (1b,
-  pass/choke), **Rest (1b)**. ~25 bits — fits a 32-bit word.
+  over 12 chromatic degrees), Strum (direction up/down/alt + time + curve, ~7b — §7), Octave (signed,
+  ~4b — §3a), Gate (1b, pass/choke), **Rest (1b)**. ~29 bits — fits a 32-bit word.
 - **Advance:** on a trigger, the cursor steps to the next recipe and applies it to the freshly
   quantised root.
 - **Rest semantics (v0.2 default):** a Rest step **holds the previous chord's voices through this
@@ -384,18 +386,19 @@ follows whatever `HarmonyEngine` becomes.
 
 ## 11. UI surfaces
 
-- **EditPage:** 16-step grid; encoder edits the selected step's Quality / Inversion / Voicing /
-  Degree Rotate / Strum; per-step Rest + Gate toggles.
-- **SequencePage:** list view of the sequence params, incl. **Gate Length** (`0` = T trig, `1–100%`
-  of the trigger interval; mirrors DiscreteMap).
-- **ScalePage (keyboard mask, §2g):** the tuning's chromatic steps (12 / n) as a reflowing bar row —
-  reuse `StochasticSequenceEditPage::drawPitchPage` (degree count from the tuning, 3-state
-  Bright/Medium/Low = sounding / enabled / off, 32-bit mask, cursor clamp). Toggles the `noteMask`;
-  named-scale select seeds it.
-- **TrackPage (setup):** `CV Source` (Track 1–8 / CV In 1–4), Root/Scale/Mode (`scaleRotate`),
-  `Trigger Source` (Off=delta-auto / a gate source / Internal counter), `Transpose` (standard
-  diatonic, §3a), `Tuning` (ET/JI, §3b). Voice→CV uses the standard CV/Gate-output routing (§7).
-  (Degree Rotate and Strum are per-step → EditPage, not here.)
+- **HarmonySequenceEditPage — hero pages, F5 = NEXT** (Stochastic pattern: internal `Page` enum,
+  `nextPage()` wraps `% Page::Count`, F5 footer cycles; F1–F4 page-local):
+  - **Recipe** — 16-step grid; layer-select F-keys edit the selected step's Quality / Inversion /
+    Voicing / Degree Rotate / Octave / Strum; per-step Rest + Gate toggles.
+  - **Scale** — the chromatic keyboard mask (§2g): the tuning's steps (12 / n) as a reflowing bar row,
+    reuse `StochasticSequenceEditPage::drawPitchPage` (3-state Bright/Medium/Low = sounding / enabled /
+    off, 32-bit `noteMask`, cursor clamp). Named-scale select seeds it.
+  - **Chord** — live readout of the sounding chord / per-voice monitor.
+- **SequencePage (list, per-pattern):** Root / Scale / Mode (`scaleRotate`), **CV Source** (Track 1–8 /
+  CV In 1–4), **Trigger Source** (delta-auto / gate / internal counter), **Gate Length** (`0` = T,
+  `1–100%`), divisor, runMode, first/last step.
+- **TrackPage (setup, track-global):** `Transpose` (standard diatonic, §3a), `Tuning` (ET/JI, §3b).
+  Voice→CV uses the standard CV/Gate-output routing (§7).
 
 ---
 
@@ -405,8 +408,8 @@ follows whatever `HarmonyEngine` becomes.
   vs gate-off — settle by ear.
 - **Q-strum-overlap:** within the inhibit window a new trigger is dropped (v0.2); confirm vs
   cancel-restart by ear.
-- **Q-per-pattern-config:** are Root/Scale/Mode/Source per-pattern or track-global? (Default:
-  sequence is per-pattern; setup is track-global — confirm.)
+- **Q-per-pattern-config — RESOLVED.** Per-pattern (SequencePage): Root/Scale/Mode, CV Source,
+  Trigger Source, Gate Length. Track-global (TrackPage): Transpose, Tuning. Per-step: Octave + the recipe.
 - **Q-scale-vs-mode — RESOLVED (hybrid, ungated).** Scale = any Performer scale (incl. 32-degree user
   scales). Harmonisation: **curated CANON LUT** for the 14 harmonàig modes (§2b–2c); **generative
   scale-step stacking** (§2e) for every other scale — augmented (whole-tone), quartal (pentatonic),
