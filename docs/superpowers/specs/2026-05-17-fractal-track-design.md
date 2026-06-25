@@ -378,9 +378,9 @@ LoopMode: enum (2 bits on model) — Loop in scope, Once future
   - Once (1): after reaching loopLast once, set _onceDone=true. Gates go off, step advancement
     stops. Transport restart or re-arming record resets _onceDone. Enables capture-one-loop workflow.
 
-RecordQuantize: bool (1 bit on model) — future
-  - Off (0, default): source CV written to buffer as-is (int16_t fixed-point).
-  - On (1): source CV is quantized to the active FractalSequence scale before writing.
+RecordQuantize: bool (1 bit on model) — **deferred**
+  - Off (0, default): source CV written to the trunk as-is (raw).
+  - On (1): source CV quantized to the **inherited track scale** before writing. This is the **one exception to "trunk stays raw"** — and it's deferred. Until/unless RecordQuantize is built, the trunk is always raw and the inherited scale touches ornaments only (KD-13).
     Uses selectedScale().noteToVolts() or equivalent. Gate is unchanged. Ensures microtonal
     source CV (from TuesdayTrack, Teletype, LFOs) snaps to scale-degree grid on capture.
 ```
@@ -654,7 +654,7 @@ After Phase 2 builds and hardware-validates the minimal MVP looper, **stop and h
 
 ### Proteus Mutation — Loop-Boundary Lifecycle (DEFERRED — not a build phase)
 
-> **Status: DEFERRED — not a build phase.** The entire mutation/evolution subsystem (KD-3/6/10) is out of scope (duplicates Stochastic; can't co-exist with Feel under the 912 gate). Kept as future design only; the in-scope post-hardware phases are two-source → branches → ornaments → two-axis capture → track-delay.
+> **Status: DEFERRED — not a build phase.** The entire mutation/evolution subsystem (KD-3/6/10) is out of scope (duplicates Stochastic; can't co-exist with Feel under the 912 gate). Kept as future design only; the in-scope post-hardware order is Branches → Ornamentation + zone → Two-Source Mix → Track-Delay → Two-Axis Capture → Visual UI.
 
 
 **Goal:** Add Proteus-inspired mutation/evolution that modifies the captured buffer at loop boundaries.
@@ -707,7 +707,7 @@ After Phase 2 builds and hardware-validates the minimal MVP looper, **stop and h
 **Goal:** Visual pages for Fractal Track in the Performer UI.
 
 **Pages (following existing patterns):**
-- `FractalTrackListModel` — track setup: input tracks, divisor, scale, root, loop window.
+- `FractalTrackListModel` — track setup: input tracks, divisor, root, loop window, scale (inherited, ornament-only).
 - `FractalBufferPage` — visual display of the captured trunk (CV/Gate), loop window, lock state.
   - **Compass loop bar:** 128px horizontal bar representing `loopFirst..loopLast`. Start/end markers as bright vertical ticks. Current playhead position as a tall tick. Lock indicator and record arm indicator in the same view. Loop window markers at loopFirst/loopLast; record extent shown as secondary brackets. Ornament zone shown within the window.
 - `FractalBranchPage` — branch count, path, pool, order.
@@ -782,9 +782,11 @@ Sources audited: `temp-ref/o_c/O_C-Phazerville/` (applets, enigma, util), `temp-
 
 ---
 
-## Porting Priority for Each Phase
+## Porting Reference (by gate)
 
-| Phase | Ported Feature | Source | Effort |
+The **Gate** column groups each ported feature by build gate (Phase 2 vs Post-HW vs Deferred) — it is **not a build order**. The post-hardware order is the 1-pager ledger (Branches → Ornamentation → Two-Source → Track-Delay → Two-Axis Capture → Visual UI).
+
+| Gate | Ported Feature | Source | Effort |
 |-------|---------------|--------|--------|
 | **Post-HW** | 2-input gate/CV mixing | Vinx LogicTrackEngine | Low — adapt existing gate/note logic to output-reading |
 | **Phase 2** | Loop freeze/rotate (bool flag) | Fractal-specific | Trivial — lock flag + existing rotation |
