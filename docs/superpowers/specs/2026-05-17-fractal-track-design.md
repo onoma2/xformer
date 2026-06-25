@@ -315,14 +315,19 @@ Each segment is one loop-window length; total played length = loopLen × (1 + br
 
 **Chained, not off-trunk.** Branch N transforms **branch N-1** (the trunk for B1), so transforms **compound** down the chain — each limb is a variation of the limb before it, the Bloom "watch it grow." (The prior design transformed every branch off the trunk; that is replaced.)
 
-**Transform set (Bloom):** each branch applies one of —
-- **Reverse**: play the previous segment backwards
-- **Inverse**: mirror pitch around a center note (`center - (cv - center)`)
-- **Transpose**: offset all CV by fixed semitones
-- **Mutate**: per-step probability of re-rolling CV via the inherited scale
-- **Randomize**: each step a random CV from the inherited scale
+**Transform set (8 ops).** Branch pitch math is **chromatic** (raw semitones) — the trunk stays raw, scale is ornament-only. Each branch applies one of:
+- **Transpose** (pitch): offset all CV by fixed semitones. Chained → a transposition ladder.
+- **Reverse** (order): play the previous segment backwards. Self-inverse (toggles per branch).
+- **Inverse** (pitch): mirror around a center note (`center - (cv - center)`). Self-inverse.
+- **Retrograde-Inverse** (order+pitch): Reverse then Inverse — completes the twelve-tone row ops.
+- **Rotate** (order): cyclic shift by k (`p → (p+k) mod len`) — a canon at a temporal offset. Chained → progressive rotation.
+- **Interval-scale** (pitch): scale each interval from center by a factor (`center + (cv-center)·f`). Chained → the melody progressively **widens/narrows** — the most fractal op.
+- **Gate-thin** (rhythm): drop every Nth gate to a rest. Chained → progressively sparser.
+- **Mutate** (generative): per-step probability of re-rolling CV to a nearby scale degree (deterministic per seed).
 
-**Transform assignment — generative, reseeded.** The engine assigns each branch's transform from an RNG seeded per track, and **reseeds when the trunk is edited** (Bloom's regenerate-on-edit). Not user-picked per branch — the chain grows on its own. The seed is stored so the assignment is stable across power cycles until the trunk changes.
+Pure **Randomize** is intentionally excluded — it breaks the recognizable, deterministic variation that makes a chain musical; Mutate covers controlled life.
+
+**Transform assignment — generative, reseeded, pool-limited.** The engine assigns each branch's transform from an RNG seeded per track, **reseeding when the trunk is edited** (Bloom's regenerate-on-edit) — the chain grows on its own, not user-picked per branch. But the assignment draws **only from the enabled pool**: `branchPool` (uint8_t bitmask, one bit per op, default all-on) lets the user **constrain the palette** — e.g. pitch-only, or no rhythm changes. Empty pool falls back to Transpose. The seed is stored so the assignment is stable across power cycles until the trunk changes.
 
 **Path — an N-bit decision word, not a pattern LUT.** Path navigates the Trunk→branches walk as a **bit-word**: `path` (uint8_t), bit *k* = branch *k*'s traversal decision (**0 = forward, 1 = reversed**). The knob/CV sweeps `0 .. 2^branchCount − 1`, so N branches expose **2^N distinct paths** (1→2, 2→4, … 7→**128**, matching Bloom at max branches). The index *is* the decision vector — no stored table, no LUT to maintain. This replaces the prior 8-entry named-pattern LUT (Forward-Ladder etc. were special cases of the all-forward / all-reverse words).
 
@@ -332,7 +337,7 @@ Each segment is one loop-window length; total played length = loopLen × (1 + br
 
 **Routable.** Both **Branch count** and **Path** are Routable destinations (CV / internal-mod, depth scaled to range — §6), matching Bloom's dedicated Branch / Path CV inputs. These plus Ornament rate + intensity (KD-13) are the four live performance controls.
 
-**RAM impact:** Zero buffers. Model params: branchCount (uint8_t, 0-7), path (uint8_t bit-word), orderMode (uint8_t, 0-6), branchSeed (uint16_t — the generative transform assignment). Branches evaluated at playback from the single trunk buffer.
+**RAM impact:** Zero buffers. Model params: branchCount (uint8_t, 0-7), path (uint8_t bit-word), orderMode (uint8_t, 0-6), branchSeed (uint16_t — the generative transform assignment), branchPool (uint8_t bitmask — enabled transform palette). Branches evaluated at playback from the single trunk buffer.
 
 ### KD-13: Ornamentation — Per-Step Classical Flourishes (Post-Trunk/Branch)
 
