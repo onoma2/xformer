@@ -27,6 +27,7 @@ set(sources
     engine/TT2Printer.cpp
     engine/TT2SceneSerializer.cpp
     engine/TT2TrackEngine.cpp
+    engine/TT2MiniTrackEngine.cpp
     engine/StochasticTrackEngine.cpp
     engine/StochasticGenerator.cpp
     engine/StochasticCache.cpp
