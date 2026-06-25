@@ -1855,10 +1855,10 @@ static void tt2ResetTrCh(TT2RuntimeT<Cfg> &r, TT2OutputState &o, int i) {
 }
 template<typename Cfg>
 static void tt2InitPatternN(const TeletypeProgramT<Cfg> *program, int pn) {
-    if (!program || pn < 0 || pn >= TT2_PATTERN_COUNT) return;
-    TT2Pattern *p = &const_cast<TeletypeProgramT<Cfg> *>(program)->patterns[pn];
-    p->idx = 0; p->len = 0; p->wrap = 1; p->start = 0; p->end = TT2_PATTERN_LENGTH - 1;
-    for (int i = 0; i < TT2_PATTERN_LENGTH; ++i) p->val[i] = 0;
+    if (!program || pn < 0 || pn >= Cfg::PatternCount) return;
+    TT2PatternT<Cfg> *p = &const_cast<TeletypeProgramT<Cfg> *>(program)->patterns[pn];
+    p->idx = 0; p->len = 0; p->wrap = 1; p->start = 0; p->end = Cfg::PatternLength - 1;
+    for (int i = 0; i < Cfg::PatternLength; ++i) p->val[i] = 0;
 }
 
 template<typename Cfg>
@@ -1892,7 +1892,7 @@ static void opInitP(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT
 template<typename Cfg>
 static void opInitPAll(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                        int16_t *, uint8_t &, bool, TT2EvalError &) {
-    for (int i = 0; i < TT2_PATTERN_COUNT; ++i) tt2InitPatternN(program, i);
+    for (int i = 0; i < Cfg::PatternCount; ++i) tt2InitPatternN(program, i);
 }
 template<typename Cfg>
 static void tt2ClearScriptN(const TeletypeProgramT<Cfg> *program, int idx) {
@@ -1929,7 +1929,7 @@ static void opInit(TT2RuntimeT<Cfg> &r, TT2OutputState &o, const TeletypeProgram
                    int16_t *, uint8_t &, bool, TT2EvalError &) {
     init(r);
     init(o);
-    for (int i = 0; i < TT2_PATTERN_COUNT; ++i) tt2InitPatternN(program, i);
+    for (int i = 0; i < Cfg::PatternCount; ++i) tt2InitPatternN(program, i);
 }
 
 // ---------------------------------------------------------------------------
@@ -3090,7 +3090,7 @@ static void opQAdd(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypePr
     }
 }
 
-static int16_t normalisePn(int16_t pn);  // defined with the pattern ops below
+template<typename Cfg> static int16_t normalisePn(int16_t pn);  // defined with the pattern ops below
 
 // Q.2P [i] — copy the queue (0..q_n-1) into the current pattern (p_n) or pattern i.
 template<typename Cfg>
@@ -3100,8 +3100,8 @@ static void opQ2P(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypePro
     auto &v = runtime.variables;
     int16_t pn = v.p_n;
     if (stackSize >= 1) { if (!popStack(stack, stackSize, pn, error)) return; }
-    TT2Pattern &pat = const_cast<TeletypeProgramT<Cfg> *>(program)->patterns[normalisePn(pn)];
-    int n = v.q_n; if (n < 0) n = 0; if (n > TT2_PATTERN_LENGTH) n = TT2_PATTERN_LENGTH;
+    TT2PatternT<Cfg> &pat = const_cast<TeletypeProgramT<Cfg> *>(program)->patterns[normalisePn<Cfg>(pn)];
+    int n = v.q_n; if (n < 0) n = 0; if (n > Cfg::PatternLength) n = Cfg::PatternLength;
     for (int i = 0; i < n; ++i) pat.val[i] = v.q[i];
     pat.len = uint16_t(n);
 }
@@ -3115,8 +3115,8 @@ static void opQP2(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypePro
     auto &v = runtime.variables;
     int16_t pn = v.p_n;
     if (stackSize >= 1) { if (!popStack(stack, stackSize, pn, error)) return; }
-    const TT2Pattern &pat = program->patterns[normalisePn(pn)];
-    for (int i = 0; i < TT2_PATTERN_LENGTH && i < TT2_Q_LENGTH; ++i) v.q[i] = pat.val[i];
+    const TT2PatternT<Cfg> &pat = program->patterns[normalisePn<Cfg>(pn)];
+    for (int i = 0; i < Cfg::PatternLength && i < TT2_Q_LENGTH; ++i) v.q[i] = pat.val[i];
     int16_t len = int16_t(pat.len);
     if (len < 1) len = 1; else if (len > TT2_Q_LENGTH) len = TT2_Q_LENGTH;
     v.q_n = len;
@@ -3281,9 +3281,9 @@ static void opSL(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProg
 // the persisted TeletypeProgram.patterns[4] store. Semantics match patterns.c.
 // ---------------------------------------------------------------------------
 
-static int16_t normalisePn(int16_t pn) {
+template<typename Cfg> static int16_t normalisePn(int16_t pn) {
     if (pn < 0) return 0;
-    if (pn >= TT2_PATTERN_COUNT) return TT2_PATTERN_COUNT - 1;
+    if (pn >= Cfg::PatternCount) return Cfg::PatternCount - 1;
     return pn;
 }
 
@@ -3291,19 +3291,19 @@ static int16_t normalisePn(int16_t pn) {
 // reaches the program through a const pointer (scripts don't change mid-run),
 // so pattern-write ops cast it away. The TT2Track::_program object is non-const.
 template<typename Cfg>
-static TT2Pattern *mutablePattern(const TeletypeProgramT<Cfg> *program, int16_t pn) {
+static TT2PatternT<Cfg> *mutablePattern(const TeletypeProgramT<Cfg> *program, int16_t pn) {
     if (!program) return nullptr;
-    return &const_cast<TeletypeProgramT<Cfg> *>(program)->patterns[normalisePn(pn)];
+    return &const_cast<TeletypeProgramT<Cfg> *>(program)->patterns[normalisePn<Cfg>(pn)];
 }
 
 // Negative idx counts from the back (upstream normalise_idx); clamp to range.
-static int16_t normaliseIdx(const TT2Pattern &p, int16_t idx) {
+template<typename Cfg> static int16_t normaliseIdx(const TT2PatternT<Cfg> &p, int16_t idx) {
     int16_t len = int16_t(p.len);
     if (idx < 0) {
         if (idx < -len) idx = 0;
         else idx = len + idx;
     }
-    if (idx >= TT2_PATTERN_LENGTH) idx = TT2_PATTERN_LENGTH - 1;
+    if (idx >= Cfg::PatternLength) idx = Cfg::PatternLength - 1;
     if (idx < 0) idx = 0;
     return idx;
 }
@@ -3315,7 +3315,7 @@ static void opPatternN(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const Telety
     if (isSet && stackSize >= 1) {
         int16_t a = 0;
         if (!popStack(stack, stackSize, a, error)) return;
-        runtime.variables.p_n = normalisePn(a);
+        runtime.variables.p_n = normalisePn<Cfg>(a);
     } else {
         pushStack(stack, stackSize, runtime.variables.p_n, error);
     }
@@ -3325,28 +3325,28 @@ static void opPatternN(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const Telety
 
 template<typename Cfg>
 static int16_t patternGetVal(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t idx) {
-    const TT2Pattern &p = program->patterns[normalisePn(pn)];
+    const TT2PatternT<Cfg> &p = program->patterns[normalisePn<Cfg>(pn)];
     return p.val[normaliseIdx(p, idx)];
 }
 
 template<typename Cfg>
 static void patternSetVal(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t idx,
                           int16_t val) {
-    TT2Pattern *p = mutablePattern(program, pn);
+    TT2PatternT<Cfg> *p = mutablePattern(program, pn);
     if (p) p->val[normaliseIdx(*p, idx)] = val;
 }
 
 template<typename Cfg>
 static void patternSetLen(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t l) {
-    TT2Pattern *p = mutablePattern(program, pn);
+    TT2PatternT<Cfg> *p = mutablePattern(program, pn);
     if (!p) return;
-    if (l < 0) l = 0; else if (l > TT2_PATTERN_LENGTH) l = TT2_PATTERN_LENGTH;
+    if (l < 0) l = 0; else if (l > Cfg::PatternLength) l = Cfg::PatternLength;
     p->len = uint16_t(l);
 }
 
 template<typename Cfg>
 static void patternSetIdx(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t i) {
-    TT2Pattern *p = mutablePattern(program, pn);
+    TT2PatternT<Cfg> *p = mutablePattern(program, pn);
     if (!p) return;
     i = normaliseIdx(*p, i);
     int16_t len = int16_t(p->len);
@@ -3390,10 +3390,10 @@ static void opPN(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cf
 template<typename Cfg>
 static void patScale(const TeletypeProgramT<Cfg> *program, int16_t pn,
                      int16_t inMin, int16_t inMax, int16_t outMin, int16_t outMax) {
-    TT2Pattern *p = mutablePattern(program, pn);
+    TT2PatternT<Cfg> *p = mutablePattern(program, pn);
     int start = p->start, end = p->end;
     if (start < 0) start = 0;
-    if (end > TT2_PATTERN_LENGTH - 1) end = TT2_PATTERN_LENGTH - 1;
+    if (end > Cfg::PatternLength - 1) end = Cfg::PatternLength - 1;
     for (int idx = start; idx <= end; ++idx) {
         p->val[idx] = tt2ScaleVal(p->val[idx], inMin, inMax, outMin, outMax);
     }
@@ -3433,7 +3433,7 @@ static void opPL(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProg
         if (!popStack(stack, stackSize, l, error)) return;
         patternSetLen(program, runtime.variables.p_n, l);
     } else {
-        pushStack(stack, stackSize, int16_t(program->patterns[normalisePn(runtime.variables.p_n)].len), error);
+        pushStack(stack, stackSize, int16_t(program->patterns[normalisePn<Cfg>(runtime.variables.p_n)].len), error);
     }
 }
 
@@ -3447,7 +3447,7 @@ static void opPNL(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<C
         if (!popStack(stack, stackSize, l, error)) return;
         patternSetLen(program, pn, l);
     } else {
-        pushStack(stack, stackSize, int16_t(program->patterns[normalisePn(pn)].len), error);
+        pushStack(stack, stackSize, int16_t(program->patterns[normalisePn<Cfg>(pn)].len), error);
     }
 }
 
@@ -3460,7 +3460,7 @@ static void opPI(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProg
         if (!popStack(stack, stackSize, i, error)) return;
         patternSetIdx(program, runtime.variables.p_n, i);
     } else {
-        pushStack(stack, stackSize, program->patterns[normalisePn(runtime.variables.p_n)].idx, error);
+        pushStack(stack, stackSize, program->patterns[normalisePn<Cfg>(runtime.variables.p_n)].idx, error);
     }
 }
 
@@ -3474,7 +3474,7 @@ static void opPNI(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<C
         if (!popStack(stack, stackSize, i, error)) return;
         patternSetIdx(program, pn, i);
     } else {
-        pushStack(stack, stackSize, program->patterns[normalisePn(pn)].idx, error);
+        pushStack(stack, stackSize, program->patterns[normalisePn<Cfg>(pn)].idx, error);
     }
 }
 
@@ -3482,12 +3482,12 @@ static void opPNI(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<C
 template<typename Cfg>
 static void opPHere(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
-    int16_t pn = normalisePn(runtime.variables.p_n);
-    const TT2Pattern &p = program->patterns[pn];
+    int16_t pn = normalisePn<Cfg>(runtime.variables.p_n);
+    const TT2PatternT<Cfg> &p = program->patterns[pn];
     if (isSet && stackSize >= 1) {
         int16_t a = 0;
         if (!popStack(stack, stackSize, a, error)) return;
-        TT2Pattern *m = mutablePattern(program, pn);
+        TT2PatternT<Cfg> *m = mutablePattern(program, pn);
         if (m) m->val[m->idx] = a;
     } else {
         pushStack(stack, stackSize, p.val[p.idx], error);
@@ -3499,12 +3499,12 @@ static void opPNHere(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgram
                      int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
-    pn = normalisePn(pn);
-    const TT2Pattern &p = program->patterns[pn];
+    pn = normalisePn<Cfg>(pn);
+    const TT2PatternT<Cfg> &p = program->patterns[pn];
     if (isSet && stackSize >= 1) {
         int16_t a = 0;
         if (!popStack(stack, stackSize, a, error)) return;
-        TT2Pattern *m = mutablePattern(program, pn);
+        TT2PatternT<Cfg> *m = mutablePattern(program, pn);
         if (m) m->val[m->idx] = a;
     } else {
         pushStack(stack, stackSize, p.val[p.idx], error);
@@ -3514,19 +3514,19 @@ static void opPNHere(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgram
 // --- bounds (WRAP / START / END) and navigation (NEXT / PREV) --------------
 
 // Advance the working index obeying START/END/WRAP/L (upstream p_next_inc_i).
-static void patternNextInc(TT2Pattern &p) {
+template<typename Cfg> static void patternNextInc(TT2PatternT<Cfg> &p) {
     int16_t len = int16_t(p.len), start = p.start, end = p.end, idx = p.idx;
     if (idx == int16_t(len - 1) || idx == end) {
         if (p.wrap) idx = start;
     } else {
         idx++;
     }
-    if (idx > len || idx < 0 || idx >= TT2_PATTERN_LENGTH) idx = 0;
+    if (idx > len || idx < 0 || idx >= Cfg::PatternLength) idx = 0;
     p.idx = idx;
 }
 
 // Step the working index back obeying START/END/WRAP/L (upstream p_prev_dec_i).
-static void patternPrevDec(TT2Pattern &p) {
+template<typename Cfg> static void patternPrevDec(TT2PatternT<Cfg> &p) {
     int16_t len = int16_t(p.len), start = p.start, end = p.end, idx = p.idx;
     if (idx == 0 || idx == start) {
         if (p.wrap) idx = (end < len) ? end : int16_t(len - 1);
@@ -3542,10 +3542,10 @@ static void opPWrap(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeP
     if (isSet && stackSize >= 1) {
         int16_t a = 0;
         if (!popStack(stack, stackSize, a, error)) return;
-        TT2Pattern *p = mutablePattern(program, runtime.variables.p_n);
+        TT2PatternT<Cfg> *p = mutablePattern(program, runtime.variables.p_n);
         if (p) p->wrap = (a >= 1) ? 1 : 0;
     } else {
-        pushStack(stack, stackSize, int16_t(program->patterns[normalisePn(runtime.variables.p_n)].wrap), error);
+        pushStack(stack, stackSize, int16_t(program->patterns[normalisePn<Cfg>(runtime.variables.p_n)].wrap), error);
     }
 }
 
@@ -3557,10 +3557,10 @@ static void opPNWrap(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgram
     if (isSet && stackSize >= 1) {
         int16_t a = 0;
         if (!popStack(stack, stackSize, a, error)) return;
-        TT2Pattern *p = mutablePattern(program, pn);
+        TT2PatternT<Cfg> *p = mutablePattern(program, pn);
         if (p) p->wrap = (a >= 1) ? 1 : 0;
     } else {
-        pushStack(stack, stackSize, int16_t(program->patterns[normalisePn(pn)].wrap), error);
+        pushStack(stack, stackSize, int16_t(program->patterns[normalisePn<Cfg>(pn)].wrap), error);
     }
 }
 
@@ -3570,10 +3570,10 @@ static void opPStart(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const Teletype
     if (isSet && stackSize >= 1) {
         int16_t a = 0;
         if (!popStack(stack, stackSize, a, error)) return;
-        TT2Pattern *p = mutablePattern(program, runtime.variables.p_n);
+        TT2PatternT<Cfg> *p = mutablePattern(program, runtime.variables.p_n);
         if (p) p->start = normaliseIdx(*p, a);
     } else {
-        pushStack(stack, stackSize, program->patterns[normalisePn(runtime.variables.p_n)].start, error);
+        pushStack(stack, stackSize, program->patterns[normalisePn<Cfg>(runtime.variables.p_n)].start, error);
     }
 }
 
@@ -3585,10 +3585,10 @@ static void opPNStart(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgra
     if (isSet && stackSize >= 1) {
         int16_t a = 0;
         if (!popStack(stack, stackSize, a, error)) return;
-        TT2Pattern *p = mutablePattern(program, pn);
+        TT2PatternT<Cfg> *p = mutablePattern(program, pn);
         if (p) p->start = normaliseIdx(*p, a);
     } else {
-        pushStack(stack, stackSize, program->patterns[normalisePn(pn)].start, error);
+        pushStack(stack, stackSize, program->patterns[normalisePn<Cfg>(pn)].start, error);
     }
 }
 
@@ -3598,10 +3598,10 @@ static void opPEnd(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypePr
     if (isSet && stackSize >= 1) {
         int16_t a = 0;
         if (!popStack(stack, stackSize, a, error)) return;
-        TT2Pattern *p = mutablePattern(program, runtime.variables.p_n);
+        TT2PatternT<Cfg> *p = mutablePattern(program, runtime.variables.p_n);
         if (p) p->end = normaliseIdx(*p, a);
     } else {
-        pushStack(stack, stackSize, program->patterns[normalisePn(runtime.variables.p_n)].end, error);
+        pushStack(stack, stackSize, program->patterns[normalisePn<Cfg>(runtime.variables.p_n)].end, error);
     }
 }
 
@@ -3613,17 +3613,17 @@ static void opPNEnd(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT
     if (isSet && stackSize >= 1) {
         int16_t a = 0;
         if (!popStack(stack, stackSize, a, error)) return;
-        TT2Pattern *p = mutablePattern(program, pn);
+        TT2PatternT<Cfg> *p = mutablePattern(program, pn);
         if (p) p->end = normaliseIdx(*p, a);
     } else {
-        pushStack(stack, stackSize, program->patterns[normalisePn(pn)].end, error);
+        pushStack(stack, stackSize, program->patterns[normalisePn<Cfg>(pn)].end, error);
     }
 }
 
 template<typename Cfg>
 static void opPNext(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
-    TT2Pattern *p = mutablePattern(program, runtime.variables.p_n);
+    TT2PatternT<Cfg> *p = mutablePattern(program, runtime.variables.p_n);
     if (!p) return;
     if (isSet && stackSize >= 1) {
         int16_t a = 0;
@@ -3641,7 +3641,7 @@ static void opPNNext(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgram
                      int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
-    TT2Pattern *p = mutablePattern(program, pn);
+    TT2PatternT<Cfg> *p = mutablePattern(program, pn);
     if (!p) return;
     if (isSet && stackSize >= 1) {
         int16_t a = 0;
@@ -3657,7 +3657,7 @@ static void opPNNext(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgram
 template<typename Cfg>
 static void opPPrev(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
-    TT2Pattern *p = mutablePattern(program, runtime.variables.p_n);
+    TT2PatternT<Cfg> *p = mutablePattern(program, runtime.variables.p_n);
     if (!p) return;
     if (isSet && stackSize >= 1) {
         int16_t a = 0;
@@ -3675,7 +3675,7 @@ static void opPNPrev(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgram
                      int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
-    TT2Pattern *p = mutablePattern(program, pn);
+    TT2PatternT<Cfg> *p = mutablePattern(program, pn);
     if (!p) return;
     if (isSet && stackSize >= 1) {
         int16_t a = 0;
@@ -3692,28 +3692,28 @@ static void opPNPrev(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgram
 
 template<typename Cfg>
 static void patternIns(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t idx, int16_t val) {
-    TT2Pattern *p = mutablePattern(program, pn);
+    TT2PatternT<Cfg> *p = mutablePattern(program, pn);
     if (!p) return;
     idx = normaliseIdx(*p, idx);
     int16_t len = int16_t(p->len);
     if (len >= idx) {
-        int16_t hi = len < TT2_PATTERN_LENGTH ? len : int16_t(TT2_PATTERN_LENGTH - 1);
+        int16_t hi = len < Cfg::PatternLength ? len : int16_t(Cfg::PatternLength - 1);
         for (int16_t i = hi; i > idx; --i) p->val[i] = p->val[i - 1];
-        if (len < TT2_PATTERN_LENGTH - 1) p->len = uint16_t(len + 1);
+        if (len < Cfg::PatternLength - 1) p->len = uint16_t(len + 1);
     }
     p->val[idx] = val;
 }
 
 template<typename Cfg>
 static int16_t patternRm(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t idx) {
-    TT2Pattern *p = mutablePattern(program, pn);
+    TT2PatternT<Cfg> *p = mutablePattern(program, pn);
     if (!p) return 0;
     int16_t len = int16_t(p->len);
     if (len <= 0) return 0;
     idx = normaliseIdx(*p, idx);
     int16_t ret = p->val[idx];
     if (idx < len) {
-        for (int16_t i = idx; i < len && i + 1 < TT2_PATTERN_LENGTH; ++i)
+        for (int16_t i = idx; i < len && i + 1 < Cfg::PatternLength; ++i)
             p->val[i] = p->val[i + 1];
         p->len = uint16_t(len - 1);
     }
@@ -3722,15 +3722,15 @@ static int16_t patternRm(const TeletypeProgramT<Cfg> *program, int16_t pn, int16
 
 template<typename Cfg>
 static void patternPush(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t val) {
-    TT2Pattern *p = mutablePattern(program, pn);
+    TT2PatternT<Cfg> *p = mutablePattern(program, pn);
     if (!p) return;
     int16_t len = int16_t(p->len);
-    if (len < TT2_PATTERN_LENGTH) { p->val[len] = val; p->len = uint16_t(len + 1); }
+    if (len < Cfg::PatternLength) { p->val[len] = val; p->len = uint16_t(len + 1); }
 }
 
 template<typename Cfg>
 static int16_t patternPop(const TeletypeProgramT<Cfg> *program, int16_t pn) {
-    TT2Pattern *p = mutablePattern(program, pn);
+    TT2PatternT<Cfg> *p = mutablePattern(program, pn);
     if (!p) return 0;
     int16_t len = int16_t(p->len);
     if (len > 0) { p->len = uint16_t(len - 1); return p->val[len - 1]; }
@@ -3806,7 +3806,7 @@ static void opPNPop(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT
 
 // --- reorder (REV / ROT / CYC / SHUF) over the [start, end] window ---------
 
-static void patternReverse(TT2Pattern &p, int16_t start, int16_t end) {
+template<typename Cfg> static void patternReverse(TT2PatternT<Cfg> &p, int16_t start, int16_t end) {
     if (end < start) return;
     int16_t mid = int16_t((end - start) / 2);
     for (int16_t i = 0; i <= mid; ++i) {
@@ -3816,7 +3816,7 @@ static void patternReverse(TT2Pattern &p, int16_t start, int16_t end) {
     }
 }
 
-static void patternRotate(TT2Pattern &p, int16_t shift) {
+template<typename Cfg> static void patternRotate(TT2PatternT<Cfg> &p, int16_t shift) {
     int16_t start = p.start, end = p.end;
     if (end < start) return;
     int16_t len = int16_t(end - start + 1);
@@ -3835,7 +3835,7 @@ static void patternRotate(TT2Pattern &p, int16_t shift) {
     }
 }
 
-static void patternShuffle(TT2Pattern &p, TT2Rng &rng) {
+template<typename Cfg> static void patternShuffle(TT2PatternT<Cfg> &p, TT2Rng &rng) {
     int16_t start = p.start, end = p.end;
     if (end < start) return;
     for (int16_t i = end; i > start; --i) {
@@ -3849,7 +3849,7 @@ static void patternShuffle(TT2Pattern &p, TT2Rng &rng) {
 template<typename Cfg>
 static void opPRev(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                    int16_t *, uint8_t &, bool, TT2EvalError &) {
-    TT2Pattern *p = mutablePattern(program, runtime.variables.p_n);
+    TT2PatternT<Cfg> *p = mutablePattern(program, runtime.variables.p_n);
     if (p) patternReverse(*p, p->start, p->end);
 }
 
@@ -3858,7 +3858,7 @@ static void opPNRev(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
-    TT2Pattern *p = mutablePattern(program, pn);
+    TT2PatternT<Cfg> *p = mutablePattern(program, pn);
     if (p) patternReverse(*p, p->start, p->end);
 }
 
@@ -3867,7 +3867,7 @@ static void opPRot(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypePr
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t shift = 0;
     if (!popStack(stack, stackSize, shift, error)) return;
-    TT2Pattern *p = mutablePattern(program, runtime.variables.p_n);
+    TT2PatternT<Cfg> *p = mutablePattern(program, runtime.variables.p_n);
     if (p) patternRotate(*p, shift);
 }
 
@@ -3877,14 +3877,14 @@ static void opPNRot(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT
     int16_t pn = 0, shift = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
     if (!popStack(stack, stackSize, shift, error)) return;
-    TT2Pattern *p = mutablePattern(program, pn);
+    TT2PatternT<Cfg> *p = mutablePattern(program, pn);
     if (p) patternRotate(*p, shift);
 }
 
 template<typename Cfg>
 static void opPShuf(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *, uint8_t &, bool, TT2EvalError &) {
-    TT2Pattern *p = mutablePattern(program, runtime.variables.p_n);
+    TT2PatternT<Cfg> *p = mutablePattern(program, runtime.variables.p_n);
     if (p) patternShuffle(*p, runtime.rng);
 }
 
@@ -3893,7 +3893,7 @@ static void opPNShuf(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const Teletype
                      int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
-    TT2Pattern *p = mutablePattern(program, pn);
+    TT2PatternT<Cfg> *p = mutablePattern(program, pn);
     if (p) patternShuffle(*p, runtime.rng);
 }
 
@@ -3909,7 +3909,7 @@ static int16_t patternWrapVal(int16_t value, int16_t a, int16_t b) {
 template<typename Cfg>
 static void patternArithAt(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t idx,
                            int16_t delta, bool sub, bool doWrap, int16_t lo, int16_t hi) {
-    TT2Pattern *p = mutablePattern(program, pn);
+    TT2PatternT<Cfg> *p = mutablePattern(program, pn);
     if (!p) return;
     idx = normaliseIdx(*p, idx);
     int16_t v = int16_t(sub ? p->val[idx] - delta : p->val[idx] + delta);
@@ -3993,7 +3993,7 @@ static int16_t clampI32(int32_t v) {
 // kind: '+' '-' '*' '/' '%' applied to every element in [start,end].
 template<typename Cfg>
 static void patternPatArith(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t arg, char kind) {
-    TT2Pattern *p = mutablePattern(program, pn);
+    TT2PatternT<Cfg> *p = mutablePattern(program, pn);
     if (!p) return;
     int16_t s = p->start, e = p->end;
     if (e < s) return;
@@ -4009,43 +4009,43 @@ static void patternPatArith(const TeletypeProgramT<Cfg> *program, int16_t pn, in
     }
 }
 
-static int16_t patternMinIdx(const TT2Pattern &p) {
+template<typename Cfg> static int16_t patternMinIdx(const TT2PatternT<Cfg> &p) {
     int16_t pos = p.start, val = p.val[p.start];
     for (int16_t i = int16_t(p.start + 1); i <= p.end; ++i)
         if (p.val[i] < val) { val = p.val[i]; pos = i; }
     return pos;
 }
-static int16_t patternMaxIdx(const TT2Pattern &p) {
+template<typename Cfg> static int16_t patternMaxIdx(const TT2PatternT<Cfg> &p) {
     int16_t pos = p.start, val = p.val[p.start];
     for (int16_t i = int16_t(p.start + 1); i <= p.end; ++i)
         if (p.val[i] > val) { val = p.val[i]; pos = i; }
     return pos;
 }
-static int16_t patternMinVal(const TT2Pattern &p) {
+template<typename Cfg> static int16_t patternMinVal(const TT2PatternT<Cfg> &p) {
     if (p.end < p.start) return 0;
     int16_t v = p.val[p.start];
     for (int16_t i = int16_t(p.start + 1); i <= p.end; ++i) if (p.val[i] < v) v = p.val[i];
     return v;
 }
-static int16_t patternMaxVal(const TT2Pattern &p) {
+template<typename Cfg> static int16_t patternMaxVal(const TT2PatternT<Cfg> &p) {
     if (p.end < p.start) return 0;
     int16_t v = p.val[p.start];
     for (int16_t i = int16_t(p.start + 1); i <= p.end; ++i) if (p.val[i] > v) v = p.val[i];
     return v;
 }
-static int16_t patternSum(const TT2Pattern &p) {
+template<typename Cfg> static int16_t patternSum(const TT2PatternT<Cfg> &p) {
     if (p.end < p.start) return 0;
     int32_t s = 0;
     for (int16_t i = p.start; i <= p.end; ++i) s += p.val[i];
     return clampI32(s);
 }
-static int16_t patternAvg(const TT2Pattern &p) {
+template<typename Cfg> static int16_t patternAvg(const TT2PatternT<Cfg> &p) {
     if (p.end < p.start) return 0;
     int32_t s = 0, c = int32_t(p.end - p.start + 1);
     for (int16_t i = p.start; i <= p.end; ++i) s += p.val[i];
     return clampI32(s / c);
 }
-static int16_t patternFind(const TT2Pattern &p, int16_t t) {
+template<typename Cfg> static int16_t patternFind(const TT2PatternT<Cfg> &p, int16_t t) {
     if (p.end < p.start) return -1;
     for (int16_t i = p.start; i <= p.end; ++i) if (p.val[i] == t) return i;
     return -1;
@@ -4073,11 +4073,11 @@ TT2_P_ARITH_OP(PMOD, '%')
 #define TT2_P_QUERY_OP(NAME, FN) \
     template<typename Cfg> static void opP##NAME(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program, \
                           int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) { \
-        pushStack(stack, stackSize, FN(program->patterns[normalisePn(runtime.variables.p_n)]), error); } \
+        pushStack(stack, stackSize, FN(program->patterns[normalisePn<Cfg>(runtime.variables.p_n)]), error); } \
     template<typename Cfg> static void opPN##NAME(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program, \
                            int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) { \
         int16_t pn = 0; if (!popStack(stack, stackSize, pn, error)) return; \
-        pushStack(stack, stackSize, FN(program->patterns[normalisePn(pn)]), error); }
+        pushStack(stack, stackSize, FN(program->patterns[normalisePn<Cfg>(pn)]), error); }
 
 TT2_P_QUERY_OP(Min, patternMinIdx)
 TT2_P_QUERY_OP(Max, patternMaxIdx)
@@ -4093,7 +4093,7 @@ static void opPFnd(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypePr
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t t = 0;
     if (!popStack(stack, stackSize, t, error)) return;
-    pushStack(stack, stackSize, patternFind(program->patterns[normalisePn(runtime.variables.p_n)], t), error);
+    pushStack(stack, stackSize, patternFind(program->patterns[normalisePn<Cfg>(runtime.variables.p_n)], t), error);
 }
 template<typename Cfg>
 static void opPNFnd(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
@@ -4101,12 +4101,12 @@ static void opPNFnd(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT
     int16_t pn = 0, t = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
     if (!popStack(stack, stackSize, t, error)) return;
-    pushStack(stack, stackSize, patternFind(program->patterns[normalisePn(pn)], t), error);
+    pushStack(stack, stackSize, patternFind(program->patterns[normalisePn<Cfg>(pn)], t), error);
 }
 
 // --- random (P.RND / RND.P) using the TT2 Pattern rng slot -----------------
 
-static int16_t patternRndVal(const TT2Pattern &p, TT2Rng &rng) {
+template<typename Cfg> static int16_t patternRndVal(const TT2PatternT<Cfg> &p, TT2Rng &rng) {
     if (p.end < p.start) return 0;
     int16_t k = int16_t(tt2RngRange(rng, TT2RngSlot::Pattern, uint32_t(p.end - p.start + 1)) + p.start);
     return p.val[k];
@@ -4115,7 +4115,7 @@ static int16_t patternRndVal(const TT2Pattern &p, TT2Rng &rng) {
 template<typename Cfg>
 static void patternRndFill(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t mn,
                            int16_t mx, TT2Rng &rng) {
-    TT2Pattern *p = mutablePattern(program, pn);
+    TT2PatternT<Cfg> *p = mutablePattern(program, pn);
     if (!p || p->end < p->start) return;
     if (mn > mx) { int16_t t = mn; mn = mx; mx = t; }
     uint32_t range = uint32_t(mx - mn + 1);
@@ -4126,7 +4126,7 @@ static void patternRndFill(const TeletypeProgramT<Cfg> *program, int16_t pn, int
 template<typename Cfg>
 static void opPRnd(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
-    pushStack(stack, stackSize, patternRndVal(program->patterns[normalisePn(runtime.variables.p_n)], runtime.rng), error);
+    pushStack(stack, stackSize, patternRndVal(program->patterns[normalisePn<Cfg>(runtime.variables.p_n)], runtime.rng), error);
 }
 
 template<typename Cfg>
@@ -4134,7 +4134,7 @@ static void opPNRnd(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeP
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
-    pushStack(stack, stackSize, patternRndVal(program->patterns[normalisePn(pn)], runtime.rng), error);
+    pushStack(stack, stackSize, patternRndVal(program->patterns[normalisePn<Cfg>(pn)], runtime.rng), error);
 }
 
 // RND.P [min max] — fill the window with randoms; min/max optional (default 0..16383).
