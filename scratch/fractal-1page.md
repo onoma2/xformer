@@ -56,14 +56,14 @@ recordFirst ≤ loopFirst ≤ ornFirst ≤ ornLast ≤ loopLast ≤ recordLast �
 
 ## RAM
 
-| Item | Estimate |
-|------|----------|
-| FractalTrack (model) | ~570 B |
-| FractalTrackEngine | ~600 B (max buffer) |
-| 8× FractalTrack model | ~4.6 KB |
-| 8× FractalTrackEngine | ~4.8 KB CCMRAM |
+Tracks are a **discriminated union** (`Container` sized to the largest member), so adding FractalTrack/Engine costs **zero net RAM** as long as each stays under the union max — the ×8 slots already exist and are already counted in the current SRAM/CCMRAM figures.
 
-Both fit comfortably under current container gates (NoteTrack=9544 B, TeletypeTrackEngine=912 B).
+| Item | Size | Union max (gate) | Net cost |
+|------|------|------------------|----------|
+| FractalTrack (model, SRAM) | ~600 B | 9544 B | 0 B (under max) |
+| FractalTrackEngine (CCMRAM) | ~600 B incl. 256 B inline trunk | 944 B | 0 B (under max) |
+
+Both fit with large margin. The model is cheap despite ×17 sequences because FractalSequence carries **no per-step array** (one cell per section); the engine + inline trunk live in CCMRAM, so nothing touches SRAM additively.
 
 ## Stage Gates (before Phase 1 code)
 

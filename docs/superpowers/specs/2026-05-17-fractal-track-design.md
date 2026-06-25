@@ -426,7 +426,7 @@ The MVP capture is one S&H per fractal section, snapped to the cell. A fuller mo
 
 **The four corners:** section+quantized = today's grid looper · section+feel = grid rhythm with the parent's swing · event+quantized = clean note-list transcription · event+feel = faithful pitch + inter-note feel (most recorder-like).
 
-**Cost:** Event cadence is ~free (reuses harmony's trigger). **Feel needs an onset-phase field** (~3-4 bits) — the 16-bit cell (11 CV + 4 gateLen + 1 valid) is full, so it must widen to 24/32-bit: +1 B × 64-128 cells × 8 tracks on the tight SRAM rail. That RAM cost is the gate on Feel mode.
+**Cost:** Event cadence is ~free (reuses harmony's trigger). **Feel needs an onset-phase field** (~3-4 bits) — the 16-bit cell (11 CV + 4 gateLen + 1 valid) is full, so it must widen to 24/32-bit: +1 B × 64-128 cells. The trunk is an engine member in **CCMRAM** (not SRAM), so this lands on the roomier rail and only bites if the wider cell pushes the engine past the 944 B union max. That CCMRAM headroom is the gate on Feel mode.
 
 ### KD-15: Timing Alignment — Bar-Quantized Loop Length, Beat Offset, Track Delay
 
@@ -564,7 +564,7 @@ else:
 - `routedScan` is an independent routing target, not sharing infrastructure with sourceA/sourceB.
 - When External is active, the list UI hides divisor, gateLength, and PlayMode (they have no effect).
 
-**Model cost:** clockSource (1 B, within existing FractalSequence budget), Routable<float> on FractalTrack (~12 B routing infrastructure). Engine state: _lastScanStep (int8_t, 1 B). Negligible.
+**Model cost:** clockSource (1 B, within existing FractalSequence budget), Routable<float> on FractalTrack (8 B). Engine state: _lastScanStep (int8_t, 1 B). Negligible.
 
 **Rationale:** DiscreteMapTrack already proves this pattern — its `clockSource == External` branch reads `getRoutedInput()` and maps to stage position directly, ignoring PlayMode entirely. For FractalTrack, External mode turns the loop buffer into a CV-indexed wavetable: any CV source (LFO, envelope, sequencer, modulation track) directly selects the playback step. This enables tape-head-style scanning, LFO-driven wobbly loops, or step selection from a master track's CV output.
 
