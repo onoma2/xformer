@@ -1,0 +1,905 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ByteLab Live Shaper</title>
+  <style>
+    :root {
+      --bg: #090a0a;
+      --panel: #101314;
+      --panel2: #15191a;
+      --line: #2f3738;
+      --text: #e5e7dc;
+      --muted: #7f8780;
+      --low: #4d5550;
+      --green: #b8f26f;
+      --amber: #ffb84d;
+      --cyan: #76e4ff;
+      --red: #ff6b5c;
+      --shadow: rgba(0, 0, 0, 0.45);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px) 0 0 / 24px 24px,
+        linear-gradient(180deg, rgba(255,255,255,0.018) 1px, transparent 1px) 0 0 / 24px 24px,
+        var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      letter-spacing: 0;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .app {
+      width: min(1220px, calc(100vw - 28px));
+      margin: 14px auto;
+      display: grid;
+      grid-template-columns: 300px minmax(520px, 1fr) 310px;
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, var(--panel), #0c0f10);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      box-shadow: 0 14px 34px var(--shadow);
+      min-width: 0;
+    }
+
+    .header {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: 300px 1fr 310px;
+      gap: 12px;
+      align-items: center;
+      min-height: 48px;
+    }
+
+    .brand,
+    .transport,
+    .meter {
+      height: 48px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand strong {
+      color: var(--green);
+      font-size: 18px;
+    }
+
+    .brand span,
+    .transport span,
+    .meter span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .transport {
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .transport button {
+      width: 34px;
+      height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--panel2);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .transport button.active {
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    .source-stack,
+    .shape-stack {
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+
+    .section-title {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 7px;
+      margin-bottom: 2px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 78px 1fr 54px;
+      gap: 9px;
+      align-items: center;
+      min-height: 31px;
+    }
+
+    .row label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .value {
+      color: var(--green);
+      text-align: right;
+      font-size: 12px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--green);
+    }
+
+    select,
+    input[type="number"] {
+      width: 100%;
+      min-width: 0;
+      background: #080a0a;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--text);
+      padding: 5px 7px;
+    }
+
+    .bit-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 4px;
+    }
+
+    .bit {
+      height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: #070808;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .bit.on {
+      border-color: var(--green);
+      background: #16220d;
+      color: var(--green);
+    }
+
+    .stage {
+      position: relative;
+      min-height: 620px;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 620px;
+      background:
+        radial-gradient(circle at 20% 0%, rgba(118, 228, 255, 0.08), transparent 28%),
+        radial-gradient(circle at 80% 100%, rgba(184, 242, 111, 0.07), transparent 28%),
+        #050606;
+    }
+
+    .readout {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .readout div {
+      background: rgba(8, 10, 10, 0.78);
+      border: 1px solid rgba(229, 231, 220, 0.14);
+      border-radius: 4px;
+      padding: 7px 8px;
+    }
+
+    .readout b {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .readout span {
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .scope-list {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+    }
+
+    .mini {
+      height: 112px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: #070808;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .mini canvas {
+      min-height: 0;
+      height: 100%;
+      background: transparent;
+    }
+
+    .mini-label {
+      position: absolute;
+      left: 8px;
+      top: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      background: rgba(7, 8, 8, 0.75);
+      padding-right: 6px;
+    }
+
+    .leds {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 4px;
+    }
+
+    .led {
+      height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      display: grid;
+      place-items: center;
+      background: #070808;
+      color: var(--low);
+      font-size: 14px;
+    }
+
+    .led.on {
+      background: #1b2c10;
+      border-color: var(--green);
+      color: var(--green);
+      box-shadow: inset 0 0 16px rgba(184, 242, 111, 0.12);
+    }
+
+    @media (max-width: 980px) {
+      .app,
+      .header {
+        grid-template-columns: 1fr;
+      }
+
+      .stage,
+      canvas {
+        min-height: 520px;
+      }
+
+      .readout {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <div class="panel brand">
+        <strong>ByteLab</strong>
+        <span>control-rate shaper</span>
+      </div>
+      <div class="panel transport">
+        <button id="runButton" class="active" type="button">RUN</button>
+        <button id="resetButton" type="button">RST</button>
+        <span id="clockReadout">120.0 BPM</span>
+      </div>
+      <div class="panel meter">
+        <span>output</span>
+        <strong id="outReadout">0.00</strong>
+      </div>
+    </header>
+
+    <section class="panel source-stack" aria-label="Source controls">
+      <div class="section-title"><span>Sources</span><span>Sine + ADSR</span></div>
+      <div class="row">
+        <label for="sourceMode">Input</label>
+        <select id="sourceMode">
+          <option value="blend">Sine + ADSR</option>
+          <option value="sine">Sine</option>
+          <option value="adsr">ADSR</option>
+        </select>
+        <span class="value">src</span>
+      </div>
+      <div class="row">
+        <label for="sourceBlend">Blend</label>
+        <input id="sourceBlend" type="range" min="0" max="100" value="45">
+        <span class="value" data-for="sourceBlend">45%</span>
+      </div>
+      <div class="row">
+        <label for="sineRate">Sine Hz</label>
+        <input id="sineRate" type="range" min="5" max="600" value="80">
+        <span class="value" data-for="sineRate">0.80</span>
+      </div>
+      <div class="row">
+        <label for="sineDepth">Sine Amt</label>
+        <input id="sineDepth" type="range" min="0" max="100" value="80">
+        <span class="value" data-for="sineDepth">80%</span>
+      </div>
+      <div class="row">
+        <label for="attack">Attack</label>
+        <input id="attack" type="range" min="20" max="1200" value="180">
+        <span class="value" data-for="attack">180</span>
+      </div>
+      <div class="row">
+        <label for="decay">Decay</label>
+        <input id="decay" type="range" min="20" max="1800" value="520">
+        <span class="value" data-for="decay">520</span>
+      </div>
+      <div class="row">
+        <label for="sustain">Sustain</label>
+        <input id="sustain" type="range" min="0" max="100" value="56">
+        <span class="value" data-for="sustain">56%</span>
+      </div>
+      <div class="row">
+        <label for="release">Release</label>
+        <input id="release" type="range" min="20" max="1800" value="680">
+        <span class="value" data-for="release">680</span>
+      </div>
+      <div class="row">
+        <label for="gateRate">Gate Hz</label>
+        <input id="gateRate" type="range" min="10" max="400" value="60">
+        <span class="value" data-for="gateRate">0.60</span>
+      </div>
+    </section>
+
+    <section class="panel stage" aria-label="ByteLab visualization">
+      <canvas id="mainCanvas" width="900" height="620"></canvas>
+      <div class="readout">
+        <div><b>source byte</b><span id="sourceByte">00</span></div>
+        <div><b>masked byte</b><span id="maskedByte">00</span></div>
+        <div><b>fold mode</b><span id="foldReadout">BYPASS</span></div>
+        <div><b>shaped out</b><span id="shapeOut">0.00</span></div>
+      </div>
+    </section>
+
+    <section class="panel shape-stack" aria-label="ByteLab controls">
+      <div class="section-title"><span>ByteLab</span><span>shaper</span></div>
+      <div class="row">
+        <label for="inputGain">Gain</label>
+        <input id="inputGain" type="range" min="25" max="400" value="140">
+        <span class="value" data-for="inputGain">1.40x</span>
+      </div>
+      <div class="row">
+        <label for="inputBias">Bias</label>
+        <input id="inputBias" type="range" min="-100" max="100" value="0">
+        <span class="value" data-for="inputBias">+0.00</span>
+      </div>
+      <div class="row">
+        <label for="divisor">Div</label>
+        <select id="divisor">
+          <option value="1">/1</option>
+          <option value="2">/2</option>
+          <option value="3">/3</option>
+          <option value="4">/4</option>
+          <option value="6">/6</option>
+          <option value="8">/8</option>
+        </select>
+        <span class="value">rate</span>
+      </div>
+      <div class="row">
+        <label for="bitsMode">Bits</label>
+        <select id="bitsMode">
+          <option value="xor">XOR mask</option>
+          <option value="and">AND mask</option>
+          <option value="or">OR mask</option>
+          <option value="fold">MSB fold</option>
+        </select>
+        <span class="value">mode</span>
+      </div>
+      <div class="bit-grid" id="maskBits" aria-label="Mask bits"></div>
+      <div class="row">
+        <label for="lutMode">Fold</label>
+        <select id="lutMode">
+          <option value="bypass">Bypass</option>
+          <option value="fold">Fold</option>
+          <option value="sine">Sine table</option>
+          <option value="steps">Steps</option>
+          <option value="cheby">Cheby</option>
+        </select>
+        <span class="value">lut</span>
+      </div>
+      <div class="row">
+        <label for="mix">Mix</label>
+        <input id="mix" type="range" min="0" max="100" value="100">
+        <span class="value" data-for="mix">100%</span>
+      </div>
+      <div class="row">
+        <label for="outputGain">Out Gain</label>
+        <input id="outputGain" type="range" min="25" max="200" value="100">
+        <span class="value" data-for="outputGain">1.00x</span>
+      </div>
+      <div class="row">
+        <label for="outputBias">Out Bias</label>
+        <input id="outputBias" type="range" min="-100" max="100" value="0">
+        <span class="value" data-for="outputBias">+0.00</span>
+      </div>
+      <div class="section-title"><span>Bus</span><span id="maskHex">5A</span></div>
+      <div class="leds" id="busLeds"></div>
+      <div class="scope-list">
+        <div class="mini">
+          <div class="mini-label">ADC input</div>
+          <canvas id="rawCanvas" width="300" height="112"></canvas>
+        </div>
+        <div class="mini">
+          <div class="mini-label">ByteLab output</div>
+          <canvas id="outCanvas" width="300" height="112"></canvas>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const controls = {
+      sourceMode: $("sourceMode"),
+      sourceBlend: $("sourceBlend"),
+      sineRate: $("sineRate"),
+      sineDepth: $("sineDepth"),
+      attack: $("attack"),
+      decay: $("decay"),
+      sustain: $("sustain"),
+      release: $("release"),
+      gateRate: $("gateRate"),
+      inputGain: $("inputGain"),
+      inputBias: $("inputBias"),
+      divisor: $("divisor"),
+      bitsMode: $("bitsMode"),
+      lutMode: $("lutMode"),
+      mix: $("mix"),
+      outputGain: $("outputGain"),
+      outputBias: $("outputBias")
+    };
+
+    const mainCanvas = $("mainCanvas");
+    const main = mainCanvas.getContext("2d");
+    const rawCanvas = $("rawCanvas");
+    const rawCtx = rawCanvas.getContext("2d");
+    const outCanvas = $("outCanvas");
+    const outCtx = outCanvas.getContext("2d");
+
+    const rawHistory = new Array(256).fill(0.5);
+    const adcHistory = new Array(256).fill(0.5);
+    const outHistory = new Array(256).fill(0.5);
+    const byteHistory = new Array(160).fill(0);
+
+    let running = true;
+    let mask = 0x5a;
+    let lastTick = performance.now();
+    let phase = 0;
+    let env = 0;
+    let envStage = "idle";
+    let gateWasHigh = false;
+    let heldOut = 0.5;
+    let heldByte = 0;
+    let heldMasked = 0;
+    let heldLut = 0;
+    let controlCounter = 0;
+
+    function makeBits() {
+      const maskBits = $("maskBits");
+      const busLeds = $("busLeds");
+      for (let i = 7; i >= 0; i--) {
+        const bit = document.createElement("button");
+        bit.className = "bit";
+        bit.type = "button";
+        bit.dataset.bit = i;
+        bit.textContent = (mask & (1 << i)) ? "1" : "0";
+        bit.addEventListener("click", () => {
+          mask ^= (1 << i);
+          syncBits();
+        });
+        maskBits.appendChild(bit);
+
+        const led = document.createElement("div");
+        led.className = "led";
+        led.dataset.bit = i;
+        led.textContent = i;
+        busLeds.appendChild(led);
+      }
+      syncBits();
+    }
+
+    function syncBits() {
+      document.querySelectorAll(".bit").forEach((bit) => {
+        const on = Boolean(mask & (1 << Number(bit.dataset.bit)));
+        bit.classList.toggle("on", on);
+        bit.textContent = on ? "1" : "0";
+      });
+      $("maskHex").textContent = toHex(mask);
+    }
+
+    function toHex(n) {
+      return (n & 0xff).toString(16).toUpperCase().padStart(2, "0");
+    }
+
+    function clamp01(v) {
+      return Math.max(0, Math.min(1, v));
+    }
+
+    function fold01(v) {
+      const x = Math.abs(((v * 2) % 2) - 1);
+      return clamp01(x);
+    }
+
+    function cheby(v) {
+      const x = v * 2 - 1;
+      return clamp01((4 * x * x * x - 3 * x + 1) * 0.5);
+    }
+
+    function byteToNorm(byte) {
+      return byte / 255;
+    }
+
+    function applyBits(byte) {
+      const mode = controls.bitsMode.value;
+      if (mode === "and") return byte & mask;
+      if (mode === "or") return byte | mask;
+      if (mode === "fold") {
+        return (byte & 0x80) ? (255 - byte) ^ (mask & 0x7f) : byte ^ (mask & 0x7f);
+      }
+      return byte ^ mask;
+    }
+
+    function applyLut(byte) {
+      const mode = controls.lutMode.value;
+      const n = byteToNorm(byte);
+      if (mode === "bypass") return byte;
+      if (mode === "sine") return Math.round(((Math.sin(n * Math.PI * 2) + 1) * 0.5) * 255);
+      if (mode === "steps") return Math.round(Math.floor(n * 8) / 7 * 255);
+      if (mode === "cheby") return Math.round(cheby(n) * 255);
+      return Math.round(fold01(n * 2.6) * 255);
+    }
+
+    function envelope(dt, t) {
+      const gateRate = Number(controls.gateRate.value) / 100;
+      const duty = 0.46;
+      const gate = (t * gateRate) % 1 < duty;
+      const attack = Number(controls.attack.value) / 1000;
+      const decay = Number(controls.decay.value) / 1000;
+      const sustain = Number(controls.sustain.value) / 100;
+      const release = Number(controls.release.value) / 1000;
+
+      if (gate && !gateWasHigh) envStage = "attack";
+      if (!gate && gateWasHigh) envStage = "release";
+      gateWasHigh = gate;
+
+      if (envStage === "attack") {
+        env += dt / Math.max(0.001, attack);
+        if (env >= 1) {
+          env = 1;
+          envStage = "decay";
+        }
+      } else if (envStage === "decay") {
+        env -= dt * (1 - sustain) / Math.max(0.001, decay);
+        if (env <= sustain) {
+          env = sustain;
+          envStage = gate ? "sustain" : "release";
+        }
+      } else if (envStage === "sustain") {
+        env = sustain;
+      } else if (envStage === "release") {
+        env -= dt * Math.max(0.01, env) / Math.max(0.001, release);
+        if (env <= 0.002) {
+          env = 0;
+          envStage = "idle";
+        }
+      }
+      return clamp01(env);
+    }
+
+    function sample(dt, now) {
+      const t = now / 1000;
+      const sineRate = Number(controls.sineRate.value) / 100;
+      const sineDepth = Number(controls.sineDepth.value) / 100;
+      const blend = Number(controls.sourceBlend.value) / 100;
+      phase += dt * sineRate;
+      phase %= 1;
+
+      const sine = clamp01(0.5 + Math.sin(phase * Math.PI * 2) * 0.5 * sineDepth);
+      const adsr = envelope(dt, t);
+      let source = clamp01(sine * (1 - blend) + adsr * blend);
+      if (controls.sourceMode.value === "sine") source = sine;
+      if (controls.sourceMode.value === "adsr") source = adsr;
+
+      const inputGain = Number(controls.inputGain.value) / 100;
+      const inputBias = Number(controls.inputBias.value) / 100;
+      const adc = clamp01((source - 0.5) * inputGain + 0.5 + inputBias);
+      const sourceByte = Math.round(adc * 255);
+
+      const divisor = Math.max(1, Number(controls.divisor.value));
+      controlCounter = (controlCounter + 1) % divisor;
+      if (controlCounter === 0) {
+        heldByte = sourceByte;
+        heldMasked = applyBits(heldByte);
+        heldLut = applyLut(heldMasked);
+      }
+
+      const shaped = byteToNorm(heldLut);
+      const mix = Number(controls.mix.value) / 100;
+      const outputGain = Number(controls.outputGain.value) / 100;
+      const outputBias = Number(controls.outputBias.value) / 100;
+      heldOut = clamp01(((adc * (1 - mix) + shaped * mix) - 0.5) * outputGain + 0.5 + outputBias);
+
+      rawHistory.push(source);
+      rawHistory.shift();
+      adcHistory.push(adc);
+      adcHistory.shift();
+      outHistory.push(heldOut);
+      outHistory.shift();
+      byteHistory.push(heldLut);
+      byteHistory.shift();
+
+      $("sourceByte").textContent = toHex(heldByte);
+      $("maskedByte").textContent = toHex(heldMasked);
+      $("foldReadout").textContent = controls.lutMode.options[controls.lutMode.selectedIndex].text.toUpperCase();
+      $("shapeOut").textContent = heldOut.toFixed(2);
+      $("outReadout").textContent = heldOut.toFixed(2);
+
+      document.querySelectorAll(".led").forEach((led) => {
+        const bit = Number(led.dataset.bit);
+        led.classList.toggle("on", Boolean(heldLut & (1 << bit)));
+      });
+    }
+
+    function drawTrace(ctx, width, height, values, color, stepped) {
+      ctx.clearRect(0, 0, width, height);
+      ctx.strokeStyle = "rgba(229,231,220,0.16)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, height / 2);
+      ctx.lineTo(width, height / 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < values.length; i++) {
+        const x = i / (values.length - 1) * width;
+        const y = height - values[i] * height;
+        if (i === 0) ctx.moveTo(x, y);
+        else if (stepped) {
+          const px = (i - 1) / (values.length - 1) * width;
+          const py = height - values[i - 1] * height;
+          ctx.lineTo(x, py);
+          ctx.lineTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+    }
+
+    function drawMain() {
+      const w = mainCanvas.width;
+      const h = mainCanvas.height;
+      main.clearRect(0, 0, w, h);
+
+      main.strokeStyle = "rgba(229,231,220,0.10)";
+      main.lineWidth = 1;
+      for (let y = 72; y < h - 88; y += 48) {
+        main.beginPath();
+        main.moveTo(32, y);
+        main.lineTo(w - 32, y);
+        main.stroke();
+      }
+
+      drawBus(main, 42, 34, w - 84, 82);
+      drawSignalLane(main, "RAW SOURCE", rawHistory, 42, 148, w - 84, 102, "#76e4ff", false);
+      drawSignalLane(main, "ADC AFTER GAIN / BIAS", adcHistory, 42, 274, w - 84, 102, "#e5e7dc", false);
+      drawByteLane(main, "BYTE LAB SHAPE", byteHistory, 42, 400, w - 84, 118);
+    }
+
+    function drawBus(ctx, x, y, w, h) {
+      ctx.fillStyle = "rgba(16,19,20,0.86)";
+      ctx.strokeStyle = "rgba(229,231,220,0.18)";
+      roundRect(ctx, x, y, w, h, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      const latest = byteHistory[byteHistory.length - 1] || 0;
+      const cell = Math.min(58, (w - 72) / 8);
+      const gap = 8;
+      const total = cell * 8 + gap * 7;
+      let cx = x + (w - total) / 2;
+      for (let i = 7; i >= 0; i--) {
+        const on = Boolean(latest & (1 << i));
+        ctx.fillStyle = on ? "rgba(184,242,111,0.16)" : "rgba(255,255,255,0.025)";
+        ctx.strokeStyle = on ? "#b8f26f" : "rgba(229,231,220,0.18)";
+        roundRect(ctx, cx, y + 22, cell, 34, 4);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = on ? "#b8f26f" : "#4d5550";
+        ctx.font = "18px ui-monospace, monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(on ? "1" : "0", cx + cell / 2, y + 45);
+        if (mask & (1 << i)) {
+          ctx.fillStyle = "#ffb84d";
+          ctx.fillRect(cx + cell * 0.25, y + 63, cell * 0.5, 3);
+        }
+        cx += cell + gap;
+      }
+
+      ctx.fillStyle = "#7f8780";
+      ctx.font = "12px ui-monospace, monospace";
+      ctx.textAlign = "left";
+      ctx.fillText("current byte bus / mask marks", x + 12, y + 16);
+    }
+
+    function drawSignalLane(ctx, label, values, x, y, w, h, color, stepped) {
+      ctx.fillStyle = "rgba(16,19,20,0.62)";
+      ctx.strokeStyle = "rgba(229,231,220,0.13)";
+      roundRect(ctx, x, y, w, h, 6);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#7f8780";
+      ctx.font = "12px ui-monospace, monospace";
+      ctx.textAlign = "left";
+      ctx.fillText(label, x + 12, y + 18);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x + 12, y + 28, w - 24, h - 42);
+      ctx.clip();
+      drawPath(ctx, values, x + 12, y + 28, w - 24, h - 42, color, stepped);
+      ctx.restore();
+    }
+
+    function drawByteLane(ctx, label, bytes, x, y, w, h) {
+      const values = bytes.map((b) => b / 255);
+      drawSignalLane(ctx, label, values, x, y, w, h, "#b8f26f", true);
+      ctx.fillStyle = "#ffb84d";
+      ctx.font = "12px ui-monospace, monospace";
+      ctx.textAlign = "right";
+      ctx.fillText(controls.bitsMode.value.toUpperCase() + " / " + controls.lutMode.value.toUpperCase(), x + w - 12, y + 18);
+    }
+
+    function drawPath(ctx, values, x, y, w, h, color, stepped) {
+      ctx.strokeStyle = "rgba(229,231,220,0.12)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, y + h / 2);
+      ctx.lineTo(x + w, y + h / 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let i = 0; i < values.length; i++) {
+        const px = x + i / (values.length - 1) * w;
+        const py = y + h - values[i] * h;
+        if (i === 0) ctx.moveTo(px, py);
+        else if (stepped) {
+          const prevX = x + (i - 1) / (values.length - 1) * w;
+          const prevY = y + h - values[i - 1] * h;
+          ctx.lineTo(px, prevY);
+          ctx.lineTo(px, py);
+        } else {
+          ctx.lineTo(px, py);
+        }
+      }
+      ctx.stroke();
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    function updateLabels() {
+      const pairs = [
+        ["sourceBlend", "%", 1],
+        ["sineDepth", "%", 1],
+        ["attack", "", 1],
+        ["decay", "", 1],
+        ["sustain", "%", 1],
+        ["release", "", 1],
+        ["mix", "%", 1]
+      ];
+      pairs.forEach(([id, suffix]) => {
+        const el = document.querySelector(`[data-for="${id}"]`);
+        if (el) el.textContent = controls[id].value + suffix;
+      });
+      document.querySelector('[data-for="sineRate"]').textContent = (Number(controls.sineRate.value) / 100).toFixed(2);
+      document.querySelector('[data-for="gateRate"]').textContent = (Number(controls.gateRate.value) / 100).toFixed(2);
+      document.querySelector('[data-for="inputGain"]').textContent = (Number(controls.inputGain.value) / 100).toFixed(2) + "x";
+      document.querySelector('[data-for="outputGain"]').textContent = (Number(controls.outputGain.value) / 100).toFixed(2) + "x";
+      const inputBias = Number(controls.inputBias.value) / 100;
+      const outputBias = Number(controls.outputBias.value) / 100;
+      document.querySelector('[data-for="inputBias"]').textContent = (inputBias >= 0 ? "+" : "") + inputBias.toFixed(2);
+      document.querySelector('[data-for="outputBias"]').textContent = (outputBias >= 0 ? "+" : "") + outputBias.toFixed(2);
+    }
+
+    function clearScopes() {
+      rawHistory.fill(rawHistory[rawHistory.length - 1] || 0.5);
+      adcHistory.fill(adcHistory[adcHistory.length - 1] || 0.5);
+      outHistory.fill(heldOut);
+      byteHistory.fill(heldLut);
+    }
+
+    function tick(now) {
+      const dt = Math.min(0.05, (now - lastTick) / 1000);
+      lastTick = now;
+      if (running) sample(dt, now);
+      drawMain();
+      drawTrace(rawCtx, rawCanvas.width, rawCanvas.height, adcHistory, "#e5e7dc", false);
+      drawTrace(outCtx, outCanvas.width, outCanvas.height, outHistory, "#b8f26f", true);
+      requestAnimationFrame(tick);
+    }
+
+    Object.values(controls).forEach((control) => {
+      control.addEventListener("input", () => {
+        updateLabels();
+        clearScopes();
+      });
+      control.addEventListener("change", () => {
+        updateLabels();
+        clearScopes();
+      });
+    });
+
+    $("runButton").addEventListener("click", () => {
+      running = !running;
+      $("runButton").classList.toggle("active", running);
+      $("runButton").textContent = running ? "RUN" : "HLD";
+    });
+
+    $("resetButton").addEventListener("click", () => {
+      env = 0;
+      envStage = "idle";
+      phase = 0;
+      heldByte = 0;
+      heldMasked = 0;
+      heldLut = 0;
+      controlCounter = 0;
+      rawHistory.fill(0.5);
+      adcHistory.fill(0.5);
+      outHistory.fill(0.5);
+      byteHistory.fill(0);
+    });
+
+    makeBits();
+    updateLabels();
+    requestAnimationFrame((now) => {
+      lastTick = now;
+      requestAnimationFrame(tick);
+    });
+  </script>
+</body>
+</html>

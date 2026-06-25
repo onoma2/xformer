@@ -114,6 +114,7 @@ from pages_modulator import (
     render_modulator_justf_adsr_intone,
     render_modulator_geode_globals,
     render_modulator_geode_voice,
+    render_modulator_bytelab_proposed,
     render_modulator_adsr_floor,
     render_modulator_list_sine,
     render_modulator_list_adsr,
@@ -439,6 +440,8 @@ def render_page(page: str, scale: int = 4):
         render_modulator_geode_globals(canvas)
     elif page == "modulator-geode-voice":
         render_modulator_geode_voice(canvas)
+    elif page == "modulator-bytelab-proposed":
+        render_modulator_bytelab_proposed(canvas)
     elif page == "modulator-adsr-floor":
         render_modulator_adsr_floor(canvas)
     elif page == "stochastic-loop-proposed":
@@ -656,7 +659,7 @@ def main():
                                  'modulator-proposed-sine', 'modulator-proposed-adsr',
                                  'modulator-proposed-random', 'modulator-proposed-chaos',
                                  'modulator-proposed-adsr-page2', 'modulator-proposed-chaos-page2',
-                                 'modulator-rate-free-proposed', 'modulator-rate-tempo-proposed', 'modulator-gatemodes-proposed', 'modulator-scope-proposed', 'modulator-destinations-grid-proposed', 'modulator-justf-time', 'modulator-justf-intone', 'modulator-justf-follower', 'modulator-justf-adsr-follower', 'modulator-justf-adsr-intone', 'modulator-geode-globals', 'modulator-geode-voice', 'modulator-adsr-floor',
+                                 'modulator-rate-free-proposed', 'modulator-rate-tempo-proposed', 'modulator-gatemodes-proposed', 'modulator-scope-proposed', 'modulator-destinations-grid-proposed', 'modulator-justf-time', 'modulator-justf-intone', 'modulator-justf-follower', 'modulator-justf-adsr-follower', 'modulator-justf-adsr-intone', 'modulator-geode-globals', 'modulator-geode-voice', 'modulator-bytelab-proposed', 'modulator-adsr-floor',
                                  'modulator-list-sine-proposed', 'modulator-list-adsr-proposed', 'modulator-list-random-proposed', 'modulator-list-chaos-proposed', 'modulator-list-random-uniform-proposed', 'modulator-list-spring-proposed', 'modulator-list-spring-p2-proposed', 'modulator-list-chaos-p2-proposed', 'modulator-list-chaos-p1-proposed', 'modulator-list-adsr-p2-proposed', 'modulator-list-adsr-p1-proposed', 'modulator-list-lfo-proposed',
                                  'stochastic-loop-proposed', 'stochastic-loop-proposed-held',
                                  'stochastic-live-proposed', 'stochastic-live-proposed-held',

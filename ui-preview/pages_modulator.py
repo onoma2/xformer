@@ -1147,6 +1147,64 @@ def render_modulator_geode_voice(canvas):
     _draw_param_list_phaseflux(canvas, labels, values, 1)
 
 
+# --- PROPOSED: ByteLab modulator-bank UI ---
+
+def _draw_bytelab_scope(canvas):
+    x, y, w, h = 1, 12, 119, 40
+    canvas.set_blend_mode(BlendMode.Set)
+    canvas.set_color(Color.Medium)
+    canvas.draw_rect(x, y, w, h)
+
+    byte = 0b10110110
+    mask = 0b01011010
+    cell_w, cell_h = 10, 8
+    bit_x = x + 5
+    bit_y = y + 4
+
+    canvas.set_font(Font.Tiny)
+    for i in range(8):
+        bit = 7 - i
+        cx = bit_x + i * (cell_w + 3)
+        active = (byte >> bit) & 1
+        masked = (mask >> bit) & 1
+        canvas.set_color(Color.Bright if active else Color.Low)
+        canvas.draw_rect(cx, bit_y, cell_w, cell_h)
+        canvas.set_color(Color.Bright if active else Color.Medium)
+        canvas.draw_text_centered(cx, bit_y, cell_w, cell_h, "1" if active else "0")
+        if masked:
+            canvas.set_color(Color.MediumBright)
+            canvas.hline(cx + 2, bit_y + cell_h + 2, cell_w - 4)
+
+    canvas.set_color(Color.Low)
+    canvas.hline(x + 3, y + 24, w - 6)
+
+    trace = [22, 35, 18, 30, 12, 42, 25, 38, 16, 28, 46, 20, 32, 14, 36, 24]
+    tx = x + 4
+    ty = y + 25
+    step_w = 7
+    prev_x = tx
+    prev_y = ty + (trace[0] * 16) // 64
+    canvas.set_color(Color.Bright)
+    for i, value in enumerate(trace[1:], start=1):
+        px = tx + i * step_w
+        py = ty + (value * 16) // 64
+        canvas.hline(prev_x, prev_y, px - prev_x)
+        canvas.vline(px, min(prev_y, py), abs(py - prev_y) + 1)
+        prev_x, prev_y = px, py
+    canvas.hline(prev_x, prev_y, x + w - 6 - prev_x)
+
+
+def render_modulator_bytelab_proposed(canvas):
+    labels = ["TAP", "IN", "MASK", "STEP", "LUT"]
+    values = ["B6", "M1", "5A", "+13", "FOLD"]
+    WindowPainter.clear(canvas)
+    WindowPainter.draw_header(canvas, track=2, mode="BYTE LAB")
+    WindowPainter.draw_active_function(canvas, "BYTE")
+    WindowPainter.draw_footer(canvas, labels, highlight=2)
+    _draw_bytelab_scope(canvas)
+    _draw_param_list_phaseflux(canvas, labels, values, 2)
+
+
 # --- PROPOSED: output transform UI — ADSR floor cell + invert indicator ---
 
 def render_modulator_adsr_floor(canvas):
