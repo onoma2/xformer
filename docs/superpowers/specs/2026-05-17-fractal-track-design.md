@@ -301,38 +301,34 @@ On trunk-phase loop boundary:
 
 ---
 
-### KD-12: Branches — Non-Destructive Playback Transforms (Post-Trunk)
+### KD-12: Branches — Concatenated Chained Transforms (Post-Trunk), Bit-Word Path
 
-**Decision:** Branches are **"trunk + math transform" at playback time** — no separate buffers. The trunk is the single ground truth recording. Each branch reads the trunk buffer and applies one of the following transforms during playback:
+**Decision:** Branches grow the played sequence by **concatenation** (Bloom). The trunk and `branchCount` generated branches play as **one long phrase**, then loop:
 
-- **Reverse**: play trunk steps backwards
+```
+Trunk → B1 → B2 → … → BN → (loop)
+```
+
+Each segment is one loop-window length; total played length = loopLen × (1 + branchCount). No separate buffers — every branch is "previous segment + math transform" evaluated at playback from the single trunk buffer.
+
+**Chained, not off-trunk.** Branch N transforms **branch N-1** (the trunk for B1), so transforms **compound** down the chain — each limb is a variation of the limb before it, the Bloom "watch it grow." (The prior design transformed every branch off the trunk; that is replaced.)
+
+**Transform set (Bloom):** each branch applies one of —
+- **Reverse**: play the previous segment backwards
 - **Inverse**: mirror pitch around a center note (`center - (cv - center)`)
-- **Transpose**: offset all CV values by fixed semitones
-- **Mutate**: per-step probability of re-rolling CV via current complexity/scale
-- **Randomize**: each step gets a random CV from the active scale
+- **Transpose**: offset all CV by fixed semitones
+- **Mutate**: per-step probability of re-rolling CV via the inherited scale
+- **Randomize**: each step a random CV from the inherited scale
 
-**Lifecycle: trunk cycles, then branches, then back to trunk:**
+**Transform assignment — generative, reseeded.** The engine assigns each branch's transform from an RNG seeded per track, and **reseeds when the trunk is edited** (Bloom's regenerate-on-edit). Not user-picked per branch — the chain grows on its own. The seed is stored so the assignment is stable across power cycles until the trunk changes.
 
-```
-trunk(N) -> branches(M) -> trunk(N) -> branches(M) -> ...
-```
+**Path — an N-bit decision word, not a pattern LUT.** Path navigates the Trunk→branches walk as a **bit-word**: `path` (uint8_t), bit *k* = branch *k*'s traversal decision (**0 = forward, 1 = reversed**). The knob/CV sweeps `0 .. 2^branchCount − 1`, so N branches expose **2^N distinct paths** (1→2, 2→4, … 7→**128**, matching Bloom at max branches). The index *is* the decision vector — no stored table, no LUT to maintain. This replaces the prior 8-entry named-pattern LUT (Forward-Ladder etc. were special cases of the all-forward / all-reverse words).
 
-Where N = trunkCycles (how many loop repetitions of trunk before switching to branches) and M = branchCount (how many branches to generate before switching back). The trunk may evolve at its loop boundaries (via KD-3/KD-6); branches do NOT mutate the buffer.
+**Order vs Path — two orthogonal axes:**
+- **Order** = how a single segment is read internally (Forward / Reverse / Pendulum / Random / Converge / Diverge / Page-Jump).
+- **Path** = the across-segments tree-walk (the N-bit forward/reverse-per-branch word).
 
-**Path:** a curated set of navigation patterns defining which branch plays in which order. Implemented as a small editable LUT (6-8 entries in rodata/flash, ~64 B). Options include:
-
-1. Forward Ladder: T -> B1 -> B2 -> ... -> BN
-2. Reverse Ladder: T -> BN -> BN-1 -> ... -> B1
-3. Ping-Pong: T -> B1 -> B2 -> B3 -> B2 -> B1 -> T
-4. Trunk Return: T -> B1 -> T -> B2 -> T -> B3 -> ...
-5. Deep Dive: T -> B1 -> B2 -> ... -> BN (stay at BN for N reps)
-6. Converge: B1 -> B2 -> ... -> T (inward)
-7. Diverge: T -> B3 -> B2 -> B1 (outward)
-8. Random Walk: randomly pick between T and any branch each loop
-
-**Order (from Bloom):** playback direction for trunk — Forward, Reverse, Pendulum, Random, Converge, Diverge, Page Jump.
-
-**RAM impact:** Zero. Branches have no buffer storage — transforms are applied at playback time reading from the single trunk buffer. Only model params: trunkCycles (uint8_t), branchCount (uint8_t, 0-7), pathType (uint8_t, 0-7), orderMode (uint8_t, 0-6), branchTransformFlags (uint8_t bitmask).
+**RAM impact:** Zero buffers. Model params: branchCount (uint8_t, 0-7), path (uint8_t bit-word), orderMode (uint8_t, 0-6), branchSeed (uint16_t — the generative transform assignment). Branches evaluated at playback from the single trunk buffer.
 
 ### KD-13: Ornamentation — Per-Step Classical Flourishes (Post-Trunk/Branch)
 
