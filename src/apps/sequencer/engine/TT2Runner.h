@@ -9,11 +9,12 @@
 // - Executes lines 0 .. script.length-1; zero-length lines are skipped.
 // - Stops on first evaluator/op error and returns it.
 // - Supports nested SCRIPT calls up to TT2_EXEC_DEPTH frames.
-inline TT2EvalResult runScript(const TeletypeProgram &program,
-                               TT2Runtime &runtime,
+template<typename Cfg>
+inline TT2EvalResult runScript(const TeletypeProgramT<Cfg> &program,
+                               TT2RuntimeT<Cfg> &runtime,
                                TT2OutputState &output,
                                uint8_t scriptIndex) {
-    if (scriptIndex >= TT2_SCRIPT_COUNT) {
+    if (scriptIndex >= Cfg::ScriptCount) {
         return {TT2EvalError::InvalidScriptIndex, 0, 0, 0};
     }
 
@@ -57,10 +58,11 @@ inline TT2EvalResult runScript(const TeletypeProgram &program,
 // Run a script as a function: push a frame carrying the input params, execute
 // all lines, return the frame's fresult (0 if the body never set FR). Mirrors
 // upstream execute_function (es_push_fparams -> run -> fresult).
-inline int16_t tt2RunFunction(const TeletypeProgram &program, TT2Runtime &runtime,
+template<typename Cfg>
+inline int16_t tt2RunFunction(const TeletypeProgramT<Cfg> &program, TT2RuntimeT<Cfg> &runtime,
                               TT2OutputState &output, uint8_t scriptIndex,
                               int16_t param1, int16_t param2) {
-    if (scriptIndex >= TT2_SCRIPT_COUNT) return 0;
+    if (scriptIndex >= Cfg::ScriptCount) return 0;
     const TT2Script &script = program.scripts[scriptIndex];
     if (script.length > TT2_COMMANDS_PER_SCRIPT) return 0;
     if (runtime.exec.depth >= TT2_EXEC_DEPTH) { runtime.exec.overflow = 1; return 0; }
@@ -87,10 +89,11 @@ inline int16_t tt2RunFunction(const TeletypeProgram &program, TT2Runtime &runtim
 }
 
 // Run a single line of a script as a function (upstream execute_function_line).
-inline int16_t tt2RunFunctionLine(const TeletypeProgram &program, TT2Runtime &runtime,
+template<typename Cfg>
+inline int16_t tt2RunFunctionLine(const TeletypeProgramT<Cfg> &program, TT2RuntimeT<Cfg> &runtime,
                                   TT2OutputState &output, uint8_t scriptIndex,
                                   uint8_t line, int16_t param1, int16_t param2) {
-    if (scriptIndex >= TT2_SCRIPT_COUNT) return 0;
+    if (scriptIndex >= Cfg::ScriptCount) return 0;
     const TT2Script &script = program.scripts[scriptIndex];
     if (line >= script.length) return 0;
     if (runtime.exec.depth >= TT2_EXEC_DEPTH) { runtime.exec.overflow = 1; return 0; }
@@ -118,12 +121,13 @@ inline int16_t tt2RunFunctionLine(const TeletypeProgram &program, TT2Runtime &ru
 // the caller's origin context restored. Faithful to upstream tele_tick():
 // the firing slot is held busy (time=1) while its body runs so a body that
 // re-enqueues a delay won't reuse the slot, then freed.
-inline void tt2AdvanceDelays(const TeletypeProgram &program, TT2Runtime &runtime,
+template<typename Cfg>
+inline void tt2AdvanceDelays(const TeletypeProgramT<Cfg> &program, TT2RuntimeT<Cfg> &runtime,
                              TT2OutputState &output, int deltaMs) {
     if (deltaMs <= 0) {
         return;
     }
-    for (int i = 0; i < TT2_DELAY_DEPTH; ++i) {
+    for (int i = 0; i < Cfg::DelayDepth; ++i) {
         TT2DelayEntry &e = runtime.delay.entries[i];
         if (e.time == 0) {
             continue;
@@ -174,14 +178,15 @@ inline void tt2AdvanceDelays(const TeletypeProgram &program, TT2Runtime &runtime
 // accumulator resets when inactive (re-enable starts fresh). In clock-sync mode
 // (M.C n d -> metroSyncDen>0) the ms period is derived from live BPM each tick:
 // ms = num/den of a whole note = num * 240000 / (den * bpm). Empty metro = no-op.
-inline void tt2AdvanceMetro(const TeletypeProgram &program, TT2Runtime &runtime,
+template<typename Cfg>
+inline void tt2AdvanceMetro(const TeletypeProgramT<Cfg> &program, TT2RuntimeT<Cfg> &runtime,
                             TT2OutputState &output, int deltaMs, int &metroAccumMs,
                             float bpm) {
     if (!runtime.variables.m_act) {
         metroAccumMs = 0;
         return;
     }
-    if (program.scripts[TT2_METRO_SCRIPT].length == 0) {
+    if (program.scripts[Cfg::MetroScript].length == 0) {
         return;
     }
     if (runtime.variables.metroSyncDen > 0 && bpm > 0.f) {
@@ -198,7 +203,7 @@ inline void tt2AdvanceMetro(const TeletypeProgram &program, TT2Runtime &runtime,
     int guard = 0;
     while (metroAccumMs >= interval && guard < 64) {
         metroAccumMs -= interval;
-        runScript(program, runtime, output, uint8_t(TT2_METRO_SCRIPT));
+        runScript(program, runtime, output, uint8_t(Cfg::MetroScript));
         ++guard;
     }
 }
