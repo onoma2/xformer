@@ -17,8 +17,8 @@ extern "C" {
 static constexpr int TT2_SCRIPT_COUNT        = TT2ConfigFull::ScriptCount;   // 8 numbered + Metro + Init
 static constexpr int TT2_COMMANDS_PER_SCRIPT = 6;
 static constexpr int TT2_COMMAND_MAX_LENGTH  = 16;
-static constexpr int TT2_PATTERN_COUNT       = 4;
-static constexpr int TT2_PATTERN_LENGTH      = 64;
+static constexpr int TT2_PATTERN_COUNT       = TT2ConfigFull::PatternCount;
+static constexpr int TT2_PATTERN_LENGTH      = TT2ConfigFull::PatternLength;
 
 static constexpr int TT2_METRO_SCRIPT     = TT2ConfigFull::MetroScript;
 static constexpr int TT2_INIT_SCRIPT      = TT2ConfigFull::InitScript;
@@ -42,13 +42,14 @@ struct TT2Command {
     int16_t value[TT2_COMMAND_MAX_LENGTH];
 };
 
-struct TT2Pattern {
+template<typename Cfg>
+struct TT2PatternT {
     int16_t idx;
     uint16_t len;
     uint16_t wrap;
     int16_t start;
     int16_t end;
-    int16_t val[TT2_PATTERN_LENGTH];
+    int16_t val[Cfg::PatternLength];
 };
 
 struct TT2Script {
@@ -100,7 +101,7 @@ struct TeletypeProgramT {
     int16_t clockMultiplier;
     uint8_t resetMetroOnLoad;
     TT2Script scripts[Cfg::ScriptCount];
-    TT2Pattern patterns[TT2_PATTERN_COUNT];
+    TT2PatternT<Cfg> patterns[Cfg::PatternCount];
     TT2TriggerSource triggerSource[Cfg::TriggerInputCount];
     TT2CvInputSource cvInputSource[TT2_CV_INPUT_COUNT];
     // Per-CV-output shaping (mirrors TT1 TeletypeTrack); applied in TT2TrackEngine::cvOutput.
@@ -111,6 +112,7 @@ struct TeletypeProgramT {
     MidiSourceConfig midiSource;  // per-track MIDI filter (port + channel); UI deferred
 };
 
+using TT2Pattern = TT2PatternT<TT2ConfigFull>;
 using TeletypeProgram = TeletypeProgramT<TT2ConfigFull>;
 
 template<typename Cfg>
@@ -123,11 +125,11 @@ inline void init(TeletypeProgramT<Cfg> &p) {
     p.clockDivisor = 12;
     p.clockMultiplier = 100;
     p.resetMetroOnLoad = 1;
-    for (int i = 0; i < TT2_PATTERN_COUNT; i++) {
+    for (int i = 0; i < Cfg::PatternCount; i++) {
         p.patterns[i].len = 0;                       // match current Teletype default
         p.patterns[i].wrap = 1;
         p.patterns[i].start = 0;
-        p.patterns[i].end = TT2_PATTERN_LENGTH - 1;
+        p.patterns[i].end = Cfg::PatternLength - 1;
     }
     // Default each trigger input to its matching CV input (CvIn1-4).
     for (int i = 0; i < Cfg::TriggerInputCount; i++) {

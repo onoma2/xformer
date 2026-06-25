@@ -21,7 +21,9 @@ CASE("TT2ConfigFull traits match today's values") {
 }
 
 CASE("TeletypeProgramT<Full> layout is unchanged") {
+    static_assert(sizeof(TT2PatternT<TT2ConfigFull>) == 138, "");
     static_assert(sizeof(TeletypeProgramT<TT2ConfigFull>) == 3638, "");
+    expect(std::is_trivially_copyable<TT2PatternT<TT2ConfigFull>>::value, "trivially copyable pattern");
     expect(std::is_trivially_copyable<TeletypeProgramT<TT2ConfigFull>>::value, "trivially copyable");
 }
 
