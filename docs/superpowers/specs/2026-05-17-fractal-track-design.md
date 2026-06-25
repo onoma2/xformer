@@ -316,7 +316,7 @@ Each segment is one loop-window length; total played length = loopLen × (1 + br
 **Chained, not off-trunk.** Branch N transforms **branch N-1** (the trunk for B1), so transforms **compound** down the chain — each limb is a variation of the limb before it, the Bloom "watch it grow." (The prior design transformed every branch off the trunk; that is replaced.)
 
 **Transform set (8 ops) — all deterministic.** Every branch is a pure transform of captured material; **no op generates content** (honouring the core constraint "no RNG content generation — all content comes from parent capture"). Branch pitch math is **chromatic** (raw semitones) — the trunk stays raw, scale is ornament-only. Each branch applies one of:
-- **Transpose** (pitch): offset all CV by fixed semitones. Chained → a transposition ladder.
+- **Transpose** (pitch): offset all CV by a **perfect 4th, 5th, or octave** (±5/±7/±12 semitones — consonant intervals only). Chained → a transposition ladder.
 - **Reverse** (order): play the previous segment backwards. Self-inverse (toggles per branch).
 - **Inverse** (pitch): mirror around a center note (`center - (cv - center)`). Self-inverse.
 - **Retrograde-Inverse** (order+pitch): Reverse then Inverse — completes the twelve-tone row ops.
@@ -329,11 +329,11 @@ Each segment is one loop-window length; total played length = loopLen × (1 + br
 
 **Transform assignment — generative, reseeded, pool-limited.** The engine assigns each branch's transform from an RNG seeded per track, **reseeding when the trunk is edited** (Bloom's regenerate-on-edit) — the chain grows on its own, not user-picked per branch. But the assignment draws **only from the enabled pool**: `branchPool` (uint8_t bitmask, one bit per op, default all-on) lets the user **constrain the palette** — e.g. pitch-only, or no rhythm changes. Empty pool falls back to Transpose. The seed is stored so the assignment is stable across power cycles until the trunk changes.
 
-**Path — an N-bit decision word, not a pattern LUT.** Path navigates the Trunk→branches walk as a **bit-word**: `path` (uint8_t), bit *k* = branch *k*'s traversal decision (**0 = forward, 1 = reversed**). The knob/CV sweeps `0 .. 2^branchCount − 1`, so N branches expose **2^N distinct paths** (1→2, 2→4, … 7→**128**, matching Bloom at max branches). The index *is* the decision vector — no stored table, no LUT to maintain. This replaces the prior 8-entry named-pattern LUT (Forward-Ladder etc. were special cases of the all-forward / all-reverse words).
+**Path — branch navigation order, as a bit-word.** Path sets the **order in which branches play** (Bloom's semantic — "the order in which the generative branches are navigated"), encoded as a bit-word: `path` (uint8_t), bit *k* = whether branch *k* is in the **outward leg** (0) or **held for the return leg** (1). The route is `Trunk → outward branches (ascending) → held branches (descending)`. all-0 = Forward Ladder `T B1 B2 … BN`; all-1 = Reverse Ladder `T BN … B1`; mixed = the orders between (e.g. B1 outward, B2/B3 held → `T B1 B3 B2`). The knob/CV sweeps `0 .. 2^branchCount − 1` → **2^N distinct orders** (7→**128**, matching Bloom). Every segment plays exactly once, so total length stays `loopLen × (1 + branchCount)`. The index *is* the route selector — no stored table, no LUT. This generalises the old named patterns (Forward/Reverse Ladder, etc.) into one CV-swept byte. **Routable.**
 
 **Order vs Path — two orthogonal axes:**
 - **Order** = how a single segment is read internally (Forward / Reverse / Pendulum / Random / Converge / Diverge / Page-Jump).
-- **Path** = the across-segments tree-walk (the N-bit forward/reverse-per-branch word).
+- **Path** = the across-segments **branch order** — which branch plays when (Trunk + outward-ascending + held-descending).
 
 **Routable.** Both **Branch count** and **Path** are Routable destinations (CV / internal-mod, depth scaled to range — §6), matching Bloom's dedicated Branch / Path CV inputs. These plus Ornament rate + intensity (KD-13) are the four live performance controls.
 
