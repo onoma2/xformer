@@ -17,7 +17,7 @@ FractalTrack is a section-sampled CV/gate child layer over one or two source tra
 
 ## Core Concept
 
-The Fractal Track is a **step-sampled CV/Gate looper with mutation**. It samples the gate/CV output of 1–2 master tracks (any engine type) once per step, loops that captured buffer, and applies Proteus-inspired mutations at loop boundaries. It is NOT a stochastic generator — it is a **record-and-evolve** child layer over existing tracks.
+The Fractal Track is a **section-sampled CV/Gate looper**. It samples the gate/CV output of 1–2 master tracks (any engine type) once per section, loops the captured trunk, and transforms playback through **branches** + **ornamentation**. It is NOT a stochastic generator — it is a **record-and-transform** child layer over existing tracks. (Mutation/evolution is deferred.)
 
 **Important:** This is a section-sampled recorder, not a continuous one. Each section captures one gate + CV snapshot, with gate length (the 4-bit field) and — in **Feel** mode (KD-14b) — the gate onset phase. It does not capture retriggers, legato, slide, or continuous intra-section motion.
 
@@ -26,7 +26,7 @@ The Fractal Track is a **step-sampled CV/Gate looper with mutation**. It samples
 | Aspect | Stochastic Track | Fractal Track |
 |--------|------------------|---------------|
 | Source material | Step probability grid (self-contained) | 1–2 external master tracks (any engine) |
-| Core loop | Generate → evaluate → lock | Record → loop → mutate/evolve |
+| Core loop | Generate → evaluate → lock | Record → loop → branch/ornament |
 | Mutation trigger | Per-step probability rolls | Loop-boundary lifecycle events |
 | Buffer semantics | Capture evaluated events into lock buffer | Step-sample gate+CV, loop, mutate |
 | Record modes | Binary capture (Hold lock) | Replace vs Latch (in scope); PunchIn, Once, record-quantize deferred |
@@ -225,10 +225,10 @@ On trunk-phase loop boundary:
 
 **Budget strategy:**
 - No per-step probability grid (unlike StochasticSequence's 512 B per pattern).
-- FractalSequence is minimal: divisor, scale, root, runMode, firstStep, lastStep (~20 B).
-- Track-level params: complexity, patience, mutation, octaveShift, density, tilt, inputTrack1, inputTrack2, mutateFirst, mutateLast (~32 B).
-- 17 sequences × ~20 B = 340 B + ~200 B overhead = ~540 B total.
-- Well under the gate. No container inflation risk.
+- FractalSequence (~28 B): divisor, clockMultiplier, resetMeasure, runMode, loopFirst/loopLast/rotate/orderMode/loopMode, recordFirst/recordLast, recordMode.
+- Track-level FractalTrack (~60 B): sourceA/B, gate/cv logic, bufferLength, recordTrigger (Routable), lock, octave, transpose, slideTime, cvUpdateMode, trackDelay, scale group, ornFirst/ornLast, branchCount, path, branchSeed, branchPool, ornamentRate/Intensity, captureCadence/Fidelity (+ the four Routables).
+- 17 sequences × ~28 B ≈ 476 B + ~60 B track-level + ~overhead ≈ **~560 B total**.
+- Well under the 9544 B gate. No container inflation risk. *(All deferred fields — density/tilt, mutation params, punchMode/recordQuantize, loopBars/beatOffset/loopPhase, clockSource — are excluded from this estimate; they are reserved, not allocated.)*
 
 ### KD-9: Engine Container Impact + RAM Allocation Policy
 
@@ -246,7 +246,8 @@ On trunk-phase loop boundary:
 - RNG, loop counters, trunk/branch counters (~50 B)
 - Inline `uint16_t` trunk (KD-2): max 128 cells × 2 B = **256 B** (CCMRAM)
 - Feel onset array (KD-14b): max 128 × 1 B = **128 B** (CCMRAM)
-- **Active target: ~730 B** — under the 912 B gate (~180 B headroom).
+- Track-delay ring (KD-15): max 16 × ~4 B = **64 B** (CCMRAM)
+- **Active target: ~800 B** — under the 912 B gate (~110 B headroom).
 
 **Deferred mutation build (NOT in the active number):** MutationHistory (16 × ~16 B ≈ 256 B) + SelectionPressure/EvolutionDepth would push the engine to ~990 B — **over** the 912 gate. So mutation **cannot co-exist with Feel** (KD-3/6 deferred); building it later requires re-probing and dropping Feel or shrinking the trunk.
 
@@ -452,7 +453,7 @@ The toggles share the harmony track's Rings (`cv_scaler`) trigger code (§4 of h
 
 > **Track Delay is in scope.** **Bar-quantized loop length** (`loopBars`), **beat offset** (`beatOffset`), and **loop phase** (`loopPhase`) are **deferred** (1-pager ledger).
 
-**Track Delay (in scope).** `trackDelay` (uint8_t, 0–16 sections, default 0): delays the fractal's **output** by N sections — each emitted note (gate+CV, plus its ornaments) is queued and released N section-boundaries later. The capture/read grid is unchanged; only the audible output is shifted, so the mirror can lag the parent for canon/echo placement. Engine cost: a small fixed ring of pending outputs (~N entries); zero model cost beyond the one byte.
+**Track Delay (in scope).** `trackDelay` (uint8_t, 0–16 sections, default 0): delays the fractal's **output** by N sections — each emitted note (gate+CV, plus its ornaments) is queued and released N section-boundaries later. The capture/read grid is unchanged; only the audible output is shifted, so the mirror can lag the parent for canon/echo placement. **Engine cost:** a fixed ring of **up to 16 pending-output entries × ~4 B** (cv `int16` = 2 B, gateLen+onset packed = 1 B, `sectionsLeft` = 1 B) = **~64 B** on the engine (CCMRAM); model cost is the one `trackDelay` byte.
 
 **Decision (deferred timing features below):** lock loop length to bars (`loopBars`), shift loop position vs the master transport (`beatOffset`), fractional read rotation (`loopPhase`).
 

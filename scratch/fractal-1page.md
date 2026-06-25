@@ -36,7 +36,7 @@ Trunk is **not serialized.** Save/load preserves model config; trunk starts empt
 ```
 tick → divisor math → shouldAdvanceSection?
   → sectionBoundary:
-      1. executeCaptureRule  (if !lock and rule allows: read source → write trunk)
+      1. executeCaptureRule  (if recordArmed and !lock: read source → write trunk per rule)
       2. play                (mapLogicalToRead → read trunk → schedule output)
   → drainQueues
 ```
@@ -61,9 +61,9 @@ Tracks are a **discriminated union** (`Container` sized to the largest member), 
 | Item | Size | Union max (gate) | Net cost |
 |------|------|------------------|----------|
 | FractalTrack (model, SRAM) | ~600 B | 9544 B | 0 B (under max) |
-| FractalTrackEngine (CCMRAM) | ~730 B incl. 256 B trunk + 128 B Feel onset array | 912 B | 0 B (under max) |
+| FractalTrackEngine (CCMRAM) | ~800 B incl. 256 B trunk + 128 B Feel onset + 64 B track-delay ring | 912 B | 0 B (under max) |
 
-Engine gate is **912 B** (TeletypeTrackEngine, PROJECT.md:299; the TT2 `static_assert` allows ≤944 — 912 is the conservative gate). Both fit. The model is cheap despite ×17 sequences because FractalSequence carries **no per-step array** (one cell per section); the engine + trunk + Feel onset array live in CCMRAM, so nothing touches SRAM additively. The ~182 B engine headroom under 912 is why **mutation (~256 B history) stays deferred** — it can't co-exist with Feel.
+Engine gate is **912 B** (TeletypeTrackEngine, PROJECT.md:299; the TT2 `static_assert` allows ≤944 — 912 is the conservative gate). Both fit. The model is cheap despite ×17 sequences because FractalSequence carries **no per-step array** (one cell per section); the engine + trunk + Feel onset + track-delay ring live in CCMRAM, so nothing touches SRAM additively. The ~110 B engine headroom under 912 is why **mutation (~256 B history) stays deferred** — it can't co-exist with the active set.
 
 ## Stage Gates (before Phase 1 code)
 
