@@ -113,6 +113,8 @@ Resolution: 1/4096 V ≈ 0.244 mV. Over 7 octaves (7V) that's 28,672 steps — ~
 
 ### KD-3: Loop Lifecycle Model — Proteus-Inspired Boredom/Mutation
 
+> **Status: DEFERRED.** The whole mutation/evolution subsystem (KD-3, KD-6, KD-10) is out of current scope — it duplicates Stochastic's mutate/degree-rotation/sleep and adds the most engine + UI weight for the least unique payoff. The mutation zone (`mutateFirst`/`mutateLast`) survives, repurposed as the **ornament eligibility zone** (`ornFirst`/`ornLast`, KD-13). Revisit as a later phase.
+
 **Decision:** Adopt the Proteus spec's loop-boundary lifecycle, augmented with a per-loop-cycle evolution system (KD-6) and a trunk/branch cycle (KD-12):
 
 1. **Boredom/Patience**: resets the loop via auto-capture at loop boundaries.
@@ -328,6 +330,8 @@ Each segment is one loop-window length; total played length = loopLen × (1 + br
 - **Order** = how a single segment is read internally (Forward / Reverse / Pendulum / Random / Converge / Diverge / Page-Jump).
 - **Path** = the across-segments tree-walk (the N-bit forward/reverse-per-branch word).
 
+**Routable.** Both **Branch count** and **Path** are Routable destinations (CV / internal-mod, depth scaled to range — §6), matching Bloom's dedicated Branch / Path CV inputs. These plus Ornament rate + intensity (KD-13) are the four live performance controls.
+
 **RAM impact:** Zero buffers. Model params: branchCount (uint8_t, 0-7), path (uint8_t bit-word), orderMode (uint8_t, 0-6), branchSeed (uint16_t — the generative transform assignment). Branches evaluated at playback from the single trunk buffer.
 
 ### KD-13: Ornamentation — Per-Step Classical Flourishes (Post-Trunk/Branch)
@@ -353,11 +357,13 @@ Each segment is one loop-window length; total played length = loopLen × (1 + br
 
 **Max ornaments:** Full 8-step trills.
 
-**User control — standalone (not coupled to Mutate, unlike Bloom).** A dedicated ornament control, separate from the Mutate/evolution knob: `ornamentProb` (uint8_t, 0-100%) = per-gated-note probability; `ornamentMode` (uint8_t) = the complexity ramp (off → 2-step → 4-step → max + trills). Graded like Bloom's zones, but its own control.
+**User control — standalone, two Routable axes.** Decoupled from the (deferred) mutation system: `ornamentRate` (uint8_t, 0-100%) = P(fire) per gated cell — *how often*; `ornamentIntensity` (uint8_t, 0-100%) = the complexity tier — *how fancy* (off → 2-step → +4-step ≥40% → +8-step trill ≥75%). The two are independent, so flourishes can be elaborate-but-occasional (Bloom fuses both into one Mutate-knob zone; we split them). **Both are Routable** — with Branch count + Path (KD-12) they are the four live performance controls, a 1:1 with Bloom's Branch / Path / Mutate CV inputs (Ornament fills the Mutate slot, since mutation is deferred).
+
+**Ornament eligibility zone.** Ornaments fire only when the sounding trunk cell falls within `ornFirst`/`ornLast` — `recordFirst ≤ loopFirst ≤ ornFirst ≤ ornLast ≤ loopLast ≤ recordLast`. The zone is defined on trunk within-positions, so the same "live region" stays expressive across every branch repetition (B1…BN). This was the mutation zone; with mutation/evolution deferred, it survives as the ornament eligibility region.
 
 **Scale source — inherited, ornament-only.** FractalTrack inherits the **project Scale + `scaleRotate`** (a setup field, standard `-1`=inherit, like every other track — `selectedScale(projectScale, projectRotate)`). The scale is applied **only to ornaments**: the flourish notes (runs, arps, half-turns, mordents, octave/fifth, trills) move by **scale degrees** off it. The **trunk stays raw** — captured CV is never quantised (the looper mirrors the parent's literal output). A raw cell that lands off-scale references its **nearest scale degree** for the ornament steps; the main note still plays raw, only the ornament notes snap to the scale around it. "Toward/Away" walks scale degrees toward/away the next cell's nearest degree.
 
-**RAM impact:** Negligible. Evaluated in tick path, no per-step storage. ~2 B model params + the inherited scale group.
+**RAM impact:** Negligible. Evaluated in tick path, no per-step storage. ~4 B model params (ornamentRate, ornamentIntensity, ornFirst, ornLast) + the inherited scale group.
 
 ### KD-14: Recording Features — Replace vs Latch, Punch-In, Loop Mode, Record Quantize
 

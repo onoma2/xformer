@@ -26,7 +26,7 @@ It is not a stochastic generator, not a note sequencer, not a CV recorder, and n
 | Owner | What it owns |
 |-------|-------------|
 | **FractalSequence** (×17 patterns) | Timing (divisor, playMode, resetMeasure), loop lenses (loopFirst, loopLast, rotate, loopMode), record extent (recordFirst, recordLast), capture rules (recordMode, punchMode, recordQuantize), reserved future fields |
-| **FractalTrack** (×1, track-wide) | 17 sequences, sourceA, bufferLength, lock, recordTrigger (Routable), octave, transpose, slideTime, cvUpdateMode, **scale group (scale+scaleRotate, inherit) — ornament-only, trunk stays raw**, reserved future fields |
+| **FractalTrack** (×1, track-wide) | 17 sequences, sourceA, bufferLength, lock, recordTrigger (Routable), octave, transpose, slideTime, cvUpdateMode, **scale group (scale+scaleRotate, inherit) — ornament-only, trunk stays raw**, branchCount, path, ornamentRate, ornamentIntensity, ornFirst, ornLast (**branchCount · path · ornamentRate · ornamentIntensity all Routable** — the four live performance controls), reserved future fields |
 | **FractalTrackEngine** (×1, volatile) | Trunk buffer, parent resolution, gate-length measurement, capture/read/loop-boundary rule execution, RNG, evolution history, branch state |
 
 Trunk is **not serialized.** Save/load preserves model config; trunk starts empty on power cycle.
@@ -47,12 +47,12 @@ Lock write-protects the trunk. Branch transforms and ornamentation continue whil
 ## Window Hierarchy
 
 ```
-recordFirst ≤ loopFirst ≤ mutateFirst ≤ mutateLast ≤ loopLast ≤ recordLast ≤ bufferLength-1
+recordFirst ≤ loopFirst ≤ ornFirst ≤ ornLast ≤ loopLast ≤ recordLast ≤ bufferLength-1
 ```
 
 - **Record extent** — where capture writes land
 - **Loop window** — what playback reads (per-pattern lens over the same trunk)
-- **Mutation zone** (post-MVP) — where evolution may change trunk cells
+- **Ornament zone** — where ornaments are eligible to fire (mutation/evolution deferred; this was the mutation zone)
 
 ## RAM
 
@@ -84,8 +84,12 @@ Both fit comfortably under current container gates (NoteTrack=9544 B, TeletypeTr
 3. List UI (active fields only)
 4. Hardware verification → **stop, hand off to user**
 
-Post-MVP (each independent, lands in reserved fields/hooks):
-runMode → two-source mixing → CV-scan → bar-quantized loop → capture variants → snapshot → sleep → density/tilt → mutation/patience → branches → ornamentation → visual page
+Post-MVP, in scope (the playable identity — each lands in reserved fields/hooks):
+branches (concatenated, chained, generative, bit-word Path) → ornaments (rate/intensity, scale-aware) + ornament zone → two-source mixing → track-delay → visual page.
+Live performance controls (Routable): branch count · path · ornament rate · ornament intensity.
+
+Deferred (later phase, nice-to-have):
+mutation/evolution (entire subsystem — KD-3/6/10) · CV-scan · capture variants (Blend/Once/PunchIn) · bar-quantized loop · beat-offset · snapshot · sleep · density/tilt.
 
 ## Key Design Constraints
 
