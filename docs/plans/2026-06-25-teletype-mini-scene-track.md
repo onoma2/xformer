@@ -31,7 +31,7 @@ The real `Track`-union cap is **NoteTrack = 9544 B**, not TT2Track's 9520 (PROJE
 
 **`TT2ConfigMini`:** `ScriptCount=3, DelayDepth=8, TriggerInputCount=2, MetroScript=2, InitScript=-1, SceneCount=4, PatternCount=4, PatternLength=64`. Sizes: `TeletypeProgramT<Mini>`≈1518, `TT2RuntimeT<Mini>`≈2192, `TT2MiniTrack`≈8.3 KB (≤9544 NoteTrack cap — ample headroom; the `<=9520` asserts below are a conservative TT2-family cap, not the union cliff). Pattern dims stay 4×64.
 
-**Execution note:** the per-task `commit` steps proceed under the user's standing go-ahead for this plan's execution run (per repo policy, commits otherwise need explicit confirmation).
+**Execution note:** the per-task `commit` steps require the user's explicit go-ahead **at execution time** — this plan text does not itself grant commit permission (repo policy requires confirmation for `git add`/`commit`). The controller obtains that go-ahead before starting the run.
 
 ---
 
@@ -156,11 +156,15 @@ CASE("program(scene) wraps modulo SceneCount") {
 
 ### Task 4: `Track.cpp` dispatch switches
 
-**Files:** `src/apps/sequencer/model/Track.cpp`. Add `TeletypeMini` to the **six** real switch sites: `clearPattern`, `copyPattern`, `gateOutputName`, `cvOutputName`, `write`, `read`. Delegate `write`/`read` to `tt2MiniTrack().write/read`; mirror TT2 for the other four. **NOT** `clear()` (no switch) or `duplicatePattern()` (delegates to `copyPattern`).
+**Files:** `src/apps/sequencer/model/Track.cpp`. Add `TeletypeMini` to the **six** real switch sites: `clearPattern`, `copyPattern`, `gateOutputName`, `cvOutputName`, `write`, `read`. **NOT** `clear()` (no switch) or `duplicatePattern()` (delegates to `copyPattern`).
 
-**Step 1 — implement** each case (read each switch, copy the `TeletypeV2` arm, swap `tt2Track()`→`tt2MiniTrack()`).
+**Decision — `clearPattern`/`copyPattern` are explicit no-ops for Mini in v1** (mirror TT2's empty `case` at `Track.cpp:~40,~73`). Rationale: the w-pattern selector only *selects* a scene (`pattern() % SceneCount`); the 16 w-pattern slots alias onto 4 scenes, so wiring clear/copy to "the mapped scene" introduces aliasing surprises (slot 0 and slot 4 are the same scene; copy 0→4 is a no-op). Scenes are edited via the script editor (Task 10), not the pattern UI. This is SAFE (no data loss, no crash) and matches the v1 "edit only" scope. **The plan states this explicitly so the executor does not assume pattern clear/copy manages scenes.** (Wiring them to real scene clear/copy is in Deferred.)
+- `write`/`read` → delegate to `tt2MiniTrack().write/read`.
+- `gateOutputName`/`cvOutputName` → mirror the TT2 arm (output naming is identical).
+
+**Step 1 — implement** each case per the above (clear/copy = empty `break;`; write/read/names mirror/delegate).
 **Step 2 — build:** `make -C build sequencer` clean.
-**Step 3 — commit:** `feat(model): TeletypeMini cases in Track.cpp dispatch` (round-trip asserted in Task 8).
+**Step 3 — commit:** `feat(model): TeletypeMini cases in Track.cpp dispatch (pattern clear/copy no-op in v1)` (round-trip asserted in Task 8).
 
 ---
 
@@ -274,6 +278,12 @@ Ctor: `_activeScene=-1`, then call `changePattern()` once to seed (base ctor's v
 **Files:** `src/apps/sequencer/ui/pages/TeletypeScriptViewPage.cpp`, `src/apps/sequencer/ui/pages/TT2IoConfigPage.cpp`, `src/apps/sequencer/engine/TT2UiAccess.h`. **This is the correctness-critical task — wrong-union reads are silent, not compile errors.**
 
 **Step 1 — thread the scene index into Seam-1.** `TT2UiAccess.h` accessors take only `Track&` and hardwire `tt2Track().program()` (single program). Extend the accessor signatures with a `int scene` param (Full passes 0; Mini passes the active scene), and inside, branch `trackMode()`: `TeletypeV2` → `tt2Track().program()`, `TeletypeMini` → `tt2MiniTrack().program(scene)`. The page computes `scene = pattern() % TT2ConfigMini::SceneCount` from the track state it already holds.
+
+**Step 1b — config-drive the script-index keys (metro/init/trigger).** The editor hardwires Full's `TT2_METRO_SCRIPT`(8)/`TT2_INIT_SCRIPT`(9) for the script labels (`:96-98`), the metro↔init nav toggle (`:432`), and a function-key map assuming 8 numbered scripts (`:427`). For Mini (`MetroScript=2, InitScript=-1, ScriptCount=3`):
+- **Metro key → the active config's `MetroScript`** (script 2 for Mini, 8 for Full) — read it via a Seam-1 accessor, not the `TT2_*` constant.
+- **INIT must be unreachable for Mini** (`InitScript < 0`): the metro↔init toggle (`:432`) must NOT select a non-existent init script; the INIT label branch (`:98`) never fires.
+- **Function/trigger keys bounded to `ScriptCount`** (F1/F2 → script0/script1 for Mini; F3-F8 inert). `setScriptIndex` (`:637-643`) already clamps to `tt2ScriptCount(...)` — verify the *key handlers* feeding it also respect the bound so no key can land on script ≥ `ScriptCount`.
+Drive all three from the config (via Seam-1: `tt2MetroScriptIndex()`/`tt2InitScriptIndex()` returning `Cfg::MetroScript`/`Cfg::InitScript`, or extend existing accessors) — do not branch on hardcoded `TT2_METRO_SCRIPT`/`TT2_INIT_SCRIPT`.
 **Step 2 — enumerate every hazard** in `TeletypeScriptViewPage.cpp`: `!= TeletypeV2` guards at `:72,:78,:353,:396,:417,:476,:726`, `as<TT2TrackEngine>()` casts at `:109,:234,:735` (incl. `drawHud` `:234`), **and the direct `tt2Track()` derefs in the edit-action paths — commit/duplicate/comment/delete/undo/save/load at `:744,:776,:796,:811,:834`** — plus `TT2IoConfigPage`'s. For EACH: redirect to `tt2MiniTrack()` / `as<TT2MiniTrackEngine>()`, OR hard-block Mini *before* the deref. **Never widen a guard to admit Mini while leaving a downstream `tt2Track()`/`as<TT2TrackEngine>()`.** List each site + its decision in the commit body.
 **Step 2b — grep gate (must pass before commit):** after wiring, every remaining `tt2Track()` / `as<TT2TrackEngine>()` in a Mini-admitted code path must be classified (redirected or provably Full-only). Run `grep -nE 'tt2Track\(\)|as<TT2TrackEngine>' src/apps/sequencer/ui/pages/TeletypeScriptViewPage.cpp src/apps/sequencer/ui/pages/TT2IoConfigPage.cpp` and confirm no unclassified site reachable when `trackMode()==TeletypeMini`.
 **Step 3 — IO page:** `TT2IoConfigPage` for Mini shows 2 trigger rows (`Cfg::TriggerInputCount`), 6 CV-in, 8 CV-out. **Exclude live-exec (`runLiveCommand`, `:735`) and SD I/O for Mini.**
@@ -303,5 +313,6 @@ Ctor: `_activeScene=-1`, then call `changePattern()` once to seed (base ctor's v
 
 ## Deferred (propose only, do not build)
 - SD scene save/load + live-exec for Mini (`FileManager`/`gTeletypeLoadScratch` overloads).
+- Mini scene clear/copy via the pattern UI (v1 no-ops `clearPattern`/`copyPattern`; wiring them to "the mapped scene" needs an aliasing-aware design — 16 slots → 4 scenes).
 - Mini pattern editing (pattern page is Full-only in v1).
 - "Supermini" with smaller pattern dims (now possible — dims are config traits).
