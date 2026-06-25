@@ -235,7 +235,10 @@ static void opLast(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypePr
     if (!popStack(stack, stackSize, a, error)) return;
     int sn = a - 1;
     if (sn < -1 || sn >= Cfg::ScriptCount) { pushStack(stack, stackSize, 0, error); return; }
-    if (sn == -1) sn = Cfg::InitScript;
+    if (sn == -1) {
+        if (Cfg::InitScript < 0) { pushStack(stack, stackSize, 0, error); return; }  // no init script
+        sn = Cfg::InitScript;
+    }
     uint32_t delta = (runtime.clockMs - runtime.scriptLastMs[sn]) & 0x7fff;
     pushStack(stack, stackSize, int16_t(delta), error);
 }
@@ -2442,7 +2445,7 @@ static void opMiDollar(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const Telety
         if (!popStack(stack, stackSize, event, error)) return;
         if (!popStack(stack, stackSize, script, error)) return;
         script -= 1;
-        if (script < 0 || script > Cfg::InitScript) script = -1;
+        if (script < 0 || script >= Cfg::ScriptCount) script = -1;   // was: script > Cfg::InitScript
         switch (event) {
             case 0: m.on_script = int8_t(script); m.off_script = int8_t(script); m.cc_script = int8_t(script);
                     m.on_count = m.off_count = m.cc_count = 0; break;
