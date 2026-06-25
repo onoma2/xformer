@@ -16,6 +16,8 @@ CASE("TT2ConfigFull traits match today's values") {
     expectEqual(TT2ConfigFull::MetroScript, 8, "MetroScript");
     expectEqual(TT2ConfigFull::InitScript, 9, "InitScript");
     expectEqual(TT2ConfigFull::SceneCount, 1, "SceneCount");
+    expectEqual(TT2ConfigFull::PatternCount, 4, "PatternCount");
+    expectEqual(TT2ConfigFull::PatternLength, 64, "PatternLength");
 }
 
 CASE("TeletypeProgramT<Full> layout is unchanged") {

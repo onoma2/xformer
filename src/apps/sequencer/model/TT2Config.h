@@ -9,4 +9,6 @@ struct TT2ConfigFull {
     static constexpr int MetroScript       = 8;
     static constexpr int InitScript        = 9;
     static constexpr int SceneCount        = 1;
+    static constexpr int PatternCount      = 4;
+    static constexpr int PatternLength     = 64;
 };
