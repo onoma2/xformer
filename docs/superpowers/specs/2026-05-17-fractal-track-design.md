@@ -13,7 +13,7 @@
 
 ## Summary
 
-FractalTrack is a step-sampled CV/gate child layer over one or two source tracks: it captures their gate+CV output once per step into a small grid (the trunk), then plays that grid back on loop with Proteus-style mutation evolving it at loop boundaries. On top of the trunk sit zero-storage branches (live math transforms — reverse, invert, transpose, etc.) and per-step ornamentation (trills, anticipations, mordents) that compose into a generative output. Identity: not a stochastic generator, not a step sequencer — a record-and-evolve child layer with trunk → branches → ornamentation as three composable layers, driven by TuesdayTrack-style track-level macro controls, not per-step programming.
+FractalTrack is a section-sampled CV/gate child layer over one or two source tracks: it captures their gate+CV output once per section into a small grid (the trunk), then plays that grid back on loop. On top of the trunk sit zero-storage branches (live math transforms — reverse, invert, transpose, rotate, interval-compress/expand, gate-thin) and ornamentation (trills, anticipations, mordents) that compose into the output. Identity: not a stochastic generator, not a step sequencer — a record-and-transform child layer with trunk → branches → ornamentation as three composable layers, driven by track-level macro controls, not per-step programming. (Mutation/evolution is a deferred layer, not part of the current identity.)
 
 ## Core Concept
 
@@ -29,7 +29,7 @@ The Fractal Track is a **step-sampled CV/Gate looper with mutation**. It samples
 | Core loop | Generate → evaluate → lock | Record → loop → mutate/evolve |
 | Mutation trigger | Per-step probability rolls | Loop-boundary lifecycle events |
 | Buffer semantics | Capture evaluated events into lock buffer | Step-sample gate+CV, loop, mutate |
-| Record modes | Binary capture (Hold lock) | Replace vs Latch, PunchIn/Immediate, Loop/Once, record quantize |
+| Record modes | Binary capture (Hold lock) | Replace vs Latch (in scope); PunchIn, Once, record-quantize deferred |
 | Relationship | Stand-alone sequencer | Post-processing child of other tracks |
 
 ---
@@ -450,9 +450,11 @@ The toggles share the harmony track's Rings (`cv_scaler`) trigger code (§4 of h
 
 ### KD-15: Timing Alignment — Track Delay (in scope) + Bar-Quantize / Beat Offset (deferred)
 
-> **Track Delay is in scope.** **Bar-quantized loop length** (`loopBars`), **beat offset** (`beatOffset`), and **loop phase** (`loopPhase`) are **deferred** (1-pager ledger). The detail below documents all three; only track-delay is built for now.
+> **Track Delay is in scope.** **Bar-quantized loop length** (`loopBars`), **beat offset** (`beatOffset`), and **loop phase** (`loopPhase`) are **deferred** (1-pager ledger).
 
-**Decision:** Add timing alignment features for locking loop length to bars, shifting loop position relative to the master transport, and microtiming nudging.
+**Track Delay (in scope).** `trackDelay` (uint8_t, 0–16 sections, default 0): delays the fractal's **output** by N sections — each emitted note (gate+CV, plus its ornaments) is queued and released N section-boundaries later. The capture/read grid is unchanged; only the audible output is shifted, so the mirror can lag the parent for canon/echo placement. Engine cost: a small fixed ring of pending outputs (~N entries); zero model cost beyond the one byte.
+
+**Decision (deferred timing features below):** lock loop length to bars (`loopBars`), shift loop position vs the master transport (`beatOffset`), fractional read rotation (`loopPhase`).
 
 **Components:**
 
@@ -600,7 +602,7 @@ else:
 
 **Files:**
 - NEW `model/FractalSequence.h` — minimal sequence: divisor, clockMultiplier, resetMeasure, runMode, scale group, firstStep, lastStep, loopFirst, loopLast, rotate, orderMode, loopMode (Loop), recordFirst, recordLast, recordMode (~28 B). *(Deferred: clockSource, punchMode, recordQuantize, loopBars, beatOffset, loopPhase.)*
-- NEW `model/FractalTrack.h` — 17 sequences + track params (**in scope**): sourceA, sourceB, gateLogic, cvLogic (two-source mix), bufferLength, recordTrigger (Routable), lock, octave, transpose, slideTime, cvUpdateMode, scale group (inherit), ornFirst, ornLast, branchCount, path, branchSeed, branchPool, ornamentRate, ornamentIntensity, captureCadence, captureFidelity. **Routable:** recordTrigger, branchCount, path, ornamentRate, ornamentIntensity. *(Deferred — reserved, not built: routedScan/clockSource (CV-scan), density, tilt, complexity, patience, mutationProb, octaveShiftProb, mutateFirst, mutateLast, evolutionDepth, pressureMode, and the Blend/Once/PunchIn capture variants.)*
+- NEW `model/FractalTrack.h` — 17 sequences + track params (**in scope**): sourceA, sourceB, gateLogic, cvLogic (two-source mix), bufferLength, recordTrigger (Routable), lock, octave, transpose, slideTime, cvUpdateMode, scale group (inherit), ornFirst, ornLast, branchCount, path, branchSeed, branchPool, ornamentRate, ornamentIntensity, captureCadence, captureFidelity, trackDelay. **Routable:** recordTrigger, branchCount, path, ornamentRate, ornamentIntensity. *(Deferred — reserved, not built: routedScan/clockSource (CV-scan), density, tilt, complexity, patience, mutationProb, octaveShiftProb, mutateFirst, mutateLast, evolutionDepth, pressureMode, and the Blend/Once/PunchIn capture variants.)*
 - EDIT `model/Track.h` — add `Fractal` to TrackMode enum, Container, union, accessors, initContainer.
 - EDIT `model/Routing.h` — add `FractalFirst..FractalLast` routing targets.
 - EDIT `engine/Engine.h` — add `FractalTrackEngine` to TrackEngineContainer typedef.
@@ -688,13 +690,12 @@ else:
 **Goal:** Branch transforms (trunk+math at playback) and ornamentation (per-step flourishes + zone). Two-source mix, two-axis capture, and track-delay are sibling in-scope post-hardware phases.
 
 **Branches (KD-12):**
-- `branchCount` (0-7): how many branch transforms to cycle through
-- `branchTransformFlags` (uint8_t bitmask): enable transforms per-branch
-- `trunkCycles` (1-16): how many loop reps of trunk before switching to branches
-- `pathType` (0-7): navigation path from curated LUT
-- `orderMode` (0-6): Bloom playback order (Forward, Reverse, Pendulum, etc.)
-- Engine playback: during trunk phase → read trunk buffer; during branch phase → read trunk buffer + apply current branch's transform
-- No buffer mutation during branch phase — transforms are render-time only
+- `branchCount` (0-7): how many branches concatenate after the trunk (Trunk→B1→…→BN, looped).
+- `branchSeed` (uint16_t): seeds the generative per-branch transform assignment (deterministic; reseeds on trunk edit).
+- `branchPool` (uint8_t bitmask): the enabled transform palette the assignment draws from (Transpose/Reverse/Inverse/Ret-Inv/Rotate/Interval-Compress/Interval-Expand/Gate-thin).
+- `path` (uint8_t bit-word): the branch navigation order (outward-ascending + held-descending), 2^branchCount routes.
+- `orderMode` (0-6): within-segment read order (Forward, Reverse, Pendulum, …).
+- Engine playback: walk the route over `Trunk→B1→…→BN`; each branch is the previous segment + its assigned deterministic transform, resolved at read time — **no buffer storage, no mutation**.
 
 **Ornamentation (KD-13):**
 - `ornamentRate` (0-100%): per-cell P(fire) — how often a gated cell ornaments.
@@ -847,7 +848,7 @@ The following Compass-derived features are noted for future consideration, not i
 | 10 | Complexity scope | Complexity controls mutation pitch selection only. Recording/recapture always from source outputs. |
 | 11 | overdubMode in Phase 1 | Removed from model. Added when blend mode is implemented (post-MVP). |
 | 12 | Branches storage | Branches are trunk+math at playback time. No separate buffers. Zero branch buffer RAM. |
-| 13 | Ornamentation storage | Ornamentation is tick-path evaluation. No per-step storage, ~2 B model params. |
+| 13 | Ornamentation storage | Ornamentation is tick-path evaluation. No per-step storage, ~4 B model params (ornamentRate, ornamentIntensity, ornFirst, ornLast). |
 | 14 | Evolution system RAM | MutationHistory 256 B inline in engine, SelectionPressure mode 2 bits on model, EvolutionDepth 1 byte on model. |
 | 15 | Timing features | KD-15: track-delay in scope. Bar-quantized loop length (loopBars), beat offset (beatOffset), free phase rotation (loopPhase) deferred. 6 B model. |
 | 16 | Recording extent vs loop window | KD-16: recordFirst/recordLast separate from loopFirst/loopLast. 4 B model (uint16_t+uint16_t). Phase 3. |

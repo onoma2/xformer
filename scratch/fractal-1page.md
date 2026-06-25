@@ -7,7 +7,7 @@
 
 ## What It Is
 
-FractalTrack is a child melodic mirror track. A parent track (Note, Curve, Stochastic, Tuesday, Teletype — any lower-index engine) supplies gate+CV. Fractal samples that output at its own section rate into a small inline trunk buffer, then plays it back through configurable loop windows, capture rules, and (post-MVP) mutation/branch/ornamentation transforms.
+FractalTrack is a child melodic mirror track. A parent track (Note, Curve, Stochastic, Tuesday, Teletype — any lower-index engine) supplies gate+CV. Fractal samples that output at its own section rate into a small inline trunk buffer, then plays it back through configurable loop windows, capture rules, and (post-hardware, in scope) branch + ornamentation transforms. Mutation/evolution is deferred.
 
 It is not a stochastic generator, not a note sequencer, and not a high-fidelity continuous automation trace. One cell per Fractal section — section-sampled. Intra-section motion is discarded **except the gate onset**, which Feel mode (KD-14b) keeps (one onset per cell).
 
@@ -25,9 +25,9 @@ It is not a stochastic generator, not a note sequencer, and not a high-fidelity 
 
 | Owner | What it owns |
 |-------|-------------|
-| **FractalSequence** (×17 patterns) | Timing (divisor, playMode, resetMeasure), loop lenses (loopFirst, loopLast, rotate, loopMode), record extent (recordFirst, recordLast), capture rules (recordMode, punchMode, recordQuantize), reserved future fields |
-| **FractalTrack** (×1, track-wide) | 17 sequences, sourceA, bufferLength, lock, recordTrigger (Routable), octave, transpose, slideTime, cvUpdateMode, **scale group (scale+scaleRotate, inherit) — ornament-only, trunk stays raw**, branchCount, path, ornamentRate, ornamentIntensity, ornFirst, ornLast (**branchCount · path · ornamentRate · ornamentIntensity all Routable** — the four live performance controls), captureCadence, captureFidelity (KD-14b), reserved future fields |
-| **FractalTrackEngine** (×1, volatile) | Trunk buffer, parent resolution, gate-length measurement, capture/read/loop-boundary rule execution, RNG, evolution history, branch state |
+| **FractalSequence** (×17 patterns) | Timing (divisor, clockMultiplier, resetMeasure, runMode), loop lenses (loopFirst, loopLast, rotate, orderMode, loopMode-Loop), record extent (recordFirst, recordLast), recordMode (Replace/Latch). *Deferred-reserved: punchMode, recordQuantize, clockSource, loopBars, beatOffset, loopPhase.* |
+| **FractalTrack** (×1, track-wide) | 17 sequences, sourceA, sourceB, gateLogic, cvLogic, bufferLength, lock, recordTrigger (Routable), octave, transpose, slideTime, cvUpdateMode, trackDelay, **scale group (scale+scaleRotate, inherit) — ornament-only, trunk stays raw**, branchCount, path, branchSeed, branchPool, ornamentRate, ornamentIntensity, ornFirst, ornLast, captureCadence, captureFidelity (**branchCount · path · ornamentRate · ornamentIntensity all Routable** — the four live performance controls). *Deferred-reserved: routedScan/clockSource, density, tilt, mutation params.* |
+| **FractalTrackEngine** (×1, volatile) | Trunk buffer + Feel onset array, parent resolution, observe-over-section gate/CV measurement, capture/read/loop-boundary rule execution, branch state, track-delay queue, RNG (branch-seed). *Deferred: evolution history.* |
 
 Trunk is **not serialized.** Save/load preserves model config; trunk starts empty on power cycle.
 
