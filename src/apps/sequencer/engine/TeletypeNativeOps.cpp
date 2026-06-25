@@ -31,7 +31,8 @@ static bool popOutputIndex(int16_t *stack, uint8_t &stackSize,
 // Variable ops
 // ---------------------------------------------------------------------------
 
-static void opA(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opA(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                 int16_t *stack,
                 uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     if (isSetPosition && stackSize >= 1) {
@@ -43,7 +44,8 @@ static void opA(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
     }
 }
 
-static void opB(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opB(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                 int16_t *stack,
                 uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     if (isSetPosition && stackSize >= 1) {
@@ -55,7 +57,8 @@ static void opB(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
     }
 }
 
-static void opX(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opX(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                 int16_t *stack,
                 uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     if (isSetPosition && stackSize >= 1) {
@@ -67,7 +70,8 @@ static void opX(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
     }
 }
 
-static void opI(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opI(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                 int16_t *stack,
                 uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     if (isSetPosition && stackSize >= 1) {
@@ -81,7 +85,7 @@ static void opI(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
 
 // Generate a plain get/set handler over a single runtime variable.
 #define TT2_SIMPLE_VAR_OP(fn, member)                                          \
-    static void fn(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *, \
+    template<typename Cfg> static void fn(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *, \
                    int16_t *stack, uint8_t &stackSize, bool isSetPosition,     \
                    TT2EvalError &error) {                                       \
         if (isSetPosition && stackSize >= 1) {                                 \
@@ -109,10 +113,11 @@ TT2_SIMPLE_VAR_OP(opRMin, r_min)
 TT2_SIMPLE_VAR_OP(opRMax, r_max)
 
 // J / K — per-script variables indexed by the active script number.
-static void opJ(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opJ(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                 int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     uint8_t sn = tt2ActiveScriptNumber(runtime);
-    if (sn >= TT2_SCRIPT_COUNT) sn = 0;
+    if (sn >= Cfg::ScriptCount) sn = 0;
     if (isSetPosition && stackSize >= 1) {
         int16_t val = 0;
         if (!popStack(stack, stackSize, val, error)) return;
@@ -122,10 +127,11 @@ static void opJ(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
     }
 }
 
-static void opK(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opK(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                 int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     uint8_t sn = tt2ActiveScriptNumber(runtime);
-    if (sn >= TT2_SCRIPT_COUNT) sn = 0;
+    if (sn >= Cfg::ScriptCount) sn = 0;
     if (isSetPosition && stackSize >= 1) {
         int16_t val = 0;
         if (!popStack(stack, stackSize, val, error)) return;
@@ -143,7 +149,8 @@ static int16_t tt2Normalise(int16_t mn, int16_t mx, int16_t wrap, int16_t v) {
 }
 
 // O — read the current bounded value, then advance by O.INC (wrapped).
-static void opO(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opO(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                 int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     auto &v = runtime.variables;
     if (isSetPosition && stackSize >= 1) {
@@ -158,7 +165,8 @@ static void opO(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
 }
 
 // DRUNK — read the bounded value, then take a random ±1 step (wrapped).
-static void opDrunk(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opDrunk(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                     int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     auto &v = runtime.variables;
     if (isSetPosition && stackSize >= 1) {
@@ -174,7 +182,8 @@ static void opDrunk(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram
 }
 
 // FLIP — read the current toggle, then flip it.
-static void opFlip(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opFlip(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     auto &v = runtime.variables;
     if (isSetPosition && stackSize >= 1) {
@@ -189,7 +198,8 @@ static void opFlip(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
 }
 
 // TIME — elapsed ms since reset (when active), masked to 15 bits.
-static void opTime(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opTime(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     auto &v = runtime.variables;
     if (isSetPosition && stackSize >= 1) {
@@ -202,7 +212,8 @@ static void opTime(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
     pushStack(stack, stackSize, int16_t(delta & 0x7fff), error);
 }
 
-static void opTimeAct(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opTimeAct(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                       int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     auto &v = runtime.variables;
     if (isSetPosition && stackSize >= 1) {
@@ -217,19 +228,21 @@ static void opTimeAct(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgr
 }
 
 // LAST n — ms since script n last ran (n==0 -> init script), masked to 15 bits.
-static void opLast(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opLast(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0;
     if (!popStack(stack, stackSize, a, error)) return;
     int sn = a - 1;
-    if (sn < -1 || sn >= TT2_SCRIPT_COUNT) { pushStack(stack, stackSize, 0, error); return; }
-    if (sn == -1) sn = TT2_INIT_SCRIPT;
+    if (sn < -1 || sn >= Cfg::ScriptCount) { pushStack(stack, stackSize, 0, error); return; }
+    if (sn == -1) sn = Cfg::InitScript;
     uint32_t delta = (runtime.clockMs - runtime.scriptLastMs[sn]) & 0x7fff;
     pushStack(stack, stackSize, int16_t(delta), error);
 }
 
 // Pick a uniform value in [min,max] (inclusive), bounds either order.
-static int16_t tt2PushRandom(TT2Runtime &runtime, int16_t a, int16_t b) {
+template<typename Cfg>
+static int16_t tt2PushRandom(TT2RuntimeT<Cfg> &runtime, int16_t a, int16_t b) {
     int16_t mn = a < b ? a : b;
     int16_t mx = a < b ? b : a;
     if (mn == mx) return mn;
@@ -238,7 +251,8 @@ static int16_t tt2PushRandom(TT2Runtime &runtime, int16_t a, int16_t b) {
 }
 
 // RAND a — uniform in [0,a] (or [a,0] for negative a); a==32767 -> full range.
-static void opRand(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opRand(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0;
     if (!popStack(stack, stackSize, a, error)) return;
@@ -252,7 +266,8 @@ static void opRand(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
 }
 
 // RRAND a b — uniform in [min(a,b), max(a,b)].
-static void opRrand(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opRrand(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0, b = 0;
     if (!popStack(stack, stackSize, a, error)) return;
@@ -261,7 +276,8 @@ static void opRrand(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram
 }
 
 // R — uniform in [R.MIN, R.MAX]; a set form pins both bounds to one value.
-static void opR(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opR(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                 int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     if (isSetPosition && stackSize >= 1) {
         int16_t val = 0;
@@ -274,7 +290,8 @@ static void opR(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
 }
 
 // TOSS — random 0 or 1.
-static void opToss(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opToss(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     pushStack(stack, stackSize, int16_t(tt2RngNext(runtime.rng, TT2RngSlot::Toss) & 1), error);
 }
@@ -283,7 +300,8 @@ static void opToss(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
 // Math ops
 // ---------------------------------------------------------------------------
 
-static void opAdd(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opAdd(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack,
                   uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t b = 0;
@@ -301,14 +319,16 @@ static bool popBinary(int16_t *stack, uint8_t &stackSize,
     return true;
 }
 
-static void opSub(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opSub(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t first = 0, second = 0;
     if (!popBinary(stack, stackSize, first, second, error)) return;
     pushStack(stack, stackSize, int16_t(first - second), error);
 }
 
-static void opMul(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opMul(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t first = 0, second = 0;
     if (!popBinary(stack, stackSize, first, second, error)) return;
@@ -318,84 +338,96 @@ static void opMul(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     pushStack(stack, stackSize, int16_t(r), error);
 }
 
-static void opDiv(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opDiv(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t first = 0, second = 0;
     if (!popBinary(stack, stackSize, first, second, error)) return;
     pushStack(stack, stackSize, int16_t(second != 0 ? first / second : 0), error);
 }
 
-static void opMod(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opMod(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t first = 0, second = 0;
     if (!popBinary(stack, stackSize, first, second, error)) return;
     pushStack(stack, stackSize, int16_t(second != 0 ? first % second : 0), error);
 }
 
-static void opMin(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opMin(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t first = 0, second = 0;
     if (!popBinary(stack, stackSize, first, second, error)) return;
     pushStack(stack, stackSize, int16_t(second > first ? first : second), error);
 }
 
-static void opMax(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opMax(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t first = 0, second = 0;
     if (!popBinary(stack, stackSize, first, second, error)) return;
     pushStack(stack, stackSize, int16_t(first > second ? first : second), error);
 }
 
-static void opEq(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opEq(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t first = 0, second = 0;
     if (!popBinary(stack, stackSize, first, second, error)) return;
     pushStack(stack, stackSize, int16_t(first == second), error);
 }
 
-static void opNe(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opNe(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t first = 0, second = 0;
     if (!popBinary(stack, stackSize, first, second, error)) return;
     pushStack(stack, stackSize, int16_t(first != second), error);
 }
 
-static void opLt(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opLt(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t first = 0, second = 0;
     if (!popBinary(stack, stackSize, first, second, error)) return;
     pushStack(stack, stackSize, int16_t(first < second), error);
 }
 
-static void opGt(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opGt(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t first = 0, second = 0;
     if (!popBinary(stack, stackSize, first, second, error)) return;
     pushStack(stack, stackSize, int16_t(first > second), error);
 }
 
-static void opLte(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opLte(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t first = 0, second = 0;
     if (!popBinary(stack, stackSize, first, second, error)) return;
     pushStack(stack, stackSize, int16_t(first <= second), error);
 }
 
-static void opGte(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opGte(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t first = 0, second = 0;
     if (!popBinary(stack, stackSize, first, second, error)) return;
     pushStack(stack, stackSize, int16_t(first >= second), error);
 }
 
-static void opAbs(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opAbs(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0;
     if (!popStack(stack, stackSize, a, error)) return;
     pushStack(stack, stackSize, int16_t(a < 0 ? -a : a), error);
 }
 
-static void opSgn(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opSgn(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0;
     if (!popStack(stack, stackSize, a, error)) return;
@@ -466,14 +498,16 @@ static int16_t noteNumberToVolts(int16_t note) {
     return tt2EtTable[note];
 }
 
-static void opN(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opN(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0;
     if (!popStack(stack, stackSize, a, error)) return;
     pushStack(stack, stackSize, noteNumberToVolts(a), error);
 }
 
-static void opV(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opV(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0;
     if (!popStack(stack, stackSize, a, error)) return;
@@ -544,7 +578,8 @@ static int16_t tt2VoltsToNote(int16_t vIn) {
 }
 
 // SCALE a b x y i — rescale i from [a,b] to [x,y].
-static void opScale(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opScale(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0, b = 0, x = 0, y = 0, i = 0;
     if (!popStack(stack, stackSize, a, error)) return;
@@ -556,7 +591,8 @@ static void opScale(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // SCALE0 b y i — rescale i from [0,b] to [0,y].
-static void opScale0(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opScale0(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                      int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t b = 0, y = 0, i = 0;
     if (!popStack(stack, stackSize, b, error)) return;
@@ -566,7 +602,8 @@ static void opScale0(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // QT a b — round b to the nearest multiple of a (ties round up).
-static void opQt(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQt(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0, b = 0;
     if (!popBinary(stack, stackSize, a, b, error)) return;
@@ -580,7 +617,8 @@ static void opQt(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // VN v — nearest ET note number for a raw volts value.
-static void opVn(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opVn(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t v = 0;
     if (!popStack(stack, stackSize, v, error)) return;
@@ -588,7 +626,8 @@ static void opVn(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // VV x — hundredths of a volt to raw (0..1000 -> 0..10V).
-static void opVv(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opVv(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0;
     if (!popStack(stack, stackSize, a, error)) return;
@@ -599,7 +638,8 @@ static void opVv(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // HZ v — raw volts to a Hz-domain value (interpolated over the note tables).
-static void opHz(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opHz(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t vIn = 0;
     if (!popStack(stack, stackSize, vIn, error)) return;
@@ -652,7 +692,8 @@ static const int16_t tt2ExpTable[256] = {
 };
 
 // EXP x — exponential curve lookup (x>>6 indexes the table; signed-mirrored).
-static void opExp(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opExp(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0;
     if (!popStack(stack, stackSize, a, error)) return;
@@ -664,7 +705,8 @@ static void opExp(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 
 // JI n d — just-intonation interval (prime-factor n/d into cents-ish value).
 // Verbatim upstream algorithm.
-static void opJi(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opJi(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     static const uint8_t prime[6] = { 2, 3, 5, 7, 11, 13 };
     static const int16_t jiConst[6] = { 6554, 10388, 15218, 18399, 22673, 24253 };
@@ -695,21 +737,24 @@ static void opJi(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 // Logic / range ops (boolean results are 1/0)
 // ---------------------------------------------------------------------------
 
-static void opAnd(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opAnd(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0, b = 0;
     if (!popBinary(stack, stackSize, a, b, error)) return;
     pushStack(stack, stackSize, int16_t(a && b), error);
 }
 
-static void opOr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opOr(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0, b = 0;
     if (!popBinary(stack, stackSize, a, b, error)) return;
     pushStack(stack, stackSize, int16_t(a || b), error);
 }
 
-static void opAnd3(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opAnd3(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0, b = 0, c = 0;
     if (!popStack(stack, stackSize, a, error)) return;
@@ -718,7 +763,8 @@ static void opAnd3(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     pushStack(stack, stackSize, int16_t(a && b && c), error);
 }
 
-static void opOr3(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opOr3(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0, b = 0, c = 0;
     if (!popStack(stack, stackSize, a, error)) return;
@@ -727,7 +773,8 @@ static void opOr3(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     pushStack(stack, stackSize, int16_t(a || b || c), error);
 }
 
-static void opAnd4(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opAnd4(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0, b = 0, c = 0, d = 0;
     if (!popStack(stack, stackSize, a, error)) return;
@@ -737,7 +784,8 @@ static void opAnd4(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     pushStack(stack, stackSize, int16_t(a && b && c && d), error);
 }
 
-static void opOr4(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opOr4(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0, b = 0, c = 0, d = 0;
     if (!popStack(stack, stackSize, a, error)) return;
@@ -747,14 +795,16 @@ static void opOr4(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     pushStack(stack, stackSize, int16_t(a || b || c || d), error);
 }
 
-static void opNz(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opNz(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0;
     if (!popStack(stack, stackSize, a, error)) return;
     pushStack(stack, stackSize, int16_t(a != 0), error);
 }
 
-static void opEz(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opEz(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0;
     if (!popStack(stack, stackSize, a, error)) return;
@@ -762,7 +812,8 @@ static void opEz(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // LIM value lo hi -> clamp value to [lo, hi]
-static void opLim(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opLim(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t i = 0, a = 0, b = 0;
     if (!popStack(stack, stackSize, i, error)) return;
@@ -772,7 +823,8 @@ static void opLim(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // WRAP value lo hi -> wrap value into the [lo, hi] cycle
-static void opWrap(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opWrap(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t i = 0, a = 0, b = 0, c = 0;
     if (!popStack(stack, stackSize, i, error)) return;
@@ -790,7 +842,8 @@ static void opWrap(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     pushStack(stack, stackSize, i, error);
 }
 
-static void opAvg(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opAvg(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0, b = 0;
     if (!popBinary(stack, stackSize, a, b, error)) return;
@@ -808,28 +861,32 @@ static bool popRange(int16_t *stack, uint8_t &stackSize,
     return true;
 }
 
-static void opInr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opInr(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t lo = 0, x = 0, hi = 0;
     if (!popRange(stack, stackSize, lo, x, hi, error)) return;
     pushStack(stack, stackSize, int16_t((lo < x) && (x < hi)), error);
 }
 
-static void opOutr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opOutr(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t lo = 0, x = 0, hi = 0;
     if (!popRange(stack, stackSize, lo, x, hi, error)) return;
     pushStack(stack, stackSize, int16_t((lo > x) || (x > hi)), error);
 }
 
-static void opInri(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opInri(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t lo = 0, x = 0, hi = 0;
     if (!popRange(stack, stackSize, lo, x, hi, error)) return;
     pushStack(stack, stackSize, int16_t((lo <= x) && (x <= hi)), error);
 }
 
-static void opOutri(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opOutri(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t lo = 0, x = 0, hi = 0;
     if (!popRange(stack, stackSize, lo, x, hi, error)) return;
@@ -847,8 +904,9 @@ static int16_t normaliseCvValue(int16_t value) {
     return value;
 }
 
-static void opCv(TT2Runtime &runtime, TT2OutputState &output,
-                 const TeletypeProgram *, int16_t *stack,
+template<typename Cfg>
+static void opCv(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
+                 const TeletypeProgramT<Cfg> *, int16_t *stack,
                  uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_CV_COUNT)) {
@@ -867,8 +925,9 @@ static void opCv(TT2Runtime &runtime, TT2OutputState &output,
     }
 }
 
-static void opTr(TT2Runtime &runtime, TT2OutputState &output,
-                 const TeletypeProgram *, int16_t *stack,
+template<typename Cfg>
+static void opTr(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
+                 const TeletypeProgramT<Cfg> *, int16_t *stack,
                  uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_TR_COUNT)) {
@@ -888,8 +947,9 @@ static void opTr(TT2Runtime &runtime, TT2OutputState &output,
 }
 
 // CV.SLEW n [ms] — per-channel slew time in ms (min 1, upstream).
-static void opCvSlew(TT2Runtime &runtime, TT2OutputState &,
-                     const TeletypeProgram *, int16_t *stack,
+template<typename Cfg>
+static void opCvSlew(TT2RuntimeT<Cfg> &runtime, TT2OutputState &,
+                     const TeletypeProgramT<Cfg> *, int16_t *stack,
                      uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_CV_COUNT)) return;
@@ -905,8 +965,9 @@ static void opCvSlew(TT2Runtime &runtime, TT2OutputState &,
 
 // CV.OFF n [v] — per-channel output offset. A set re-seeds the live ramp so
 // the new offset takes effect immediately (upstream re-calls tele_cv).
-static void opCvOff(TT2Runtime &runtime, TT2OutputState &output,
-                    const TeletypeProgram *, int16_t *stack,
+template<typename Cfg>
+static void opCvOff(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
+                    const TeletypeProgramT<Cfg> *, int16_t *stack,
                     uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_CV_COUNT)) return;
@@ -923,8 +984,9 @@ static void opCvOff(TT2Runtime &runtime, TT2OutputState &output,
 }
 
 // TR.POL n [p] — per-channel rest polarity (0/1).
-static void opTrPol(TT2Runtime &runtime, TT2OutputState &,
-                    const TeletypeProgram *, int16_t *stack,
+template<typename Cfg>
+static void opTrPol(TT2RuntimeT<Cfg> &runtime, TT2OutputState &,
+                    const TeletypeProgramT<Cfg> *, int16_t *stack,
                     uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_TR_COUNT)) return;
@@ -938,8 +1000,9 @@ static void opTrPol(TT2Runtime &runtime, TT2OutputState &,
 }
 
 // TR.TIME n [ms] — per-channel pulse length in ms (>= 0).
-static void opTrTime(TT2Runtime &runtime, TT2OutputState &,
-                     const TeletypeProgram *, int16_t *stack,
+template<typename Cfg>
+static void opTrTime(TT2RuntimeT<Cfg> &runtime, TT2OutputState &,
+                     const TeletypeProgramT<Cfg> *, int16_t *stack,
                      uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_TR_COUNT)) return;
@@ -955,8 +1018,9 @@ static void opTrTime(TT2Runtime &runtime, TT2OutputState &,
 
 // TR.PULSE / TR.P n — fire a one-shot pulse: set the active level (tr_pol),
 // arm the timer at tr_time. Action op (no value pushed).
-static void opTrPulse(TT2Runtime &runtime, TT2OutputState &output,
-                      const TeletypeProgram *, int16_t *stack,
+template<typename Cfg>
+static void opTrPulse(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
+                      const TeletypeProgramT<Cfg> *, int16_t *stack,
                       uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_TR_COUNT)) return;
@@ -984,7 +1048,8 @@ static void opTrPulse(TT2Runtime &runtime, TT2OutputState &output,
 }
 
 // TR.W n pct — pulse width as % of the metro interval (0 = use TR.TIME).
-static void opTrW(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opTrW(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_TR_COUNT)) return;
@@ -998,7 +1063,8 @@ static void opTrW(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *
 }
 
 // TR.D n div — pulse divisor (fire every Nth TR.P).
-static void opTrD(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opTrD(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_TR_COUNT)) return;
@@ -1013,17 +1079,19 @@ static void opTrD(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *
 }
 
 // M.RESET / M.RESET.A — request the engine zero the metro phase.
-static void opMReset(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opMReset(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                      int16_t *, uint8_t &, bool, TT2EvalError &) {
     runtime.metroResetReq = 1;
 }
 
 // SYNC count — set every-counters so the next EVERY boundary is `count` away.
-static void opSync(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opSync(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t count = 0;
     if (!popStack(stack, stackSize, count, error)) return;
-    for (int s = 0; s < TT2_SCRIPT_COUNT; ++s) {
+    for (int s = 0; s < Cfg::ScriptCount; ++s) {
         for (int l = 0; l < TT2_COMMANDS_PER_SCRIPT; ++l) {
             TT2EveryCount &e = runtime.every.every[s][l];
             if (e.mod > 0) { e.count = int16_t(count % e.mod); if (e.count < 0) e.count += e.mod; }
@@ -1032,8 +1100,9 @@ static void opSync(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
 }
 
 // TR.TOG n — flip the current level. Action op (no value pushed).
-static void opTrTog(TT2Runtime &runtime, TT2OutputState &output,
-                    const TeletypeProgram *, int16_t *stack,
+template<typename Cfg>
+static void opTrTog(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
+                    const TeletypeProgramT<Cfg> *, int16_t *stack,
                     uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_TR_COUNT)) return;
@@ -1174,23 +1243,26 @@ static void tt2TurtleSetFence(TT2Turtle &t, int16_t x1, int16_t y1, int16_t x2, 
 
 static void tt2TurtleSetMode(TT2Turtle &t, TT2TurtleMode m) { t.mode = m; tt2TurtleNormalizePos(t, m); }
 
-static int16_t tt2TurtleGetVal(const TeletypeProgram *program, TT2Turtle &t) {
+template<typename Cfg>
+static int16_t tt2TurtleGetVal(const TeletypeProgramT<Cfg> *program, TT2Turtle &t) {
     if (!program) return 0;
     TT2TurtlePosition p; tt2TurtleResolve(t.position, p);
     if (p.x > 3 || p.x < 0 || p.y > 63 || p.y < 0) return 0;
     return program->patterns[p.x].val[p.y];
 }
 
-static void tt2TurtleSetVal(const TeletypeProgram *program, TT2Turtle &t, int16_t v) {
+template<typename Cfg>
+static void tt2TurtleSetVal(const TeletypeProgramT<Cfg> *program, TT2Turtle &t, int16_t v) {
     if (!program) return;
     TT2TurtlePosition p; tt2TurtleResolve(t.position, p);
     if (p.x > 3 || p.x < 0 || p.y > 63 || p.y < 0) return;
-    const_cast<TeletypeProgram *>(program)->patterns[p.x].val[p.y] = v;
+    const_cast<TeletypeProgramT<Cfg> *>(program)->patterns[p.x].val[p.y] = v;
 }
 
 // --- @ op handlers ---
 
-static void opTurtle(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opTurtle(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                      int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) {
         int16_t v = 0;
@@ -1201,7 +1273,8 @@ static void opTurtle(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgra
     }
 }
 
-static void opTurtleX(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opTurtleX(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                       int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) {
         int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
@@ -1209,7 +1282,8 @@ static void opTurtleX(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgr
     } else pushStack(stack, stackSize, tt2TurtleGetX(runtime.turtle), error);
 }
 
-static void opTurtleY(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opTurtleY(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                       int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) {
         int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
@@ -1217,7 +1291,8 @@ static void opTurtleY(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgr
     } else pushStack(stack, stackSize, tt2TurtleGetY(runtime.turtle), error);
 }
 
-static void opTurtleMove(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opTurtleMove(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                          int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0, b = 0;  // tokens: native pops left->right; upstream x=last, y=first
     if (!popStack(stack, stackSize, a, error)) return;
@@ -1225,7 +1300,8 @@ static void opTurtleMove(TT2Runtime &runtime, TT2OutputState &, const TeletypePr
     tt2TurtleMove(runtime.turtle, b, a);
 }
 
-static void opTurtleF(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opTurtleF(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                       int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0, b = 0, c = 0, d = 0;  // x1=d,y1=c,x2=b,y2=a (reversed pop order)
     if (!popStack(stack, stackSize, a, error)) return;
@@ -1236,7 +1312,7 @@ static void opTurtleF(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgr
 }
 
 #define TT2_TURTLE_FENCE_OP(fn, member)                                        \
-    static void fn(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *, \
+    template<typename Cfg> static void fn(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *, \
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) { \
         if (isSet && stackSize >= 1) {                                         \
             int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return; \
@@ -1249,7 +1325,8 @@ TT2_TURTLE_FENCE_OP(opTurtleFy1, y1)
 TT2_TURTLE_FENCE_OP(opTurtleFx2, x2)
 TT2_TURTLE_FENCE_OP(opTurtleFy2, y2)
 
-static void opTurtleSpeed(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opTurtleSpeed(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                           int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) {
         int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
@@ -1257,7 +1334,8 @@ static void opTurtleSpeed(TT2Runtime &runtime, TT2OutputState &, const TeletypeP
     } else pushStack(stack, stackSize, runtime.turtle.speed, error);
 }
 
-static void opTurtleDir(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opTurtleDir(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                         int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) {
         int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
@@ -1265,13 +1343,14 @@ static void opTurtleDir(TT2Runtime &runtime, TT2OutputState &, const TeletypePro
     } else pushStack(stack, stackSize, int16_t(runtime.turtle.heading), error);
 }
 
-static void opTurtleStep(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opTurtleStep(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                          int16_t *, uint8_t &, bool, TT2EvalError &) {
     tt2TurtleStep(runtime.turtle);
 }
 
 #define TT2_TURTLE_MODE_OP(fn, MODE)                                           \
-    static void fn(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *, \
+    template<typename Cfg> static void fn(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *, \
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) { \
         if (isSet && stackSize >= 1) {                                         \
             int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return; \
@@ -1282,20 +1361,22 @@ TT2_TURTLE_MODE_OP(opTurtleBump, Bump)
 TT2_TURTLE_MODE_OP(opTurtleWrap, Wrap)
 TT2_TURTLE_MODE_OP(opTurtleBounce, Bounce)
 
-static void opTurtleScript(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opTurtleScript(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                            int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) {
         int16_t sn = 0; if (!popStack(stack, stackSize, sn, error)) return;
         sn -= 1;
-        runtime.turtle.scriptNumber = (sn < 0 || sn >= TT2_SCRIPT_COUNT) ? uint8_t(TT2_SCRIPT_COUNT) : uint8_t(sn);
+        runtime.turtle.scriptNumber = (sn < 0 || sn >= Cfg::ScriptCount) ? uint8_t(Cfg::ScriptCount) : uint8_t(sn);
         runtime.turtle.stepped = 0;
     } else {
         uint8_t s = runtime.turtle.scriptNumber;
-        pushStack(stack, stackSize, int16_t(s >= TT2_SCRIPT_COUNT ? 0 : s + 1), error);
+        pushStack(stack, stackSize, int16_t(s >= Cfg::ScriptCount ? 0 : s + 1), error);
     }
 }
 
-static void opTurtleShow(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opTurtleShow(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                          int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) {
         int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
@@ -1307,28 +1388,32 @@ static void opTurtleShow(TT2Runtime &runtime, TT2OutputState &, const TeletypePr
 // Bitwise / shift ops
 // ---------------------------------------------------------------------------
 
-static void opBitOr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opBitOr(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0, b = 0;
     if (!popBinary(stack, stackSize, a, b, error)) return;
     pushStack(stack, stackSize, int16_t(a | b), error);
 }
 
-static void opBitAnd(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opBitAnd(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                      int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0, b = 0;
     if (!popBinary(stack, stackSize, a, b, error)) return;
     pushStack(stack, stackSize, int16_t(a & b), error);
 }
 
-static void opBitXor(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opBitXor(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                      int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0, b = 0;
     if (!popBinary(stack, stackSize, a, b, error)) return;
     pushStack(stack, stackSize, int16_t(a ^ b), error);
 }
 
-static void opBitNot(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opBitNot(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                      int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0;
     if (!popStack(stack, stackSize, a, error)) return;
@@ -1336,28 +1421,32 @@ static void opBitNot(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // BSET/BGET/BCLR/BTOG value = leftmost arg, bit index = rightmost (BSET x i).
-static void opBset(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opBset(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t v = 0, b = 0;
     if (!popBinary(stack, stackSize, v, b, error)) return;
     pushStack(stack, stackSize, int16_t(v | (1 << b)), error);
 }
 
-static void opBget(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opBget(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t v = 0, b = 0;
     if (!popBinary(stack, stackSize, v, b, error)) return;
     pushStack(stack, stackSize, int16_t((v >> b) & 1), error);
 }
 
-static void opBclr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opBclr(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t v = 0, b = 0;
     if (!popBinary(stack, stackSize, v, b, error)) return;
     pushStack(stack, stackSize, int16_t(v & ~(1 << b)), error);
 }
 
-static void opBtog(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opBtog(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t v = 0, b = 0;
     if (!popBinary(stack, stackSize, v, b, error)) return;
@@ -1373,7 +1462,8 @@ static int16_t tt2BitReverse(int16_t v, int bits) {
     return reversed;
 }
 
-static void opBrev(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opBrev(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0;
     if (!popStack(stack, stackSize, a, error)) return;
@@ -1381,14 +1471,16 @@ static void opBrev(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // RSH/LSH value = leftmost arg, shift = rightmost (RSH x n); negative flips.
-static void opRsh(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opRsh(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t x = 0, n = 0;
     if (!popBinary(stack, stackSize, x, n, error)) return;
     pushStack(stack, stackSize, int16_t(n > 0 ? (x >> n) : (x << -n)), error);
 }
 
-static void opLsh(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opLsh(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t x = 0, n = 0;
     if (!popBinary(stack, stackSize, x, n, error)) return;
@@ -1398,7 +1490,8 @@ static void opLsh(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 static uint16_t tt2Rrot(uint16_t x, uint8_t n) { return uint16_t((x >> n) | (x << (16 - n))); }
 static uint16_t tt2Lrot(uint16_t x, uint8_t n) { return uint16_t((x << n) | (x >> (16 - n))); }
 
-static void opRrot(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opRrot(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t x = 0, n = 0;
     if (!popBinary(stack, stackSize, x, n, error)) return;
@@ -1408,7 +1501,8 @@ static void opRrot(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     pushStack(stack, stackSize, int16_t(u), error);
 }
 
-static void opLrot(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opLrot(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t x = 0, n = 0;
     if (!popBinary(stack, stackSize, x, n, error)) return;
@@ -1481,7 +1575,8 @@ static int16_t tt2QuantizeToBitmaskScale(int16_t scaleBits, int16_t transpose, i
 }
 
 // N.S root scale degree
-static void opNS(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opNS(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t root = 0, scale = 0, degree = 0;
     if (!popStack(stack, stackSize, root, error)) return;
@@ -1495,7 +1590,8 @@ static void opNS(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // N.C root chord component
-static void opNC(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opNC(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t root = 0, chord = 0, comp = 0;
     if (!popStack(stack, stackSize, root, error)) return;
@@ -1509,7 +1605,8 @@ static void opNC(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // N.CS root scale scl_deg ch_deg
-static void opNCS(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opNCS(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t root = 0, scale = 0, sclDeg = 0, chDeg = 0;
     if (!popStack(stack, stackSize, root, error)) return;
@@ -1534,7 +1631,8 @@ static int16_t tt2NbScaleBitsFromArg(int16_t scaleBits) {
 }
 
 // N.B degree (get) / N.B scale_bits root (set, slot 0)
-static void opNB(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opNB(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
     if (isSet && stackSize >= 2) {
@@ -1551,7 +1649,8 @@ static void opNB(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
 }
 
 // N.BX scale_nb degree (get) / N.BX scale_nb scale_bits root (set)
-static void opNBX(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opNBX(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
     if (isSet && stackSize >= 3) {
@@ -1572,7 +1671,8 @@ static void opNBX(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *
 }
 
 // QT.S v_in transpose scale
-static void opQtS(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQtS(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t vIn = 0, transpose = 0, scale = 0;
     if (!popStack(stack, stackSize, vIn, error)) return;
@@ -1583,7 +1683,8 @@ static void opQtS(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // QT.CS v_in transpose scale degree voices
-static void opQtCS(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQtCS(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t vIn = 0, transpose = 0, scale = 0, degree = 0, voices = 0;
     if (!popStack(stack, stackSize, vIn, error)) return;
@@ -1598,7 +1699,8 @@ static void opQtCS(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // QT.B v_in (uses scale slot 0)
-static void opQtB(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQtB(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t vIn = 0;
     if (!popStack(stack, stackSize, vIn, error)) return;
@@ -1608,7 +1710,8 @@ static void opQtB(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *
 }
 
 // QT.BX v_in scale_nb
-static void opQtBX(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQtBX(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t vIn = 0, nb = 0;
     if (!popStack(stack, stackSize, vIn, error)) return;
@@ -1624,7 +1727,8 @@ static void opQtBX(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
 // ---------------------------------------------------------------------------
 
 // ER fill len step — Euclidean rhythm bit. (native pops leftmost first)
-static void opEr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opEr(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t fill = 0, len = 0, step = 0;
     if (!popStack(stack, stackSize, fill, error)) return;
@@ -1634,7 +1738,8 @@ static void opEr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // NR prime mask factor step — numeric-rhythm bit (table_nr + factor/mask twiddle).
-static void opNr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opNr(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t prime = 0, mask = 0, factor = 0, step = 0;
     if (!popStack(stack, stackSize, prime, error)) return;
@@ -1655,7 +1760,8 @@ static void opNr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // DR.T bank p1 p2 len step — tresillo bit.
-static void opDrT(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opDrT(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t bank = 0, p1 = 0, p2 = 0, len = 0, step = 0;
     if (!popStack(stack, stackSize, bank, error)) return;
@@ -1667,7 +1773,8 @@ static void opDrT(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // DR.P bank pattern step — drum-bank bit.
-static void opDrP(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opDrP(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t bank = 0, pattern = 0, step = 0;
     if (!popStack(stack, stackSize, bank, error)) return;
@@ -1677,7 +1784,8 @@ static void opDrP(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // DR.V pattern step — drum velocity.
-static void opDrV(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opDrV(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pattern = 0, step = 0;
     if (!popStack(stack, stackSize, pattern, error)) return;
@@ -1686,24 +1794,28 @@ static void opDrV(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // CHAOS / CHAOS.R / CHAOS.ALG — process-global chaos generator (upstream).
-static void opChaos(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opChaos(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                     int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) { int16_t v=0; if(!popStack(stack,stackSize,v,error))return; chaos_set_val(v); }
     else pushStack(stack, stackSize, chaos_get_val(), error);
 }
-static void opChaosR(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opChaosR(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                      int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) { int16_t v=0; if(!popStack(stack,stackSize,v,error))return; chaos_set_r(v); }
     else pushStack(stack, stackSize, chaos_get_r(), error);
 }
-static void opChaosAlg(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opChaosAlg(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                        int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) { int16_t v=0; if(!popStack(stack,stackSize,v,error))return; chaos_set_alg(v); }
     else pushStack(stack, stackSize, chaos_get_alg(), error);
 }
 
 // SEED — global reseed of all rng slots; *.SEED/*.SD reseed one slot.
-static void opSeed(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opSeed(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) {
         int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
@@ -1715,7 +1827,7 @@ static void opSeed(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
 }
 
 #define TT2_SEED_SLOT_OP(fn, SLOT)                                             \
-    static void fn(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *, \
+    template<typename Cfg> static void fn(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *, \
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) { \
         uint32_t &s = runtime.rng.state[uint8_t(TT2RngSlot::SLOT)];            \
         if (isSet && stackSize >= 1) { int16_t v=0; if(!popStack(stack,stackSize,v,error))return; s = uint32_t(uint16_t(v)); } \
@@ -1731,74 +1843,89 @@ TT2_SEED_SLOT_OP(opPSeed, Pattern)
 // INIT family — reset native state to defaults.
 // ---------------------------------------------------------------------------
 
-static void tt2ResetCvCh(TT2Runtime &r, TT2OutputState &o, int i) {
+template<typename Cfg>
+static void tt2ResetCvCh(TT2RuntimeT<Cfg> &r, TT2OutputState &o, int i) {
     r.variables.cv[i] = 0; r.variables.cv_off[i] = 0; r.variables.cv_slew[i] = 1;
     tt2SeedCvSlew(o.cv[i], 0, 0);
 }
-static void tt2ResetTrCh(TT2Runtime &r, TT2OutputState &o, int i) {
+template<typename Cfg>
+static void tt2ResetTrCh(TT2RuntimeT<Cfg> &r, TT2OutputState &o, int i) {
     r.variables.tr[i] = 0; r.variables.tr_pol[i] = 1; r.variables.tr_time[i] = 100;
     o.tr[i].level = 0; o.tr[i].restLevel = 0; o.tr[i].pulseRemainingMs = 0;
 }
-static void tt2InitPatternN(const TeletypeProgram *program, int pn) {
+template<typename Cfg>
+static void tt2InitPatternN(const TeletypeProgramT<Cfg> *program, int pn) {
     if (!program || pn < 0 || pn >= TT2_PATTERN_COUNT) return;
-    TT2Pattern *p = &const_cast<TeletypeProgram *>(program)->patterns[pn];
+    TT2Pattern *p = &const_cast<TeletypeProgramT<Cfg> *>(program)->patterns[pn];
     p->idx = 0; p->len = 0; p->wrap = 1; p->start = 0; p->end = TT2_PATTERN_LENGTH - 1;
     for (int i = 0; i < TT2_PATTERN_LENGTH; ++i) p->val[i] = 0;
 }
 
-static void opInitCv(TT2Runtime &r, TT2OutputState &o, const TeletypeProgram *,
+template<typename Cfg>
+static void opInitCv(TT2RuntimeT<Cfg> &r, TT2OutputState &o, const TeletypeProgramT<Cfg> *,
                      int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
     int i = v - 1; if (i >= 0 && i < TT2_OUTPUT_CV_COUNT) tt2ResetCvCh(r, o, i);
 }
-static void opInitCvAll(TT2Runtime &r, TT2OutputState &o, const TeletypeProgram *,
+template<typename Cfg>
+static void opInitCvAll(TT2RuntimeT<Cfg> &r, TT2OutputState &o, const TeletypeProgramT<Cfg> *,
                         int16_t *, uint8_t &, bool, TT2EvalError &) {
     for (int i = 0; i < TT2_OUTPUT_CV_COUNT; ++i) tt2ResetCvCh(r, o, i);
 }
-static void opInitTr(TT2Runtime &r, TT2OutputState &o, const TeletypeProgram *,
+template<typename Cfg>
+static void opInitTr(TT2RuntimeT<Cfg> &r, TT2OutputState &o, const TeletypeProgramT<Cfg> *,
                      int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
     int i = v - 1; if (i >= 0 && i < TT2_OUTPUT_TR_COUNT) tt2ResetTrCh(r, o, i);
 }
-static void opInitTrAll(TT2Runtime &r, TT2OutputState &o, const TeletypeProgram *,
+template<typename Cfg>
+static void opInitTrAll(TT2RuntimeT<Cfg> &r, TT2OutputState &o, const TeletypeProgramT<Cfg> *,
                         int16_t *, uint8_t &, bool, TT2EvalError &) {
     for (int i = 0; i < TT2_OUTPUT_TR_COUNT; ++i) tt2ResetTrCh(r, o, i);
 }
-static void opInitP(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opInitP(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
     tt2InitPatternN(program, v);  // 0-based, upstream
 }
-static void opInitPAll(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opInitPAll(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                        int16_t *, uint8_t &, bool, TT2EvalError &) {
     for (int i = 0; i < TT2_PATTERN_COUNT; ++i) tt2InitPatternN(program, i);
 }
-static void tt2ClearScriptN(const TeletypeProgram *program, int idx) {
-    if (!program || idx < 0 || idx >= TT2_SCRIPT_COUNT) return;
-    TT2Script &s = const_cast<TeletypeProgram *>(program)->scripts[idx];
+template<typename Cfg>
+static void tt2ClearScriptN(const TeletypeProgramT<Cfg> *program, int idx) {
+    if (!program || idx < 0 || idx >= Cfg::ScriptCount) return;
+    TT2Script &s = const_cast<TeletypeProgramT<Cfg> *>(program)->scripts[idx];
     s.length = 0;
     for (int c = 0; c < TT2_COMMANDS_PER_SCRIPT; ++c) s.commands[c].length = 0;
 }
-static void opInitScript(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opInitScript(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                          int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
     tt2ClearScriptN(program, v - 1);
 }
-static void opInitScriptAll(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opInitScriptAll(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                             int16_t *, uint8_t &, bool, TT2EvalError &) {
-    for (int i = 0; i < TT2_SCRIPT_COUNT; ++i) tt2ClearScriptN(program, i);
+    for (int i = 0; i < Cfg::ScriptCount; ++i) tt2ClearScriptN(program, i);
 }
-static void opInitData(TT2Runtime &r, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opInitData(TT2RuntimeT<Cfg> &r, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                        int16_t *, uint8_t &, bool, TT2EvalError &) {
     tt2InitVariables(r.variables);
 }
-static void opInitTime(TT2Runtime &r, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opInitTime(TT2RuntimeT<Cfg> &r, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                        int16_t *, uint8_t &, bool, TT2EvalError &) {
     tt2DelayClear(r);
     r.variables.time = int64_t(r.clockMs);  // TIME reads 0 right after
-    for (int i = 0; i < TT2_SCRIPT_COUNT; ++i) r.scriptLastMs[i] = r.clockMs;  // LAST -> 0
+    for (int i = 0; i < Cfg::ScriptCount; ++i) r.scriptLastMs[i] = r.clockMs;  // LAST -> 0
 }
-static void opInit(TT2Runtime &r, TT2OutputState &o, const TeletypeProgram *program,
+template<typename Cfg>
+static void opInit(TT2RuntimeT<Cfg> &r, TT2OutputState &o, const TeletypeProgramT<Cfg> *program,
                    int16_t *, uint8_t &, bool, TT2EvalError &) {
     init(r);
     init(o);
@@ -1811,7 +1938,8 @@ static void opInit(TT2Runtime &r, TT2OutputState &o, const TeletypeProgram *prog
 // ---------------------------------------------------------------------------
 
 // BPM a — ms-per-step for a given BPM (pure formula, upstream op_BPM).
-static void opBpm(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opBpm(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0; if (!popStack(stack, stackSize, a, error)) return;
     if (a < 2) a = 2; if (a > 1000) a = 1000;
@@ -1820,23 +1948,27 @@ static void opBpm(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     pushStack(stack, stackSize, int16_t(ret), error);
 }
 
-static void opWbpm(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opWbpm(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     TT2Host *h = tt2ActiveHost();
     pushStack(stack, stackSize, h ? h->hostTempo() : 0, error);
 }
-static void opWbpmS(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opWbpmS(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
     if (TT2Host *h = tt2ActiveHost()) h->hostSetTempo(v);
 }
-static void opWms(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opWms(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t mult = 0; if (!popStack(stack, stackSize, mult, error)) return;
     TT2Host *h = tt2ActiveHost();
     pushStack(stack, stackSize, h ? h->hostWms(uint8_t(mult)) : 0, error);
 }
-static void opWtu(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opWtu(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t div = 0, mult = 0;
     if (!popStack(stack, stackSize, div, error)) return;
@@ -1844,31 +1976,36 @@ static void opWtu(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     TT2Host *h = tt2ActiveHost();
     pushStack(stack, stackSize, h ? h->hostWtu(uint8_t(div), uint8_t(mult)) : 0, error);
 }
-static void opBar(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opBar(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t bars = 0; if (!popStack(stack, stackSize, bars, error)) return;
     TT2Host *h = tt2ActiveHost();
     pushStack(stack, stackSize, h ? h->hostBarFraction(uint8_t(bars < 1 ? 1 : bars)) : 0, error);
 }
-static void opWp(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opWp(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t t = 0; if (!popStack(stack, stackSize, t, error)) return;
     TT2Host *h = tt2ActiveHost();
     pushStack(stack, stackSize, h ? h->hostTrackPattern(uint8_t(t - 1)) : 0, error);
 }
-static void opWpSet(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opWpSet(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t t = 0, p = 0;
     if (!popStack(stack, stackSize, t, error)) return;
     if (!popStack(stack, stackSize, p, error)) return;
     if (TT2Host *h = tt2ActiveHost()) h->hostSetTrackPattern(uint8_t(t - 1), uint8_t(p));
 }
-static void opWr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opWr(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     TT2Host *h = tt2ActiveHost();
     pushStack(stack, stackSize, h ? h->hostTransportRunning() : 0, error);
 }
-static void opWrAct(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opWrAct(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                     int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) {
         int16_t s = 0; if (!popStack(stack, stackSize, s, error)) return;
@@ -1878,7 +2015,8 @@ static void opWrAct(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
         pushStack(stack, stackSize, h ? h->hostTransportRunning() : 0, error);
     }
 }
-static void opWng(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opWng(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t t = 0, s = 0;
     if (!popStack(stack, stackSize, t, error)) return;
@@ -1891,7 +2029,8 @@ static void opWng(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
         pushStack(stack, stackSize, h ? h->hostNoteGateGet(uint8_t(t - 1), uint8_t(s)) : 0, error);
     }
 }
-static void opWnn(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opWnn(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t t = 0, s = 0;
     if (!popStack(stack, stackSize, t, error)) return;
@@ -1904,25 +2043,29 @@ static void opWnn(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
         pushStack(stack, stackSize, h ? h->hostNoteNoteGet(uint8_t(t - 1), uint8_t(s)) : 0, error);
     }
 }
-static void opWngH(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opWngH(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t t = 0; if (!popStack(stack, stackSize, t, error)) return;
     TT2Host *h = tt2ActiveHost();
     pushStack(stack, stackSize, h ? h->hostNoteGateHere(uint8_t(t - 1)) : 0, error);
 }
-static void opWnnH(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opWnnH(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t t = 0; if (!popStack(stack, stackSize, t, error)) return;
     TT2Host *h = tt2ActiveHost();
     pushStack(stack, stackSize, h ? h->hostNoteNoteHere(uint8_t(t - 1)) : 0, error);
 }
-static void opRt(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opRt(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t i = 0; if (!popStack(stack, stackSize, i, error)) return;
     TT2Host *h = tt2ActiveHost();
     pushStack(stack, stackSize, h ? h->hostRoutingSource(uint8_t(i - 1)) : 0, error);
 }
-static void opBus(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opBus(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, 4)) return;  // 1-based -> 0-based, 4 lanes
@@ -1943,7 +2086,7 @@ static void opBus(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 // ---------------------------------------------------------------------------
 
 #define TT2_GEODE_GLOBAL_OP(fn, getter, setter)                                \
-    static void fn(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,    \
+    template<typename Cfg> static void fn(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,    \
                    int16_t *stack, uint8_t &stackSize, bool isSet,             \
                    TT2EvalError &error) {                                      \
         TT2Host *h = tt2ActiveHost();                                          \
@@ -1961,7 +2104,8 @@ TT2_GEODE_GLOBAL_OP(opGRamp, ramp, setRamp)
 TT2_GEODE_GLOBAL_OP(opGCurv, curve, setCurve)
 TT2_GEODE_GLOBAL_OP(opGMode, mode, setMode)
 
-static void opGRun(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opGRun(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     TT2Host *h = tt2ActiveHost();
     if (isSet && stackSize >= 1) {
@@ -1972,14 +2116,16 @@ static void opGRun(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     }
 }
 
-static void opGVal(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opGVal(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     TT2Host *h = tt2ActiveHost();
     pushStack(stack, stackSize, h ? h->hostGeodeMix() : 0, error);
 }
 
 // G.TUNE v num den (v=0 -> all voices). pops leftmost-first = doc order.
-static void opGTune(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opGTune(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t v = 0, num = 0, den = 0;
     if (!popStack(stack, stackSize, v, error)) return;
@@ -1996,7 +2142,8 @@ static void opGTune(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // G.V v divs reps (v=0 -> all voices). Host mirrors the live gate-fire sequence.
-static void opGV(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opGV(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t v = 0, divs = 0, reps = 0;
     if (!popStack(stack, stackSize, v, error)) return;
@@ -2012,7 +2159,8 @@ static void opGV(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // G.S t i n -> set TIME, TONE(intone), RUN in one line (no trigger).
-static void opGS(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opGS(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t t = 0, i = 0, n = 0;
     if (!popStack(stack, stackSize, t, error)) return;
@@ -2033,7 +2181,8 @@ static void opGS(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 // advanced, unvalidated write (no UI curation/self-filter).
 // ---------------------------------------------------------------------------
 
-static void opMo(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opMo(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, CONFIG_MODULATOR_COUNT)) return;
@@ -2041,7 +2190,8 @@ static void opMo(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     pushStack(stack, stackSize, h ? h->hostModulatorOutput(uint8_t(idx)) : 0, error);
 }
 
-static void opMoP(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opMoP(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, CONFIG_MODULATOR_COUNT)) return;
@@ -2058,7 +2208,7 @@ static void opMoP(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 #define TT2_MO_FIELD_OP(fn, paramName)                                         \
-    static void fn(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,    \
+    template<typename Cfg> static void fn(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,    \
                    int16_t *stack, uint8_t &stackSize, bool isSet,             \
                    TT2EvalError &error) {                                      \
         int16_t idx = 0;                                                       \
@@ -2079,7 +2229,8 @@ TT2_MO_FIELD_OP(opMoDepth, Depth)
 TT2_MO_FIELD_OP(opMoMode, Mode)
 TT2_MO_FIELD_OP(opMoOff, Offset)
 
-static void opMoTrig(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opMoTrig(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                      int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, CONFIG_MODULATOR_COUNT)) return;
@@ -2100,7 +2251,7 @@ static void tt2ForceEnvelope(Modulator &m) {
 }
 
 #define TT2_E_FIELD_OP(fn, getter, setter)                                     \
-    static void fn(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,    \
+    template<typename Cfg> static void fn(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,    \
                    int16_t *stack, uint8_t &stackSize, bool isSet,             \
                    TT2EvalError &error) {                                      \
         int16_t idx = 0;                                                       \
@@ -2120,7 +2271,8 @@ TT2_E_FIELD_OP(opEnvO, offset, setOffset)
 
 // Bare E: set claims the slot + sets the envelope peak (Amplitude); read pushes
 // the slot's live output (mirrors bare MO), not the Amplitude field.
-static void opEnv(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opEnv(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, CONFIG_MODULATOR_COUNT)) return;
@@ -2133,7 +2285,8 @@ static void opEnv(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
     }
 }
 
-static void opEnvT(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opEnvT(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, CONFIG_MODULATOR_COUNT)) return;
@@ -2154,7 +2307,7 @@ static void tt2ForceLfo(Modulator &m) {
 }
 
 #define TT2_LFO_FIELD_OP(fn, getter, setter)                                   \
-    static void fn(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,    \
+    template<typename Cfg> static void fn(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,    \
                    int16_t *stack, uint8_t &stackSize, bool isSet,             \
                    TT2EvalError &error) {                                      \
         int16_t idx = 0;                                                       \
@@ -2173,7 +2326,8 @@ TT2_LFO_FIELD_OP(opLfoO, offset, setOffset)
 
 // LFO.R n x — free rate in centi-Hz (Free domain). Set the domain before the
 // rate so setRate() clamps into the Free range (1..1600).
-static void opLfoR(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opLfoR(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, CONFIG_MODULATOR_COUNT)) return;
@@ -2193,7 +2347,8 @@ static void opLfoR(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 
 // LFO.C n d — clocked rate from a note divisor (Tempo domain). rate = PPQN*2/d;
 // the setter clamps into the Tempo range (6..6144). d floored to 1.
-static void opLfoC(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opLfoC(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, CONFIG_MODULATOR_COUNT)) return;
@@ -2215,7 +2370,8 @@ static void opLfoC(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 // PRINT / PRT — 16-slot dashboard value store in the runtime (ephemeral, like
 // the TT1-track g_dashboardValues). PRINT n x writes slot n (1-based), PRINT n
 // reads it. Pure runtime state — no host. PRT is an alias.
-static void opPrint(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opPrint(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                     int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, TT2_PRINT_SLOT_COUNT)) return;
@@ -2232,10 +2388,11 @@ static void opPrint(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram
 // active frame's I loop var (1-based), matching upstream teletype/src/ops/midi.c.
 // ---------------------------------------------------------------------------
 
-static int16_t tt2MiIndex(TT2Runtime &runtime) { return tt2ActiveFrame(runtime).i; }
+template<typename Cfg>
+static int16_t tt2MiIndex(TT2RuntimeT<Cfg> &runtime) { return tt2ActiveFrame(runtime).i; }
 
 #define TT2_MI_LAST_OP(fn, expr)                                               \
-    static void fn(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *, \
+    template<typename Cfg> static void fn(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *, \
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) { \
         const TT2Midi &m = runtime.midi; (void)m;                              \
         pushStack(stack, stackSize, int16_t(expr), error);                     \
@@ -2256,7 +2413,7 @@ TT2_MI_LAST_OP(opMiCl,   m.cc_count)
 
 // Indexed (read I); 0 when I is out of [1, count].
 #define TT2_MI_IDX_OP(fn, count, expr)                                         \
-    static void fn(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *, \
+    template<typename Cfg> static void fn(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *, \
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) { \
         const TT2Midi &m = runtime.midi; (void)m;                              \
         int16_t i = tt2MiIndex(runtime);                                       \
@@ -2276,7 +2433,8 @@ TT2_MI_IDX_OP(opMiCcv, cc_count, m.cc[i - 1] * 129)
 TT2_MI_IDX_OP(opMiCch, cc_count, m.cc_channel[i - 1] + 1)
 
 // MI.$ event [script] — get/set the per-event fire-script binding.
-static void opMiDollar(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opMiDollar(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                        int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     TT2Midi &m = runtime.midi;
     if (isSet && stackSize >= 2) {
@@ -2284,7 +2442,7 @@ static void opMiDollar(TT2Runtime &runtime, TT2OutputState &, const TeletypeProg
         if (!popStack(stack, stackSize, event, error)) return;
         if (!popStack(stack, stackSize, script, error)) return;
         script -= 1;
-        if (script < 0 || script > TT2_INIT_SCRIPT) script = -1;
+        if (script < 0 || script > Cfg::InitScript) script = -1;
         switch (event) {
             case 0: m.on_script = int8_t(script); m.off_script = int8_t(script); m.cc_script = int8_t(script);
                     m.on_count = m.off_count = m.cc_count = 0; break;
@@ -2311,7 +2469,8 @@ static void opMiDollar(TT2Runtime &runtime, TT2OutputState &, const TeletypeProg
 }
 
 // MI.CLKD — MIDI clock divisor (1..24); MI.CLKR — reset (no-op, TT2 has no MIDI clock counter yet).
-static void opMiClkd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opMiClkd(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                      int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) {
         int16_t d = 0; if (!popStack(stack, stackSize, d, error)) return;
@@ -2321,7 +2480,8 @@ static void opMiClkd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgra
         pushStack(stack, stackSize, int16_t(runtime.midi.clock_div), error);
     }
 }
-static void opMiClkr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opMiClkr(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                      int16_t *, uint8_t &, bool, TT2EvalError &) { /* no-op */ }
 
 // ---------------------------------------------------------------------------
@@ -2329,7 +2489,8 @@ static void opMiClkr(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 // ---------------------------------------------------------------------------
 
 // TIF cond a b — ternary select (pure).
-static void opTif(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opTif(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t cond = 0, a = 0, b = 0;
     if (!popStack(stack, stackSize, cond, error)) return;
@@ -2339,13 +2500,15 @@ static void opTif(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
 }
 
 // M! — read the metro period.
-static void opMBang(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opMBang(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     pushStack(stack, stackSize, runtime.variables.m, error);
 }
 
 // CV.GET n — read the channel's current value.
-static void opCvGet(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opCvGet(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_CV_COUNT)) return;
@@ -2353,7 +2516,8 @@ static void opCvGet(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram
 }
 
 // CV.SET n v — set CV directly with NO slew (snap), offset applied.
-static void opCvSet(TT2Runtime &runtime, TT2OutputState &output, const TeletypeProgram *,
+template<typename Cfg>
+static void opCvSet(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output, const TeletypeProgramT<Cfg> *,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_CV_COUNT)) return;
@@ -2367,7 +2531,8 @@ static void opCvSet(TT2Runtime &runtime, TT2OutputState &output, const TeletypeP
 }
 
 // M.A m — set metro period (single-track "all" == this track).
-static void opMA(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opMA(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t m = 0;
     if (!popStack(stack, stackSize, m, error)) return;
@@ -2376,7 +2541,8 @@ static void opMA(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
 }
 
 // M.ACT.A state — set metro active (single-track "all").
-static void opMActA(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opMActA(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t s = 0;
     if (!popStack(stack, stackSize, s, error)) return;
@@ -2384,20 +2550,21 @@ static void opMActA(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram
 }
 
 // SCRIPT.POL / $.POL — per-trigger-input script polarity (a==0 sets all).
-static void opScriptPol(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opScriptPol(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                         int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 2) {
         int16_t a = 0, pol = 0;
         if (!popStack(stack, stackSize, a, error)) return;
         if (!popStack(stack, stackSize, pol, error)) return;
         if (pol < 0 || pol > 3) return;
-        if (a == 0) { for (int i = 0; i < TT2_TRIGGER_INPUTS; ++i) runtime.variables.script_pol[i] = uint8_t(pol); }
-        else { int s = a - 1; if (s >= 0 && s < TT2_TRIGGER_INPUTS) runtime.variables.script_pol[s] = uint8_t(pol); }
+        if (a == 0) { for (int i = 0; i < Cfg::TriggerInputCount; ++i) runtime.variables.script_pol[i] = uint8_t(pol); }
+        else { int s = a - 1; if (s >= 0 && s < Cfg::TriggerInputCount) runtime.variables.script_pol[s] = uint8_t(pol); }
     } else {
         int16_t a = 0;
         if (!popStack(stack, stackSize, a, error)) return;
         int s = a - 1;
-        pushStack(stack, stackSize, (s >= 0 && s < TT2_TRIGGER_INPUTS) ? int16_t(runtime.variables.script_pol[s]) : 0, error);
+        pushStack(stack, stackSize, (s >= 0 && s < Cfg::TriggerInputCount) ? int16_t(runtime.variables.script_pol[s]) : 0, error);
     }
 }
 
@@ -2413,20 +2580,23 @@ static int16_t scaleInput(int16_t raw, int16_t outMin, int16_t outMax) {
 }
 
 // IN / PARAM — scaled read of the sampled CV input.
-static void opIn(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opIn(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     pushStack(stack, stackSize, scaleInput(runtime.variables.in,
               runtime.variables.in_min, runtime.variables.in_max), error);
 }
 
-static void opParam(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opParam(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     pushStack(stack, stackSize, scaleInput(runtime.variables.param,
               runtime.variables.param_min, runtime.variables.param_max), error);
 }
 
 // IN.SCALE / PARAM.SCALE min max — set the output range (leftmost arg = min).
-static void opInScale(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opInScale(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                       int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t mn = 0, mx = 0;
     if (!popStack(stack, stackSize, mn, error)) return;
@@ -2435,7 +2605,8 @@ static void opInScale(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgr
     runtime.variables.in_max = mx;
 }
 
-static void opParamScale(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opParamScale(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                          int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t mn = 0, mx = 0;
     if (!popStack(stack, stackSize, mn, error)) return;
@@ -2446,21 +2617,23 @@ static void opParamScale(TT2Runtime &runtime, TT2OutputState &, const TeletypePr
 
 // STATE n — live level of trigger input n (latched by the engine). Out of
 // range pushes 0 (upstream semantics, no error).
-static void opState(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opState(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t a = 0;
     if (!popStack(stack, stackSize, a, error)) return;
     int idx = a - 1;
-    int16_t level = (idx >= 0 && idx < TT2_TRIGGER_INPUT_COUNT)
+    int16_t level = (idx >= 0 && idx < Cfg::TriggerInputCount)
                         ? int16_t(runtime.inputLevel[idx]) : 0;
     pushStack(stack, stackSize, level, error);
 }
 
 // MUTE n [v] — get/set the mute bit for trigger input n.
-static void opMute(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opMute(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     int16_t idx = 0;
-    if (!popOutputIndex(stack, stackSize, idx, error, TT2_TRIGGER_INPUT_COUNT)) return;
+    if (!popOutputIndex(stack, stackSize, idx, error, Cfg::TriggerInputCount)) return;
     uint8_t bit = uint8_t(1 << idx);
     if (isSetPosition && stackSize >= 1) {
         int16_t val = 0;
@@ -2476,7 +2649,8 @@ static void opMute(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
 // Metro ops
 // ---------------------------------------------------------------------------
 
-static void opM(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opM(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                 int16_t *stack,
                 uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     if (isSetPosition && stackSize >= 1) {
@@ -2492,7 +2666,8 @@ static void opM(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
 
 // M.C n d — clock-synced metro: period = n/d of a whole note, derived from live
 // BPM in tt2AdvanceMetro. Set-only (consumes 2); plain M / M! revert to free ms.
-static void opMC(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opMC(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t n = 0, d = 0;
     if (!popStack(stack, stackSize, n, error)) return;
@@ -2503,7 +2678,8 @@ static void opMC(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
     runtime.variables.metroSyncDen = d;
 }
 
-static void opMAct(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opMAct(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack,
                    uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     if (isSetPosition && stackSize >= 1) {
@@ -2519,14 +2695,15 @@ static void opMAct(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
 // Script op — nested script call
 // ---------------------------------------------------------------------------
 
-static void opScript(TT2Runtime &runtime, TT2OutputState &output,
-                     const TeletypeProgram *program, int16_t *stack,
+template<typename Cfg>
+static void opScript(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
+                     const TeletypeProgramT<Cfg> *program, int16_t *stack,
                      uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     if (isSetPosition && stackSize >= 1) {
         int16_t oneBased = 0;
         if (!popStack(stack, stackSize, oneBased, error)) return;
         int16_t zeroBased = oneBased - 1;
-        if (zeroBased < 0 || zeroBased >= TT2_SCRIPT_COUNT) {
+        if (zeroBased < 0 || zeroBased >= Cfg::ScriptCount) {
             error = TT2EvalError::OutOfRange;
             return;
         }
@@ -2552,8 +2729,9 @@ static void opScript(TT2Runtime &runtime, TT2OutputState &output,
 // passing params (read via I1/I2) and returning FR. Native pop order is
 // left-to-right, so token roles mirror upstream's reversed cs_pop order.
 
-static void opF(TT2Runtime &runtime, TT2OutputState &output,
-                const TeletypeProgram *program, int16_t *stack,
+template<typename Cfg>
+static void opF(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
+                const TeletypeProgramT<Cfg> *program, int16_t *stack,
                 uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t script = 0;
     if (!popStack(stack, stackSize, script, error)) return;
@@ -2561,8 +2739,9 @@ static void opF(TT2Runtime &runtime, TT2OutputState &output,
     pushStack(stack, stackSize, tt2RunFunction(*program, runtime, output, uint8_t(script - 1), 0, 0), error);
 }
 
-static void opF1(TT2Runtime &runtime, TT2OutputState &output,
-                 const TeletypeProgram *program, int16_t *stack,
+template<typename Cfg>
+static void opF1(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
+                 const TeletypeProgramT<Cfg> *program, int16_t *stack,
                  uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t param1 = 0, script = 0;
     if (!popStack(stack, stackSize, param1, error)) return;
@@ -2571,8 +2750,9 @@ static void opF1(TT2Runtime &runtime, TT2OutputState &output,
     pushStack(stack, stackSize, tt2RunFunction(*program, runtime, output, uint8_t(script - 1), param1, 0), error);
 }
 
-static void opF2(TT2Runtime &runtime, TT2OutputState &output,
-                 const TeletypeProgram *program, int16_t *stack,
+template<typename Cfg>
+static void opF2(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
+                 const TeletypeProgramT<Cfg> *program, int16_t *stack,
                  uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t param2 = 0, param1 = 0, script = 0;
     if (!popStack(stack, stackSize, param2, error)) return;
@@ -2582,8 +2762,9 @@ static void opF2(TT2Runtime &runtime, TT2OutputState &output,
     pushStack(stack, stackSize, tt2RunFunction(*program, runtime, output, uint8_t(script - 1), param1, param2), error);
 }
 
-static void opL(TT2Runtime &runtime, TT2OutputState &output,
-                const TeletypeProgram *program, int16_t *stack,
+template<typename Cfg>
+static void opL(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
+                const TeletypeProgramT<Cfg> *program, int16_t *stack,
                 uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t line = 0, script = 0;
     if (!popStack(stack, stackSize, line, error)) return;
@@ -2592,8 +2773,9 @@ static void opL(TT2Runtime &runtime, TT2OutputState &output,
     pushStack(stack, stackSize, tt2RunFunctionLine(*program, runtime, output, uint8_t(script - 1), uint8_t(line - 1), 0, 0), error);
 }
 
-static void opL1(TT2Runtime &runtime, TT2OutputState &output,
-                 const TeletypeProgram *program, int16_t *stack,
+template<typename Cfg>
+static void opL1(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
+                 const TeletypeProgramT<Cfg> *program, int16_t *stack,
                  uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t param1 = 0, line = 0, script = 0;
     if (!popStack(stack, stackSize, param1, error)) return;
@@ -2603,8 +2785,9 @@ static void opL1(TT2Runtime &runtime, TT2OutputState &output,
     pushStack(stack, stackSize, tt2RunFunctionLine(*program, runtime, output, uint8_t(script - 1), uint8_t(line - 1), param1, 0), error);
 }
 
-static void opL2(TT2Runtime &runtime, TT2OutputState &output,
-                 const TeletypeProgram *program, int16_t *stack,
+template<typename Cfg>
+static void opL2(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
+                 const TeletypeProgramT<Cfg> *program, int16_t *stack,
                  uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t param2 = 0, param1 = 0, line = 0, script = 0;
     if (!popStack(stack, stackSize, param2, error)) return;
@@ -2615,8 +2798,9 @@ static void opL2(TT2Runtime &runtime, TT2OutputState &output,
     pushStack(stack, stackSize, tt2RunFunctionLine(*program, runtime, output, uint8_t(script - 1), uint8_t(line - 1), param1, param2), error);
 }
 
-static void opS(TT2Runtime &runtime, TT2OutputState &output,
-                const TeletypeProgram *program, int16_t *stack,
+template<typename Cfg>
+static void opS(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
+                const TeletypeProgramT<Cfg> *program, int16_t *stack,
                 uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t line = 0;
     if (!popStack(stack, stackSize, line, error)) return;
@@ -2624,8 +2808,9 @@ static void opS(TT2Runtime &runtime, TT2OutputState &output,
     pushStack(stack, stackSize, tt2RunFunctionLine(*program, runtime, output, tt2ActiveScriptNumber(runtime), uint8_t(line - 1), 0, 0), error);
 }
 
-static void opS1(TT2Runtime &runtime, TT2OutputState &output,
-                 const TeletypeProgram *program, int16_t *stack,
+template<typename Cfg>
+static void opS1(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
+                 const TeletypeProgramT<Cfg> *program, int16_t *stack,
                  uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t param1 = 0, line = 0;
     if (!popStack(stack, stackSize, param1, error)) return;
@@ -2634,8 +2819,9 @@ static void opS1(TT2Runtime &runtime, TT2OutputState &output,
     pushStack(stack, stackSize, tt2RunFunctionLine(*program, runtime, output, tt2ActiveScriptNumber(runtime), uint8_t(line - 1), param1, 0), error);
 }
 
-static void opS2(TT2Runtime &runtime, TT2OutputState &output,
-                 const TeletypeProgram *program, int16_t *stack,
+template<typename Cfg>
+static void opS2(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
+                 const TeletypeProgramT<Cfg> *program, int16_t *stack,
                  uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t param2 = 0, param1 = 0, line = 0;
     if (!popStack(stack, stackSize, param2, error)) return;
@@ -2646,18 +2832,21 @@ static void opS2(TT2Runtime &runtime, TT2OutputState &output,
 }
 
 // I1 / I2 — read the active function call's input params.
-static void opI1(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opI1(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     pushStack(stack, stackSize, tt2ActiveFrame(runtime).fparam1, error);
 }
 
-static void opI2(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opI2(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     pushStack(stack, stackSize, tt2ActiveFrame(runtime).fparam2, error);
 }
 
 // FR — get/set the active function's return value.
-static void opFr(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opFr(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     TT2ExecFrame &frame = tt2ActiveFrame(runtime);
     if (isSetPosition && stackSize >= 1) {
@@ -2672,23 +2861,26 @@ static void opFr(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
 
 // DEL.CLR — clear the delay queue (faithful subset: TT2 has no TR pulse
 // timers / persistent op stack to also flush).
-static void opDelClr(TT2Runtime &runtime, TT2OutputState &,
-                     const TeletypeProgram *, int16_t *,
+template<typename Cfg>
+static void opDelClr(TT2RuntimeT<Cfg> &runtime, TT2OutputState &,
+                     const TeletypeProgramT<Cfg> *, int16_t *,
                      uint8_t &, bool, TT2EvalError &) {
     tt2DelayClear(runtime);
 }
 
 // BREAK / BRK — flag the active exec frame so the enclosing L loop stops.
-static void opBreak(TT2Runtime &runtime, TT2OutputState &,
-                    const TeletypeProgram *, int16_t *,
+template<typename Cfg>
+static void opBreak(TT2RuntimeT<Cfg> &runtime, TT2OutputState &,
+                    const TeletypeProgramT<Cfg> *, int16_t *,
                     uint8_t &, bool, TT2EvalError &) {
     tt2ActiveBreaking(runtime) = 1;
 }
 
 // KILL — clear the stack, disable the metro, and clear the delay queue
 // (upstream op_KILL_get; TT2 has no TR pulse timers to also flush).
-static void opKill(TT2Runtime &runtime, TT2OutputState &,
-                   const TeletypeProgram *, int16_t *,
+template<typename Cfg>
+static void opKill(TT2RuntimeT<Cfg> &runtime, TT2OutputState &,
+                   const TeletypeProgramT<Cfg> *, int16_t *,
                    uint8_t &, bool, TT2EvalError &) {
     runtime.stack.top = 0;
     runtime.variables.m_act = 0;
@@ -2700,7 +2892,8 @@ static void opKill(TT2Runtime &runtime, TT2OutputState &,
 // Q.RND (rand source) and Q.2P / Q.P2 (pattern store) deferred to later batches.
 // ---------------------------------------------------------------------------
 
-static void opQ(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQ(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                 int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
     if (isSet && stackSize >= 1) {
@@ -2715,7 +2908,8 @@ static void opQ(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
     }
 }
 
-static void opQN(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQN(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
     if (isSet && stackSize >= 1) {
@@ -2728,7 +2922,8 @@ static void opQN(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
     }
 }
 
-static void opQAvg(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQAvg(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
     if (isSet && stackSize >= 1) {
@@ -2746,7 +2941,8 @@ static void opQAvg(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
     }
 }
 
-static void opQClr(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQClr(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
     int16_t first = 0;
@@ -2757,7 +2953,8 @@ static void opQClr(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
     if (doSet) v.q[0] = first;
 }
 
-static void opQGrw(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQGrw(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
     if (isSet && stackSize >= 1) {
@@ -2770,7 +2967,8 @@ static void opQGrw(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
     }
 }
 
-static void opQSum(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQSum(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     auto &v = runtime.variables;
     int16_t sum = 0;
@@ -2778,7 +2976,8 @@ static void opQSum(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
     pushStack(stack, stackSize, sum, error);
 }
 
-static void opQMin(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQMin(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
     if (isSet && stackSize >= 1) {
@@ -2792,7 +2991,8 @@ static void opQMin(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
     }
 }
 
-static void opQMax(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQMax(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
     if (isSet && stackSize >= 1) {
@@ -2818,7 +3018,8 @@ static void qSortRange(int16_t *q, int lo, int hi) {
     }
 }
 
-static void opQSrt(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQSrt(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
     if (isSet && stackSize >= 1) {
@@ -2834,7 +3035,8 @@ static void opQSrt(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
     }
 }
 
-static void opQRev(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQRev(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *, uint8_t &, bool, TT2EvalError &) {
     auto &v = runtime.variables;
     for (int i = 0; i < v.q_n / 2; ++i) {
@@ -2844,7 +3046,8 @@ static void opQRev(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
     }
 }
 
-static void opQSh(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQSh(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
     if (isSet && stackSize >= 1) {
@@ -2871,7 +3074,8 @@ static int qClampIndex(int16_t i, int16_t q_n) {
     return i;
 }
 
-static void opQAdd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQAdd(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
     int16_t amt = 0;
@@ -2889,13 +3093,14 @@ static void opQAdd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
 static int16_t normalisePn(int16_t pn);  // defined with the pattern ops below
 
 // Q.2P [i] — copy the queue (0..q_n-1) into the current pattern (p_n) or pattern i.
-static void opQ2P(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opQ2P(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     if (!program) { error = TT2EvalError::NoTrack; return; }
     auto &v = runtime.variables;
     int16_t pn = v.p_n;
     if (stackSize >= 1) { if (!popStack(stack, stackSize, pn, error)) return; }
-    TT2Pattern &pat = const_cast<TeletypeProgram *>(program)->patterns[normalisePn(pn)];
+    TT2Pattern &pat = const_cast<TeletypeProgramT<Cfg> *>(program)->patterns[normalisePn(pn)];
     int n = v.q_n; if (n < 0) n = 0; if (n > TT2_PATTERN_LENGTH) n = TT2_PATTERN_LENGTH;
     for (int i = 0; i < n; ++i) pat.val[i] = v.q[i];
     pat.len = uint16_t(n);
@@ -2903,7 +3108,8 @@ static void opQ2P(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *
 
 // Q.P2 [i] — copy the whole current pattern (or pattern i) into the queue; queue
 // length becomes the pattern length (Q.P2 copies the entire pattern, not up to len).
-static void opQP2(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opQP2(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     if (!program) { error = TT2EvalError::NoTrack; return; }
     auto &v = runtime.variables;
@@ -2918,7 +3124,8 @@ static void opQP2(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *
 
 // Q.RND [x] — get a random element from the queue; if x>0, set all active
 // elements to one random value.
-static void opQRnd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQRnd(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
     int n = v.q_n < 1 ? 1 : (v.q_n > TT2_Q_LENGTH ? TT2_Q_LENGTH : v.q_n);
@@ -2934,7 +3141,8 @@ static void opQRnd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
     }
 }
 
-static void opQSub(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQSub(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
     int16_t amt = 0;
@@ -2949,7 +3157,8 @@ static void opQSub(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
     }
 }
 
-static void opQMul(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQMul(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
     int16_t amt = 0;
@@ -2964,7 +3173,8 @@ static void opQMul(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
     }
 }
 
-static void opQDiv(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQDiv(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
     int16_t amt = 0;
@@ -2980,7 +3190,8 @@ static void opQDiv(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
     }
 }
 
-static void opQMod(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQMod(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
     int16_t amt = 0;
@@ -2996,7 +3207,8 @@ static void opQMod(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
     }
 }
 
-static void opQI(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opQI(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     auto &v = runtime.variables;
     int16_t idx = 0;
@@ -3017,8 +3229,9 @@ static void opQI(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
 // mod pushes onto. S.ALL/S.POP execute stored commands through the evaluator.
 // ---------------------------------------------------------------------------
 
-static void runStoredCommand(const TT2RuntimeCommand &body, TT2Runtime &runtime,
-                             TT2OutputState &output, const TeletypeProgram *program) {
+template<typename Cfg>
+static void runStoredCommand(const TT2RuntimeCommand &body, TT2RuntimeT<Cfg> &runtime,
+                             TT2OutputState &output, const TeletypeProgramT<Cfg> *program) {
     TT2Command cmd;
     cmd.length = body.length;
     for (int k = 0; k < TT2_COMMAND_MAX_LENGTH; ++k) {
@@ -3029,8 +3242,9 @@ static void runStoredCommand(const TT2RuntimeCommand &body, TT2Runtime &runtime,
 }
 
 // S.ALL — run every stacked command (most-recent first), then clear.
-static void opSAll(TT2Runtime &runtime, TT2OutputState &output,
-                   const TeletypeProgram *program, int16_t *, uint8_t &, bool,
+template<typename Cfg>
+static void opSAll(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
+                   const TeletypeProgramT<Cfg> *program, int16_t *, uint8_t &, bool,
                    TT2EvalError &) {
     uint8_t n = runtime.stack.top;
     for (uint8_t i = 0; i < n; ++i) {
@@ -3040,8 +3254,9 @@ static void opSAll(TT2Runtime &runtime, TT2OutputState &output,
 }
 
 // S.POP — run the most-recently pushed command, leaving the rest.
-static void opSPop(TT2Runtime &runtime, TT2OutputState &output,
-                   const TeletypeProgram *program, int16_t *, uint8_t &, bool,
+template<typename Cfg>
+static void opSPop(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
+                   const TeletypeProgramT<Cfg> *program, int16_t *, uint8_t &, bool,
                    TT2EvalError &) {
     if (runtime.stack.top > 0) {
         runtime.stack.top--;
@@ -3049,12 +3264,14 @@ static void opSPop(TT2Runtime &runtime, TT2OutputState &output,
     }
 }
 
-static void opSClr(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opSClr(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                    int16_t *, uint8_t &, bool, TT2EvalError &) {
     runtime.stack.top = 0;
 }
 
-static void opSL(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opSL(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                  int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     pushStack(stack, stackSize, int16_t(runtime.stack.top), error);
 }
@@ -3073,9 +3290,10 @@ static int16_t normalisePn(int16_t pn) {
 // Patterns are mutable scene state persisted in TeletypeProgram; the evaluator
 // reaches the program through a const pointer (scripts don't change mid-run),
 // so pattern-write ops cast it away. The TT2Track::_program object is non-const.
-static TT2Pattern *mutablePattern(const TeletypeProgram *program, int16_t pn) {
+template<typename Cfg>
+static TT2Pattern *mutablePattern(const TeletypeProgramT<Cfg> *program, int16_t pn) {
     if (!program) return nullptr;
-    return &const_cast<TeletypeProgram *>(program)->patterns[normalisePn(pn)];
+    return &const_cast<TeletypeProgramT<Cfg> *>(program)->patterns[normalisePn(pn)];
 }
 
 // Negative idx counts from the back (upstream normalise_idx); clamp to range.
@@ -3091,7 +3309,8 @@ static int16_t normaliseIdx(const TT2Pattern &p, int16_t idx) {
 }
 
 // P.N — working pattern selector.
-static void opPatternN(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+template<typename Cfg>
+static void opPatternN(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                        int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) {
         int16_t a = 0;
@@ -3104,25 +3323,29 @@ static void opPatternN(TT2Runtime &runtime, TT2OutputState &, const TeletypeProg
 
 // --- value workers (shared by P.* and PN.*) -------------------------------
 
-static int16_t patternGetVal(const TeletypeProgram *program, int16_t pn, int16_t idx) {
+template<typename Cfg>
+static int16_t patternGetVal(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t idx) {
     const TT2Pattern &p = program->patterns[normalisePn(pn)];
     return p.val[normaliseIdx(p, idx)];
 }
 
-static void patternSetVal(const TeletypeProgram *program, int16_t pn, int16_t idx,
+template<typename Cfg>
+static void patternSetVal(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t idx,
                           int16_t val) {
     TT2Pattern *p = mutablePattern(program, pn);
     if (p) p->val[normaliseIdx(*p, idx)] = val;
 }
 
-static void patternSetLen(const TeletypeProgram *program, int16_t pn, int16_t l) {
+template<typename Cfg>
+static void patternSetLen(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t l) {
     TT2Pattern *p = mutablePattern(program, pn);
     if (!p) return;
     if (l < 0) l = 0; else if (l > TT2_PATTERN_LENGTH) l = TT2_PATTERN_LENGTH;
     p->len = uint16_t(l);
 }
 
-static void patternSetIdx(const TeletypeProgram *program, int16_t pn, int16_t i) {
+template<typename Cfg>
+static void patternSetIdx(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t i) {
     TT2Pattern *p = mutablePattern(program, pn);
     if (!p) return;
     i = normaliseIdx(*p, i);
@@ -3133,7 +3356,8 @@ static void patternSetIdx(const TeletypeProgram *program, int16_t pn, int16_t i)
 }
 
 // P / PN — indexed value access. P: idx [val] (working pattern). PN: pn idx [val].
-static void opP(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opP(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                 int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popStack(stack, stackSize, idx, error)) return;
@@ -3146,7 +3370,8 @@ static void opP(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *pr
     }
 }
 
-static void opPN(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPN(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t pn = 0, idx = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3162,7 +3387,8 @@ static void opPN(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
 
 // Rescale every value in pattern pn's [start,end] window from [in_min,in_max]
 // to [out_min,out_max] (upstream p_pat_scale; uses the shared SCALE math).
-static void patScale(const TeletypeProgram *program, int16_t pn,
+template<typename Cfg>
+static void patScale(const TeletypeProgramT<Cfg> *program, int16_t pn,
                      int16_t inMin, int16_t inMax, int16_t outMin, int16_t outMax) {
     TT2Pattern *p = mutablePattern(program, pn);
     int start = p->start, end = p->end;
@@ -3174,7 +3400,8 @@ static void patScale(const TeletypeProgram *program, int16_t pn,
 }
 
 // P.SCALE in_min in_max out_min out_max — rescale the working pattern.
-static void opPScale(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPScale(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                      int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t inMin = 0, inMax = 0, outMin = 0, outMax = 0;
     if (!popStack(stack, stackSize, inMin, error)) return;
@@ -3185,7 +3412,8 @@ static void opPScale(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgra
 }
 
 // PN.SCALE pn in_min in_max out_min out_max — rescale an explicit pattern.
-static void opPNScale(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNScale(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                       int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pn = 0, inMin = 0, inMax = 0, outMin = 0, outMax = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3197,7 +3425,8 @@ static void opPNScale(TT2Runtime &, TT2OutputState &, const TeletypeProgram *pro
 }
 
 // P.L / PN.L — length.
-static void opPL(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPL(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) {
         int16_t l = 0;
@@ -3208,7 +3437,8 @@ static void opPL(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *p
     }
 }
 
-static void opPNL(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNL(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3222,7 +3452,8 @@ static void opPNL(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program
 }
 
 // P.I / PN.I — working index.
-static void opPI(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPI(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) {
         int16_t i = 0;
@@ -3233,7 +3464,8 @@ static void opPI(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *p
     }
 }
 
-static void opPNI(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNI(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3247,7 +3479,8 @@ static void opPNI(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program
 }
 
 // P.HERE / PN.HERE — value at the working index (no advance).
-static void opPHere(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPHere(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t pn = normalisePn(runtime.variables.p_n);
     const TT2Pattern &p = program->patterns[pn];
@@ -3261,7 +3494,8 @@ static void opPHere(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram
     }
 }
 
-static void opPNHere(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNHere(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                      int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3302,7 +3536,8 @@ static void patternPrevDec(TT2Pattern &p) {
     p.idx = idx;
 }
 
-static void opPWrap(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPWrap(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) {
         int16_t a = 0;
@@ -3314,7 +3549,8 @@ static void opPWrap(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram
     }
 }
 
-static void opPNWrap(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNWrap(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                      int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3328,7 +3564,8 @@ static void opPNWrap(TT2Runtime &, TT2OutputState &, const TeletypeProgram *prog
     }
 }
 
-static void opPStart(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPStart(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                      int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) {
         int16_t a = 0;
@@ -3340,7 +3577,8 @@ static void opPStart(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgra
     }
 }
 
-static void opPNStart(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNStart(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                       int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3354,7 +3592,8 @@ static void opPNStart(TT2Runtime &, TT2OutputState &, const TeletypeProgram *pro
     }
 }
 
-static void opPEnd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPEnd(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                    int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (isSet && stackSize >= 1) {
         int16_t a = 0;
@@ -3366,7 +3605,8 @@ static void opPEnd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
     }
 }
 
-static void opPNEnd(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNEnd(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3380,7 +3620,8 @@ static void opPNEnd(TT2Runtime &, TT2OutputState &, const TeletypeProgram *progr
     }
 }
 
-static void opPNext(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNext(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     TT2Pattern *p = mutablePattern(program, runtime.variables.p_n);
     if (!p) return;
@@ -3395,7 +3636,8 @@ static void opPNext(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram
     }
 }
 
-static void opPNNext(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNNext(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                      int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3412,7 +3654,8 @@ static void opPNNext(TT2Runtime &, TT2OutputState &, const TeletypeProgram *prog
     }
 }
 
-static void opPPrev(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPPrev(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     TT2Pattern *p = mutablePattern(program, runtime.variables.p_n);
     if (!p) return;
@@ -3427,7 +3670,8 @@ static void opPPrev(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram
     }
 }
 
-static void opPNPrev(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNPrev(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                      int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3446,7 +3690,8 @@ static void opPNPrev(TT2Runtime &, TT2OutputState &, const TeletypeProgram *prog
 
 // --- insert / remove / push / pop (get-only edits) -------------------------
 
-static void patternIns(const TeletypeProgram *program, int16_t pn, int16_t idx, int16_t val) {
+template<typename Cfg>
+static void patternIns(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t idx, int16_t val) {
     TT2Pattern *p = mutablePattern(program, pn);
     if (!p) return;
     idx = normaliseIdx(*p, idx);
@@ -3459,7 +3704,8 @@ static void patternIns(const TeletypeProgram *program, int16_t pn, int16_t idx, 
     p->val[idx] = val;
 }
 
-static int16_t patternRm(const TeletypeProgram *program, int16_t pn, int16_t idx) {
+template<typename Cfg>
+static int16_t patternRm(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t idx) {
     TT2Pattern *p = mutablePattern(program, pn);
     if (!p) return 0;
     int16_t len = int16_t(p->len);
@@ -3474,14 +3720,16 @@ static int16_t patternRm(const TeletypeProgram *program, int16_t pn, int16_t idx
     return ret;
 }
 
-static void patternPush(const TeletypeProgram *program, int16_t pn, int16_t val) {
+template<typename Cfg>
+static void patternPush(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t val) {
     TT2Pattern *p = mutablePattern(program, pn);
     if (!p) return;
     int16_t len = int16_t(p->len);
     if (len < TT2_PATTERN_LENGTH) { p->val[len] = val; p->len = uint16_t(len + 1); }
 }
 
-static int16_t patternPop(const TeletypeProgram *program, int16_t pn) {
+template<typename Cfg>
+static int16_t patternPop(const TeletypeProgramT<Cfg> *program, int16_t pn) {
     TT2Pattern *p = mutablePattern(program, pn);
     if (!p) return 0;
     int16_t len = int16_t(p->len);
@@ -3489,7 +3737,8 @@ static int16_t patternPop(const TeletypeProgram *program, int16_t pn) {
     return 0;
 }
 
-static void opPIns(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPIns(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t idx = 0, val = 0;
     if (!popStack(stack, stackSize, idx, error)) return;
@@ -3497,7 +3746,8 @@ static void opPIns(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
     patternIns(program, runtime.variables.p_n, idx, val);
 }
 
-static void opPNIns(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNIns(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pn = 0, idx = 0, val = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3506,14 +3756,16 @@ static void opPNIns(TT2Runtime &, TT2OutputState &, const TeletypeProgram *progr
     patternIns(program, pn, idx, val);
 }
 
-static void opPRm(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPRm(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                   int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popStack(stack, stackSize, idx, error)) return;
     pushStack(stack, stackSize, patternRm(program, runtime.variables.p_n, idx), error);
 }
 
-static void opPNRm(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNRm(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pn = 0, idx = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3521,14 +3773,16 @@ static void opPNRm(TT2Runtime &, TT2OutputState &, const TeletypeProgram *progra
     pushStack(stack, stackSize, patternRm(program, pn, idx), error);
 }
 
-static void opPPush(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPPush(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t val = 0;
     if (!popStack(stack, stackSize, val, error)) return;
     patternPush(program, runtime.variables.p_n, val);
 }
 
-static void opPNPush(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNPush(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                      int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pn = 0, val = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3536,12 +3790,14 @@ static void opPNPush(TT2Runtime &, TT2OutputState &, const TeletypeProgram *prog
     patternPush(program, pn, val);
 }
 
-static void opPPop(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPPop(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     pushStack(stack, stackSize, patternPop(program, runtime.variables.p_n), error);
 }
 
-static void opPNPop(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNPop(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3590,13 +3846,15 @@ static void patternShuffle(TT2Pattern &p, TT2Rng &rng) {
     }
 }
 
-static void opPRev(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPRev(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                    int16_t *, uint8_t &, bool, TT2EvalError &) {
     TT2Pattern *p = mutablePattern(program, runtime.variables.p_n);
     if (p) patternReverse(*p, p->start, p->end);
 }
 
-static void opPNRev(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNRev(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3604,7 +3862,8 @@ static void opPNRev(TT2Runtime &, TT2OutputState &, const TeletypeProgram *progr
     if (p) patternReverse(*p, p->start, p->end);
 }
 
-static void opPRot(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPRot(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t shift = 0;
     if (!popStack(stack, stackSize, shift, error)) return;
@@ -3612,7 +3871,8 @@ static void opPRot(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
     if (p) patternRotate(*p, shift);
 }
 
-static void opPNRot(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNRot(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pn = 0, shift = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3621,13 +3881,15 @@ static void opPNRot(TT2Runtime &, TT2OutputState &, const TeletypeProgram *progr
     if (p) patternRotate(*p, shift);
 }
 
-static void opPShuf(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPShuf(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *, uint8_t &, bool, TT2EvalError &) {
     TT2Pattern *p = mutablePattern(program, runtime.variables.p_n);
     if (p) patternShuffle(*p, runtime.rng);
 }
 
-static void opPNShuf(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNShuf(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                      int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3644,7 +3906,8 @@ static int16_t patternWrapVal(int16_t value, int16_t a, int16_t b) {
     return i;
 }
 
-static void patternArithAt(const TeletypeProgram *program, int16_t pn, int16_t idx,
+template<typename Cfg>
+static void patternArithAt(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t idx,
                            int16_t delta, bool sub, bool doWrap, int16_t lo, int16_t hi) {
     TT2Pattern *p = mutablePattern(program, pn);
     if (!p) return;
@@ -3655,7 +3918,8 @@ static void patternArithAt(const TeletypeProgram *program, int16_t pn, int16_t i
 }
 
 // Pop the trailing (idx, delta[, lo, hi]) args after the optional leading pn.
-static void patternArithDispatch(const TeletypeProgram *program, int16_t pn, bool sub,
+template<typename Cfg>
+static void patternArithDispatch(const TeletypeProgramT<Cfg> *program, int16_t pn, bool sub,
                                  bool doWrap, int16_t *stack, uint8_t &stackSize,
                                  TT2EvalError &error) {
     int16_t idx = 0, delta = 0, lo = 0, hi = 0;
@@ -3668,42 +3932,50 @@ static void patternArithDispatch(const TeletypeProgram *program, int16_t pn, boo
     patternArithAt(program, pn, idx, delta, sub, doWrap, lo, hi);
 }
 
-static void opPAdd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPAdd(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     patternArithDispatch(program, runtime.variables.p_n, false, false, stack, stackSize, error);
 }
-static void opPAddW(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPAddW(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     patternArithDispatch(program, runtime.variables.p_n, false, true, stack, stackSize, error);
 }
-static void opPSub(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPSub(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     patternArithDispatch(program, runtime.variables.p_n, true, false, stack, stackSize, error);
 }
-static void opPSubW(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPSubW(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     patternArithDispatch(program, runtime.variables.p_n, true, true, stack, stackSize, error);
 }
 
-static void opPNAdd(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNAdd(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
     patternArithDispatch(program, pn, false, false, stack, stackSize, error);
 }
-static void opPNAddW(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNAddW(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                      int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
     patternArithDispatch(program, pn, false, true, stack, stackSize, error);
 }
-static void opPNSub(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNSub(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
     patternArithDispatch(program, pn, true, false, stack, stackSize, error);
 }
-static void opPNSubW(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNSubW(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                      int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3719,7 +3991,8 @@ static int16_t clampI32(int32_t v) {
 }
 
 // kind: '+' '-' '*' '/' '%' applied to every element in [start,end].
-static void patternPatArith(const TeletypeProgram *program, int16_t pn, int16_t arg, char kind) {
+template<typename Cfg>
+static void patternPatArith(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t arg, char kind) {
     TT2Pattern *p = mutablePattern(program, pn);
     if (!p) return;
     int16_t s = p->start, e = p->end;
@@ -3779,11 +4052,11 @@ static int16_t patternFind(const TT2Pattern &p, int16_t t) {
 }
 
 #define TT2_P_ARITH_OP(NAME, KIND) \
-    static void opP##NAME(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program, \
+    template<typename Cfg> static void opP##NAME(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program, \
                           int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) { \
         int16_t a = 0; if (!popStack(stack, stackSize, a, error)) return; \
         patternPatArith(program, runtime.variables.p_n, a, KIND); } \
-    static void opPN##NAME(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program, \
+    template<typename Cfg> static void opPN##NAME(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program, \
                            int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) { \
         int16_t pn = 0, a = 0; \
         if (!popStack(stack, stackSize, pn, error)) return; \
@@ -3798,10 +4071,10 @@ TT2_P_ARITH_OP(PMOD, '%')
 #undef TT2_P_ARITH_OP
 
 #define TT2_P_QUERY_OP(NAME, FN) \
-    static void opP##NAME(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program, \
+    template<typename Cfg> static void opP##NAME(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program, \
                           int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) { \
         pushStack(stack, stackSize, FN(program->patterns[normalisePn(runtime.variables.p_n)]), error); } \
-    static void opPN##NAME(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program, \
+    template<typename Cfg> static void opPN##NAME(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program, \
                            int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) { \
         int16_t pn = 0; if (!popStack(stack, stackSize, pn, error)) return; \
         pushStack(stack, stackSize, FN(program->patterns[normalisePn(pn)]), error); }
@@ -3815,13 +4088,15 @@ TT2_P_QUERY_OP(Avg, patternAvg)
 #undef TT2_P_QUERY_OP
 
 // FND takes a target arg.
-static void opPFnd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPFnd(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t t = 0;
     if (!popStack(stack, stackSize, t, error)) return;
     pushStack(stack, stackSize, patternFind(program->patterns[normalisePn(runtime.variables.p_n)], t), error);
 }
-static void opPNFnd(TT2Runtime &, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNFnd(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pn = 0, t = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3837,7 +4112,8 @@ static int16_t patternRndVal(const TT2Pattern &p, TT2Rng &rng) {
     return p.val[k];
 }
 
-static void patternRndFill(const TeletypeProgram *program, int16_t pn, int16_t mn,
+template<typename Cfg>
+static void patternRndFill(const TeletypeProgramT<Cfg> *program, int16_t pn, int16_t mn,
                            int16_t mx, TT2Rng &rng) {
     TT2Pattern *p = mutablePattern(program, pn);
     if (!p || p->end < p->start) return;
@@ -3847,12 +4123,14 @@ static void patternRndFill(const TeletypeProgram *program, int16_t pn, int16_t m
         p->val[i] = int16_t(tt2RngRange(rng, TT2RngSlot::Pattern, range) + mn);
 }
 
-static void opPRnd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPRnd(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     pushStack(stack, stackSize, patternRndVal(program->patterns[normalisePn(runtime.variables.p_n)], runtime.rng), error);
 }
 
-static void opPNRnd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opPNRnd(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3860,7 +4138,8 @@ static void opPNRnd(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram
 }
 
 // RND.P [min max] — fill the window with randoms; min/max optional (default 0..16383).
-static void opRndP(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opRndP(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                    int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t mn = 0, mx = 16383;
     if (stackSize >= 2) {
@@ -3870,7 +4149,8 @@ static void opRndP(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram 
     patternRndFill(program, runtime.variables.p_n, mn, mx, runtime.rng);
 }
 
-static void opRndPN(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *program,
+template<typename Cfg>
+static void opRndPN(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProgramT<Cfg> *program,
                     int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t pn = 0;
     if (!popStack(stack, stackSize, pn, error)) return;
@@ -3887,418 +4167,418 @@ static void opRndPN(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram
 // ---------------------------------------------------------------------------
 
 namespace {
-    struct OpTableBuilder {
-        TT2OpFunc table[E_OP__LENGTH];
-        OpTableBuilder() {
+    template<typename Cfg> struct OpTableBuilderT {
+        TT2OpFuncT<Cfg> table[E_OP__LENGTH];
+        OpTableBuilderT() {
             for (int i = 0; i < E_OP__LENGTH; ++i) {
                 table[i] = nullptr;
             }
-            table[E_OP_A]        = opA;
-            table[E_OP_B]        = opB;
-            table[E_OP_X]        = opX;
-            table[E_OP_I]        = opI;
-            table[E_OP_ADD]      = opAdd;
-            table[E_OP_SYM_PLUS] = opAdd;
-            table[E_OP_SUB]      = opSub;
-            table[E_OP_SYM_DASH] = opSub;
-            table[E_OP_MUL]      = opMul;
-            table[E_OP_SYM_STAR] = opMul;
-            table[E_OP_DIV]                = opDiv;
-            table[E_OP_SYM_FORWARD_SLASH]  = opDiv;
-            table[E_OP_MOD]                = opMod;
-            table[E_OP_SYM_PERCENTAGE]     = opMod;
-            table[E_OP_MIN]      = opMin;
-            table[E_OP_MAX]      = opMax;
-            table[E_OP_EQ]                   = opEq;
-            table[E_OP_SYM_EQUAL_x2]         = opEq;
-            table[E_OP_NE]                   = opNe;
-            table[E_OP_SYM_EXCLAMATION_EQUAL] = opNe;
-            table[E_OP_LT]                   = opLt;
-            table[E_OP_SYM_LEFT_ANGLED]      = opLt;
-            table[E_OP_GT]                   = opGt;
-            table[E_OP_SYM_RIGHT_ANGLED]     = opGt;
-            table[E_OP_LTE]                      = opLte;
-            table[E_OP_SYM_LEFT_ANGLED_EQUAL]    = opLte;
-            table[E_OP_GTE]                      = opGte;
-            table[E_OP_SYM_RIGHT_ANGLED_EQUAL]   = opGte;
-            table[E_OP_ABS]      = opAbs;
-            table[E_OP_SGN]      = opSgn;
-            table[E_OP_N]        = opN;
-            table[E_OP_V]        = opV;
-            table[E_OP_SCALE]    = opScale;
-            table[E_OP_SCL]      = opScale;
-            table[E_OP_SCALE0]   = opScale0;
-            table[E_OP_SCL0]     = opScale0;
-            table[E_OP_QT]       = opQt;
-            table[E_OP_VN]       = opVn;
-            table[E_OP_VV]       = opVv;
-            table[E_OP_HZ]       = opHz;
-            table[E_OP_P_SCALE]  = opPScale;
-            table[E_OP_PN_SCALE] = opPNScale;
-            table[E_OP_N_S]      = opNS;
-            table[E_OP_N_C]      = opNC;
-            table[E_OP_N_CS]     = opNCS;
-            table[E_OP_N_B]      = opNB;
-            table[E_OP_N_BX]     = opNBX;
-            table[E_OP_QT_S]     = opQtS;
-            table[E_OP_QT_CS]    = opQtCS;
-            table[E_OP_QT_B]     = opQtB;
-            table[E_OP_QT_BX]    = opQtBX;
-            table[E_OP_BIT_OR]   = opBitOr;
-            table[E_OP_BIT_AND]  = opBitAnd;
-            table[E_OP_BIT_XOR]  = opBitXor;
-            table[E_OP_BIT_NOT]  = opBitNot;
-            table[E_OP_XOR]      = opNe;
-            table[E_OP_BSET]     = opBset;
-            table[E_OP_BGET]     = opBget;
-            table[E_OP_BCLR]     = opBclr;
-            table[E_OP_BTOG]     = opBtog;
-            table[E_OP_BREV]     = opBrev;
-            table[E_OP_RSH]      = opRsh;
-            table[E_OP_LSH]      = opLsh;
-            table[E_OP_SYM_RIGHT_ANGLED_x2] = opRsh;  // >> alias of RSH
-            table[E_OP_SYM_LEFT_ANGLED_x2]  = opLsh;  // << alias of LSH
-            table[E_OP_RROT]     = opRrot;
-            table[E_OP_LROT]     = opLrot;
-            table[E_OP_TURTLE]       = opTurtle;
-            table[E_OP_TURTLE_X]     = opTurtleX;
-            table[E_OP_TURTLE_Y]     = opTurtleY;
-            table[E_OP_TURTLE_MOVE]  = opTurtleMove;
-            table[E_OP_TURTLE_F]     = opTurtleF;
-            table[E_OP_TURTLE_FX1]   = opTurtleFx1;
-            table[E_OP_TURTLE_FY1]   = opTurtleFy1;
-            table[E_OP_TURTLE_FX2]   = opTurtleFx2;
-            table[E_OP_TURTLE_FY2]   = opTurtleFy2;
-            table[E_OP_TURTLE_SPEED] = opTurtleSpeed;
-            table[E_OP_TURTLE_DIR]   = opTurtleDir;
-            table[E_OP_TURTLE_STEP]  = opTurtleStep;
-            table[E_OP_TURTLE_BUMP]  = opTurtleBump;
-            table[E_OP_TURTLE_WRAP]  = opTurtleWrap;
-            table[E_OP_TURTLE_BOUNCE] = opTurtleBounce;
-            table[E_OP_TURTLE_SCRIPT] = opTurtleScript;
-            table[E_OP_TURTLE_SHOW]  = opTurtleShow;
-            table[E_OP_AND]                = opAnd;
-            table[E_OP_SYM_AMPERSAND_x2]   = opAnd;
-            table[E_OP_OR]                 = opOr;
-            table[E_OP_SYM_PIPE_x2]        = opOr;
-            table[E_OP_AND3]               = opAnd3;
-            table[E_OP_SYM_AMPERSAND_x3]   = opAnd3;
-            table[E_OP_OR3]                = opOr3;
-            table[E_OP_SYM_PIPE_x3]        = opOr3;
-            table[E_OP_AND4]               = opAnd4;
-            table[E_OP_SYM_AMPERSAND_x4]   = opAnd4;
-            table[E_OP_OR4]                = opOr4;
-            table[E_OP_SYM_PIPE_x4]        = opOr4;
-            table[E_OP_NZ]       = opNz;
-            table[E_OP_EZ]       = opEz;
-            table[E_OP_LIM]      = opLim;
-            table[E_OP_WRAP]     = opWrap;
-            table[E_OP_WRP]      = opWrap;
-            table[E_OP_AVG]      = opAvg;
-            table[E_OP_INR]      = opInr;
-            table[E_OP_OUTR]     = opOutr;
-            table[E_OP_INRI]     = opInri;
-            table[E_OP_OUTRI]    = opOutri;
-            table[E_OP_Q]        = opQ;
-            table[E_OP_Q_N]      = opQN;
-            table[E_OP_Q_AVG]    = opQAvg;
-            table[E_OP_Q_CLR]    = opQClr;
-            table[E_OP_Q_GRW]    = opQGrw;
-            table[E_OP_Q_SUM]    = opQSum;
-            table[E_OP_Q_MIN]    = opQMin;
-            table[E_OP_Q_MAX]    = opQMax;
-            table[E_OP_Q_SRT]    = opQSrt;
-            table[E_OP_Q_REV]    = opQRev;
-            table[E_OP_Q_SH]     = opQSh;
-            table[E_OP_Q_ADD]    = opQAdd;
-            table[E_OP_Q_SUB]    = opQSub;
-            table[E_OP_Q_2P]     = opQ2P;
-            table[E_OP_Q_P2]     = opQP2;
-            table[E_OP_Q_RND]    = opQRnd;
-            table[E_OP_Q_MUL]    = opQMul;
-            table[E_OP_Q_DIV]    = opQDiv;
-            table[E_OP_Q_MOD]    = opQMod;
-            table[E_OP_Q_I]      = opQI;
-            table[E_OP_S_ALL]    = opSAll;
-            table[E_OP_S_POP]    = opSPop;
-            table[E_OP_S_CLR]    = opSClr;
-            table[E_OP_S_L]      = opSL;
-            table[E_OP_P_N]      = opPatternN;
-            table[E_OP_P]        = opP;
-            table[E_OP_PN]       = opPN;
-            table[E_OP_P_L]      = opPL;
-            table[E_OP_PN_L]     = opPNL;
-            table[E_OP_P_I]      = opPI;
-            table[E_OP_PN_I]     = opPNI;
-            table[E_OP_P_HERE]   = opPHere;
-            table[E_OP_PN_HERE]  = opPNHere;
-            table[E_OP_P_WRAP]   = opPWrap;
-            table[E_OP_PN_WRAP]  = opPNWrap;
-            table[E_OP_P_START]  = opPStart;
-            table[E_OP_PN_START] = opPNStart;
-            table[E_OP_P_END]    = opPEnd;
-            table[E_OP_PN_END]   = opPNEnd;
-            table[E_OP_P_NEXT]   = opPNext;
-            table[E_OP_PN_NEXT]  = opPNNext;
-            table[E_OP_P_PREV]   = opPPrev;
-            table[E_OP_PN_PREV]  = opPNPrev;
-            table[E_OP_P_INS]    = opPIns;
-            table[E_OP_PN_INS]   = opPNIns;
-            table[E_OP_P_RM]     = opPRm;
-            table[E_OP_PN_RM]    = opPNRm;
-            table[E_OP_P_PUSH]   = opPPush;
-            table[E_OP_PN_PUSH]  = opPNPush;
-            table[E_OP_P_POP]    = opPPop;
-            table[E_OP_PN_POP]   = opPNPop;
-            table[E_OP_P_REV]    = opPRev;
-            table[E_OP_PN_REV]   = opPNRev;
-            table[E_OP_P_ROT]    = opPRot;
-            table[E_OP_PN_ROT]   = opPNRot;
-            table[E_OP_P_SHUF]   = opPShuf;
-            table[E_OP_PN_SHUF]  = opPNShuf;
-            table[E_OP_P_ADD]    = opPAdd;
-            table[E_OP_PN_ADD]   = opPNAdd;
-            table[E_OP_P_ADDW]   = opPAddW;
-            table[E_OP_PN_ADDW]  = opPNAddW;
-            table[E_OP_P_SUB]    = opPSub;
-            table[E_OP_PN_SUB]   = opPNSub;
-            table[E_OP_P_SUBW]   = opPSubW;
-            table[E_OP_PN_SUBW]  = opPNSubW;
-            table[E_OP_P_PA]     = opPPA;
-            table[E_OP_PN_PA]    = opPNPA;
-            table[E_OP_P_PS]     = opPPS;
-            table[E_OP_PN_PS]    = opPNPS;
-            table[E_OP_P_PM]     = opPPM;
-            table[E_OP_PN_PM]    = opPNPM;
-            table[E_OP_P_PD]     = opPPD;
-            table[E_OP_PN_PD]    = opPNPD;
-            table[E_OP_P_PMOD]   = opPPMOD;
-            table[E_OP_PN_PMOD]  = opPNPMOD;
-            table[E_OP_P_MIN]    = opPMin;
-            table[E_OP_PN_MIN]   = opPNMin;
-            table[E_OP_P_MAX]    = opPMax;
-            table[E_OP_PN_MAX]   = opPNMax;
-            table[E_OP_P_MINV]   = opPMinv;
-            table[E_OP_PN_MINV]  = opPNMinv;
-            table[E_OP_P_MAXV]   = opPMaxv;
-            table[E_OP_PN_MAXV]  = opPNMaxv;
-            table[E_OP_P_SUM]    = opPSum;
-            table[E_OP_PN_SUM]   = opPNSum;
-            table[E_OP_P_AVG]    = opPAvg;
-            table[E_OP_PN_AVG]   = opPNAvg;
-            table[E_OP_P_FND]    = opPFnd;
-            table[E_OP_PN_FND]   = opPNFnd;
-            table[E_OP_P_RND]    = opPRnd;
-            table[E_OP_PN_RND]   = opPNRnd;
-            table[E_OP_RND_P]    = opRndP;
-            table[E_OP_RND_PN]   = opRndPN;
-            table[E_OP_CV]       = opCv;
-            table[E_OP_CV_SLEW]  = opCvSlew;
-            table[E_OP_CV_OFF]   = opCvOff;
-            table[E_OP_TR]       = opTr;
-            table[E_OP_TR_POL]   = opTrPol;
-            table[E_OP_TR_TIME]  = opTrTime;
-            table[E_OP_TR_PULSE] = opTrPulse;
-            table[E_OP_TR_P]     = opTrPulse;
-            table[E_OP_TR_TOG]   = opTrTog;
-            table[E_OP_C]        = opC;
-            table[E_OP_D]        = opD;
-            table[E_OP_Y]        = opY;
-            table[E_OP_Z]        = opZ;
-            table[E_OP_T]        = opT;
-            table[E_OP_J]        = opJ;
-            table[E_OP_K]        = opK;
-            table[E_OP_O]        = opO;
-            table[E_OP_O_INC]    = opOInc;
-            table[E_OP_O_MIN]    = opOMin;
-            table[E_OP_O_MAX]    = opOMax;
-            table[E_OP_O_WRAP]   = opOWrap;
-            table[E_OP_DRUNK]    = opDrunk;
-            table[E_OP_DRUNK_MIN]  = opDrunkMin;
-            table[E_OP_DRUNK_MAX]  = opDrunkMax;
-            table[E_OP_DRUNK_WRAP] = opDrunkWrap;
-            table[E_OP_FLIP]     = opFlip;
-            table[E_OP_TIME]     = opTime;
-            table[E_OP_TIME_ACT] = opTimeAct;
-            table[E_OP_LAST]     = opLast;
-            table[E_OP_RAND]     = opRand;
-            table[E_OP_RRAND]    = opRrand;
-            table[E_OP_RND]      = opRand;   // alias of RAND
-            table[E_OP_RRND]     = opRrand;  // alias of RRAND
-            table[E_OP_EXP]      = opExp;
-            table[E_OP_JI]       = opJi;
-            table[E_OP_SYM_RIGHT_ANGLED_LEFT_ANGLED]        = opInr;    // ><
-            table[E_OP_SYM_LEFT_ANGLED_RIGHT_ANGLED]        = opOutr;   // <>
-            table[E_OP_SYM_RIGHT_ANGLED_EQUAL_LEFT_ANGLED]  = opInri;   // >=<
-            table[E_OP_SYM_LEFT_ANGLED_EQUAL_RIGHT_ANGLED]  = opOutri;  // <=>
-            table[E_OP_SYM_EXCLAMATION]                     = opEz;     // !
-            table[E_OP_SYM_LEFT_ANGLED_x3]                  = opLrot;   // <<<
-            table[E_OP_SYM_RIGHT_ANGLED_x3]                 = opRrot;   // >>>
-            table[E_OP_SYM_AMPERSAND_x3]                    = opAnd3;   // &&&
-            table[E_OP_SYM_PIPE_x3]                         = opOr3;    // |||
-            table[E_OP_SYM_AMPERSAND_x4]                    = opAnd4;   // &&&&
-            table[E_OP_SYM_PIPE_x4]                         = opOr4;    // ||||
-            table[E_OP_ER]        = opEr;
-            table[E_OP_NR]        = opNr;
-            table[E_OP_DR_T]      = opDrT;
-            table[E_OP_DR_P]      = opDrP;
-            table[E_OP_DR_V]      = opDrV;
-            table[E_OP_CHAOS]     = opChaos;
-            table[E_OP_CHAOS_R]   = opChaosR;
-            table[E_OP_CHAOS_ALG] = opChaosAlg;
-            table[E_OP_SEED]        = opSeed;
-            table[E_OP_RAND_SEED]   = opRandSeed;
-            table[E_OP_SYM_RAND_SD] = opRandSeed;
-            table[E_OP_SYM_R_SD]    = opRandSeed;
-            table[E_OP_TOSS_SEED]   = opTossSeed;
-            table[E_OP_SYM_TOSS_SD] = opTossSeed;
-            table[E_OP_PROB_SEED]   = opProbSeed;
-            table[E_OP_SYM_PROB_SD] = opProbSeed;
-            table[E_OP_DRUNK_SEED]  = opDrunkSeed;
-            table[E_OP_SYM_DRUNK_SD] = opDrunkSeed;
-            table[E_OP_P_SEED]      = opPSeed;
-            table[E_OP_SYM_P_SD]    = opPSeed;
-            table[E_OP_INIT]            = opInit;
-            table[E_OP_INIT_CV]         = opInitCv;
-            table[E_OP_INIT_CV_ALL]     = opInitCvAll;
-            table[E_OP_INIT_TR]         = opInitTr;
-            table[E_OP_INIT_TR_ALL]     = opInitTrAll;
-            table[E_OP_INIT_P]          = opInitP;
-            table[E_OP_INIT_P_ALL]      = opInitPAll;
-            table[E_OP_INIT_SCRIPT]     = opInitScript;
-            table[E_OP_INIT_SCRIPT_ALL] = opInitScriptAll;
-            table[E_OP_INIT_DATA]       = opInitData;
-            table[E_OP_INIT_TIME]       = opInitTime;
-            table[E_OP_TIF]                = opTif;
-            table[E_OP_M_SYM_EXCLAMATION]  = opMBang;
-            table[E_OP_CV_GET]             = opCvGet;
-            table[E_OP_CV_SET]             = opCvSet;
-            table[E_OP_M_A]                = opMA;
-            table[E_OP_M_ACT_A]            = opMActA;
-            table[E_OP_SCRIPT_POL]         = opScriptPol;
-            table[E_OP_SYM_DOLLAR_POL]     = opScriptPol;
-            table[E_OP_TR_W]               = opTrW;
-            table[E_OP_TR_D]               = opTrD;
-            table[E_OP_M_RESET]            = opMReset;
-            table[E_OP_M_RESET_A]          = opMReset;
-            table[E_OP_SYNC]               = opSync;
-            table[E_OP_BPM]                = opBpm;
-            table[E_OP_WBPM]               = opWbpm;
-            table[E_OP_WBPM_S]             = opWbpmS;
-            table[E_OP_WMS]                = opWms;
-            table[E_OP_WTU]                = opWtu;
-            table[E_OP_BAR]                = opBar;
-            table[E_OP_WP]                 = opWp;
-            table[E_OP_WP_SET]             = opWpSet;
-            table[E_OP_WR]                 = opWr;
-            table[E_OP_WR_ACT]             = opWrAct;
-            table[E_OP_WNG]                = opWng;
-            table[E_OP_WNN]                = opWnn;
-            table[E_OP_WNG_H]              = opWngH;
-            table[E_OP_WNN_H]              = opWnnH;
-            table[E_OP_RT]                 = opRt;
-            table[E_OP_BUS]                = opBus;
+            table[E_OP_A]        = opA<Cfg>;
+            table[E_OP_B]        = opB<Cfg>;
+            table[E_OP_X]        = opX<Cfg>;
+            table[E_OP_I]        = opI<Cfg>;
+            table[E_OP_ADD]      = opAdd<Cfg>;
+            table[E_OP_SYM_PLUS] = opAdd<Cfg>;
+            table[E_OP_SUB]      = opSub<Cfg>;
+            table[E_OP_SYM_DASH] = opSub<Cfg>;
+            table[E_OP_MUL]      = opMul<Cfg>;
+            table[E_OP_SYM_STAR] = opMul<Cfg>;
+            table[E_OP_DIV]                = opDiv<Cfg>;
+            table[E_OP_SYM_FORWARD_SLASH]  = opDiv<Cfg>;
+            table[E_OP_MOD]                = opMod<Cfg>;
+            table[E_OP_SYM_PERCENTAGE]     = opMod<Cfg>;
+            table[E_OP_MIN]      = opMin<Cfg>;
+            table[E_OP_MAX]      = opMax<Cfg>;
+            table[E_OP_EQ]                   = opEq<Cfg>;
+            table[E_OP_SYM_EQUAL_x2]         = opEq<Cfg>;
+            table[E_OP_NE]                   = opNe<Cfg>;
+            table[E_OP_SYM_EXCLAMATION_EQUAL] = opNe<Cfg>;
+            table[E_OP_LT]                   = opLt<Cfg>;
+            table[E_OP_SYM_LEFT_ANGLED]      = opLt<Cfg>;
+            table[E_OP_GT]                   = opGt<Cfg>;
+            table[E_OP_SYM_RIGHT_ANGLED]     = opGt<Cfg>;
+            table[E_OP_LTE]                      = opLte<Cfg>;
+            table[E_OP_SYM_LEFT_ANGLED_EQUAL]    = opLte<Cfg>;
+            table[E_OP_GTE]                      = opGte<Cfg>;
+            table[E_OP_SYM_RIGHT_ANGLED_EQUAL]   = opGte<Cfg>;
+            table[E_OP_ABS]      = opAbs<Cfg>;
+            table[E_OP_SGN]      = opSgn<Cfg>;
+            table[E_OP_N]        = opN<Cfg>;
+            table[E_OP_V]        = opV<Cfg>;
+            table[E_OP_SCALE]    = opScale<Cfg>;
+            table[E_OP_SCL]      = opScale<Cfg>;
+            table[E_OP_SCALE0]   = opScale0<Cfg>;
+            table[E_OP_SCL0]     = opScale0<Cfg>;
+            table[E_OP_QT]       = opQt<Cfg>;
+            table[E_OP_VN]       = opVn<Cfg>;
+            table[E_OP_VV]       = opVv<Cfg>;
+            table[E_OP_HZ]       = opHz<Cfg>;
+            table[E_OP_P_SCALE]  = opPScale<Cfg>;
+            table[E_OP_PN_SCALE] = opPNScale<Cfg>;
+            table[E_OP_N_S]      = opNS<Cfg>;
+            table[E_OP_N_C]      = opNC<Cfg>;
+            table[E_OP_N_CS]     = opNCS<Cfg>;
+            table[E_OP_N_B]      = opNB<Cfg>;
+            table[E_OP_N_BX]     = opNBX<Cfg>;
+            table[E_OP_QT_S]     = opQtS<Cfg>;
+            table[E_OP_QT_CS]    = opQtCS<Cfg>;
+            table[E_OP_QT_B]     = opQtB<Cfg>;
+            table[E_OP_QT_BX]    = opQtBX<Cfg>;
+            table[E_OP_BIT_OR]   = opBitOr<Cfg>;
+            table[E_OP_BIT_AND]  = opBitAnd<Cfg>;
+            table[E_OP_BIT_XOR]  = opBitXor<Cfg>;
+            table[E_OP_BIT_NOT]  = opBitNot<Cfg>;
+            table[E_OP_XOR]      = opNe<Cfg>;
+            table[E_OP_BSET]     = opBset<Cfg>;
+            table[E_OP_BGET]     = opBget<Cfg>;
+            table[E_OP_BCLR]     = opBclr<Cfg>;
+            table[E_OP_BTOG]     = opBtog<Cfg>;
+            table[E_OP_BREV]     = opBrev<Cfg>;
+            table[E_OP_RSH]      = opRsh<Cfg>;
+            table[E_OP_LSH]      = opLsh<Cfg>;
+            table[E_OP_SYM_RIGHT_ANGLED_x2] = opRsh<Cfg>;  // >> alias of RSH
+            table[E_OP_SYM_LEFT_ANGLED_x2]  = opLsh<Cfg>;  // << alias of LSH
+            table[E_OP_RROT]     = opRrot<Cfg>;
+            table[E_OP_LROT]     = opLrot<Cfg>;
+            table[E_OP_TURTLE]       = opTurtle<Cfg>;
+            table[E_OP_TURTLE_X]     = opTurtleX<Cfg>;
+            table[E_OP_TURTLE_Y]     = opTurtleY<Cfg>;
+            table[E_OP_TURTLE_MOVE]  = opTurtleMove<Cfg>;
+            table[E_OP_TURTLE_F]     = opTurtleF<Cfg>;
+            table[E_OP_TURTLE_FX1]   = opTurtleFx1<Cfg>;
+            table[E_OP_TURTLE_FY1]   = opTurtleFy1<Cfg>;
+            table[E_OP_TURTLE_FX2]   = opTurtleFx2<Cfg>;
+            table[E_OP_TURTLE_FY2]   = opTurtleFy2<Cfg>;
+            table[E_OP_TURTLE_SPEED] = opTurtleSpeed<Cfg>;
+            table[E_OP_TURTLE_DIR]   = opTurtleDir<Cfg>;
+            table[E_OP_TURTLE_STEP]  = opTurtleStep<Cfg>;
+            table[E_OP_TURTLE_BUMP]  = opTurtleBump<Cfg>;
+            table[E_OP_TURTLE_WRAP]  = opTurtleWrap<Cfg>;
+            table[E_OP_TURTLE_BOUNCE] = opTurtleBounce<Cfg>;
+            table[E_OP_TURTLE_SCRIPT] = opTurtleScript<Cfg>;
+            table[E_OP_TURTLE_SHOW]  = opTurtleShow<Cfg>;
+            table[E_OP_AND]                = opAnd<Cfg>;
+            table[E_OP_SYM_AMPERSAND_x2]   = opAnd<Cfg>;
+            table[E_OP_OR]                 = opOr<Cfg>;
+            table[E_OP_SYM_PIPE_x2]        = opOr<Cfg>;
+            table[E_OP_AND3]               = opAnd3<Cfg>;
+            table[E_OP_SYM_AMPERSAND_x3]   = opAnd3<Cfg>;
+            table[E_OP_OR3]                = opOr3<Cfg>;
+            table[E_OP_SYM_PIPE_x3]        = opOr3<Cfg>;
+            table[E_OP_AND4]               = opAnd4<Cfg>;
+            table[E_OP_SYM_AMPERSAND_x4]   = opAnd4<Cfg>;
+            table[E_OP_OR4]                = opOr4<Cfg>;
+            table[E_OP_SYM_PIPE_x4]        = opOr4<Cfg>;
+            table[E_OP_NZ]       = opNz<Cfg>;
+            table[E_OP_EZ]       = opEz<Cfg>;
+            table[E_OP_LIM]      = opLim<Cfg>;
+            table[E_OP_WRAP]     = opWrap<Cfg>;
+            table[E_OP_WRP]      = opWrap<Cfg>;
+            table[E_OP_AVG]      = opAvg<Cfg>;
+            table[E_OP_INR]      = opInr<Cfg>;
+            table[E_OP_OUTR]     = opOutr<Cfg>;
+            table[E_OP_INRI]     = opInri<Cfg>;
+            table[E_OP_OUTRI]    = opOutri<Cfg>;
+            table[E_OP_Q]        = opQ<Cfg>;
+            table[E_OP_Q_N]      = opQN<Cfg>;
+            table[E_OP_Q_AVG]    = opQAvg<Cfg>;
+            table[E_OP_Q_CLR]    = opQClr<Cfg>;
+            table[E_OP_Q_GRW]    = opQGrw<Cfg>;
+            table[E_OP_Q_SUM]    = opQSum<Cfg>;
+            table[E_OP_Q_MIN]    = opQMin<Cfg>;
+            table[E_OP_Q_MAX]    = opQMax<Cfg>;
+            table[E_OP_Q_SRT]    = opQSrt<Cfg>;
+            table[E_OP_Q_REV]    = opQRev<Cfg>;
+            table[E_OP_Q_SH]     = opQSh<Cfg>;
+            table[E_OP_Q_ADD]    = opQAdd<Cfg>;
+            table[E_OP_Q_SUB]    = opQSub<Cfg>;
+            table[E_OP_Q_2P]     = opQ2P<Cfg>;
+            table[E_OP_Q_P2]     = opQP2<Cfg>;
+            table[E_OP_Q_RND]    = opQRnd<Cfg>;
+            table[E_OP_Q_MUL]    = opQMul<Cfg>;
+            table[E_OP_Q_DIV]    = opQDiv<Cfg>;
+            table[E_OP_Q_MOD]    = opQMod<Cfg>;
+            table[E_OP_Q_I]      = opQI<Cfg>;
+            table[E_OP_S_ALL]    = opSAll<Cfg>;
+            table[E_OP_S_POP]    = opSPop<Cfg>;
+            table[E_OP_S_CLR]    = opSClr<Cfg>;
+            table[E_OP_S_L]      = opSL<Cfg>;
+            table[E_OP_P_N]      = opPatternN<Cfg>;
+            table[E_OP_P]        = opP<Cfg>;
+            table[E_OP_PN]       = opPN<Cfg>;
+            table[E_OP_P_L]      = opPL<Cfg>;
+            table[E_OP_PN_L]     = opPNL<Cfg>;
+            table[E_OP_P_I]      = opPI<Cfg>;
+            table[E_OP_PN_I]     = opPNI<Cfg>;
+            table[E_OP_P_HERE]   = opPHere<Cfg>;
+            table[E_OP_PN_HERE]  = opPNHere<Cfg>;
+            table[E_OP_P_WRAP]   = opPWrap<Cfg>;
+            table[E_OP_PN_WRAP]  = opPNWrap<Cfg>;
+            table[E_OP_P_START]  = opPStart<Cfg>;
+            table[E_OP_PN_START] = opPNStart<Cfg>;
+            table[E_OP_P_END]    = opPEnd<Cfg>;
+            table[E_OP_PN_END]   = opPNEnd<Cfg>;
+            table[E_OP_P_NEXT]   = opPNext<Cfg>;
+            table[E_OP_PN_NEXT]  = opPNNext<Cfg>;
+            table[E_OP_P_PREV]   = opPPrev<Cfg>;
+            table[E_OP_PN_PREV]  = opPNPrev<Cfg>;
+            table[E_OP_P_INS]    = opPIns<Cfg>;
+            table[E_OP_PN_INS]   = opPNIns<Cfg>;
+            table[E_OP_P_RM]     = opPRm<Cfg>;
+            table[E_OP_PN_RM]    = opPNRm<Cfg>;
+            table[E_OP_P_PUSH]   = opPPush<Cfg>;
+            table[E_OP_PN_PUSH]  = opPNPush<Cfg>;
+            table[E_OP_P_POP]    = opPPop<Cfg>;
+            table[E_OP_PN_POP]   = opPNPop<Cfg>;
+            table[E_OP_P_REV]    = opPRev<Cfg>;
+            table[E_OP_PN_REV]   = opPNRev<Cfg>;
+            table[E_OP_P_ROT]    = opPRot<Cfg>;
+            table[E_OP_PN_ROT]   = opPNRot<Cfg>;
+            table[E_OP_P_SHUF]   = opPShuf<Cfg>;
+            table[E_OP_PN_SHUF]  = opPNShuf<Cfg>;
+            table[E_OP_P_ADD]    = opPAdd<Cfg>;
+            table[E_OP_PN_ADD]   = opPNAdd<Cfg>;
+            table[E_OP_P_ADDW]   = opPAddW<Cfg>;
+            table[E_OP_PN_ADDW]  = opPNAddW<Cfg>;
+            table[E_OP_P_SUB]    = opPSub<Cfg>;
+            table[E_OP_PN_SUB]   = opPNSub<Cfg>;
+            table[E_OP_P_SUBW]   = opPSubW<Cfg>;
+            table[E_OP_PN_SUBW]  = opPNSubW<Cfg>;
+            table[E_OP_P_PA]     = opPPA<Cfg>;
+            table[E_OP_PN_PA]    = opPNPA<Cfg>;
+            table[E_OP_P_PS]     = opPPS<Cfg>;
+            table[E_OP_PN_PS]    = opPNPS<Cfg>;
+            table[E_OP_P_PM]     = opPPM<Cfg>;
+            table[E_OP_PN_PM]    = opPNPM<Cfg>;
+            table[E_OP_P_PD]     = opPPD<Cfg>;
+            table[E_OP_PN_PD]    = opPNPD<Cfg>;
+            table[E_OP_P_PMOD]   = opPPMOD<Cfg>;
+            table[E_OP_PN_PMOD]  = opPNPMOD<Cfg>;
+            table[E_OP_P_MIN]    = opPMin<Cfg>;
+            table[E_OP_PN_MIN]   = opPNMin<Cfg>;
+            table[E_OP_P_MAX]    = opPMax<Cfg>;
+            table[E_OP_PN_MAX]   = opPNMax<Cfg>;
+            table[E_OP_P_MINV]   = opPMinv<Cfg>;
+            table[E_OP_PN_MINV]  = opPNMinv<Cfg>;
+            table[E_OP_P_MAXV]   = opPMaxv<Cfg>;
+            table[E_OP_PN_MAXV]  = opPNMaxv<Cfg>;
+            table[E_OP_P_SUM]    = opPSum<Cfg>;
+            table[E_OP_PN_SUM]   = opPNSum<Cfg>;
+            table[E_OP_P_AVG]    = opPAvg<Cfg>;
+            table[E_OP_PN_AVG]   = opPNAvg<Cfg>;
+            table[E_OP_P_FND]    = opPFnd<Cfg>;
+            table[E_OP_PN_FND]   = opPNFnd<Cfg>;
+            table[E_OP_P_RND]    = opPRnd<Cfg>;
+            table[E_OP_PN_RND]   = opPNRnd<Cfg>;
+            table[E_OP_RND_P]    = opRndP<Cfg>;
+            table[E_OP_RND_PN]   = opRndPN<Cfg>;
+            table[E_OP_CV]       = opCv<Cfg>;
+            table[E_OP_CV_SLEW]  = opCvSlew<Cfg>;
+            table[E_OP_CV_OFF]   = opCvOff<Cfg>;
+            table[E_OP_TR]       = opTr<Cfg>;
+            table[E_OP_TR_POL]   = opTrPol<Cfg>;
+            table[E_OP_TR_TIME]  = opTrTime<Cfg>;
+            table[E_OP_TR_PULSE] = opTrPulse<Cfg>;
+            table[E_OP_TR_P]     = opTrPulse<Cfg>;
+            table[E_OP_TR_TOG]   = opTrTog<Cfg>;
+            table[E_OP_C]        = opC<Cfg>;
+            table[E_OP_D]        = opD<Cfg>;
+            table[E_OP_Y]        = opY<Cfg>;
+            table[E_OP_Z]        = opZ<Cfg>;
+            table[E_OP_T]        = opT<Cfg>;
+            table[E_OP_J]        = opJ<Cfg>;
+            table[E_OP_K]        = opK<Cfg>;
+            table[E_OP_O]        = opO<Cfg>;
+            table[E_OP_O_INC]    = opOInc<Cfg>;
+            table[E_OP_O_MIN]    = opOMin<Cfg>;
+            table[E_OP_O_MAX]    = opOMax<Cfg>;
+            table[E_OP_O_WRAP]   = opOWrap<Cfg>;
+            table[E_OP_DRUNK]    = opDrunk<Cfg>;
+            table[E_OP_DRUNK_MIN]  = opDrunkMin<Cfg>;
+            table[E_OP_DRUNK_MAX]  = opDrunkMax<Cfg>;
+            table[E_OP_DRUNK_WRAP] = opDrunkWrap<Cfg>;
+            table[E_OP_FLIP]     = opFlip<Cfg>;
+            table[E_OP_TIME]     = opTime<Cfg>;
+            table[E_OP_TIME_ACT] = opTimeAct<Cfg>;
+            table[E_OP_LAST]     = opLast<Cfg>;
+            table[E_OP_RAND]     = opRand<Cfg>;
+            table[E_OP_RRAND]    = opRrand<Cfg>;
+            table[E_OP_RND]      = opRand<Cfg>;   // alias of RAND
+            table[E_OP_RRND]     = opRrand<Cfg>;  // alias of RRAND
+            table[E_OP_EXP]      = opExp<Cfg>;
+            table[E_OP_JI]       = opJi<Cfg>;
+            table[E_OP_SYM_RIGHT_ANGLED_LEFT_ANGLED]        = opInr<Cfg>;    // ><
+            table[E_OP_SYM_LEFT_ANGLED_RIGHT_ANGLED]        = opOutr<Cfg>;   // <>
+            table[E_OP_SYM_RIGHT_ANGLED_EQUAL_LEFT_ANGLED]  = opInri<Cfg>;   // >=<
+            table[E_OP_SYM_LEFT_ANGLED_EQUAL_RIGHT_ANGLED]  = opOutri<Cfg>;  // <=>
+            table[E_OP_SYM_EXCLAMATION]                     = opEz<Cfg>;     // !
+            table[E_OP_SYM_LEFT_ANGLED_x3]                  = opLrot<Cfg>;   // <<<
+            table[E_OP_SYM_RIGHT_ANGLED_x3]                 = opRrot<Cfg>;   // >>>
+            table[E_OP_SYM_AMPERSAND_x3]                    = opAnd3<Cfg>;   // &&&
+            table[E_OP_SYM_PIPE_x3]                         = opOr3<Cfg>;    // |||
+            table[E_OP_SYM_AMPERSAND_x4]                    = opAnd4<Cfg>;   // &&&&
+            table[E_OP_SYM_PIPE_x4]                         = opOr4<Cfg>;    // ||||
+            table[E_OP_ER]        = opEr<Cfg>;
+            table[E_OP_NR]        = opNr<Cfg>;
+            table[E_OP_DR_T]      = opDrT<Cfg>;
+            table[E_OP_DR_P]      = opDrP<Cfg>;
+            table[E_OP_DR_V]      = opDrV<Cfg>;
+            table[E_OP_CHAOS]     = opChaos<Cfg>;
+            table[E_OP_CHAOS_R]   = opChaosR<Cfg>;
+            table[E_OP_CHAOS_ALG] = opChaosAlg<Cfg>;
+            table[E_OP_SEED]        = opSeed<Cfg>;
+            table[E_OP_RAND_SEED]   = opRandSeed<Cfg>;
+            table[E_OP_SYM_RAND_SD] = opRandSeed<Cfg>;
+            table[E_OP_SYM_R_SD]    = opRandSeed<Cfg>;
+            table[E_OP_TOSS_SEED]   = opTossSeed<Cfg>;
+            table[E_OP_SYM_TOSS_SD] = opTossSeed<Cfg>;
+            table[E_OP_PROB_SEED]   = opProbSeed<Cfg>;
+            table[E_OP_SYM_PROB_SD] = opProbSeed<Cfg>;
+            table[E_OP_DRUNK_SEED]  = opDrunkSeed<Cfg>;
+            table[E_OP_SYM_DRUNK_SD] = opDrunkSeed<Cfg>;
+            table[E_OP_P_SEED]      = opPSeed<Cfg>;
+            table[E_OP_SYM_P_SD]    = opPSeed<Cfg>;
+            table[E_OP_INIT]            = opInit<Cfg>;
+            table[E_OP_INIT_CV]         = opInitCv<Cfg>;
+            table[E_OP_INIT_CV_ALL]     = opInitCvAll<Cfg>;
+            table[E_OP_INIT_TR]         = opInitTr<Cfg>;
+            table[E_OP_INIT_TR_ALL]     = opInitTrAll<Cfg>;
+            table[E_OP_INIT_P]          = opInitP<Cfg>;
+            table[E_OP_INIT_P_ALL]      = opInitPAll<Cfg>;
+            table[E_OP_INIT_SCRIPT]     = opInitScript<Cfg>;
+            table[E_OP_INIT_SCRIPT_ALL] = opInitScriptAll<Cfg>;
+            table[E_OP_INIT_DATA]       = opInitData<Cfg>;
+            table[E_OP_INIT_TIME]       = opInitTime<Cfg>;
+            table[E_OP_TIF]                = opTif<Cfg>;
+            table[E_OP_M_SYM_EXCLAMATION]  = opMBang<Cfg>;
+            table[E_OP_CV_GET]             = opCvGet<Cfg>;
+            table[E_OP_CV_SET]             = opCvSet<Cfg>;
+            table[E_OP_M_A]                = opMA<Cfg>;
+            table[E_OP_M_ACT_A]            = opMActA<Cfg>;
+            table[E_OP_SCRIPT_POL]         = opScriptPol<Cfg>;
+            table[E_OP_SYM_DOLLAR_POL]     = opScriptPol<Cfg>;
+            table[E_OP_TR_W]               = opTrW<Cfg>;
+            table[E_OP_TR_D]               = opTrD<Cfg>;
+            table[E_OP_M_RESET]            = opMReset<Cfg>;
+            table[E_OP_M_RESET_A]          = opMReset<Cfg>;
+            table[E_OP_SYNC]               = opSync<Cfg>;
+            table[E_OP_BPM]                = opBpm<Cfg>;
+            table[E_OP_WBPM]               = opWbpm<Cfg>;
+            table[E_OP_WBPM_S]             = opWbpmS<Cfg>;
+            table[E_OP_WMS]                = opWms<Cfg>;
+            table[E_OP_WTU]                = opWtu<Cfg>;
+            table[E_OP_BAR]                = opBar<Cfg>;
+            table[E_OP_WP]                 = opWp<Cfg>;
+            table[E_OP_WP_SET]             = opWpSet<Cfg>;
+            table[E_OP_WR]                 = opWr<Cfg>;
+            table[E_OP_WR_ACT]             = opWrAct<Cfg>;
+            table[E_OP_WNG]                = opWng<Cfg>;
+            table[E_OP_WNN]                = opWnn<Cfg>;
+            table[E_OP_WNG_H]              = opWngH<Cfg>;
+            table[E_OP_WNN_H]              = opWnnH<Cfg>;
+            table[E_OP_RT]                 = opRt<Cfg>;
+            table[E_OP_BUS]                = opBus<Cfg>;
             // Geode (G.*) — canonical + short aliases share one handler.
-            table[E_OP_G_TIME] = opGTime;  table[E_OP_G_T]  = opGTime;
-            table[E_OP_G_TONE] = opGTone;  table[E_OP_G_I]  = opGTone;
-            table[E_OP_G_RAMP] = opGRamp;  table[E_OP_G_RA] = opGRamp;
-            table[E_OP_G_CURV] = opGCurv;  table[E_OP_G_C]  = opGCurv;
-            table[E_OP_G_MODE] = opGMode;  table[E_OP_G_M]  = opGMode;
-            table[E_OP_G_RUN]  = opGRun;   table[E_OP_G_N]  = opGRun;
-            table[E_OP_G_VAL]  = opGVal;   table[E_OP_G_L]  = opGVal;
-            table[E_OP_G_TUNE] = opGTune;
-            table[E_OP_G_V]    = opGV;
-            table[E_OP_G_S]    = opGS;
+            table[E_OP_G_TIME] = opGTime<Cfg>;  table[E_OP_G_T]  = opGTime<Cfg>;
+            table[E_OP_G_TONE] = opGTone<Cfg>;  table[E_OP_G_I]  = opGTone<Cfg>;
+            table[E_OP_G_RAMP] = opGRamp<Cfg>;  table[E_OP_G_RA] = opGRamp<Cfg>;
+            table[E_OP_G_CURV] = opGCurv<Cfg>;  table[E_OP_G_C]  = opGCurv<Cfg>;
+            table[E_OP_G_MODE] = opGMode<Cfg>;  table[E_OP_G_M]  = opGMode<Cfg>;
+            table[E_OP_G_RUN]  = opGRun<Cfg>;   table[E_OP_G_N]  = opGRun<Cfg>;
+            table[E_OP_G_VAL]  = opGVal<Cfg>;   table[E_OP_G_L]  = opGVal<Cfg>;
+            table[E_OP_G_TUNE] = opGTune<Cfg>;
+            table[E_OP_G_V]    = opGV<Cfg>;
+            table[E_OP_G_S]    = opGS<Cfg>;
             // Modulator (MO.*) — canonical + short aliases share one handler.
-            table[E_OP_MO]       = opMo;
-            table[E_OP_MO_P]     = opMoP;
-            table[E_OP_MO_SHAPE] = opMoShape;  table[E_OP_MO_S] = opMoShape;
-            table[E_OP_MO_RATE]  = opMoRate;   table[E_OP_MO_R] = opMoRate;
-            table[E_OP_MO_DEPTH] = opMoDepth;  table[E_OP_MO_D] = opMoDepth;
-            table[E_OP_MO_MODE]  = opMoMode;   table[E_OP_MO_M] = opMoMode;
-            table[E_OP_MO_OFF]   = opMoOff;    table[E_OP_MO_O] = opMoOff;
-            table[E_OP_MO_TRIG]  = opMoTrig;   table[E_OP_MO_T] = opMoTrig;
+            table[E_OP_MO]       = opMo<Cfg>;
+            table[E_OP_MO_P]     = opMoP<Cfg>;
+            table[E_OP_MO_SHAPE] = opMoShape<Cfg>;  table[E_OP_MO_S] = opMoShape<Cfg>;
+            table[E_OP_MO_RATE]  = opMoRate<Cfg>;   table[E_OP_MO_R] = opMoRate<Cfg>;
+            table[E_OP_MO_DEPTH] = opMoDepth<Cfg>;  table[E_OP_MO_D] = opMoDepth<Cfg>;
+            table[E_OP_MO_MODE]  = opMoMode<Cfg>;   table[E_OP_MO_M] = opMoMode<Cfg>;
+            table[E_OP_MO_OFF]   = opMoOff<Cfg>;    table[E_OP_MO_O] = opMoOff<Cfg>;
+            table[E_OP_MO_TRIG]  = opMoTrig<Cfg>;   table[E_OP_MO_T] = opMoTrig<Cfg>;
             // E.* envelope aliases (ADSR-locked over the modulator slots).
-            table[E_OP_E]   = opEnv;
-            table[E_OP_E_A] = opEnvA;
-            table[E_OP_E_D] = opEnvD;
-            table[E_OP_E_O] = opEnvO;
-            table[E_OP_E_T] = opEnvT;
+            table[E_OP_E]   = opEnv<Cfg>;
+            table[E_OP_E_A] = opEnvA<Cfg>;
+            table[E_OP_E_D] = opEnvD<Cfg>;
+            table[E_OP_E_O] = opEnvO<Cfg>;
+            table[E_OP_E_T] = opEnvT<Cfg>;
             // LFO.* aliases (Sine-locked over the modulator slots). W/F/S deferred.
-            table[E_OP_LFO_R] = opLfoR;
-            table[E_OP_LFO_C] = opLfoC;
-            table[E_OP_LFO_A] = opLfoA;
-            table[E_OP_LFO_O] = opLfoO;
+            table[E_OP_LFO_R] = opLfoR<Cfg>;
+            table[E_OP_LFO_C] = opLfoC<Cfg>;
+            table[E_OP_LFO_A] = opLfoA<Cfg>;
+            table[E_OP_LFO_O] = opLfoO<Cfg>;
             // PRINT/PRT dashboard value store (runtime).
-            table[E_OP_PRINT] = opPrint;
-            table[E_OP_PRT]   = opPrint;
+            table[E_OP_PRINT] = opPrint<Cfg>;
+            table[E_OP_PRT]   = opPrint<Cfg>;
             // E_OP_G_O / E_OP_G_BAR / E_OP_G_B / E_OP_G_R left nullptr ->
             // UnsupportedOp (no live GeodeConfig field; see Geode ops comment).
-            table[E_OP_MI_SYM_DOLLAR]      = opMiDollar;
-            table[E_OP_MI_LE]   = opMiLe;
-            table[E_OP_MI_LN]   = opMiLn;
-            table[E_OP_MI_LNV]  = opMiLnv;
-            table[E_OP_MI_LV]   = opMiLv;
-            table[E_OP_MI_LVV]  = opMiLvv;
-            table[E_OP_MI_LO]   = opMiLo;
-            table[E_OP_MI_LC]   = opMiLc;
-            table[E_OP_MI_LCC]  = opMiLcc;
-            table[E_OP_MI_LCCV] = opMiLccv;
-            table[E_OP_MI_LCH]  = opMiLch;
-            table[E_OP_MI_NL]   = opMiNl;
-            table[E_OP_MI_N]    = opMiN;
-            table[E_OP_MI_NV]   = opMiNv;
-            table[E_OP_MI_V]    = opMiV;
-            table[E_OP_MI_VV]   = opMiVv;
-            table[E_OP_MI_NCH]  = opMiNch;
-            table[E_OP_MI_OL]   = opMiOl;
-            table[E_OP_MI_O]    = opMiO;
-            table[E_OP_MI_OCH]  = opMiOch;
-            table[E_OP_MI_CL]   = opMiCl;
-            table[E_OP_MI_C]    = opMiC;
-            table[E_OP_MI_CC]   = opMiCc;
-            table[E_OP_MI_CCV]  = opMiCcv;
-            table[E_OP_MI_CCH]  = opMiCch;
-            table[E_OP_MI_CLKD] = opMiClkd;
-            table[E_OP_MI_CLKR] = opMiClkr;
-            table[E_OP_R]        = opR;
-            table[E_OP_R_MIN]    = opRMin;
-            table[E_OP_R_MAX]    = opRMax;
-            table[E_OP_TOSS]     = opToss;
-            table[E_OP_IN]          = opIn;
-            table[E_OP_IN_SCALE]    = opInScale;
-            table[E_OP_PARAM]       = opParam;
-            table[E_OP_PRM]         = opParam;  // PRM alias of PARAM
-            table[E_OP_PARAM_SCALE] = opParamScale;
-            table[E_OP_STATE]       = opState;
-            table[E_OP_MUTE]        = opMute;
-            table[E_OP_M]        = opM;
-            table[E_OP_M_C]      = opMC;
-            table[E_OP_M_ACT]    = opMAct;
-            table[E_OP_SCRIPT]   = opScript;
-            table[E_OP_SYM_DOLLAR]    = opScript;
-            table[E_OP_SYM_DOLLAR_F]  = opF;
-            table[E_OP_SYM_DOLLAR_F1] = opF1;
-            table[E_OP_SYM_DOLLAR_F2] = opF2;
-            table[E_OP_SYM_DOLLAR_L]  = opL;
-            table[E_OP_SYM_DOLLAR_L1] = opL1;
-            table[E_OP_SYM_DOLLAR_L2] = opL2;
-            table[E_OP_SYM_DOLLAR_S]  = opS;
-            table[E_OP_SYM_DOLLAR_S1] = opS1;
-            table[E_OP_SYM_DOLLAR_S2] = opS2;
-            table[E_OP_I1]       = opI1;
-            table[E_OP_I2]       = opI2;
-            table[E_OP_FR]       = opFr;
-            table[E_OP_DEL_CLR]  = opDelClr;
-            table[E_OP_BREAK]    = opBreak;
-            table[E_OP_BRK]      = opBreak;
-            table[E_OP_KILL]     = opKill;
+            table[E_OP_MI_SYM_DOLLAR]      = opMiDollar<Cfg>;
+            table[E_OP_MI_LE]   = opMiLe<Cfg>;
+            table[E_OP_MI_LN]   = opMiLn<Cfg>;
+            table[E_OP_MI_LNV]  = opMiLnv<Cfg>;
+            table[E_OP_MI_LV]   = opMiLv<Cfg>;
+            table[E_OP_MI_LVV]  = opMiLvv<Cfg>;
+            table[E_OP_MI_LO]   = opMiLo<Cfg>;
+            table[E_OP_MI_LC]   = opMiLc<Cfg>;
+            table[E_OP_MI_LCC]  = opMiLcc<Cfg>;
+            table[E_OP_MI_LCCV] = opMiLccv<Cfg>;
+            table[E_OP_MI_LCH]  = opMiLch<Cfg>;
+            table[E_OP_MI_NL]   = opMiNl<Cfg>;
+            table[E_OP_MI_N]    = opMiN<Cfg>;
+            table[E_OP_MI_NV]   = opMiNv<Cfg>;
+            table[E_OP_MI_V]    = opMiV<Cfg>;
+            table[E_OP_MI_VV]   = opMiVv<Cfg>;
+            table[E_OP_MI_NCH]  = opMiNch<Cfg>;
+            table[E_OP_MI_OL]   = opMiOl<Cfg>;
+            table[E_OP_MI_O]    = opMiO<Cfg>;
+            table[E_OP_MI_OCH]  = opMiOch<Cfg>;
+            table[E_OP_MI_CL]   = opMiCl<Cfg>;
+            table[E_OP_MI_C]    = opMiC<Cfg>;
+            table[E_OP_MI_CC]   = opMiCc<Cfg>;
+            table[E_OP_MI_CCV]  = opMiCcv<Cfg>;
+            table[E_OP_MI_CCH]  = opMiCch<Cfg>;
+            table[E_OP_MI_CLKD] = opMiClkd<Cfg>;
+            table[E_OP_MI_CLKR] = opMiClkr<Cfg>;
+            table[E_OP_R]        = opR<Cfg>;
+            table[E_OP_R_MIN]    = opRMin<Cfg>;
+            table[E_OP_R_MAX]    = opRMax<Cfg>;
+            table[E_OP_TOSS]     = opToss<Cfg>;
+            table[E_OP_IN]          = opIn<Cfg>;
+            table[E_OP_IN_SCALE]    = opInScale<Cfg>;
+            table[E_OP_PARAM]       = opParam<Cfg>;
+            table[E_OP_PRM]         = opParam<Cfg>;  // PRM alias of PARAM
+            table[E_OP_PARAM_SCALE] = opParamScale<Cfg>;
+            table[E_OP_STATE]       = opState<Cfg>;
+            table[E_OP_MUTE]        = opMute<Cfg>;
+            table[E_OP_M]        = opM<Cfg>;
+            table[E_OP_M_C]      = opMC<Cfg>;
+            table[E_OP_M_ACT]    = opMAct<Cfg>;
+            table[E_OP_SCRIPT]   = opScript<Cfg>;
+            table[E_OP_SYM_DOLLAR]    = opScript<Cfg>;
+            table[E_OP_SYM_DOLLAR_F]  = opF<Cfg>;
+            table[E_OP_SYM_DOLLAR_F1] = opF1<Cfg>;
+            table[E_OP_SYM_DOLLAR_F2] = opF2<Cfg>;
+            table[E_OP_SYM_DOLLAR_L]  = opL<Cfg>;
+            table[E_OP_SYM_DOLLAR_L1] = opL1<Cfg>;
+            table[E_OP_SYM_DOLLAR_L2] = opL2<Cfg>;
+            table[E_OP_SYM_DOLLAR_S]  = opS<Cfg>;
+            table[E_OP_SYM_DOLLAR_S1] = opS1<Cfg>;
+            table[E_OP_SYM_DOLLAR_S2] = opS2<Cfg>;
+            table[E_OP_I1]       = opI1<Cfg>;
+            table[E_OP_I2]       = opI2<Cfg>;
+            table[E_OP_FR]       = opFr<Cfg>;
+            table[E_OP_DEL_CLR]  = opDelClr<Cfg>;
+            table[E_OP_BREAK]    = opBreak<Cfg>;
+            table[E_OP_BRK]      = opBreak<Cfg>;
+            table[E_OP_KILL]     = opKill<Cfg>;
         }
     };
-    CCMRAM_BSS OpTableBuilder opTableBuilder;  // CPU-only dispatch table -> CCMRAM (not DMA)
+    CCMRAM_BSS OpTableBuilderT<TT2ConfigFull> opTableBuilderFull;  // CPU-only dispatch table -> CCMRAM (not DMA)
 }
 
-const TT2OpFunc *tt2NativeOpTable = opTableBuilder.table;
+const TT2OpFunc *tt2NativeOpTable = opTableBuilderFull.table;
 const size_t tt2NativeOpCount = E_OP__LENGTH;
 
-template<> const TT2OpFuncT<TT2ConfigFull> *tt2OpTable<TT2ConfigFull>() { return tt2NativeOpTable; }
+template<> const TT2OpFuncT<TT2ConfigFull> *tt2OpTable<TT2ConfigFull>() { return opTableBuilderFull.table; }
