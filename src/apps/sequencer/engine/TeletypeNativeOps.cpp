@@ -4300,3 +4300,5 @@ namespace {
 
 const TT2OpFunc *tt2NativeOpTable = opTableBuilder.table;
 const size_t tt2NativeOpCount = E_OP__LENGTH;
+
+template<> const TT2OpFuncT<TT2ConfigFull> *tt2OpTable<TT2ConfigFull>() { return tt2NativeOpTable; }

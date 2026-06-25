@@ -64,10 +64,19 @@ struct TT2EvalResult {
 // - Handlers read/write TT2Runtime and TT2OutputState directly.
 // - Set vs get is decided by each handler: set when isSetPosition && there
 //   are remaining args on the stack, otherwise get.
-using TT2OpFunc = void (*)(TT2Runtime &runtime, TT2OutputState &output,
-                           const TeletypeProgram *program,
+template<typename Cfg>
+using TT2OpFuncT = void (*)(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
+                           const TeletypeProgramT<Cfg> *program,
                            int16_t *stack, uint8_t &stackSize,
                            bool isSetPosition, TT2EvalError &error);
+using TT2OpFunc = TT2OpFuncT<TT2ConfigFull>;
+
+template<typename Cfg> const TT2OpFuncT<Cfg> *tt2OpTable();
+template<> const TT2OpFuncT<TT2ConfigFull> *tt2OpTable<TT2ConfigFull>();
+
+// Non-deduced wrapper so Cfg is fixed by `runtime` alone; lets callers pass a
+// bare `nullptr` program without breaking template argument deduction.
+template<typename T> struct TT2Identity { typedef T type; };
 
 // Global native v2 op table indexed by parser op enum (tele_op_idx_t).
 // Size is E_OP__LENGTH; unimplemented entries are nullptr.
@@ -80,14 +89,15 @@ extern const size_t tt2NativeOpCount;
 // Right-to-left evaluation, fresh stack.
 // When forceGet is true, the first (leftmost) op is treated as a getter
 // regardless of context; used for mod prefix expressions.
+template<typename Cfg>
 inline TT2EvalResult evaluateSegment(const TT2Command &cmd,
                                      uint8_t start, uint8_t end,
-                                     TT2Runtime &runtime,
+                                     TT2RuntimeT<Cfg> &runtime,
                                      TT2OutputState &output,
-                                     const TT2OpFunc *table,
+                                     const TT2OpFuncT<Cfg> *table,
                                      size_t tableCount,
                                      bool forceGet = false,
-                                     const TeletypeProgram *program = nullptr,
+                                     const TeletypeProgramT<Cfg> *program = nullptr,
                                      int16_t *outStack = nullptr,
                                      uint8_t *outSize = nullptr) {
     int16_t stack[TT2_COMMAND_MAX_LENGTH];
@@ -109,7 +119,7 @@ inline TT2EvalResult evaluateSegment(const TT2Command &cmd,
             if (value < 0 || static_cast<size_t>(value) >= tableCount) {
                 error = TT2EvalError::UnknownOp;
             } else {
-                const TT2OpFunc op = table[value];
+                const TT2OpFuncT<Cfg> op = table[value];
                 if (op == nullptr) {
                     error = TT2EvalError::UnsupportedOp;
                 } else {
@@ -134,42 +144,46 @@ inline TT2EvalResult evaluateSegment(const TT2Command &cmd,
 }
 
 // Convenience wrapper using the global native v2 op table.
+template<typename Cfg>
 inline TT2EvalResult evaluateSegment(const TT2Command &cmd,
                                      uint8_t start, uint8_t end,
-                                     TT2Runtime &runtime,
+                                     TT2RuntimeT<Cfg> &runtime,
                                      TT2OutputState &output,
-                                     const TeletypeProgram *program = nullptr) {
+                                     const TeletypeProgramT<Cfg> *program = nullptr) {
     return evaluateSegment(cmd, start, end, runtime, output,
-                           tt2NativeOpTable, tt2NativeOpCount, false, program);
+                           tt2OpTable<Cfg>(), tt2NativeOpCount, false, program);
 }
 
 // Convenience: evaluate a mod prefix expression (force-get all ops).
+template<typename Cfg>
 inline TT2EvalResult evaluateModPrefix(const TT2Command &cmd,
                                        uint8_t start, uint8_t end,
-                                       TT2Runtime &runtime,
+                                       TT2RuntimeT<Cfg> &runtime,
                                        TT2OutputState &output,
-                                       const TeletypeProgram *program = nullptr) {
+                                       const TeletypeProgramT<Cfg> *program = nullptr) {
     return evaluateSegment(cmd, start, end, runtime, output,
-                           tt2NativeOpTable, tt2NativeOpCount, true, program);
+                           tt2OpTable<Cfg>(), tt2NativeOpCount, true, program);
 }
 
 // Like evaluateModPrefix but also copies the resulting stack out (bottom..top)
 // for mods that need more than 2 args (DEL.G).
+template<typename Cfg>
 inline TT2EvalResult evaluateModPrefixStack(const TT2Command &cmd,
                                             uint8_t start, uint8_t end,
-                                            TT2Runtime &runtime,
+                                            TT2RuntimeT<Cfg> &runtime,
                                             TT2OutputState &output,
                                             int16_t *outStack, uint8_t *outSize,
-                                            const TeletypeProgram *program = nullptr) {
+                                            const TeletypeProgramT<Cfg> *program = nullptr) {
     return evaluateSegment(cmd, start, end, runtime, output,
-                           tt2NativeOpTable, tt2NativeOpCount, true, program,
+                           tt2OpTable<Cfg>(), tt2NativeOpCount, true, program,
                            outStack, outSize);
 }
 
 // Capture the post-':' body of a DEL* command and enqueue it at timeMs with
 // the active exec frame's origin context. Shared by every DEL variant.
+template<typename Cfg>
 inline void tt2EnqueueDelayBody(const TT2Command &cmd, uint8_t preSepPos,
-                                TT2Runtime &runtime, int16_t timeMs) {
+                                TT2RuntimeT<Cfg> &runtime, int16_t timeMs) {
     TT2RuntimeCommand bodyCmd = {};
     uint8_t bodyLen = 0;
     for (uint8_t pos = preSepPos + 1;
@@ -189,8 +203,9 @@ inline void tt2EnqueueDelayBody(const TT2Command &cmd, uint8_t preSepPos,
 // Capture the post-':' body of an S command and push it onto the command stack
 // for later execution via S.ALL / S.POP. Silently drops when the stack is full
 // (upstream mod_S behaviour).
+template<typename Cfg>
 inline void tt2PushStackBody(const TT2Command &cmd, uint8_t preSepPos,
-                             TT2Runtime &runtime) {
+                             TT2RuntimeT<Cfg> &runtime) {
     if (runtime.stack.top >= TT2_STACK_DEPTH) {
         return;
     }
@@ -225,10 +240,11 @@ inline int16_t tt2ClampDelayMs(int32_t ms) {
 //   L start end: body — loop body (remaining segments) with I = start..end.
 // - Unsupported mods return UnsupportedMod; prefix is not evaluated.
 // - Stops at first error and returns it.
+template<typename Cfg>
 inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
-                                     TT2Runtime &runtime,
+                                     TT2RuntimeT<Cfg> &runtime,
                                      TT2OutputState &output,
-                                     const TeletypeProgram *program = nullptr) {
+                                     const typename TT2Identity<TeletypeProgramT<Cfg>>::type *program = nullptr) {
     // Split at SUB_SEP into segments.
     uint8_t segStart[TT2_COMMAND_MAX_LENGTH];
     uint8_t segEnd[TT2_COMMAND_MAX_LENGTH];

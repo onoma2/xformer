@@ -3,6 +3,7 @@
 #include "model/TT2Config.h"
 #include "model/TeletypeProgram.h"
 #include "model/TeletypeRuntime.h"
+#include "engine/TT2Evaluator.h"
 
 #include <type_traits>
 
@@ -25,6 +26,11 @@ CASE("TeletypeProgramT<Full> layout is unchanged") {
 CASE("TT2RuntimeT<Full> layout is unchanged") {
     static_assert(sizeof(TT2RuntimeT<TT2ConfigFull>) == 5880, "");
     expect(std::is_trivially_copyable<TT2RuntimeT<TT2ConfigFull>>::value, "trivially copyable");
+}
+
+CASE("tt2OpTable<Full> resolves to the global native table") {
+    expectEqual((const void *)tt2OpTable<TT2ConfigFull>(),
+                (const void *)tt2NativeOpTable, "trait identity");
 }
 
 }
