@@ -31,8 +31,8 @@ UNIT_TEST("TeletypeV2Input") {
         init(p);
         expectEqual(int(p.cvInputSource[int(TT2CvInput::In)]),    int(TT2CvInputSource::CvIn1), "IN -> CvIn1");
         expectEqual(int(p.cvInputSource[int(TT2CvInput::Param)]), int(TT2CvInputSource::CvIn2), "PARAM -> CvIn2");
-        expectEqual(int(p.cvInputSource[int(TT2CvInput::X)]),     int(TT2CvInputSource::CvIn3), "X -> CvIn3");
-        expectEqual(int(p.cvInputSource[int(TT2CvInput::Y)]),     int(TT2CvInputSource::CvIn4), "Y -> CvIn4");
+        expectEqual(int(p.cvInputSource[int(TT2CvInput::X)]),     int(TT2CvInputSource::None),  "X -> None (scratch)");
+        expectEqual(int(p.cvInputSource[int(TT2CvInput::Y)]),     int(TT2CvInputSource::None),  "Y -> None (scratch)");
         expectEqual(int(p.cvInputSource[int(TT2CvInput::Z)]),     int(TT2CvInputSource::None),  "Z -> None");
         expectEqual(int(p.cvInputSource[int(TT2CvInput::T)]),     int(TT2CvInputSource::None),  "T -> None");
     }
