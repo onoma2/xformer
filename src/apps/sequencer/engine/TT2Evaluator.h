@@ -391,7 +391,7 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 uint8_t scriptNumber = tt2ActiveScriptNumber(runtime);
                 uint8_t lineNumber = tt2ActiveLineNumber(runtime);
 
-                if (scriptNumber < TT2_SCRIPT_COUNT &&
+                if (scriptNumber < Cfg::ScriptCount &&
                     lineNumber < TT2_COMMANDS_PER_SCRIPT) {
                     TT2EveryCount &every =
                         runtime.every.every[scriptNumber][lineNumber];

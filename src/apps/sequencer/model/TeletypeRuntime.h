@@ -7,7 +7,7 @@
 #include <cstring>
 
 static constexpr int TT2_STACK_DEPTH      = 16;
-static constexpr int TT2_DELAY_DEPTH      = 64;   // teletype DELAY_SIZE parity
+static constexpr int TT2_DELAY_DEPTH      = TT2ConfigFull::DelayDepth;   // teletype DELAY_SIZE parity
 static constexpr int TT2_RNG_COUNT        = 5;
 static constexpr int TT2_VARIABLE_COUNT   = 20;
 static constexpr int TT2_CV_COUNT         = 8;
@@ -15,7 +15,7 @@ static constexpr int TT2_TR_COUNT         = 8;
 static constexpr int TT2_Q_LENGTH         = 64;
 static constexpr int TT2_EXEC_DEPTH       = 8;
 static constexpr int TT2_NB_SCALES        = 16;
-static constexpr int TT2_TRIGGER_INPUTS   = 8;
+static constexpr int TT2_TRIGGER_INPUTS   = TT2ConfigFull::TriggerInputCount;
 static constexpr int TT2_PRINT_SLOT_COUNT = 16;  // PRINT/PRT dashboard slots
 
 struct TT2RuntimeCommand {
