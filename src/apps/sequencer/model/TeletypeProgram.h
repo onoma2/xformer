@@ -135,11 +135,11 @@ inline void init(TeletypeProgramT<Cfg> &p) {
     for (int i = 0; i < Cfg::TriggerInputCount; i++) {
         p.triggerSource[i] = TT2TriggerSource(int(TT2TriggerSource::CvIn1) + i);
     }
-    // Default IN/PARAM/X/Y to CvIn1-4; Z/T unmapped (memset leaves them None).
+    // Default IN/PARAM to CvIn1-2 only. X/Y/Z/T stay unmapped (None) so scripts use
+    // them as scratch vars — sampleInputs() skips None, so a script's X/Y persist.
+    // Map a CV source explicitly (I/O page) to make X/Y/Z/T read CV: assignment = patch.
     p.cvInputSource[int(TT2CvInput::In)]    = TT2CvInputSource::CvIn1;
     p.cvInputSource[int(TT2CvInput::Param)] = TT2CvInputSource::CvIn2;
-    p.cvInputSource[int(TT2CvInput::X)]     = TT2CvInputSource::CvIn3;
-    p.cvInputSource[int(TT2CvInput::Y)]     = TT2CvInputSource::CvIn4;
     // Per-output shaping defaults: ±5V range, no quantize, 0 offset/root.
     for (int i = 0; i < TT2_CV_OUTPUT_COUNT; i++) {
         p.cvOutputRange[i] = Types::VoltageRange::Bipolar5V;
