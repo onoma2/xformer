@@ -48,16 +48,11 @@ public:
         _metroAccumMs = 0;
     }
 
-    // Run the boot/init script once on (re)start. Periodic work (metro) and
-    // time-based work (delays) run in update(dt) on the real ms clock.
+    // Boot/init runs in update() (transport-independent), not here: the metro it
+    // configures free-runs on wall-clock, so init must apply before the clock
+    // ever ticks — otherwise the metro runs with default vars until first PLAY.
     virtual TickResult tick(uint32_t tick) override {
         (void)tick;
-        if (_firstTick) {
-            _firstTick = false;
-            ScopedHost host(this);
-            runScript(uint8_t(_tt2Track.program().bootScriptIndex));
-            return TickResult(CvUpdate | GateUpdate);
-        }
         return NoUpdate;
     }
 
@@ -66,6 +61,13 @@ public:
     // remainder so slow refreshes still advance time accurately.
     virtual void update(float dt) override {
         ScopedHost host(this);
+        // Boot/init script runs once on the first refresh — transport-independent,
+        // so the free-running metro starts with init's settings (M, MO.*) applied
+        // rather than runtime defaults. reset()/restart() re-arm _firstTick.
+        if (_firstTick) {
+            _firstTick = false;
+            runScript(uint8_t(_tt2Track.program().bootScriptIndex));
+        }
         // Sample trigger inputs + CV-mapped inputs every refresh (async, not clocked).
         updateInputTriggers();
         sampleInputs();
