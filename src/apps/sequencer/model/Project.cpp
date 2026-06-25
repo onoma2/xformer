@@ -46,9 +46,17 @@ void seedTeletypeV2Demo(TeletypeProgram &p) {
         "CV 6 N P.NEXT\n");               // advance cursor, quantize, drive CV 6 (exercises pattern* family)
     loadScriptText(p, 5,                  // S6: command stack — push a body then run it; exercises runStoredCommand re-entry
         "S : TR.P 6\n"                    // push "TR.P 6" onto the command stack
-        "S.ALL\n");                       // run + clear the stack -> gate 6 pulses
+        "S.ALL\n"                         // run + clear the stack -> gate 6 pulses
+        "SCRIPT 8\n");                    // -> S8 pattern transforms (re-entry depth 4)
     loadScriptText(p, 6,                  // S7: delay queue — gate 7 pulses 250ms after each metro tick
         "DEL 250: TR.P 7\n");             // exercises tt2AdvanceDelays + the delay queue
+    loadScriptText(p, 7,                  // S8: pattern transforms — P.PUSH build + P.REV on bank 1 -> CV 7 walks the reversed seq
+        "P.N 1\n"                         // bank 1 (separate from S5's bank 0)
+        "P.L 0\n"                         // reset empty each fire (idempotent rebuild)
+        "P.PUSH 0\n"                      // append 0  (patternPush)
+        "P.PUSH 5\n"                      // append 5 -> {0,5}
+        "P.REV\n"                         // reverse -> {5,0}  (patternReverse)
+        "CV 7 N P.NEXT\n");               // walk reversed -> CV 7 cycles 5,0 (contrast S5's forward)
     loadScriptText(p, TT2_METRO_SCRIPT,   // M: counter drives Mod 1 + jack 1, fires S3 for jack 8
         "X ADD X 1\n"
         "X MOD X 8\n"
