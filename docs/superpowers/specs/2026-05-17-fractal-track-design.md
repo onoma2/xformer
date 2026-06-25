@@ -315,17 +315,17 @@ Each segment is one loop-window length; total played length = loopLen × (1 + br
 
 **Chained, not off-trunk.** Branch N transforms **branch N-1** (the trunk for B1), so transforms **compound** down the chain — each limb is a variation of the limb before it, the Bloom "watch it grow." (The prior design transformed every branch off the trunk; that is replaced.)
 
-**Transform set (8 ops).** Branch pitch math is **chromatic** (raw semitones) — the trunk stays raw, scale is ornament-only. Each branch applies one of:
+**Transform set (8 ops) — all deterministic.** Every branch is a pure transform of captured material; **no op generates content** (honouring the core constraint "no RNG content generation — all content comes from parent capture"). Branch pitch math is **chromatic** (raw semitones) — the trunk stays raw, scale is ornament-only. Each branch applies one of:
 - **Transpose** (pitch): offset all CV by fixed semitones. Chained → a transposition ladder.
 - **Reverse** (order): play the previous segment backwards. Self-inverse (toggles per branch).
 - **Inverse** (pitch): mirror around a center note (`center - (cv - center)`). Self-inverse.
 - **Retrograde-Inverse** (order+pitch): Reverse then Inverse — completes the twelve-tone row ops.
 - **Rotate** (order): cyclic shift by k (`p → (p+k) mod len`) — a canon at a temporal offset. Chained → progressive rotation.
-- **Interval-scale** (pitch): scale each interval from center by a factor (`center + (cv-center)·f`). Chained → the melody progressively **widens/narrows** — the most fractal op.
+- **Interval-Compress** (pitch): scale each interval toward the center (`center + (cv-center)·f`, f<1). Chained → the melody progressively narrows.
+- **Interval-Expand** (pitch): scale each interval away from center (f>1). Chained → progressively widens — the most fractal op.
 - **Gate-thin** (rhythm): drop every Nth gate to a rest. Chained → progressively sparser.
-- **Mutate** (generative): per-step probability of re-rolling CV to a nearby scale degree (deterministic per seed).
 
-Pure **Randomize** is intentionally excluded — it breaks the recognizable, deterministic variation that makes a chain musical; Mutate covers controlled life.
+**Mutate and Randomize are both excluded** — re-rolling CV invents notes the parent never played, which is RNG content generation and violates the mirror identity. Variety comes from the seeded *assignment*, the pool, the chain combinatorics, and the bit-word Path — never from inventing pitches.
 
 **Transform assignment — generative, reseeded, pool-limited.** The engine assigns each branch's transform from an RNG seeded per track, **reseeding when the trunk is edited** (Bloom's regenerate-on-edit) — the chain grows on its own, not user-picked per branch. But the assignment draws **only from the enabled pool**: `branchPool` (uint8_t bitmask, one bit per op, default all-on) lets the user **constrain the palette** — e.g. pitch-only, or no rhythm changes. Empty pool falls back to Transpose. The seed is stored so the assignment is stable across power cycles until the trunk changes.
 
