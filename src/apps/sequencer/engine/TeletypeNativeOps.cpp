@@ -4576,9 +4576,14 @@ namespace {
         }
     };
     CCMRAM_BSS OpTableBuilderT<TT2ConfigFull> opTableBuilderFull;  // CPU-only dispatch table -> CCMRAM (not DMA)
+    CCMRAM_BSS OpTableBuilderT<TT2ConfigMini> opTableBuilderMini;  // CPU-only dispatch table -> CCMRAM (not DMA)
 }
 
 const TT2OpFunc *tt2NativeOpTable = opTableBuilderFull.table;
 const size_t tt2NativeOpCount = E_OP__LENGTH;
 
 template<> const TT2OpFuncT<TT2ConfigFull> *tt2OpTable<TT2ConfigFull>() { return opTableBuilderFull.table; }
+
+const TT2OpFuncT<TT2ConfigMini> *tt2NativeOpTableMini = opTableBuilderMini.table;
+
+template<> const TT2OpFuncT<TT2ConfigMini> *tt2OpTable<TT2ConfigMini>() { return tt2NativeOpTableMini; }

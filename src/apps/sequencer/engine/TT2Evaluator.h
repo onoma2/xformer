@@ -73,6 +73,7 @@ using TT2OpFunc = TT2OpFuncT<TT2ConfigFull>;
 
 template<typename Cfg> const TT2OpFuncT<Cfg> *tt2OpTable();
 template<> const TT2OpFuncT<TT2ConfigFull> *tt2OpTable<TT2ConfigFull>();
+template<> const TT2OpFuncT<TT2ConfigMini> *tt2OpTable<TT2ConfigMini>();
 
 // Non-deduced wrapper so Cfg is fixed by `runtime` alone; lets callers pass a
 // bare `nullptr` program without breaking template argument deduction.

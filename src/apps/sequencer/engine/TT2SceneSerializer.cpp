@@ -254,3 +254,8 @@ template bool tt2SerializeScene<TT2ConfigFull>(const TeletypeProgramT<TT2ConfigF
 template bool tt2DeserializeScene<TT2ConfigFull>(TeletypeProgramT<TT2ConfigFull> &, Tt2SceneRead, void *);
 template bool tt2SerializeScript<TT2ConfigFull>(const TeletypeProgramT<TT2ConfigFull> &, int, Tt2SceneWrite, void *);
 template bool tt2DeserializeScript<TT2ConfigFull>(TeletypeProgramT<TT2ConfigFull> &, int, Tt2SceneRead, void *);
+
+template bool tt2SerializeScene<TT2ConfigMini>(const TeletypeProgramT<TT2ConfigMini> &, Tt2SceneWrite, void *);
+template bool tt2DeserializeScene<TT2ConfigMini>(TeletypeProgramT<TT2ConfigMini> &, Tt2SceneRead, void *);
+template bool tt2SerializeScript<TT2ConfigMini>(const TeletypeProgramT<TT2ConfigMini> &, int, Tt2SceneWrite, void *);
+template bool tt2DeserializeScript<TT2ConfigMini>(TeletypeProgramT<TT2ConfigMini> &, int, Tt2SceneRead, void *);
