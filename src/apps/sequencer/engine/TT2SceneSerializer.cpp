@@ -69,14 +69,14 @@ bool tt2SerializeScene(const TeletypeProgramT<Cfg> &p, Tt2SceneWrite w, void *c)
 
     // #P: 4 patterns. Rows: len, wrap, start, end, then 64 value rows.
     wstr(w, c, "#P\n");
-    for (int b = 0; b < TT2_PATTERN_COUNT; ++b) { wint(w, c, int(p.patterns[b].len));   wch(w, c, b == TT2_PATTERN_COUNT - 1 ? '\n' : '\t'); }
-    for (int b = 0; b < TT2_PATTERN_COUNT; ++b) { wint(w, c, int(p.patterns[b].wrap));  wch(w, c, b == TT2_PATTERN_COUNT - 1 ? '\n' : '\t'); }
-    for (int b = 0; b < TT2_PATTERN_COUNT; ++b) { wint(w, c, int(p.patterns[b].start)); wch(w, c, b == TT2_PATTERN_COUNT - 1 ? '\n' : '\t'); }
-    for (int b = 0; b < TT2_PATTERN_COUNT; ++b) { wint(w, c, int(p.patterns[b].end));   wch(w, c, b == TT2_PATTERN_COUNT - 1 ? '\n' : '\t'); }
-    for (int r = 0; r < TT2_PATTERN_LENGTH; ++r) {
-        for (int b = 0; b < TT2_PATTERN_COUNT; ++b) {
+    for (int b = 0; b < Cfg::PatternCount; ++b) { wint(w, c, int(p.patterns[b].len));   wch(w, c, b == Cfg::PatternCount - 1 ? '\n' : '\t'); }
+    for (int b = 0; b < Cfg::PatternCount; ++b) { wint(w, c, int(p.patterns[b].wrap));  wch(w, c, b == Cfg::PatternCount - 1 ? '\n' : '\t'); }
+    for (int b = 0; b < Cfg::PatternCount; ++b) { wint(w, c, int(p.patterns[b].start)); wch(w, c, b == Cfg::PatternCount - 1 ? '\n' : '\t'); }
+    for (int b = 0; b < Cfg::PatternCount; ++b) { wint(w, c, int(p.patterns[b].end));   wch(w, c, b == Cfg::PatternCount - 1 ? '\n' : '\t'); }
+    for (int r = 0; r < Cfg::PatternLength; ++r) {
+        for (int b = 0; b < Cfg::PatternCount; ++b) {
             wint(w, c, int(p.patterns[b].val[r]));
-            wch(w, c, b == TT2_PATTERN_COUNT - 1 ? '\n' : '\t');
+            wch(w, c, b == Cfg::PatternCount - 1 ? '\n' : '\t');
         }
     }
 
@@ -151,12 +151,12 @@ bool tt2DeserializeScene(TeletypeProgramT<Cfg> &p, Tt2SceneRead rd, void *c) {
                 }
             } else if (section == SEC_PAT) {
                 if (!isBlankLine(line)) {
-                    long v[TT2_PATTERN_COUNT];
-                    int got = parseInts(line, v, TT2_PATTERN_COUNT);
-                    if (got < TT2_PATTERN_COUNT) {
+                    long v[Cfg::PatternCount];
+                    int got = parseInts(line, v, Cfg::PatternCount);
+                    if (got < Cfg::PatternCount) {
                         ok = false;
                     } else if (patPhase < 4) {
-                        for (int b = 0; b < TT2_PATTERN_COUNT; ++b) {
+                        for (int b = 0; b < Cfg::PatternCount; ++b) {
                             switch (patPhase) {
                             case 0: p.patterns[b].len   = uint16_t(v[b]); break;
                             case 1: p.patterns[b].wrap  = uint16_t(v[b]); break;
@@ -167,8 +167,8 @@ bool tt2DeserializeScene(TeletypeProgramT<Cfg> &p, Tt2SceneRead rd, void *c) {
                         ++patPhase;
                     } else {
                         int r = patPhase - 4;
-                        if (r < TT2_PATTERN_LENGTH) {
-                            for (int b = 0; b < TT2_PATTERN_COUNT; ++b) {
+                        if (r < Cfg::PatternLength) {
+                            for (int b = 0; b < Cfg::PatternCount; ++b) {
                                 p.patterns[b].val[r] = int16_t(v[b]);
                             }
                         }
