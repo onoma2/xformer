@@ -10,7 +10,7 @@
 
 FractalTrack is a child melodic mirror track. A parent track (Note, Curve, Stochastic, Tuesday, Teletype — any lower-index engine) supplies gate+CV. Fractal samples that output at its own section rate into a small inline trunk buffer, then plays it back through configurable loop windows, capture rules, and (post-MVP) mutation/branch/ornamentation transforms.
 
-It is not a stochastic generator, not a note sequencer, not a CV recorder, and not a high-fidelity automation trace. One cell per Fractal section. Intra-section motion is intentionally discarded.
+It is not a stochastic generator, not a note sequencer, and not a high-fidelity continuous automation trace. One cell per Fractal section — section-sampled. Intra-section motion is discarded **except the gate onset**, which Feel mode (KD-14b) keeps (one onset per cell).
 
 ## Substrate
 
@@ -26,7 +26,7 @@ It is not a stochastic generator, not a note sequencer, not a CV recorder, and n
 | Owner | What it owns |
 |-------|-------------|
 | **FractalSequence** (×17 patterns) | Timing (divisor, playMode, resetMeasure), loop lenses (loopFirst, loopLast, rotate, loopMode), record extent (recordFirst, recordLast), capture rules (recordMode, punchMode, recordQuantize), reserved future fields |
-| **FractalTrack** (×1, track-wide) | 17 sequences, sourceA, bufferLength, lock, recordTrigger (Routable), octave, transpose, slideTime, cvUpdateMode, **scale group (scale+scaleRotate, inherit) — ornament-only, trunk stays raw**, branchCount, path, ornamentRate, ornamentIntensity, ornFirst, ornLast (**branchCount · path · ornamentRate · ornamentIntensity all Routable** — the four live performance controls), reserved future fields |
+| **FractalTrack** (×1, track-wide) | 17 sequences, sourceA, bufferLength, lock, recordTrigger (Routable), octave, transpose, slideTime, cvUpdateMode, **scale group (scale+scaleRotate, inherit) — ornament-only, trunk stays raw**, branchCount, path, ornamentRate, ornamentIntensity, ornFirst, ornLast (**branchCount · path · ornamentRate · ornamentIntensity all Routable** — the four live performance controls), captureCadence, captureFidelity (KD-14b), reserved future fields |
 | **FractalTrackEngine** (×1, volatile) | Trunk buffer, parent resolution, gate-length measurement, capture/read/loop-boundary rule execution, RNG, evolution history, branch state |
 
 Trunk is **not serialized.** Save/load preserves model config; trunk starts empty on power cycle.
@@ -61,9 +61,9 @@ Tracks are a **discriminated union** (`Container` sized to the largest member), 
 | Item | Size | Union max (gate) | Net cost |
 |------|------|------------------|----------|
 | FractalTrack (model, SRAM) | ~600 B | 9544 B | 0 B (under max) |
-| FractalTrackEngine (CCMRAM) | ~600 B incl. 256 B inline trunk | 944 B | 0 B (under max) |
+| FractalTrackEngine (CCMRAM) | ~730 B incl. 256 B trunk + 128 B Feel onset array | 944 B | 0 B (under max) |
 
-Both fit with large margin. The model is cheap despite ×17 sequences because FractalSequence carries **no per-step array** (one cell per section); the engine + inline trunk live in CCMRAM, so nothing touches SRAM additively.
+Both fit with margin. The model is cheap despite ×17 sequences because FractalSequence carries **no per-step array** (one cell per section); the engine + trunk + Feel onset array live in CCMRAM, so nothing touches SRAM additively. The ~214 B engine headroom under 944 is why **mutation (~256 B history) stays deferred** — it can't co-exist with Feel.
 
 ## Stage Gates (before Phase 1 code)
 
@@ -85,11 +85,11 @@ Both fit with large margin. The model is cheap despite ×17 sequences because Fr
 4. Hardware verification → **stop, hand off to user**
 
 Post-MVP, in scope (the playable identity — each lands in reserved fields/hooks):
-branches (concatenated, chained, generative, bit-word Path) → ornaments (rate/intensity, scale-aware) + ornament zone → two-source mixing → track-delay → visual page.
+branches (concatenated, chained, generative, bit-word Path) → ornaments (rate/intensity, scale-aware) + ornament zone → two-source mixing → track-delay → **two-axis capture (Section/Event cadence × Quantized/Feel fidelity — KD-14b)** → visual page.
 Live performance controls (Routable): branch count · path · ornament rate · ornament intensity.
 
 Deferred (later phase, nice-to-have):
-mutation/evolution (entire subsystem — KD-3/6/10) · CV-scan · capture variants (Blend/Once/PunchIn) · bar-quantized loop · beat-offset · snapshot · sleep · density/tilt · two-axis capture model (Event cadence + Feel/microtiming — KD-14b, the recorder direction).
+mutation/evolution (entire subsystem — KD-3/6/10) · CV-scan · capture variants (Blend/Once/PunchIn) · bar-quantized loop · beat-offset · snapshot · sleep · density/tilt.
 
 ## Key Design Constraints
 

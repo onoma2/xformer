@@ -21,7 +21,7 @@ FractalTrack is a step-sampled CV/gate child layer over one or two source tracks
 
 The Fractal Track is a **step-sampled CV/Gate looper with mutation**. It samples the gate/CV output of 1–2 master tracks (any engine type) once per step, loops that captured buffer, and applies Proteus-inspired mutations at loop boundaries. It is NOT a stochastic generator — it is a **record-and-evolve** child layer over existing tracks.
 
-**Important:** This is a step-sampled recorder, not a continuous audio recorder. Each step captures one instantaneous gate + CV snapshot at step-clock boundaries. It does not capture gate length, retriggers, legato, slide, or intra-step timing. If those are needed later, they are a separate feature gate.
+**Important:** This is a section-sampled recorder, not a continuous one. Each section captures one gate + CV snapshot, with gate length (the 4-bit field) and — in **Feel** mode (KD-14b) — the gate onset phase. It does not capture retriggers, legato, slide, or continuous intra-section motion.
 
 ### Identity: How it differs from Stochastic Track
 
@@ -69,14 +69,16 @@ Configurable length: default **64 cells**, max **128**.
 
 **Why inline, not heap:** the engine is a discriminated-union member in `CCMRAM_BSS`. An inline array is pre-allocated BSS — it costs nothing beyond the engine's union slot, needs no allocator, and honours Stage Gate D ("no heap in the tick path"). A heap buffer would change the rail, require OOM handling, and break that gate.
 
+**Onset side array (Feel mode, KD-14b):** a parallel `uint8 _onset[CONFIG_FRACTAL_MAX_CELLS]` holds the 4-bit per-cell gate-onset phase (when in the section the gate fired). Kept separate so the 16-bit cell bitpacking is untouched. Zero in Quantized mode.
+
 **RAM:**
-- Default 64 cells × 2 B = **128 B**
-- Max 128 cells × 2 B = **256 B**
-- In **CCMRAM**, inside the FractalTrackEngine union slot → **net-zero** while the engine stays under the engine-union max (944 B). Not in SRAM, not on the heap.
+- Trunk: default 64 cells × 2 B = **128 B**, max 128 × 2 B = **256 B**
+- Onset array: max 128 × 1 B = **128 B**
+- Both in **CCMRAM**, inside the FractalTrackEngine union slot → **net-zero** while the engine stays under the engine-union max (944 B). Not in SRAM, not on the heap.
 
 **Why bitpacked uint16:** one cell = one section snapshot. 11-bit CV (~5.9 cents/LSB) is ample for a mirrored melodic line; the 4-bit gate-length field carries rest / trig / proportional / tie in a single word. 16 bits/cell with no split arrays and no padding.
 
-**Why no per-cell duration:** one cell per section on a uniform grid — each cell *is* one section. Intra-section motion is intentionally discarded (the mirror identity). Sub-section microtiming is the deferred **Feel** mode (KD-14b), which would widen the cell to carry an onset-phase field (a CCMRAM cost, gated there).
+**Why no per-cell duration:** one cell per section on a uniform grid — each cell *is* one section. Intra-section motion is discarded **except the gate onset**, which **Feel** mode (KD-14b) keeps in the onset array. Still one cell per section (one onset, one note) — section-sampled, not a continuous CV recorder.
 
 **Persistence:** the trunk is **volatile engine state**, not serialized. Project save stores model config only; the trunk starts empty on power cycle and clears on track-mode change, buffer-length change, or explicit user clear. (Saving recorded loops as project data is a possible post-MVP revisit — it would affect file format and flash wear.)
 
@@ -412,9 +414,9 @@ On loopLast -> loopFirst boundary:
 
 ### KD-14b: Two-Axis Capture Model — Cadence × Fidelity
 
-> **Status: DEFERRED.** This pushes the fractal toward a *recorder*, which the design explicitly disclaims ("not a CV recorder, not a high-fidelity automation trace; intra-section motion is intentionally discarded"). Pinned here as a coherent future model, **not** in current scope. Build only if a feel-preserving transcriber is wanted alongside the mirror-looper.
+> **Status: in scope.** Capture is **two orthogonal toggles** spanning "grid looper → faithful transcriber." It keeps the **one-cell-per-section** identity (still section-sampled, not a continuous CV recorder), but in **Feel** mode it keeps the *one* gate onset of that cell — so "intra-section motion is discarded" is amended to: discarded **except the gate onset**, which Feel captures (one onset per cell). Defaults (Section + Quantized) are the plain mirror-looper; the other corners are opt-in.
 
-The MVP capture is one S&H per fractal section, snapped to the cell. A fuller model is **two orthogonal toggles** that span "grid looper → faithful recorder," sharing the harmony track's Rings (`cv_scaler`) trigger code (§4 of harmony-spec.md):
+The toggles share the harmony track's Rings (`cv_scaler`) trigger code (§4 of harmony-spec.md):
 
 **Axis 1 — Cadence (when a cell is written, `captureCadence`):**
 - **Section** (default): the fractal-divisor strobe. A time **grid** — rests where the parent was silent. The looper identity.
@@ -426,7 +428,7 @@ The MVP capture is one S&H per fractal section, snapped to the cell. A fuller mo
 
 **The four corners:** section+quantized = today's grid looper · section+feel = grid rhythm with the parent's swing · event+quantized = clean note-list transcription · event+feel = faithful pitch + inter-note feel (most recorder-like).
 
-**Cost:** Event cadence is ~free (reuses harmony's trigger). **Feel needs an onset-phase field** (~3-4 bits) — the 16-bit cell (11 CV + 4 gateLen + 1 valid) is full, so it must widen to 24/32-bit: +1 B × 64-128 cells. The trunk is an engine member in **CCMRAM** (not SRAM), so this lands on the roomier rail and only bites if the wider cell pushes the engine past the 944 B union max. That CCMRAM headroom is the gate on Feel mode.
+**Cost:** Event cadence is ~free (reuses harmony's trigger). **Feel** keeps the 16-bit cell intact and adds a **parallel onset byte array** `uint8 _onset[CELLS]` (4-bit onset phase per cell): +1 B × 128 cells = **+128 B** on the engine's **CCMRAM** trunk, bringing the engine to ~730 B — under the 944 B union gate (net-zero so long as mutation, the other ~256 B grower, stays deferred; the two cannot both land — KD-9). `model` params: `captureCadence` (uint8), `captureFidelity` (uint8).
 
 ### KD-15: Timing Alignment — Bar-Quantized Loop Length, Beat Offset, Track Delay
 
