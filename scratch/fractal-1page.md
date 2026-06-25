@@ -26,7 +26,7 @@ It is not a stochastic generator, not a note sequencer, not a CV recorder, and n
 | Owner | What it owns |
 |-------|-------------|
 | **FractalSequence** (×17 patterns) | Timing (divisor, playMode, resetMeasure), loop lenses (loopFirst, loopLast, rotate, loopMode), record extent (recordFirst, recordLast), capture rules (recordMode, punchMode, recordQuantize), reserved future fields |
-| **FractalTrack** (×1, track-wide) | 17 sequences, sourceA, bufferLength, lock, recordTrigger (Routable), octave, transpose, slideTime, cvUpdateMode, reserved future fields |
+| **FractalTrack** (×1, track-wide) | 17 sequences, sourceA, bufferLength, lock, recordTrigger (Routable), octave, transpose, slideTime, cvUpdateMode, **scale group (scale+scaleRotate, inherit) — ornament-only, trunk stays raw**, reserved future fields |
 | **FractalTrackEngine** (×1, volatile) | Trunk buffer, parent resolution, gate-length measurement, capture/read/loop-boundary rule execution, RNG, evolution history, branch state |
 
 Trunk is **not serialized.** Save/load preserves model config; trunk starts empty on power cycle.

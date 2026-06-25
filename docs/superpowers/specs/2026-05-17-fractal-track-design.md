@@ -357,9 +357,11 @@ Where N = trunkCycles (how many loop repetitions of trunk before switching to br
 
 **Max ornaments:** Full 8-step trills.
 
-**User control:** Ornamentation probability per step (like Bloom's Performance Mode Mutate knob). Implemented as `ornamentProb` (uint8_t, 0-100%) + `ornamentMode` (uint8_t selecting 2-step / 4-step / max / off).
+**User control — standalone (not coupled to Mutate, unlike Bloom).** A dedicated ornament control, separate from the Mutate/evolution knob: `ornamentProb` (uint8_t, 0-100%) = per-gated-note probability; `ornamentMode` (uint8_t) = the complexity ramp (off → 2-step → 4-step → max + trills). Graded like Bloom's zones, but its own control.
 
-**RAM impact:** Negligible. Evaluated in tick path, no per-step storage. ~2 B model params.
+**Scale source — inherited, ornament-only.** FractalTrack inherits the **project Scale + `scaleRotate`** (a setup field, standard `-1`=inherit, like every other track — `selectedScale(projectScale, projectRotate)`). The scale is applied **only to ornaments**: the flourish notes (runs, arps, half-turns, mordents, octave/fifth, trills) move by **scale degrees** off it. The **trunk stays raw** — captured CV is never quantised (the looper mirrors the parent's literal output). A raw cell that lands off-scale references its **nearest scale degree** for the ornament steps; the main note still plays raw, only the ornament notes snap to the scale around it. "Toward/Away" walks scale degrees toward/away the next cell's nearest degree.
+
+**RAM impact:** Negligible. Evaluated in tick path, no per-step storage. ~2 B model params + the inherited scale group.
 
 ### KD-14: Recording Features — Replace vs Latch, Punch-In, Loop Mode, Record Quantize
 
