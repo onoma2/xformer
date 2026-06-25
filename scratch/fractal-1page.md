@@ -80,9 +80,10 @@ Engine gate is **912 B** (TeletypeTrackEngine, PROJECT.md:299; the TT2 `static_a
 
 0. Contract cleanup + stage gates
 1. Model + serialization + round-trip test
-2. Engine (minimal behavior: Replace capture, forward playback, lock)
-3. List UI (active fields only)
-4. Hardware verification → **stop, hand off to user**
+2. Engine (minimal: Replace capture, forward playback, lock) + minimal list UI (active fields only)
+3. Hardware verification → **stop, hand off to user**
+
+After Phase 3 there are **no phase numbers** — the post-hardware in-scope work is named (order below).
 
 Post-MVP, in scope (the playable identity — each lands in reserved fields/hooks):
 branches (concatenated, chained, generative, bit-word Path) → ornaments (rate/intensity, scale-aware) + ornament zone → two-source mixing → track-delay → **two-axis capture (Section/Event cadence × Quantized/Feel fidelity — KD-14b)** → visual page.

@@ -27,8 +27,8 @@ The Fractal Track is a **section-sampled CV/Gate looper**. It samples the gate/C
 |--------|------------------|---------------|
 | Source material | Step probability grid (self-contained) | 1–2 external master tracks (any engine) |
 | Core loop | Generate → evaluate → lock | Record → loop → branch/ornament |
-| Mutation trigger | Per-step probability rolls | Loop-boundary lifecycle events |
-| Buffer semantics | Capture evaluated events into lock buffer | Step-sample gate+CV, loop, mutate |
+| Transform trigger | Per-step probability rolls | Playback-time branch + ornament (mutation deferred) |
+| Buffer semantics | Capture evaluated events into lock buffer | Section-sample gate+CV, loop, branch/ornament |
 | Record modes | Binary capture (Hold lock) | Replace vs Latch (in scope); PunchIn, Once, record-quantize deferred |
 | Relationship | Stand-alone sequencer | Post-processing child of other tracks |
 
@@ -101,7 +101,7 @@ Configurable length: default **64 cells**, max **128**.
 
 > **Status: DEFERRED.** The whole mutation/evolution subsystem (KD-3, KD-6, KD-10) is out of current scope — it duplicates Stochastic's mutate/degree-rotation/sleep and adds the most engine + UI weight for the least unique payoff. The mutation zone (`mutateFirst`/`mutateLast`) survives, repurposed as the **ornament eligibility zone** (`ornFirst`/`ornLast`, KD-13). Revisit as a later phase.
 
-**Decision:** Adopt the Proteus spec's loop-boundary lifecycle, augmented with a per-loop-cycle evolution system (KD-6) and a trunk/branch cycle (KD-12):
+**Decision (deferred):** Adopt the Proteus spec's loop-boundary lifecycle, augmented with a per-loop-cycle evolution system (KD-6). (The **branch concatenation/navigation is KD-12 — in-scope and independent of this deferred mutation lifecycle**; it does not depend on the Proteus cycle below.)
 
 1. **Boredom/Patience**: resets the loop via auto-capture at loop boundaries.
 2. **Mutation via Evolution**: selects a step index in the mutation zone, influenced by Evolution mode/depth/history (KD-6), and re-generates its CV.
@@ -125,7 +125,7 @@ Configurable length: default **64 cells**, max **128**.
 3. No buffer mutation during branch phase — branches are non-destructive transforms
 ```
 
-**Rationale:** These are the Proteus §3.2–3.4 mechanics, adapted from "melody buffer reset" to "captured-loop mutation." The evolution system (KD-6) adds per-loop-cycle memory; the trunk/branch cycle (KD-12) adds Bloom-style generative navigation.
+**Rationale:** These are the Proteus §3.2–3.4 mechanics, adapted from "melody buffer reset" to "captured-loop mutation." The evolution system (KD-6) adds per-loop-cycle memory. (Branch navigation is KD-12, in-scope and standalone — it is not part of this deferred lifecycle.)
 
 ### KD-4: Two-Master Input Mixing
 
@@ -453,7 +453,7 @@ The toggles share the harmony track's Rings (`cv_scaler`) trigger code (§4 of h
 
 > **Track Delay is in scope.** **Bar-quantized loop length** (`loopBars`), **beat offset** (`beatOffset`), and **loop phase** (`loopPhase`) are **deferred** (1-pager ledger).
 
-**Track Delay (in scope).** `trackDelay` (uint8_t, 0–16 sections, default 0): delays the fractal's **output** by N sections — each emitted note (gate+CV, plus its ornaments) is queued and released N section-boundaries later. The capture/read grid is unchanged; only the audible output is shifted, so the mirror can lag the parent for canon/echo placement. **Engine cost:** a fixed ring of **up to 16 pending-output entries × ~4 B** (cv `int16` = 2 B, gateLen+onset packed = 1 B, `sectionsLeft` = 1 B) = **~64 B** on the engine (CCMRAM); model cost is the one `trackDelay` byte.
+**Track Delay (in scope).** `trackDelay` (uint8_t, 0–16 sections, default 0): delays the fractal's **output note** by N sections. The capture/read grid is unchanged; only the audible output is shifted, so the mirror can lag the parent for canon/echo placement. The queued entry is the **note only** — ornaments are re-evaluated in the tick path when the delayed note actually fires (not stored per entry). **Engine cost:** a fixed ring of **up to 16 pending entries × 4 B** — `cv` (int16, 2 B) + gateLen(4b)/onset(4b) packed (1 B) + `sectionsLeft` (uint8, 1 B) = **64 B** on the engine (CCMRAM); model cost is the one `trackDelay` byte.
 
 **Decision (deferred timing features below):** lock loop length to bars (`loopBars`), shift loop position vs the master transport (`beatOffset`), fractional read rotation (`loopPhase`).
 
@@ -491,7 +491,7 @@ loopPhase (float, 0.0 to 1.0, default 0.0):
   `globalPhase` pattern exactly.
 ```
 
-**Rationale:** Eurorack CV recorders commonly offer bar-quantized loop lengths (Flame "record mode" ties to gate length) and beat-aligned start points. Phase rotation lets the user freely adjust where the loop starts in the cycle. CurveTrack already proves this pattern with `globalPhase`; FractalTrack adopts it directly. `rotate` handles coarse integer-step shifts, `loopPhase` handles continuous fractional rotation. Together they replace the need for a fixed tick delay.
+**Rationale:** Eurorack CV recorders commonly offer bar-quantized loop lengths (Flame "record mode" ties to gate length) and beat-aligned start points. Phase rotation lets the user freely adjust where the loop starts in the cycle. CurveTrack already proves this pattern with `globalPhase`; FractalTrack adopts it directly. `rotate` handles coarse integer-step shifts, `loopPhase` handles continuous fractional rotation. These rotate the *read position within the loop* — orthogonal to **track-delay** (in scope), which shifts the *output in time*. Complementary, not competing.
 
 **Model cost:** loopBars (1 B), beatOffset (1 B), loopPhase (4 B) = 6 B total. No engine state beyond reading them. Negligible.
 
@@ -595,7 +595,7 @@ else:
 
 ## Phased Implementation Plan
 
-> **Sequencing authority = the 1-pager phase order.** In short: **Phase 1** model (all in-scope fields declared/serialized) → **Phase 2** the *minimal MVP looper* (one parent source, Replace/Latch capture, forward playback via loop window + Order, lock, minimal list UI) → **Phase 3** hardware verification → *stop, hand off*. The **in-scope extras are post-hardware phases**, in this order: two-source mix → branches (count/path/pool) → ornaments + ornament zone → two-axis capture (Event/Feel) → track-delay → visual UI. **Deferred and not phased:** mutation/evolution, CV-scan, capture variants (Punch/Once/Quantize), bar-quantize/beat-offset, density/tilt.
+> **Sequencing authority = the 1-pager phase order.** **Phase 1** model (all in-scope fields declared/serialized) → **Phase 2** the *minimal MVP looper* (one parent source, Replace/Latch capture, forward playback via loop window + Order, lock, minimal list UI) → **Phase 3** hardware verification → *stop, hand off*. After that there are **no phase numbers** — the in-scope extras are named post-hardware sections, built in this order: Loop Controls → Two-Source Mix → Branches (count/path/pool) → Ornamentation + zone → Two-Axis Capture (Event/Feel) → Track-Delay → Visual UI. **Deferred and not phased:** mutation/evolution, CV-scan, capture variants (Punch/Once/Quantize), bar-quantize/beat-offset, density/tilt.
 
 ### Phase 1: Model & Serialization
 
@@ -636,7 +636,11 @@ else:
 
 **Verification:** STM32 build, manual test via list UI: assign NoteTrack as parent, record one loop, hear it repeat.
 
-### Phase 3: Loop Controls — Windowing, Rotation, Lock, Ornament Zone
+### Phase 3: Hardware Verification → Stop, Hand Off
+
+After Phase 2 builds and hardware-validates the minimal MVP looper, **stop and hand off to the user.** The sections below are **post-hardware, in-scope** work (no phase numbers — order is the 1-pager ledger): Loop Controls → Two-Source Mix → Branches → Ornamentation → Two-Axis Capture → Track-Delay → Visual UI. Deferred features are never phased.
+
+### Loop Controls — Windowing, Rotation, Lock, Ornament Zone (post-hardware, in scope)
 
 **Goal:** Loop windowing (first/last step), rotation, lock (freeze buffer from further recording), and the ornament eligibility zone (KD-13).
 
@@ -656,7 +660,7 @@ else:
 
 **Verification:** Record into long buffer, narrow loop window to subset, confirm playback is constrained. Extend loop window across record extent boundary — confirm list model enforces constraint.
 
-### Phase 4: Proteus Mutation — Loop-Boundary Lifecycle
+### Proteus Mutation — Loop-Boundary Lifecycle (DEFERRED — not a build phase)
 
 > **Status: DEFERRED — not a build phase.** The entire mutation/evolution subsystem (KD-3/6/10) is out of scope (duplicates Stochastic; can't co-exist with Feel under the 912 gate). Kept as future design only; the in-scope post-hardware phases are two-source → branches → ornaments → two-axis capture → track-delay.
 
@@ -686,7 +690,7 @@ else:
 
 **Verification:** Set moderate patience + mutation, observe buffer evolving over multiple loops. Confirm lock prevents mutation.
 
-### Phase 5: Branches + Ornamentation (in-scope, post-hardware)
+### Branches + Ornamentation (post-hardware, in scope)
 
 **Goal:** Branch transforms (trunk+math at playback) and ornamentation (per-step flourishes + zone). Two-source mix, two-axis capture, and track-delay are sibling in-scope post-hardware phases.
 
@@ -706,7 +710,7 @@ else:
 
 **Verification:** Set branchCount=3, cycle through trunk+3 branches. Enable ornamentation, confirm flourishes fire on gated cells within the ornament zone only.
 
-### Phase 6: Visual UI Pages (Post-Hardware Validation)
+### Visual UI Pages (post-hardware)
 
 **Goal:** Visual pages for Fractal Track in the Performer UI.
 
@@ -725,7 +729,7 @@ else:
 
 **Verification:** Full UI flow: set parent tracks, record, view the trunk, adjust branches/ornaments, observe changes.
 
-### Phase 8: Validation & Polish
+### Validation & Polish
 
 **Goal:** STM32 release validation, RAM probe, hardware testing.
 
@@ -815,7 +819,7 @@ The following Compass-derived features are noted for future consideration, not i
 
 **Discrete rate table (future):** Compass uses 6 discrete rates {-2, -1, -0.5, 0.5, 1, 2} with slew smoothing. FractalTrack could support a playback speed multiplier, enabling half-speed (2 octaves down), double-speed (1 octave up), or reverse-speed loop playback. **Model cost:** uint8_t rate index (1 B). **Engine cost:** float accumulator per engine (4 B). **Trade-off:** Speed modulation changes the step-time relationship — the FractalTrack tick fires at the master clock rate, so speed would skip or repeat buffer reads, not change the recording. This is a fundamentally different timing model than the current step-aligned approach.
 
-**Grid gesture recording (Phase 6+):** Compass records grid touches (x,y positions) into 8 pattern slots and replays them. The grid's row 4-5 touches correspond to buffer position, while row 7 touches advance the command sequencer step. FractalTrack has no grid hardware, but the *concept* of recording gestural inputs as a pattern layer applies: a Performer encoder gesture (knob turn direction, speed, duration) could be recorded as a modulation track over the FractalTrack buffer. This is architecturally closer to the existing accumulator system than to FractalTrack.
+**Grid gesture recording (future):** Compass records grid touches (x,y positions) into 8 pattern slots and replays them. The grid's row 4-5 touches correspond to buffer position, while row 7 touches advance the command sequencer step. FractalTrack has no grid hardware, but the *concept* of recording gestural inputs as a pattern layer applies: a Performer encoder gesture (knob turn direction, speed, duration) could be recorded as a modulation track over the FractalTrack buffer. This is architecturally closer to the existing accumulator system than to FractalTrack.
 
 ---
 
@@ -827,7 +831,7 @@ The following Compass-derived features are noted for future consideration, not i
 4. **Buffer clear trigger:** Only via explicit user action, or also on pattern change? **Resolved:** Buffer is volatile engine state. Clear on: track mode change, buffer length change, explicit clear, power cycle. Survives transport reset and pattern change.
 5. **Overdub semantics:** **Resolved:** MVP is overwrite only (KD-5). Post-MVP blend mode uses weighted lerp (NOT additive CV accumulation, which breaks V/Oct pitch). Palimpsest-style compose/decompose rates control blend weight.
 6. **Turing DNA timing:** **Resolved:** KD-6 uses evolution system (history + pressure + depth) for mutation step selection, not purely random RNG. Turing shift register deferred to post-MVP (~12 B added to engine when adopted) for correlated drift patterns only.
-7. **UI before hardware:** Phase 6 (minimal list UI) must come before Phase 8 (hardware validation). Lesson from Stochastic: no manual testing without at least a list model.
+7. **UI before hardware:** the minimal list UI (Phase 2) must come before hardware verification (Phase 3). Lesson from Stochastic: no manual testing without at least a list model.
 8. **Buffer persistence:** **Deferred to post-MVP.** MVP uses volatile engine buffer (not serialized). Options for persistence (per-pattern, per-track, external import) will be decided after the volatile engine proves the concept. Affects project file format, flash wear, and RAM budget.
 9. **Branches:** **Resolved:** Branches (KD-12) are an in-scope post-hardware phase. Trunk+math transforms at playback time with zero buffer storage.
 10. **Ornamentation:** **Resolved:** Ornamentation + zone (KD-13) is an in-scope post-hardware phase. Per-cell flourishes evaluated in tick path, ~4 B model params.
