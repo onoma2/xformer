@@ -262,9 +262,9 @@ Ctor: `_activeScene=-1`, then call `changePattern()` once to seed (base ctor's v
 
 ---
 
-## Phase 4 — UI (v1: edit only; no SD I/O; no live-exec)
+## Phase 4 — UI (v1: edit + interactive script-firing; no command-line live eval; no SD I/O)
 
-> **Scope guard:** mode selection + script/IO editing of the active scene + scene indicator. **No SD scene save/load** (project blob persists it). **No live-exec** for Mini. Pattern page blocks Mini.
+> **Scope guard — one rule for "live":** Mini is a *playable* engine track, so the UI **allows interactive firing of its stored scripts**: trigger/function keys (`:414`), metro toggle, and script mute — all via the Mini engine's Seam-2 verbs (`triggerScript`/`toggleScriptMute`/`toggleMetroActive`, implemented in Task 5). What's **banned for Mini v1** is **command-line live eval** — `runLiveCommand` (`:735`, the ad-hoc typed-command entry/`:903` live-input path) — and **SD scene save/load** (project blob persists scenes). The pattern page blocks Mini. So: stored-script execution = allowed; ad-hoc command eval = deferred.
 
 ### Task 9: expose `TeletypeMini` in track-mode selection
 
@@ -286,7 +286,7 @@ Ctor: `_activeScene=-1`, then call `changePattern()` once to seed (base ctor's v
 Drive all three from the config (via Seam-1: `tt2MetroScriptIndex()`/`tt2InitScriptIndex()` returning `Cfg::MetroScript`/`Cfg::InitScript`, or extend existing accessors) — do not branch on hardcoded `TT2_METRO_SCRIPT`/`TT2_INIT_SCRIPT`.
 **Step 2 — enumerate every hazard** in `TeletypeScriptViewPage.cpp`: `!= TeletypeV2` guards at `:72,:78,:353,:396,:417,:476,:726`, `as<TT2TrackEngine>()` casts at `:109,:234,:735` (incl. `drawHud` `:234`), **and the direct `tt2Track()` derefs in the edit-action paths — commit/duplicate/comment/delete/undo/save/load at `:744,:776,:796,:811,:834`** — plus `TT2IoConfigPage`'s. For EACH: redirect to `tt2MiniTrack()` / `as<TT2MiniTrackEngine>()`, OR hard-block Mini *before* the deref. **Never widen a guard to admit Mini while leaving a downstream `tt2Track()`/`as<TT2TrackEngine>()`.** List each site + its decision in the commit body.
 **Step 2b — grep gate (must pass before commit):** after wiring, every remaining `tt2Track()` / `as<TT2TrackEngine>()` in a Mini-admitted code path must be classified (redirected or provably Full-only). Run `grep -nE 'tt2Track\(\)|as<TT2TrackEngine>' src/apps/sequencer/ui/pages/TeletypeScriptViewPage.cpp src/apps/sequencer/ui/pages/TT2IoConfigPage.cpp` and confirm no unclassified site reachable when `trackMode()==TeletypeMini`.
-**Step 3 — IO page:** `TT2IoConfigPage` for Mini shows 2 trigger rows (`Cfg::TriggerInputCount`), 6 CV-in, 8 CV-out. **Exclude live-exec (`runLiveCommand`, `:735`) and SD I/O for Mini.**
+**Step 3 — IO page:** `TT2IoConfigPage` for Mini shows 2 trigger rows (`Cfg::TriggerInputCount`), 6 CV-in, 8 CV-out. **Allowed for Mini:** the script trigger/function keys + metro toggle (Seam-2 verbs, Step 1b). **Banned for Mini v1:** `runLiveCommand` (`:735`/`:903`, ad-hoc command-line eval) and SD I/O — hard-block those before their deref.
 **Step 4 — render** any touched layout with `ui-preview/` (per CLAUDE.md OLED rule) and `open` the PNG.
 **Step 5 — build sim + host + ARM:** all 0 errors.
 **Step 6 — commit:** `feat(ui): script/IO pages edit the mini active scene` (body: per-site guard/cast decisions).
@@ -312,7 +312,7 @@ Drive all three from the config (via Seam-1: `tt2MetroScriptIndex()`/`tt2InitScr
 - Then: **superpowers:finishing-a-development-branch**.
 
 ## Deferred (propose only, do not build)
-- SD scene save/load + live-exec for Mini (`FileManager`/`gTeletypeLoadScratch` overloads).
+- Command-line live eval (`runLiveCommand`) + SD scene save/load for Mini (`FileManager`/`gTeletypeLoadScratch` overloads). (Stored-script firing via trigger keys IS in v1.)
 - Mini scene clear/copy via the pattern UI (v1 no-ops `clearPattern`/`copyPattern`; wiring them to "the mapped scene" needs an aliasing-aware design — 16 slots → 4 scenes).
 - Mini pattern editing (pattern page is Full-only in v1).
 - "Supermini" with smaller pattern dims (now possible — dims are config traits).
