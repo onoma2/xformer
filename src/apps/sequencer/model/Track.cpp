@@ -40,6 +40,8 @@ void Track::clearPattern(int patternIndex) {
     case TrackMode::TeletypeV2:
         // TT2 is not pattern-based — nothing per-pattern to clear.
         break;
+    case TrackMode::TeletypeMini:
+        break;
     case TrackMode::Last:
         break;
     }
@@ -72,6 +74,8 @@ void Track::copyPattern(int src, int dst) {
         break;
     case TrackMode::TeletypeV2:
         // TT2 is not pattern-based — nothing per-pattern to copy.
+        break;
+    case TrackMode::TeletypeMini:
         break;
     case TrackMode::Last:
         break;
@@ -113,6 +117,9 @@ void Track::gateOutputName(int index, StringBuilder &str) const {
     case TrackMode::TeletypeV2:
         str("Gate");
         break;
+    case TrackMode::TeletypeMini:
+        str("Gate");
+        break;
     case TrackMode::Last:
         break;
     }
@@ -143,6 +150,9 @@ void Track::cvOutputName(int index, StringBuilder &str) const {
         str("CV");
         break;
     case TrackMode::TeletypeV2:
+        str("CV");
+        break;
+    case TrackMode::TeletypeMini:
         str("CV");
         break;
     case TrackMode::Last:
@@ -185,6 +195,9 @@ void Track::write(VersionedSerializedWriter &writer) const {
         break;
     case TrackMode::TeletypeV2:
         _track.tt2->write(writer);
+        break;
+    case TrackMode::TeletypeMini:
+        tt2MiniTrack().write(writer);
         break;
     case TrackMode::Last:
         break;
@@ -231,6 +244,9 @@ void Track::read(VersionedSerializedReader &reader) {
         break;
     case TrackMode::TeletypeV2:
         _track.tt2->read(reader);
+        break;
+    case TrackMode::TeletypeMini:
+        tt2MiniTrack().read(reader);
         break;
     case TrackMode::Last:
         break;
