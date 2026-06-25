@@ -47,13 +47,14 @@ enum Section { SEC_NONE, SEC_SCRIPT, SEC_PAT, SEC_TI, SEC_CI, SEC_CO, SEC_UNKNOW
 
 } // namespace
 
-bool tt2SerializeScene(const TeletypeProgram &p, Tt2SceneWrite w, void *c) {
+template<typename Cfg>
+bool tt2SerializeScene(const TeletypeProgramT<Cfg> &p, Tt2SceneWrite w, void *c) {
     char line[TT2_PRINT_LINE_MAX];
 
-    for (int s = 0; s < TT2_SCRIPT_COUNT; ++s) {
+    for (int s = 0; s < Cfg::ScriptCount; ++s) {
         wch(w, c, '#');
-        if (s == TT2_METRO_SCRIPT)      wch(w, c, 'M');
-        else if (s == TT2_INIT_SCRIPT)  wch(w, c, 'I');
+        if (s == Cfg::MetroScript)      wch(w, c, 'M');
+        else if (s == Cfg::InitScript)  wch(w, c, 'I');
         else                            wch(w, c, char('1' + s));
         wch(w, c, '\n');
 
@@ -81,7 +82,7 @@ bool tt2SerializeScene(const TeletypeProgram &p, Tt2SceneWrite w, void *c) {
 
     // #TI / #CI: input source enums, one per line.
     wstr(w, c, "#TI\n");
-    for (int i = 0; i < TT2_TRIGGER_INPUT_COUNT; ++i) { wint(w, c, int(p.triggerSource[i])); wch(w, c, '\n'); }
+    for (int i = 0; i < Cfg::TriggerInputCount; ++i) { wint(w, c, int(p.triggerSource[i])); wch(w, c, '\n'); }
     wstr(w, c, "#CI\n");
     for (int i = 0; i < TT2_CV_INPUT_COUNT; ++i) { wint(w, c, int(p.cvInputSource[i])); wch(w, c, '\n'); }
 
@@ -97,7 +98,8 @@ bool tt2SerializeScene(const TeletypeProgram &p, Tt2SceneWrite w, void *c) {
     return true;
 }
 
-bool tt2DeserializeScene(TeletypeProgram &p, Tt2SceneRead rd, void *c) {
+template<typename Cfg>
+bool tt2DeserializeScene(TeletypeProgramT<Cfg> &p, Tt2SceneRead rd, void *c) {
     init(p);  // defaults; omitted sections stay default
 
     char line[TT2_PRINT_LINE_MAX];
@@ -126,9 +128,9 @@ bool tt2DeserializeScene(TeletypeProgram &p, Tt2SceneRead rd, void *c) {
                 if (t[0] >= '1' && t[0] <= '8' && t[1] == '\0') {
                     section = SEC_SCRIPT; scriptIdx = t[0] - '1'; scriptLine = 0;
                 } else if (std::strcmp(t, "M") == 0) {
-                    section = SEC_SCRIPT; scriptIdx = TT2_METRO_SCRIPT; scriptLine = 0;
+                    section = SEC_SCRIPT; scriptIdx = Cfg::MetroScript; scriptLine = 0;
                 } else if (std::strcmp(t, "I") == 0) {
-                    section = SEC_SCRIPT; scriptIdx = TT2_INIT_SCRIPT; scriptLine = 0;
+                    section = SEC_SCRIPT; scriptIdx = Cfg::InitScript; scriptLine = 0;
                 } else if (std::strcmp(t, "P") == 0) {
                     section = SEC_PAT; patPhase = 0;
                 } else if (std::strcmp(t, "TI") == 0) {
@@ -174,7 +176,7 @@ bool tt2DeserializeScene(TeletypeProgram &p, Tt2SceneRead rd, void *c) {
                     }
                 }
             } else if (section == SEC_TI) {
-                if (!isBlankLine(line) && tiIdx < TT2_TRIGGER_INPUT_COUNT) {
+                if (!isBlankLine(line) && tiIdx < Cfg::TriggerInputCount) {
                     long v[1];
                     if (parseInts(line, v, 1) == 1 &&
                         v[0] >= 0 && v[0] < int(TT2TriggerSource::Last)) {
@@ -223,8 +225,9 @@ bool tt2DeserializeScene(TeletypeProgram &p, Tt2SceneRead rd, void *c) {
     return ok;
 }
 
-bool tt2SerializeScript(const TeletypeProgram &p, int scriptIndex, Tt2SceneWrite w, void *c) {
-    if (scriptIndex < 0 || scriptIndex >= TT2_SCRIPT_COUNT) return false;
+template<typename Cfg>
+bool tt2SerializeScript(const TeletypeProgramT<Cfg> &p, int scriptIndex, Tt2SceneWrite w, void *c) {
+    if (scriptIndex < 0 || scriptIndex >= Cfg::ScriptCount) return false;
     char line[TT2_PRINT_LINE_MAX];
     const TT2Script &sc = p.scripts[scriptIndex];
     int len = sc.length > TT2_COMMANDS_PER_SCRIPT ? TT2_COMMANDS_PER_SCRIPT : sc.length;
@@ -236,8 +239,9 @@ bool tt2SerializeScript(const TeletypeProgram &p, int scriptIndex, Tt2SceneWrite
     return true;
 }
 
-bool tt2DeserializeScript(TeletypeProgram &p, int scriptIndex, Tt2SceneRead r, void *c) {
-    if (scriptIndex < 0 || scriptIndex >= TT2_SCRIPT_COUNT) return false;
+template<typename Cfg>
+bool tt2DeserializeScript(TeletypeProgramT<Cfg> &p, int scriptIndex, Tt2SceneRead r, void *c) {
+    if (scriptIndex < 0 || scriptIndex >= Cfg::ScriptCount) return false;
     char buf[TT2_COMMANDS_PER_SCRIPT * 128 + 1];
     size_t n = 0;
     int ch;
@@ -245,3 +249,8 @@ bool tt2DeserializeScript(TeletypeProgram &p, int scriptIndex, Tt2SceneRead r, v
     buf[n] = '\0';
     return loadScriptText(p, scriptIndex, buf) >= 0;
 }
+
+template bool tt2SerializeScene<TT2ConfigFull>(const TeletypeProgramT<TT2ConfigFull> &, Tt2SceneWrite, void *);
+template bool tt2DeserializeScene<TT2ConfigFull>(TeletypeProgramT<TT2ConfigFull> &, Tt2SceneRead, void *);
+template bool tt2SerializeScript<TT2ConfigFull>(const TeletypeProgramT<TT2ConfigFull> &, int, Tt2SceneWrite, void *);
+template bool tt2DeserializeScript<TT2ConfigFull>(TeletypeProgramT<TT2ConfigFull> &, int, Tt2SceneRead, void *);

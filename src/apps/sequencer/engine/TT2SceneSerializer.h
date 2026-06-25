@@ -20,16 +20,20 @@ using Tt2SceneRead = int (*)(void *ctx);
 
 // Serialize program -> text via write(ctx, ...). Returns false only on an
 // internal line-buffer overflow (a single command longer than the buffer).
-bool tt2SerializeScene(const TeletypeProgram &program, Tt2SceneWrite write, void *ctx);
+template<typename Cfg>
+bool tt2SerializeScene(const TeletypeProgramT<Cfg> &program, Tt2SceneWrite write, void *ctx);
 
 // Deserialize text (pulled via read(ctx)) into `staging`. The function init()s
 // `staging` first, so any omitted section keeps defaults; unknown #-sections are
 // skipped. Returns false on malformed input (script parse error, short numeric
 // row). The caller swaps `staging` into the live track only on true.
-bool tt2DeserializeScene(TeletypeProgram &staging, Tt2SceneRead read, void *ctx);
+template<typename Cfg>
+bool tt2DeserializeScene(TeletypeProgramT<Cfg> &staging, Tt2SceneRead read, void *ctx);
 
 // Serialize/deserialize a single script slot's text (its command lines only, no
 // #-section header). Deserialize replaces just that slot, leaving the rest of
 // the program untouched. Used by per-script save/load.
-bool tt2SerializeScript(const TeletypeProgram &program, int scriptIndex, Tt2SceneWrite write, void *ctx);
-bool tt2DeserializeScript(TeletypeProgram &program, int scriptIndex, Tt2SceneRead read, void *ctx);
+template<typename Cfg>
+bool tt2SerializeScript(const TeletypeProgramT<Cfg> &program, int scriptIndex, Tt2SceneWrite write, void *ctx);
+template<typename Cfg>
+bool tt2DeserializeScript(TeletypeProgramT<Cfg> &program, int scriptIndex, Tt2SceneRead read, void *ctx);
