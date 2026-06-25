@@ -42,7 +42,7 @@ The Fractal Track is a **step-sampled CV/Gate looper with mutation**. It samples
 
 ### KD-1: Input Source Resolution — Any-Engine via TrackEngine Output
 
-**Decision:** Read `_gateOutput` and `_cvOutput` directly from the linked track engines, not from sequence step data.
+**Decision:** Capture the parent's **final emitted output** — `gateOutput(0)` / `cvOutput(0)`, the rendered gate+CV the parent sends to its jack (after slide, transpose, gate-length, accumulator — everything its engine applies). **Not** sequence step data, and **not** any intermediate/pre-output engine state. Fractal mirrors what the parent *plays*: a parent rest (gate low) records a rest cell; a slewed CV records the slewed value at the section boundary.
 
 **Rationale:** The existing `LogicTrackEngine` already demonstrates per-tick resolution of parent engines via `_engine.trackEngine(index)`. The Fractal Track does NOT need a `FractalSourceInterface` — it just reads the concrete output of any engine. This avoids adding virtual methods to all 8 existing engine types.
 
