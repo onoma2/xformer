@@ -27,9 +27,11 @@ The whole TT2 core is `template<typename Cfg>`: `TeletypeProgramT<Cfg>`/`TT2Runt
 
 ## Config decision — `ScriptCount=3`, no init slot (RESOLVED)
 
-`ScriptCount=4` busts the union: `TeletypeProgramT<Mini>`=1820 → `TT2MiniTrack`=4×1820+2240+`_trackIndex`=**9522 > 9520** (`Track` union would grow, assert fails). Unnecessary anyway: boot runs `runScript(bootScriptIndex)` unconditionally and `bootScriptIndex = InitScript>=0 ? InitScript : 0` (`TeletypeProgram.h:122`) → with `InitScript=-1`, **script0 runs on boot/scene-load**. So script0 IS the per-scene init hook (set `M`/`MO.*`/output shaping there).
+The real `Track`-union cap is **NoteTrack = 9544 B**, not TT2Track's 9520 (PROJECT.md:251,293 — the 8-track `Track::_container` is sized by NoteTrack; a model below 9544 B adds no Model RAM). So `ScriptCount=4` (TT2MiniTrack=9522 ≤ 9544) *would* fit for free. We still choose **`ScriptCount=3`**: boot runs `runScript(bootScriptIndex)` unconditionally and `bootScriptIndex = InitScript>=0 ? InitScript : 0` (`TeletypeProgram.h:122`) → with `InitScript=-1`, **script0 runs on boot/scene-load**, so script0 IS the per-scene init hook (set `M`/`MO.*`/output shaping there). **script0 also fires as trigger-1** — triggering input 1 re-runs the scene's setup; that's the accepted trade for the smaller layout.
 
-**`TT2ConfigMini`:** `ScriptCount=3, DelayDepth=8, TriggerInputCount=2, MetroScript=2, InitScript=-1, SceneCount=4, PatternCount=4, PatternLength=64`. Expected sizes: `TeletypeProgramT<Mini>`≈1518, `TT2RuntimeT<Mini>`≈2192, `TT2MiniTrack`≈8.3 KB (≤9520, headroom). Pattern dims stay 4×64.
+**`TT2ConfigMini`:** `ScriptCount=3, DelayDepth=8, TriggerInputCount=2, MetroScript=2, InitScript=-1, SceneCount=4, PatternCount=4, PatternLength=64`. Sizes: `TeletypeProgramT<Mini>`≈1518, `TT2RuntimeT<Mini>`≈2192, `TT2MiniTrack`≈8.3 KB (≤9544 NoteTrack cap — ample headroom; the `<=9520` asserts below are a conservative TT2-family cap, not the union cliff). Pattern dims stay 4×64.
+
+**Execution note:** the per-task `commit` steps proceed under the user's standing go-ahead for this plan's execution run (per repo policy, commits otherwise need explicit confirmation).
 
 ---
 
@@ -109,7 +111,8 @@ template<> const TT2OpFuncT<TT2ConfigMini>* tt2OpTable<TT2ConfigMini>() { return
 (The builder in this TU's anon namespace instantiates all ~272 ops for Mini implicitly.)
 **Step 6 — implement (serializer).** In `TT2SceneSerializer.cpp`, after the Full quartet (`:253-256`), add the four `template ...<TT2ConfigMini>;` explicit instantiations (mirror each line, swap `TT2ConfigFull`→`TT2ConfigMini`).
 **Step 7 — run, expect PASS.**
-**Step 8 — commit:** `feat(tt2): instantiate Mini config (op table, trait decl+def, serializer)`
+**Step 8 — budget the second op table (ARM `.map`).** The engine `≤944` check does NOT cover this — `opTableBuilderMini` is a global in `.ccmram_bss`, and the Mini op bodies are a second `.text` set. `make -C build/stm32/release sequencer`, then: `grep -E 'opTableBuilderMini|tt2NativeOpTableMini' build/stm32/release/*.map` and check the section totals. Expect `.ccmram_bss` +`E_OP__LENGTH`×4 B (~1.7 KB; ~11 KB was free) and `.text` +~42 KB (~360 KB free). Record both deltas in the commit body.
+**Step 9 — commit:** `feat(tt2): instantiate Mini config (op table, trait decl+def, serializer)`
 
 ---
 
@@ -240,15 +243,18 @@ Ctor: `_activeScene=-1`, then call `changePattern()` once to seed (base ctor's v
 
 ## Phase 3 — Project serialization round-trip
 
-### Task 8: per-scene write/read round-trip
+### Task 8: round-trip at the `Track` level (mode dispatch, not just the model)
 
-**Files:** Test create `src/tests/unit/sequencer/TestTT2MiniSerialize.cpp` (delegation already wired in Task 4).
+**Files:** Test create `src/tests/unit/sequencer/TestTT2MiniSerialize.cpp`. **Round-trip a `Track`, NOT a bare `TT2MiniTrack`** — the risky code is `Track::trackModeSerialize` (mode→9), `Track::write`, `Track::read` (`Track.cpp`). A direct `TT2MiniTrack` round-trip passes even if the mode serializes as 0 or reads back as the wrong mode.
 
-**Step 1 — failing test** (read an existing model write/read test for the `VersionedSerializedWriter`/`Reader` + buffer idiom; mirror it). Fill 4 *distinct* scenes (e.g. script0 length differs per scene, or a marker command per scene), `write()` the `TT2MiniTrack` to a buffer, `read()` into a fresh `TT2MiniTrack`, assert each scene N round-trips to its own content and the four remain distinct, and `runtime` is re-inited.
-**Step 2 — register + run, expect FAIL** (if Task 4 delegation is incomplete, scenes come back blank — the silent-noop check).
-**Step 3 — fix** any Task-4 gap surfaced (likely the `write`/`read` case). No new code if Task 4 was complete.
+**Step 1 — failing test** (read an existing `Track` write/read test for the `VersionedSerializedWriter`/`Reader` + buffer idiom; mirror it):
+- Construct a `Track`, set mode to `Track::TrackMode::TeletypeMini`, fill 4 *distinct* scenes via `track.tt2MiniTrack().program(n)` (a per-scene marker — e.g. distinct script0 length or a marker command).
+- `track.write(writer)` to a buffer, `track.read(reader)` into a *fresh* `Track`.
+- **Assert: `fresh.trackMode() == TeletypeMini`** (catches a missing `trackModeSerialize`/`initContainer` case — would come back as Note), AND each of the 4 scenes round-trips to its own content and the four stay distinct.
+**Step 2 — register + run, expect FAIL** (Task-3/4 gap surfaces here: wrong mode back, or blank scenes).
+**Step 3 — fix** any Task-3/4 gap surfaced (likely a missing `trackModeSerialize`/`write`/`read` case). No new code if 3/4 were complete.
 **Step 4 — run, expect PASS.**
-**Step 5 — commit:** `test(tt2): mini 4-scene serialization round-trip`
+**Step 5 — commit:** `test(tt2): mini Track-level mode + 4-scene round-trip`
 
 ---
 
@@ -268,7 +274,8 @@ Ctor: `_activeScene=-1`, then call `changePattern()` once to seed (base ctor's v
 **Files:** `src/apps/sequencer/ui/pages/TeletypeScriptViewPage.cpp`, `src/apps/sequencer/ui/pages/TT2IoConfigPage.cpp`, `src/apps/sequencer/engine/TT2UiAccess.h`. **This is the correctness-critical task — wrong-union reads are silent, not compile errors.**
 
 **Step 1 — thread the scene index into Seam-1.** `TT2UiAccess.h` accessors take only `Track&` and hardwire `tt2Track().program()` (single program). Extend the accessor signatures with a `int scene` param (Full passes 0; Mini passes the active scene), and inside, branch `trackMode()`: `TeletypeV2` → `tt2Track().program()`, `TeletypeMini` → `tt2MiniTrack().program(scene)`. The page computes `scene = pattern() % TT2ConfigMini::SceneCount` from the track state it already holds.
-**Step 2 — enumerate every hazard** in `TeletypeScriptViewPage.cpp`: `!= TeletypeV2` guards at `:72,:78,:353,:396,:417,:476,:726` and `as<TT2TrackEngine>()` casts at `:109,:234,:735` (incl. `drawHud` `:234`), plus `TT2IoConfigPage`'s. For EACH: redirect to `tt2MiniTrack()` / `as<TT2MiniTrackEngine>()`, OR hard-block Mini *before* the deref. **Never widen a guard to admit Mini while leaving a downstream `tt2Track()`/`as<TT2TrackEngine>()`.** List each site + its decision in the commit body.
+**Step 2 — enumerate every hazard** in `TeletypeScriptViewPage.cpp`: `!= TeletypeV2` guards at `:72,:78,:353,:396,:417,:476,:726`, `as<TT2TrackEngine>()` casts at `:109,:234,:735` (incl. `drawHud` `:234`), **and the direct `tt2Track()` derefs in the edit-action paths — commit/duplicate/comment/delete/undo/save/load at `:744,:776,:796,:811,:834`** — plus `TT2IoConfigPage`'s. For EACH: redirect to `tt2MiniTrack()` / `as<TT2MiniTrackEngine>()`, OR hard-block Mini *before* the deref. **Never widen a guard to admit Mini while leaving a downstream `tt2Track()`/`as<TT2TrackEngine>()`.** List each site + its decision in the commit body.
+**Step 2b — grep gate (must pass before commit):** after wiring, every remaining `tt2Track()` / `as<TT2TrackEngine>()` in a Mini-admitted code path must be classified (redirected or provably Full-only). Run `grep -nE 'tt2Track\(\)|as<TT2TrackEngine>' src/apps/sequencer/ui/pages/TeletypeScriptViewPage.cpp src/apps/sequencer/ui/pages/TT2IoConfigPage.cpp` and confirm no unclassified site reachable when `trackMode()==TeletypeMini`.
 **Step 3 — IO page:** `TT2IoConfigPage` for Mini shows 2 trigger rows (`Cfg::TriggerInputCount`), 6 CV-in, 8 CV-out. **Exclude live-exec (`runLiveCommand`, `:735`) and SD I/O for Mini.**
 **Step 4 — render** any touched layout with `ui-preview/` (per CLAUDE.md OLED rule) and `open` the PNG.
 **Step 5 — build sim + host + ARM:** all 0 errors.
@@ -286,7 +293,8 @@ Ctor: `_activeScene=-1`, then call `changePattern()` once to seed (base ctor's v
 
 - Full host suite green: `ctest --test-dir build` — all `TestTeletypeV2*`/`TestTT2*` + new `TestTeletypeMini`/`TestTT2MiniTrack`/`TestTT2MiniEngine`/`TestTT2MiniSerialize`.
 - **Full TT2 unchanged** (additive): `sizeof(TeletypeProgramT<Full>)==3638`, `TT2RuntimeT<Full>==5880` still assert; `Track`/engine sizes unchanged on the ARM `.map`.
-- `sizeof`: `TeletypeProgramT<Mini>`<1700, `TT2RuntimeT<Mini>`<2600, `TT2MiniTrack`≤9520, `TT2MiniTrackEngine`≤944.
+- `sizeof`: `TeletypeProgramT<Mini>`<1700, `TT2RuntimeT<Mini>`<2600, `TT2MiniTrack`≤9520 (conservative; real union cap is NoteTrack 9544 per PROJECT.md:293), `TT2MiniTrackEngine`≤944.
+- **Second op table budget:** ARM `.map` shows `.ccmram_bss` and `.text` deltas within free space (Task 1 Step 8) — the engine `≤944` check does NOT cover the global op table.
 - Op-table coverage parity (Mini non-null wherever Full is).
 - Scene-switch: `p % SceneCount`; same-pattern `changePattern()` no-op; script0 runs on boot/scene-load so the metro period is the scene's, not 1000 (sim).
 - Output on the TT2 jack layer; serialization round-trip; Mini does NOT persist as the fall-through mode.
