@@ -4,7 +4,7 @@
 
 **Goal:** Add a second Teletype track mode ("TT-Mini": 2 scripts + metro, 8-deep delay) that stores 4 scenes and switches between them via the w-pattern selector (modulo-wrap), coexisting with the full 10-script TT2 track.
 
-**Architecture:** Instantiate a second config `TT2ConfigMini` against the already-merged `template<Cfg>` TT2 core, add a `TT2MiniTrack` model (`programs[SceneCount]` + one runtime), a `TeletypeMini` `TrackMode`, dispatch/routing/container wiring, a `TT2MiniTrackEngine`, and the UI seam's Mini branch. `changePattern()` selects `programs[pattern() % SceneCount]` and re-inits on a real scene change.
+**Architecture:** Instantiate a second config `TT2ConfigMini` against the already-merged `template<Cfg>` TT2 core, add a `TT2MiniTrack` model (`programs[SceneCount]` + one runtime), a `TeletypeMini` `TrackMode`, dispatch/routing/container wiring, a `TT2MiniTrackEngine`, and the UI seam's Mini branch. `changePattern()` just retargets `programs[pattern() % SceneCount]` — switching is **seamless**: the shared runtime carries, no reset, no re-boot (see the Scene-switch contract).
 
 **Tech Stack:** C++11, STM32F405 + host. Test idiom: `UNIT_TEST("X"){ CASE("..."){ expectEqual(a,b,"msg"); expect(cond,"msg"); } }` (see `src/tests/unit/sequencer/TestTT2Config.cpp`). Register each test with `register_sequencer_test(Name Name.cpp)` in `src/tests/unit/sequencer/CMakeLists.txt`.
 
