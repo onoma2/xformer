@@ -131,12 +131,12 @@ public:
     // touches. Synchronous on the UI thread, mirroring the legacy live path.
     // Defined in the .cpp (need the full Engine definition to lock).
     TT2EvalResult runLiveCommand(const TT2Command &cmd);
-    void triggerScript(int scriptIndex);
+    void triggerScript(int scriptIndex) override;
 
     // UI-thread toggles (also hold Engine::lock()). Mute gates the trigger-input
     // script firing; metro-active gates the METRO tick (variables.m_act).
-    void toggleScriptMute(int scriptIndex);
-    void toggleMetroActive();
+    void toggleScriptMute(int scriptIndex) override;
+    void toggleMetroActive() override;
 
     TT2OutputState &output() { return _output; }
     const TT2OutputState &output() const { return _output; }

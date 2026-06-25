@@ -63,6 +63,12 @@ public:
 
     virtual void changePattern() {}
 
+    // UI-control hooks (Seam-2): Teletype engines override; default no-ops so the
+    // script page can drive any engine through a TrackEngine& without a cast.
+    virtual void triggerScript(int scriptIndex) {}
+    virtual void toggleScriptMute(int scriptIndex) {}
+    virtual void toggleMetroActive() {}
+
     virtual bool receiveMidi(MidiPort port, const MidiMessage &message) { return false; }
     virtual void monitorMidi(uint32_t tick, const MidiMessage &message) {}
     virtual void clearMidiMonitoring() {}
