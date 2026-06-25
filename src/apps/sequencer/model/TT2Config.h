@@ -12,3 +12,14 @@ struct TT2ConfigFull {
     static constexpr int PatternCount      = 4;
     static constexpr int PatternLength     = 64;
 };
+
+struct TT2ConfigMini {
+    static constexpr int ScriptCount       = 3;
+    static constexpr int DelayDepth        = 8;
+    static constexpr int TriggerInputCount = 2;
+    static constexpr int MetroScript        = 2;
+    static constexpr int InitScript         = -1;
+    static constexpr int SceneCount         = 4;
+    static constexpr int PatternCount      = 4;
+    static constexpr int PatternLength     = 64;
+};

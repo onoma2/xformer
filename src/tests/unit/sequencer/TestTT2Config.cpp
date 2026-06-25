@@ -20,6 +20,17 @@ CASE("TT2ConfigFull traits match today's values") {
     expectEqual(TT2ConfigFull::PatternLength, 64, "PatternLength");
 }
 
+CASE("TT2ConfigMini traits") {
+    expectEqual(TT2ConfigMini::ScriptCount, 3, "ScriptCount");
+    expectEqual(TT2ConfigMini::DelayDepth, 8, "DelayDepth");
+    expectEqual(TT2ConfigMini::TriggerInputCount, 2, "TriggerInputCount");
+    expectEqual(TT2ConfigMini::MetroScript, 2, "MetroScript");
+    expectEqual(TT2ConfigMini::InitScript, -1, "InitScript");
+    expectEqual(TT2ConfigMini::SceneCount, 4, "SceneCount");
+    expectEqual(TT2ConfigMini::PatternCount, 4, "PatternCount");
+    expectEqual(TT2ConfigMini::PatternLength, 64, "PatternLength");
+}
+
 CASE("TeletypeProgramT<Full> layout is unchanged") {
     static_assert(sizeof(TT2PatternT<TT2ConfigFull>) == 138, "");
     static_assert(sizeof(TeletypeProgramT<TT2ConfigFull>) == 3638, "");
