@@ -439,6 +439,24 @@ On loopLast -> loopFirst boundary:
     wrap to loopFirst normally
 ```
 
+### KD-14b: Two-Axis Capture Model — Cadence × Fidelity
+
+> **Status: DEFERRED.** This pushes the fractal toward a *recorder*, which the design explicitly disclaims ("not a CV recorder, not a high-fidelity automation trace; intra-section motion is intentionally discarded"). Pinned here as a coherent future model, **not** in current scope. Build only if a feel-preserving transcriber is wanted alongside the mirror-looper.
+
+The MVP capture is one S&H per fractal section, snapped to the cell. A fuller model is **two orthogonal toggles** that span "grid looper → faithful recorder," sharing the harmony track's Rings (`cv_scaler`) trigger code (§4 of harmony-spec.md):
+
+**Axis 1 — Cadence (when a cell is written, `captureCadence`):**
+- **Section** (default): the fractal-divisor strobe. A time **grid** — rests where the parent was silent. The looper identity.
+- **Event (delta)**: capture on the parent's **hysteretic note-change** — Rings `cv_scaler` directional hysteresis (±⅓ semitone past a boundary) + an **inhibit window** (Rings `inhibit_strum_`). `recordPos` advances per *parent note event*, so the trunk becomes a compact **note-list** (no rests; glide/noise can't spray redundant cells). This is the harmony S&H trigger ported verbatim — no new theory.
+
+**Axis 2 — Fidelity (what timing is kept, `captureFidelity`):**
+- **Quantized** (default): snap the event to the cell; onset discarded.
+- **Feel**: sample CV **at the gate rising edge** (also kills the boundary-aliasing where the section strobe lands on the wrong step) + store the **onset phase** within the section. Playback schedules the gate at `sectionStart + onsetPhase·sectionDur` → swing/microtiming reproduced. Captures the **first** edge per section only (multiple sub-section hits = a separate ratchet feature).
+
+**The four corners:** section+quantized = today's grid looper · section+feel = grid rhythm with the parent's swing · event+quantized = clean note-list transcription · event+feel = faithful pitch + inter-note feel (most recorder-like).
+
+**Cost:** Event cadence is ~free (reuses harmony's trigger). **Feel needs an onset-phase field** (~3-4 bits) — the 16-bit cell (11 CV + 4 gateLen + 1 valid) is full, so it must widen to 24/32-bit: +1 B × 64-128 cells × 8 tracks on the tight SRAM rail. That RAM cost is the gate on Feel mode.
+
 ### KD-15: Timing Alignment — Bar-Quantized Loop Length, Beat Offset, Track Delay
 
 **Decision:** Add timing alignment features for locking loop length to bars, shifting loop position relative to the master transport, and microtiming nudging.

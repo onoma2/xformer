@@ -89,7 +89,7 @@ branches (concatenated, chained, generative, bit-word Path) → ornaments (rate/
 Live performance controls (Routable): branch count · path · ornament rate · ornament intensity.
 
 Deferred (later phase, nice-to-have):
-mutation/evolution (entire subsystem — KD-3/6/10) · CV-scan · capture variants (Blend/Once/PunchIn) · bar-quantized loop · beat-offset · snapshot · sleep · density/tilt.
+mutation/evolution (entire subsystem — KD-3/6/10) · CV-scan · capture variants (Blend/Once/PunchIn) · bar-quantized loop · beat-offset · snapshot · sleep · density/tilt · two-axis capture model (Event cadence + Feel/microtiming — KD-14b, the recorder direction).
 
 ## Key Design Constraints
 
