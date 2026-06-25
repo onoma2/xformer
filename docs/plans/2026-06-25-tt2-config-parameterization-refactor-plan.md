@@ -40,9 +40,9 @@
 ### Task 1: templatize the program struct
 **Files:** `model/TeletypeProgram.h`.
 
-1. **Failing test** (`TestTT2Config.cpp`, extend): `static_assert(sizeof(TeletypeProgramT<TT2ConfigFull>) == <current sizeof>)` — capture the current value first (`sizeof(TeletypeProgram)` today). Also `expect(std::is_trivially_copyable<TeletypeProgramT<TT2ConfigFull>>::value)`.
+1. **Failing test** (`TestTT2Config.cpp`, extend): `static_assert(sizeof(TeletypeProgramT<TT2ConfigFull>) == 3638, "")` (host baseline from Task 0a). Also `expect(std::is_trivially_copyable<TeletypeProgramT<TT2ConfigFull>>::value)`.
 2. Run → fails (type not templated).
-3. Implement: `template<typename Cfg> struct TeletypeProgramT` + `TT2ScriptT<Cfg>` (arrays use `Cfg::ScriptCount`, `Cfg::TriggerInputCount`; `Cfg::CommandsPerScript` is fixed → keep `TT2_COMMANDS_PER_SCRIPT`). `init(...)` → free function template (global namespace, ADL). Boot defaults honor `Cfg::InitScript < 0`. Add aliases `using TeletypeProgram = TeletypeProgramT<TT2ConfigFull>; using TT2Script = …;` + the existing `sizeof <= 3640` static_assert via the alias. Keep `TT2_SCRIPT_COUNT` etc. as **permanent** `= TT2ConfigFull::X` compat aliases.
+3. Implement: `template<typename Cfg> struct TeletypeProgramT`. **Only the two arrays sized by a varying value become `Cfg::`** — `scripts[Cfg::ScriptCount]` and `triggerSource[Cfg::TriggerInputCount]`. Everything else keeps its fixed constant: `patterns[TT2_PATTERN_COUNT]`, `cvInputSource[TT2_CV_INPUT_COUNT]`, `cvOutput*[TT2_CV_OUTPUT_COUNT]`, and `TT2Script`/`TT2Command`/`TT2Pattern` stay **non-templated** (their dims — commands-per-script 6, pattern length 64 — are fixed, not among the six). `init(...)` → free function template (global namespace, ADL). Boot defaults honor `Cfg::InitScript < 0`. Add alias `using TeletypeProgram = TeletypeProgramT<TT2ConfigFull>;` + the existing `sizeof <= 3640` static_assert via the alias. Keep `TT2_SCRIPT_COUNT` etc. as **permanent** `= TT2ConfigFull::X` compat aliases.
 4. Run full suite + new asserts → PASS, sizeof identical.
 5. **Commit:** `refactor(tt2): template TeletypeProgram on config, alias Full`
 
@@ -53,9 +53,9 @@
 ### Task 2: templatize the runtime struct + its inline helpers
 **Files:** `model/TeletypeRuntime.h`.
 
-1. **Failing test:** `static_assert(sizeof(TT2RuntimeT<TT2ConfigFull>) == <current>)` + trivially-copyable.
+1. **Failing test:** `static_assert(sizeof(TT2RuntimeT<TT2ConfigFull>) == 5880, "")` (host baseline from Task 0a) + trivially-copyable.
 2. Run → fails.
-3. Implement: `template<typename Cfg> struct TT2RuntimeT` — `j/k[Cfg::ScriptCount]`, `script_pol[Cfg::TriggerInputCount]`, `every[Cfg::ScriptCount][TT2_COMMANDS_PER_SCRIPT]`, `delay.entries[Cfg::DelayDepth]`, `scriptLastMs[Cfg::ScriptCount]`; fixed dims keep their constants. **Make `init`, `tt2InitVariables`, `tt2DelayAdd` (`:395`), `tt2DelayClear` (`:412`), and the other inline helpers function templates** on `Cfg`. Alias `using TT2Runtime = TT2RuntimeT<TT2ConfigFull>;` + sizeof assert.
+3. Implement: `template<typename Cfg> struct TT2RuntimeT`. **Templated sub-structs (each holds a Cfg-varying array): `TT2VariablesT<Cfg>`** (`j[Cfg::ScriptCount]`, `k[Cfg::ScriptCount]`, `script_pol[Cfg::TriggerInputCount]` — all its other arrays `cv[8]/q[64]/n_scale[16]/tr[8]/dashboard[16]` keep fixed constants), **`TT2DelayQueueT<Cfg>`** (`entries[Cfg::DelayDepth]`), **`TT2EveryStateT<Cfg>`** (`every[Cfg::ScriptCount][TT2_COMMANDS_PER_SCRIPT]`). `TT2RuntimeT<Cfg>` also carries `scriptLastMs[Cfg::ScriptCount]`. **Stay NON-templated (fixed dims):** `TT2Stack` (StackDepth=16), `TT2ExecState` (ExecDepth=8), `TT2Metro`, `TT2Rng`, `TT2Turtle`, `TT2Midi`, `TT2DelayEntry`, `TT2RuntimeCommand`, `TT2EveryCount`. **Helper rule:** a free/inline helper becomes `template<Cfg>` iff its parameter type is now templated — i.e. takes `TT2RuntimeT<Cfg>&`/`TT2VariablesT<Cfg>&`/`TT2DelayQueueT<Cfg>&`/`TT2EveryStateT<Cfg>&` (so `init`, `tt2InitVariables`, `tt2DelayAdd` `:395`, `tt2DelayClear` `:412`, and the `tt2Active*` accessors that take `TT2Runtime&` all template). Helpers taking only a plain sub-struct (`tt2RngNext/Range` on `TT2Rng&`, `tt2Midi*` on `TT2Midi&`, `tt2Every*` on `TT2EveryCount&`) **stay plain**. Alias `using TT2Runtime = TT2RuntimeT<TT2ConfigFull>;` + keep existing `<= 5900` assert.
 4. Run full suite → PASS, sizeof identical. (`TestTeletypeV2Delay` exercises the templated delay helpers.)
 5. **Commit:** `refactor(tt2): template TT2Runtime + inline helpers on config`
 
@@ -64,15 +64,17 @@
 ## Phase 3 — Template runner + evaluator + the `tt2OpTable` trait
 
 ### Task 3: `TT2Runner.h`
-**Files:** `engine/TT2Runner.h`.
-1. Templatize `runScript`, `tt2AdvanceDelays`, `tt2AdvanceMetro`, `tt2RunFunction*`, `runStoredCommand` on `Cfg`; resolve table from `tt2OpTable<Cfg>()` internally; metro fires `Cfg::MetroScript`, delay loops `Cfg::DelayDepth`, skip boot when `Cfg::InitScript < 0`.
-2. Run suite → PASS. **Commit:** `refactor(tt2): template TT2Runner, table via Cfg trait`
+**Files:** `engine/TT2Runner.h`. (`runStoredCommand` is NOT here — it lives in `TeletypeNativeOps.cpp`, Task 5.)
+1. Templatize the five inline functions on `Cfg`, each taking `const TeletypeProgramT<Cfg>&`, `TT2RuntimeT<Cfg>&`, `TT2OutputState&`: `runScript`, `tt2RunFunction`, `tt2RunFunctionLine`, `tt2AdvanceDelays`, `tt2AdvanceMetro`. (`tt2AdvanceMetro<Cfg>` calls `runScript<Cfg>` — both templated.)
+2. Swap **only the varying constants** to `Cfg::`: `TT2_SCRIPT_COUNT`→`Cfg::ScriptCount` (`:16,:63,:93`), `TT2_DELAY_DEPTH`→`Cfg::DelayDepth` (`:126`), `TT2_METRO_SCRIPT`→`Cfg::MetroScript` (`:184,:201`). **Keep fixed constants:** `TT2_COMMANDS_PER_SCRIPT` (`:21,:65`), `TT2_EXEC_DEPTH` (`:25,:66,:96,:144`), `TT2_COMMAND_MAX_LENGTH` (`:157`).
+3. **Do NOT reference `tt2OpTable` and do NOT add boot/init logic** — the runner has neither. Keep the `evaluateCommand(cmd, runtime, output, &program)` calls exactly as-is; for Full they bind to today's non-template `evaluateCommand`, and become the templated overload after Task 4.
+4. Run suite (`TestTeletypeV2{Metro,Delay,ScriptRunner,Function}` exercise these five) → PASS. **Commit:** `refactor(tt2): template TT2Runner functions on config`
 
 ### Task 4: `TT2Evaluator.h` — op-func type + trait decl + Full overload
 **Files:** `engine/TT2Evaluator.h` (declarations), `engine/TeletypeNativeOps.cpp` (stub definition).
 1. **Failing test** (`TestTT2Config.cpp` or a new `TestTT2OpTable.cpp`): `expect(tt2OpTable<TT2ConfigFull>() == tt2NativeOpTable)` (identity with the legacy global). Won't compile yet.
 2. Run → fails.
-3. Implement: `template<typename Cfg> using TT2OpFuncT = …;`, `using TT2OpFunc = TT2OpFuncT<TT2ConfigFull>;`, **both** the primary `template<typename Cfg> const TT2OpFuncT<Cfg>* tt2OpTable();` AND the explicit-specialization declaration `template<> const TT2OpFuncT<TT2ConfigFull>* tt2OpTable<TT2ConfigFull>();` in the header (blocker B1). `evaluateSegment`/`evaluateCommand` → `template<Cfg>` with table as defaulted param `= tt2OpTable<Cfg>()`; `Cfg` deduces from the `runtime` arg (not `program`); keep the explicit-table overload for `fakeOpTable`.
+3. Implement in `TT2Evaluator.h`: `template<typename Cfg> using TT2OpFuncT = void(*)(TT2RuntimeT<Cfg>&, TT2OutputState&, const TeletypeProgramT<Cfg>*, int16_t*, uint8_t&, bool, TT2EvalError&);` + `using TT2OpFunc = TT2OpFuncT<TT2ConfigFull>;` (keeps the existing `extern const TT2OpFunc* tt2NativeOpTable;` decl valid). Add **both** the primary `template<typename Cfg> const TT2OpFuncT<Cfg>* tt2OpTable();` AND the explicit-spec *declaration* `template<> const TT2OpFuncT<TT2ConfigFull>* tt2OpTable<TT2ConfigFull>();` (B1). Templatize on `Cfg` (deducing from the `runtime`/`program` args): the **full** `evaluateSegment` (keeps explicit `const TT2OpFuncT<Cfg>* table, size_t count` params — this is what the fake-ops test injects), the **convenience** `evaluateSegment`/`evaluateModPrefix`/`evaluateModPrefixStack` (now pass `tt2OpTable<Cfg>(), tt2NativeOpCount` instead of the hardcoded global), `tt2EnqueueDelayBody`, `tt2PushStackBody`, and `evaluateCommand`. **`evaluateCommand` gets NO table param** — it calls the convenience wrappers which resolve the trait. `tt2ClampDelayMs` (scalar) stays plain. Count `tt2NativeOpCount` is config-independent (`E_OP__LENGTH`) — keep using the global for the size arg.
 4. **MANDATORY stub so this commit links** (blocker — otherwise every `runScript`/`evaluateCommand` caller, incl. `TT2TrackEngine.cpp:76,130,143,360` + ~23 test TUs, hits an undefined `tt2OpTable<TT2ConfigFull>()` and the whole `sequencer` target fails to link). Header (`TT2Evaluator.h`) holds only the primary template + the explicit-spec *declaration* (B1). The **single definition** goes in `TeletypeNativeOps.cpp` (NOT the header — a non-inline explicit specialization in a widely-included header is an ODR multiple-definition): `template<> const TT2OpFuncT<TT2ConfigFull>* tt2OpTable<TT2ConfigFull>() { return tt2NativeOpTable; }`. The legacy global already exists (`TeletypeNativeOps.cpp:4301`) and is valid here since ops aren't templated yet. **Task 5 EDITS this definition's body in place** (`return opTableBuilderFull.table;`) — it must not add a second definition of the same specialization.
 5. Run full suite → PASS (trait-identity test green, link holds). **Commit:** `refactor(tt2): template evaluator + tt2OpTable trait (stub → global)`
 
@@ -88,9 +90,11 @@
 4. Run full suite (incl. `TestTeletypeV2NativeOps`/`ScriptRunner`/`Function`) + the Task-4 trait-identity test → PASS.
 5. **Commit:** `refactor(tt2): template native ops + helpers + Full op table`
 
-### Task 6: printer / serializer / loader
-**Files:** `engine/TT2Printer.{h,cpp}`, `engine/TT2SceneSerializer.{h,cpp}`, `engine/TT2ScriptLoader.h`.
-Templatize on `Cfg`; add explicit `template …<TT2ConfigFull>;` instantiation at the end of the two `.cpp`s (out-of-line defs). Metro/init markers read `Cfg::`. Run suite (incl. `TestTT2SceneSerializer`) → PASS. **Commit:** `refactor(tt2): template printer/serializer/loader (+explicit Full instantiation)`
+### Task 6: serializer + loader (printer is config-independent — SKIP)
+**Files:** `engine/TT2SceneSerializer.{h,cpp}`, `engine/TT2ScriptLoader.h`. **`TT2Printer.{h,cpp}` is NOT touched** — `tt2PrintCommand(const TT2Command&)`/`tt2PrintScript(const TT2Script&)` take only fixed non-templated types, use no varying constant.
+- `TT2SceneSerializer`: templatize the four functions (`tt2SerializeScene`/`tt2DeserializeScene`/`tt2SerializeScript`/`tt2DeserializeScript`, each takes `TeletypeProgram&`) on `Cfg`. Swap → `Cfg::`: `TT2_SCRIPT_COUNT` (`:53,:227,:240`), `TT2_METRO_SCRIPT`/`TT2_INIT_SCRIPT` (`:55,:56,:129,:131`), `TT2_TRIGGER_INPUT_COUNT` (`:84,:177`). Keep `TT2_PATTERN_COUNT` and the numbered-script `<= '8'` char-range literal as-is (Full-only, deferred). **Out-of-line defs → add explicit `template ...<TT2ConfigFull>;` instantiations at the `.cpp` end** or other TUs won't link.
+- `TT2ScriptLoader.h` (inline): templatize `loadScriptText`/`setScriptCommand`/`insertScriptCommand`/`deleteScriptCommand` on `Cfg`; `TT2_SCRIPT_COUNT` (`:18,:78,:91,:106`) → `Cfg::ScriptCount`; `TT2_COMMANDS_PER_SCRIPT` stays fixed.
+Run suite (incl. `TestTT2SceneSerializer`) → PASS. **Commit:** `refactor(tt2): template serializer + loader (+explicit Full instantiation)`
 
 ---
 
