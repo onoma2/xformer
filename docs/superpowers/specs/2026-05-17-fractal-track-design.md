@@ -1,14 +1,12 @@
 # Fractal Track Engine — Recorder/Mutator Design
 
-> Current status, 2026-05-22: historical spec. The current best contract is in
-> `.tasks/fractal-track-implementation/TASK.md`,
-> `.tasks/fractal-track-implementation/DICTIONARY.md`, and
-> `docs/fractal-track-options-comparison.html`.
+> **Current truth**, paired with `scratch/fractal-1page.md` (kept in sync). This doc carries the
+> KD-by-KD detail; the 1-pager is the at-a-glance view.
 >
 > Current topology: FractalTrack is a parent-dependent command/rule sequencer over
 > sampled melodic CV/gate material. Parent tracks provide the motif; the engine keeps a
 > small volatile trunk of 16-bit pitch/gate-length sections; the model owns capture/read rules
-> such as record extent, Replace/Latch/Once, PunchIn, lock, and loop lens. Fractal is a
+> such as record extent, Replace/Latch capture, lock, and loop lens. Fractal is a
 > melodic material mirror, not a high-fidelity CV recorder. It should not aim to capture
 > every CV movement inside a section. Fractal does not know why the parent output changed:
 > parent sequencing state, mutes, routing, resetMeasure, held notes, curves, and scripts are all opaque.
@@ -40,7 +38,14 @@ The Fractal Track is a **step-sampled CV/Gate looper with mutation**. It samples
 
 ### KD-1: Input Source Resolution — Any-Engine via TrackEngine Output
 
-**Decision:** Capture the parent's **final emitted output** — `gateOutput(0)` / `cvOutput(0)`, the rendered gate+CV the parent sends to its jack (after slide, transpose, gate-length, accumulator — everything its engine applies). **Not** sequence step data, and **not** any intermediate/pre-output engine state. Fractal mirrors what the parent *plays*: a parent rest (gate low) records a rest cell; a slewed CV records the slewed value at the section boundary.
+**Decision:** Capture the parent's **final emitted output** — `gateOutput(0)` / `cvOutput(0)`, the rendered gate+CV the parent sends to its jack (after slide, transpose, gate-length, accumulator — everything its engine applies). **Not** sequence step data, and **not** any intermediate/pre-output engine state. Fractal mirrors what the parent *plays*: a parent rest (gate low) records a rest cell; a slewed CV records the slewed value.
+
+**Observe-over-section, commit-at-boundary (capture mechanics).** One cell per section, but a single boundary sample can't measure gate length or onset — so the engine **observes the parent's `gateOutput(0)`/`cvOutput(0)` every tick across the section** and accumulates:
+- **gate length** — count of ticks the gate was high ÷ section ticks → the 4-bit gateLen field (0 if never high → rest).
+- **onset** (Feel only, KD-14b) — the section-fraction at the **first rising edge**.
+- **CV** — sampled-and-held: at the **first rising edge** in Feel/at the boundary in Quantized (a rest holds the last value but writes gateLen 0).
+
+At the section boundary it **commits one summarized cell** (CV + gateLen + valid, plus onset in Feel). Intra-section motion beyond these three summaries is discarded.
 
 **Rationale:** The existing `LogicTrackEngine` already demonstrates per-tick resolution of parent engines via `_engine.trackEngine(index)`. The Fractal Track does NOT need a `FractalSourceInterface` — it just reads the concrete output of any engine. This avoids adding virtual methods to all 8 existing engine types.
 
@@ -60,12 +65,18 @@ The Fractal Track is a **step-sampled CV/Gate looper with mutation**. It samples
 ```cpp
 uint16_t _trunk[CONFIG_FRACTAL_MAX_CELLS];  // inline engine member, CCMRAM BSS
 
-// bits 0-10:  CV (11-bit fixed-point, semitones rel root, ~5.9 cents/LSB)
+// bits 0-10:  CV — signed 11-bit, semitones rel root (see encoding below)
 // bits 11-14: gate length (4-bit: 0=rest, 1=trigger, 2-14=proportional, 15=full/tie)
 // bit 15:     valid (uncaptured cells output the project root, gate off)
 ```
 
 Configurable length: default **64 cells**, max **128**.
+
+**CV encoding (exact):** bits 0-10 are a **signed two's-complement 11-bit** value `c ∈ [-1024, 1023]`. Range is **±5 octaves** about the project root (±60 semitones, ±5 V at 1V/oct), so:
+- `semitonesRelRoot = c × 60 / 1024` → LSB = 60/1024 ≈ **0.0586 st (5.86 cents)**
+- `volts = c × 5 / 1024` → LSB ≈ **4.88 mV**; `c = 0` is the root (bias = root).
+- **Encode:** `c = clamp(round(semitonesRelRoot × 1024 / 60), -1024, 1023)` (out-of-range parent CV clamps to ±5 oct).
+- The captured value is the parent's output **relative to the project root**; the fractal's own octave/transpose are applied at playback, not stored.
 
 **Why inline, not heap:** the engine is a discriminated-union member in `CCMRAM_BSS`. An inline array is pre-allocated BSS — it costs nothing beyond the engine's union slot, needs no allocator, and honours Stage Gate D ("no heap in the tick path"). A heap buffer would change the rail, require OOM handling, and break that gate.
 
@@ -74,7 +85,7 @@ Configurable length: default **64 cells**, max **128**.
 **RAM:**
 - Trunk: default 64 cells × 2 B = **128 B**, max 128 × 2 B = **256 B**
 - Onset array: max 128 × 1 B = **128 B**
-- Both in **CCMRAM**, inside the FractalTrackEngine union slot → **net-zero** while the engine stays under the engine-union max (944 B). Not in SRAM, not on the heap.
+- Both in **CCMRAM**, inside the FractalTrackEngine union slot → **net-zero** while the engine stays under the engine-union max (912 B). Not in SRAM, not on the heap.
 
 **Why bitpacked uint16:** one cell = one section snapshot. 11-bit CV (~5.9 cents/LSB) is ample for a mirrored melodic line; the 4-bit gate-length field carries rest / trig / proportional / tie in a single word. 16 bits/cell with no split arrays and no padding.
 
@@ -199,9 +210,10 @@ On trunk-phase loop boundary:
 
 ### KD-7: Record Trigger — Fractal-Local Record Arm
 
-**Decision:** Recording is controlled by a **Fractal-local `_recordArmed` flag**. Not tied to the global `_engine.recording()` state.
-- User toggles record arm via list UI parameter or dedicated button.
-- When armed and transport is running: records source gate+CV into buffer on each step.
+**Decision:** Recording is **Fractal-local**, not tied to the global `_engine.recording()` state. Two layers, one concept:
+- **Model:** `recordTrigger` — a **Routable** field. The user sets it (list-UI toggle / button) or a CV/internal source drives it (so capture can be sequenced/automated).
+- **Engine:** resolves `recordTrigger` to a per-tick `_recordArmed` bool. Capture executes when `_recordArmed && !lock`, per the Replace/Latch rule (KD-14). `recordTrigger` is the *input*; `_recordArmed` is its *resolved state* — not two competing mechanisms.
+- The "capture rule while unlocked" (Replace continuously overwrites) is simply what runs **when armed**; arming is the gate, the rule is the write semantics.
 - Auto-stop conditions: buffer fills to `loopLast`, or user disarms.
 - Auto-capture: if buffer is empty and recording starts, first loop pass fills it.
 
@@ -220,12 +232,12 @@ On trunk-phase loop boundary:
 
 ### KD-9: Engine Container Impact + RAM Allocation Policy
 
-**Decision:** FractalTrackEngine must stay at or below the engine-union max (944 B = TT2TrackEngine). It is a union member in `CCMRAM_BSS`, so staying under that max means **zero net CCMRAM** (no additive ×8 allocation).
+**Decision:** FractalTrackEngine must stay at or below the engine-union max — **912 B**, set by TeletypeTrackEngine (PROJECT.md:299; note the TT2TrackEngine `static_assert` allows ≤944, so 912 is the conservative documented gate — budget against it). It is a union member in `CCMRAM_BSS`, so staying under the max means **zero net CCMRAM** (no additive ×8 allocation).
 
 **RAM allocation policy:**
 1. **Inline trunk, no heap:** the trunk is an inline `uint16_t` member (KD-2) — default 64 cells (128 B), max 128 cells (256 B), in the engine's CCMRAM slot. No allocator, no OOM path, no per-engine heap cap.
 2. **One trunk per engine, not per pattern:** pattern switching changes config only; the single inline trunk is not swapped or reallocated. No 17× amplification.
-3. **ARM `sizeof` probe required before Phase 4-5:** build a skeleton FractalTrackEngine on STM32 and report `sizeof` before adding deferred state (e.g. the KD-14b onset-phase cell widening, or MutationHistory if it un-defers). This validates the ~600 B estimate against the 944 B gate; if it's wrong, re-budget or cut.
+3. **ARM `sizeof` probe required before Phase 4-5:** build a skeleton FractalTrackEngine on STM32 and report `sizeof` before adding deferred state (e.g. the KD-14b onset-phase cell widening, or MutationHistory if it un-defers). This validates the ~600 B estimate against the 912 B gate; if it's wrong, re-budget or cut.
 
 **Engine members estimate:**
 - TrackEngine base (~100 B)
@@ -234,7 +246,7 @@ On trunk-phase loop boundary:
 - MutationHistory: 16 records x ~16 B = ~256 B inline
 - SelectionPressure mode + EvolutionDepth (2 B on model, 0 B in engine)
 - Inline `uint16_t` trunk (KD-2): 128 cells × 2 B = 256 B, in the engine's CCMRAM slot
-- **Target: ~600 B** — under the 944 B engine-union gate. (MutationHistory is deferred with the rest of the evolution subsystem; if it un-defers it adds ~256 B inline and must be re-probed against the gate.)
+- **Target: ~600 B** — under the 912 B engine-union gate. (MutationHistory is deferred with the rest of the evolution subsystem; if it un-defers it adds ~256 B inline and must be re-probed against the gate.)
 
 ### KD-10: Mutation Zone — Scoped Transform Range
 
@@ -428,7 +440,7 @@ The toggles share the harmony track's Rings (`cv_scaler`) trigger code (§4 of h
 
 **The four corners:** section+quantized = today's grid looper · section+feel = grid rhythm with the parent's swing · event+quantized = clean note-list transcription · event+feel = faithful pitch + inter-note feel (most recorder-like).
 
-**Cost:** Event cadence is ~free (reuses harmony's trigger). **Feel** keeps the 16-bit cell intact and adds a **parallel onset byte array** `uint8 _onset[CELLS]` (4-bit onset phase per cell): +1 B × 128 cells = **+128 B** on the engine's **CCMRAM** trunk, bringing the engine to ~730 B — under the 944 B union gate (net-zero so long as mutation, the other ~256 B grower, stays deferred; the two cannot both land — KD-9). `model` params: `captureCadence` (uint8), `captureFidelity` (uint8).
+**Cost:** Event cadence is ~free (reuses harmony's trigger). **Feel** keeps the 16-bit cell intact and adds a **parallel onset byte array** `uint8 _onset[CELLS]` (4-bit onset phase per cell): +1 B × 128 cells = **+128 B** on the engine's **CCMRAM** trunk, bringing the engine to ~730 B — under the 912 B union gate (~182 B headroom; net-zero so long as mutation, the other ~256 B grower, stays deferred; the two cannot both land — KD-9). `model` params: `captureCadence` (uint8), `captureFidelity` (uint8).
 
 ### KD-15: Timing Alignment — Bar-Quantized Loop Length, Beat Offset, Track Delay
 
@@ -579,8 +591,10 @@ else:
 **Goal:** `FractalTrack` and `FractalSequence` in the Track container, serializable.
 
 **Files:**
-- NEW `model/FractalSequence.h` — minimal sequence: divisor, scale, root, runMode, firstStep, lastStep, playMode, clockSource, resetMeasure (~22 B).
-- NEW `model/FractalTrack.h` — 17 sequences + track params (MVP core only): sourceA, sourceB, gateLogic, cvLogic, bufferLength, recordArmed, recordMode, punchMode, loopMode, recordQuantize, lock, loopFirst, loopLast, loopBars, beatOffset, loopPhase, rotate, complexity, patience, mutationProb, octaveShiftProb, density, tilt, slideTime, octave, transpose, routedScan. (mutateFirst, mutateLast deferred to Phase 3. evolutionDepth, pressureMode deferred to Phase 4. trunkCycles, branchCount, pathType, orderMode, branchTransformFlags deferred to Phase 5. ornamentProb, ornamentMode deferred to Phase 5.)
+> **Scope authority:** the in-scope/deferred split is the 1-pager's ledger (`scratch/fractal-1page.md`). The field lists below reflect it; the older "deferred to Phase 3/4/5" annotations are superseded by that ledger.
+
+- NEW `model/FractalSequence.h` — minimal sequence: divisor, clockMultiplier, resetMeasure, runMode, scale group, firstStep, lastStep, loopFirst, loopLast, rotate, orderMode, loopMode (Loop), recordFirst, recordLast, recordMode (~28 B). *(Deferred: clockSource, punchMode, recordQuantize, loopBars, beatOffset, loopPhase.)*
+- NEW `model/FractalTrack.h` — 17 sequences + track params (**in scope**): sourceA, sourceB, gateLogic, cvLogic (two-source mix), bufferLength, recordTrigger (Routable), lock, octave, transpose, slideTime, cvUpdateMode, scale group (inherit), ornFirst, ornLast, branchCount, path, branchSeed, branchPool, ornamentRate, ornamentIntensity, captureCadence, captureFidelity. **Routable:** recordTrigger, branchCount, path, ornamentRate, ornamentIntensity. *(Deferred — reserved, not built: routedScan/clockSource (CV-scan), density, tilt, complexity, patience, mutationProb, octaveShiftProb, mutateFirst, mutateLast, evolutionDepth, pressureMode, and the Blend/Once/PunchIn capture variants.)*
 - EDIT `model/Track.h` — add `Fractal` to TrackMode enum, Container, union, accessors, initContainer.
 - EDIT `model/Routing.h` — add `FractalFirst..FractalLast` routing targets.
 - EDIT `engine/Engine.h` — add `FractalTrackEngine` to TrackEngineContainer typedef.
@@ -615,7 +629,7 @@ else:
 
 **Cycle safety:** Engine checks source track indices < Fractal track index at creation time. Warns and treats invalid sources as idle.
 
-**List UI integration (Phase 2, not deferred):** `FractalTrackListModel` with MVP core params immediately: Clock Source (Internal/External), PlayMode, Divisor, Scale, Root, Source A/B, Gate/CV Logic, BufferLength, Record Arm, Clear Buffer (action), Record Mode (Replace/Latch), Punch Mode (Immediate/PunchIn), Loop Mode (Loop/Once), Rec Quantize (Off/On), Lock, Density, Tilt, Loop First/Last, Loop Bars, Beat Offset, Loop Phase, Rotate, SlideTime, Octave, Transpose. When ClockSource=External, divisor, PlayMode, and gateLength are hidden (they have no effect). When LoopBars > 0, Loop Last is derived and hidden from the list UI (LoopBars displayed instead). This list lives in TrackPage.cpp's existing list routing — no new page type needed. Mutation/evolution params (Complexity, Patience, MutationProb, OctaveShiftProb) are also included from Phase 1 since they're model fields.
+**List UI integration (Phase 2):** `FractalTrackListModel` with the **in-scope** params: Divisor, Clock Mult, Reset Measure, Run Mode, Scale, Root, Source A/B, Gate/CV Logic, BufferLength, Record Arm (recordTrigger), Clear Buffer (action), Record Mode (Replace/Latch), Capture Cadence (Section/Event), Capture Fidelity (Quantized/Feel), Lock, Loop First/Last, Order, Rotate, Ornament Zone First/Last, Branch Count, Path, Branch Pool, Ornament Rate/Intensity, Track Delay, SlideTime, Octave, Transpose. This list lives in TrackPage.cpp's existing list routing — no new page type needed. *(Deferred, not shown: Clock Source/CV-scan, Punch Mode, Loop Mode Once, Rec Quantize, Loop Bars, Beat Offset, Loop Phase, Density, Tilt, and all mutation/evolution params.)*
 
 **Verification:** STM32 build, manual test via list UI: assign NoteTrack as parent, record one loop, hear it repeat.
 
@@ -720,7 +734,7 @@ else:
 
 **Checks:**
 - `sizeof(FractalTrack)` under 9544 B.
-- `sizeof(FractalTrackEngine)` under the 944 B engine-union gate (TT2TrackEngine).
+- `sizeof(FractalTrackEngine)` under the 912 B engine-union gate (TeletypeTrackEngine, PROJECT.md:299).
 - Inline trunk (CCMRAM): 64 cells × 2 B = 128 B default, 128 cells = 256 B max.
 - Full `.data + .bss` stays under 120 KB.
 - Config serialization round-trip (model params only — buffer is volatile).

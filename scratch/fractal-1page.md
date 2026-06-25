@@ -1,8 +1,7 @@
 # Fractal Track — Current Design Summary
 
 **Status:** Pre-implementation. Blocked on stochastic completion + RAM budget.
-**Last updated:** 2026-05-22
-**Canonical details:** DICTIONARY.md (vocabulary/ownership), TASK.md (phases/gates)
+**Canonical:** this file + `docs/superpowers/specs/2026-05-17-fractal-track-design.md` are the current truth (the two are kept in sync). The design doc carries the KD-by-KD detail; this 1-pager is the at-a-glance view.
 
 ---
 
@@ -17,9 +16,10 @@ It is not a stochastic generator, not a note sequencer, and not a high-fidelity 
 **Mirror with section grid.** One inline `uint16_t` trunk per engine instance. Default 64 cells (128 B), max 128 cells (256 B). No heap. No per-pattern buffer. Pattern switch changes config only; trunk survives.
 
 **Cell encoding (16 bits):**
-- bits 0–10: CV (11-bit fixed-point, ~5.9 cents/LSB)
+- bits 0–10: CV — signed 11-bit (`c ∈ [-1024,1023]`), semitones rel root: `semis = c·60/1024` (±5 oct, LSB ≈ 5.86 cents); `c=0` = root. See KD-2 for encode/clamp.
 - bits 11–14: gate length (0=rest, 1=trigger, 2–14=proportional, 15=full/tie)
 - bit 15: valid (uncaptured cells output project root note with gate off)
+- (Feel mode, KD-14b: a parallel `uint8 _onset[]` array holds the per-cell gate-onset phase — not packed in the cell.)
 
 ## Ownership
 
@@ -61,9 +61,9 @@ Tracks are a **discriminated union** (`Container` sized to the largest member), 
 | Item | Size | Union max (gate) | Net cost |
 |------|------|------------------|----------|
 | FractalTrack (model, SRAM) | ~600 B | 9544 B | 0 B (under max) |
-| FractalTrackEngine (CCMRAM) | ~730 B incl. 256 B trunk + 128 B Feel onset array | 944 B | 0 B (under max) |
+| FractalTrackEngine (CCMRAM) | ~730 B incl. 256 B trunk + 128 B Feel onset array | 912 B | 0 B (under max) |
 
-Both fit with margin. The model is cheap despite ×17 sequences because FractalSequence carries **no per-step array** (one cell per section); the engine + trunk + Feel onset array live in CCMRAM, so nothing touches SRAM additively. The ~214 B engine headroom under 944 is why **mutation (~256 B history) stays deferred** — it can't co-exist with Feel.
+Engine gate is **912 B** (TeletypeTrackEngine, PROJECT.md:299; the TT2 `static_assert` allows ≤944 — 912 is the conservative gate). Both fit. The model is cheap despite ×17 sequences because FractalSequence carries **no per-step array** (one cell per section); the engine + trunk + Feel onset array live in CCMRAM, so nothing touches SRAM additively. The ~182 B engine headroom under 912 is why **mutation (~256 B history) stays deferred** — it can't co-exist with Feel.
 
 ## Stage Gates (before Phase 1 code)
 
@@ -96,5 +96,5 @@ mutation/evolution (entire subsystem — KD-3/6/10) · CV-scan · capture varian
 - **No RNG content generation.** All content comes from parent capture or defaults to project root note.
 - **No heap in engine.** Inline buffer, pre-allocated BSS only.
 - **No cache between model and engine.** Parent reads are live; trunk writes are immediate.
-- **No reseed.** Mutations evolve from captured baseline.
+- **No content reseed.** No RNG *generates* trunk content — it all comes from parent capture (the deferred mutation evolves from the captured baseline, never dice-rolls new notes). This does **not** forbid the branch **transform-assignment seed** (KD-12), which is structural (it picks *which deterministic transform* each branch applies, from captured material) and regenerates on trunk edit — no content is invented.
 - **Section phase is always active** (4-section lens, neutral defaults = identity transform).
