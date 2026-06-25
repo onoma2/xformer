@@ -5,9 +5,9 @@
 #if PLATFORM_SIM
 #include "engine/TT2ScriptLoader.h"
 namespace {
-// Seed a TeletypeV2 track with demo scripts spanning the op surface so the
-// simulator boots an auditable TT2 patch without hand-typing on hardware.
-// Trigger scripts S1-S4 = indices 0-3, metro = 4, init = 5.
+// Seed a TeletypeV2 track with demo scripts spanning the op surface (incl. the
+// templated re-entrant/delay/pattern paths) so the sim boots an auditable patch.
+// Trigger scripts S1-S8 = indices 0-7; metro = 8, init = 9.
 void seedTeletypeV2Demo(TeletypeProgram &p) {
     // Deterministic by design: no RND, so every op's effect is self-evident on
     // the HUD / modulator page. The metro drives Mod 1 so it animates live.
@@ -24,16 +24,31 @@ void seedTeletypeV2Demo(TeletypeProgram &p) {
         "CV 5 BUS 1\n"
         "WNG 2 0 1\n"
         "WNN 2 0 7\n");
-    loadScriptText(p, 2,                  // S3: 8th-pair additive routing (metro-fired)
+    loadScriptText(p, 2,                  // S3: additive routing + fans out to the templated-path demos (metro-fired)
         "MO.DEPTH 1 MUL X 12\n"           // relocated from metro (keeps Mod 1 depth live)
         "CV 8 N MUL X 2\n"                // TT2 CV sums onto physical CV jack 8
-        "TR.P 8\n");                      // TT2 gate ORs onto physical gate jack 8
+        "TR.P 8\n"                        // TT2 gate ORs onto physical gate jack 8
+        "SCRIPT 5\n"                      // -> S5 pattern walk (re-entry depth 3)
+        "SCRIPT 6\n"                      // -> S6 command stack (S.ALL re-enters, depth 4)
+        "SCRIPT 7\n");                    // -> S7 delay queue
     loadScriptText(p, 3,                  // S4: Geode
         "G.MODE 1\n"
         "G.TUNE 1 2\n"
         "G.V 1 4 2\n"
         "G.V 2 4 2\n"
         "G.RUN 64\n");
+    loadScriptText(p, 4,                  // S5: pattern family — P.N/P.L/PN write + P.NEXT walk -> CV 6 cycles 0,7,12
+        "P.N 0\n"                         // select pattern bank 0
+        "P.L 3\n"                         // length 3 (cursor wraps every 3 steps)
+        "PN 0 0 0\n"                      // bank0[0]=0
+        "PN 0 1 7\n"                      // bank0[1]=7
+        "PN 0 2 12\n"                     // bank0[2]=12
+        "CV 6 N P.NEXT\n");               // advance cursor, quantize, drive CV 6 (exercises pattern* family)
+    loadScriptText(p, 5,                  // S6: command stack — push a body then run it; exercises runStoredCommand re-entry
+        "S : TR.P 6\n"                    // push "TR.P 6" onto the command stack
+        "S.ALL\n");                       // run + clear the stack -> gate 6 pulses
+    loadScriptText(p, 6,                  // S7: delay queue — gate 7 pulses 250ms after each metro tick
+        "DEL 250: TR.P 7\n");             // exercises tt2AdvanceDelays + the delay queue
     loadScriptText(p, TT2_METRO_SCRIPT,   // M: counter drives Mod 1 + jack 1, fires S3 for jack 8
         "X ADD X 1\n"
         "X MOD X 8\n"
