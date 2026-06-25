@@ -106,24 +106,16 @@ Configurable length: default **64 cells**, max **128**.
 1. **Boredom/Patience**: resets the loop via auto-capture at loop boundaries.
 2. **Mutation via Evolution**: selects a step index in the mutation zone, influenced by Evolution mode/depth/history (KD-6), and re-generates its CV.
 3. **Octave Shift**: offsets CV values in the mutation zone by ±12 semitones.
-4. **Trunk/Branch cycle management**: track trunk/branch phase counters and switch layers at boundaries (KD-12).
-
-**Loop-boundary execution order (during trunk phase):**
+**Loop-boundary execution order:**
 ```
 1. Boredom reset (patience): may set _autoCapturePending
 2. Select mutation target via evolution mode + depth + history
 3. Mutate selected step's CV via complexity + scale
 4. Record mutation to history: {stepIndex, oldCV, newCV, loopCount}
 5. Octave shift
-6. Decrement trunk cycle counter; if zero, switch to branch phase
 ```
 
-**Loop-boundary execution order (during branch phase):**
-```
-1. Advance to next branch in path
-2. Decrement branch cycle counter; if zero, switch to trunk phase
-3. No buffer mutation during branch phase — branches are non-destructive transforms
-```
+Branch navigation is **not** part of this lifecycle — KD-12 is in-scope and concatenated (Trunk→B1→…→BN, navigated by Path), not a trunk/branch "phase switch."
 
 **Rationale:** These are the Proteus §3.2–3.4 mechanics, adapted from "melody buffer reset" to "captured-loop mutation." The evolution system (KD-6) adds per-loop-cycle memory. (Branch navigation is KD-12, in-scope and standalone — it is not part of this deferred lifecycle.)
 
@@ -447,7 +439,7 @@ The toggles share the harmony track's Rings (`cv_scaler`) trigger code (§4 of h
 
 **The four corners:** section+quantized = today's grid looper · section+feel = grid rhythm with the parent's swing · event+quantized = clean note-list transcription · event+feel = faithful pitch + inter-note feel (most recorder-like).
 
-**Cost:** Event cadence is ~free (reuses harmony's trigger). **Feel** keeps the 16-bit cell intact and adds a **parallel onset byte array** `uint8 _onset[CELLS]` (4-bit onset phase per cell): +1 B × 128 cells = **+128 B** on the engine's **CCMRAM** trunk, bringing the engine to ~730 B — under the 912 B union gate (~182 B headroom; net-zero so long as mutation, the other ~256 B grower, stays deferred; the two cannot both land — KD-9). `model` params: `captureCadence` (uint8), `captureFidelity` (uint8).
+**Cost:** Event cadence is ~free (reuses harmony's trigger). **Feel** keeps the 16-bit cell intact and adds a **parallel onset byte array** `uint8 _onset[CELLS]` (4-bit onset phase per cell): +1 B × 128 cells = **+128 B** on the engine's **CCMRAM** trunk. With the track-delay ring this puts the active engine at **~800 B — ~110 B under the 912 gate** (the full breakdown is in KD-9; net-zero so long as mutation, the other ~256 B grower, stays deferred — the two cannot both land). `model` params: `captureCadence` (uint8), `captureFidelity` (uint8).
 
 ### KD-15: Timing Alignment — Track Delay (in scope) + Bar-Quantize / Beat Offset (deferred)
 
@@ -552,7 +544,7 @@ recordLast (uint16_t, default bufferLength-1): last step of the recording extent
 
 **Rationale:** Without this, the user records into the full buffer and can only loop the whole thing. Separating recording extent from loop window lets you record a long 256-step passage and loop only bars 1-4, or record 8 bars and loop a specific 2-bar section. Compass proves this pattern works well with its `sPoint`/`ePoint` vs `loopStart`/`loopEnd` distinction.
 
-**Phase:** Phase 3 (Loop Controls — windowing). Phase 2 uses `recordFirst=0, recordLast=bufferLength-1` (legacy default). Phase 3 adds the params and the extent-constrained loop window.
+**Phase:** Phase 2 — `recordFirst`/`recordLast` ship with the loop window as part of the MVP looper (the "Loop Window, Record Extent…" section). A track that doesn't set them defaults to `recordFirst=0, recordLast=bufferLength-1` (full buffer).
 
 ### KD-17: ClockSource — CV-Driven Playback Step (DiscreteMap Pattern)
 
@@ -640,16 +632,16 @@ else:
 
 After Phase 2 builds and hardware-validates the minimal MVP looper, **stop and hand off to the user.** The sections below are **post-hardware, in-scope** work (no phase numbers — order is the 1-pager ledger): Loop Controls → Two-Source Mix → Branches → Ornamentation → Two-Axis Capture → Track-Delay → Visual UI. Deferred features are never phased.
 
-### Loop Controls — Windowing, Rotation, Lock, Ornament Zone (post-hardware, in scope)
+### Loop Window, Record Extent, Rotation, Lock — Phase 2 detail (single owner)
 
-**Goal:** Loop windowing (first/last step), rotation, lock (freeze buffer from further recording), and the ornament eligibility zone (KD-13).
+> **Owner: Phase 2.** These are the MVP looper's spatial controls (you can't loop usefully without setting the window/extent/lock) — built in Phase 2, not a separate phase. The **ornament-zone fields** (`ornFirst`/`ornLast`) are *declared* here as part of the window hierarchy but only take effect when **Ornamentation** ships post-hardware (KD-13).
 
-**Model additions:**
-- `loopFirst`, `loopLast` on FractalTrack (already planned).
+**Model (Phase 2):**
+- `loopFirst`, `loopLast` — loop window over the trunk.
 - `recordFirst`, `recordLast` — recording extent (KD-16). Default `recordFirst=0`, `recordLast=bufferLength-1`. Recording wraps within extent, not full buffer.
 - `lock` bool — when true, buffer is read-only; recording is blocked.
 - `rotate` — address rotation over `loopFirst..loopLast`.
-- `ornFirst`, `ornLast` — ornament eligibility zone boundaries (KD-13). Default to `loopFirst`/`loopLast`. Extent invariant: `recordFirst <= loopFirst <= ornFirst <= ornLast <= loopLast <= recordLast <= bufferLength-1`.
+- `ornFirst`, `ornLast` — ornament eligibility zone (KD-13, **used post-hardware**). Default to `loopFirst`/`loopLast`. Window invariant: `recordFirst <= loopFirst <= ornFirst <= ornLast <= loopLast <= recordLast <= bufferLength-1`.
 
 **Engine changes:**
 - Recording targets `recordFirst..recordLast`. Record position wraps from `recordLast` to `recordFirst`.
@@ -795,7 +787,7 @@ Sources audited: `temp-ref/o_c/O_C-Phazerville/` (applets, enigma, util), `temp-
 | Phase | Ported Feature | Source | Effort |
 |-------|---------------|--------|--------|
 | **Post-HW** | 2-input gate/CV mixing | Vinx LogicTrackEngine | Low — adapt existing gate/note logic to output-reading |
-| **Phase 3** | Loop freeze/rotate (bool flag) | Fractal-specific | Trivial — lock flag + existing rotation |
+| **Phase 2** | Loop freeze/rotate (bool flag) | Fractal-specific | Trivial — lock flag + existing rotation |
 | **Post-HW** | Branch transforms + Path LUT | Bloom v2 (KD-12) | Low — playback-time math on trunk, zero buffer storage |
 | **Post-HW** | Ornamentation per-step + zone | Bloom v2 (KD-13) | Low — tick-path eval, ~4 B model params |
 | **Deferred** | Per-loop mutation bias via SelectionPressure + EvolutionDepth | Evolution system (KD-6) | Low — history 16 x 16 B inline, bias function per mode |
@@ -825,8 +817,8 @@ The following Compass-derived features are noted for future consideration, not i
 
 ## Open Questions (mutation subsystem — decide if it un-defers)
 
-1. **Patience ramp function:** Linear or exponential? Linear is simpler and predictable. Exponential creates longer "plateaus" before sudden change. **Recommendation: Linear for MVP.**
-2. **Mutation pitch source:** Simplified complexity-based selection (anchor/adjacent/full) or full degree-ticket integration from Stochastic track? **Recommendation: Simplified for MVP, tickets as upgrade.**
+1. **Patience ramp function:** Linear or exponential? Linear is simpler and predictable. Exponential creates longer "plateaus" before sudden change. **Recommendation: Linear for the future mutation build.**
+2. **Mutation pitch source:** Simplified complexity-based selection (anchor/adjacent/full) or full degree-ticket integration from Stochastic track? **Recommendation: Simplified first, tickets as upgrade — if mutation un-defers.**
 3. **Scale awareness:** Should mutation snap to the project scale, or the parent track's scale? **Recommendation: FractalSequence has its own scale/root (like Stochastic), defaulting to project scale.**
 4. **Buffer clear trigger:** Only via explicit user action, or also on pattern change? **Resolved:** Buffer is volatile engine state. Clear on: track mode change, buffer length change, explicit clear, power cycle. Survives transport reset and pattern change.
 5. **Overdub semantics:** **Resolved:** MVP is overwrite only (KD-5). Post-MVP blend mode uses weighted lerp (NOT additive CV accumulation, which breaks V/Oct pitch). Palimpsest-style compose/decompose rates control blend weight.
@@ -856,5 +848,5 @@ The following Compass-derived features are noted for future consideration, not i
 | 13 | Ornamentation storage | Ornamentation is tick-path evaluation. No per-step storage, ~4 B model params (ornamentRate, ornamentIntensity, ornFirst, ornLast). |
 | 14 | Evolution system RAM | MutationHistory 256 B inline in engine, SelectionPressure mode 2 bits on model, EvolutionDepth 1 byte on model. |
 | 15 | Timing features | KD-15: track-delay in scope. Bar-quantized loop length (loopBars), beat offset (beatOffset), free phase rotation (loopPhase) deferred. 6 B model. |
-| 16 | Recording extent vs loop window | KD-16: recordFirst/recordLast separate from loopFirst/loopLast. 4 B model (uint16_t+uint16_t). Phase 3. |
+| 16 | Recording extent vs loop window | KD-16: recordFirst/recordLast separate from loopFirst/loopLast. 4 B model (uint16_t+uint16_t). Phase 2 (with the loop window). |
 | 17 | CV-driven playback | KD-17: deferred. clockSource (Internal/External) on FractalSequence. External = routedScan CV direct-maps to step position via int(cv) floor-truncation + edge detection. Bypasses divisor, PlayMode, all clock machinery. DiscreteMap pattern. |
