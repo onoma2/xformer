@@ -88,7 +88,9 @@ struct TT2ConfigMini {
 };
 ```
 **Step 4 — run, expect PASS.**
-**Step 5 — commit:** `git add -A && git commit -m "feat(tt2): add TT2ConfigMini traits"`
+**Step 5 — commit:** stage ONLY this task's files (never `git add -A`): `git add src/apps/sequencer/model/TT2Config.h src/tests/unit/sequencer/TestTT2Config.cpp && git commit -m "feat(tt2): add TT2ConfigMini traits"`.
+
+> **All tasks:** stage only the explicit files you changed; **never `git add -A`** (the working tree holds unrelated `.scratch/`/`docs/`/`ui-preview/` WIP that must not be committed). To build+run a unit test, build its target first — `make sequencer` builds firmware, NOT tests: `make -C build <TestName> && ctest --test-dir build -R <TestName> -V`.
 
 ### Task 1: instantiate Mini op table + trait (decl + def) + serializer
 
