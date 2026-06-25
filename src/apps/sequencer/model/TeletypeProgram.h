@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MidiConfig.h"
+#include "TT2Config.h"
 #include "Types.h"
 
 #include <cassert>
@@ -11,14 +12,16 @@ extern "C" {
 #include "command.h"
 }
 
-static constexpr int TT2_SCRIPT_COUNT        = 10;   // 8 numbered + Metro + Init
+// Varying dimensions live on the config; these compat aliases keep the ~30
+// other files + tests that reference the bare names compiling unchanged.
+static constexpr int TT2_SCRIPT_COUNT        = TT2ConfigFull::ScriptCount;   // 8 numbered + Metro + Init
 static constexpr int TT2_COMMANDS_PER_SCRIPT = 6;
 static constexpr int TT2_COMMAND_MAX_LENGTH  = 16;
 static constexpr int TT2_PATTERN_COUNT       = 4;
 static constexpr int TT2_PATTERN_LENGTH      = 64;
 
-static constexpr int TT2_METRO_SCRIPT     = 8;
-static constexpr int TT2_INIT_SCRIPT      = 9;
+static constexpr int TT2_METRO_SCRIPT     = TT2ConfigFull::MetroScript;
+static constexpr int TT2_INIT_SCRIPT      = TT2ConfigFull::InitScript;
 
 enum class TT2TimeBase : uint8_t {
     Ms,
@@ -53,7 +56,7 @@ struct TT2Script {
     TT2Command commands[TT2_COMMANDS_PER_SCRIPT];
 };
 
-static constexpr int TT2_TRIGGER_INPUT_COUNT = 8;   // 8 trigger inputs -> scripts 1-8
+static constexpr int TT2_TRIGGER_INPUT_COUNT = TT2ConfigFull::TriggerInputCount;   // 8 trigger inputs -> scripts 1-8
 
 // Per trigger-input source. Mirrors TeletypeTrack::TriggerInputSource so the
 // (deferred) editor I/O grid edits the same shape. Engine reads it to decide
@@ -87,7 +90,8 @@ enum class TT2CvInputSource : uint8_t {
     Last
 };
 
-struct TeletypeProgram {
+template<typename Cfg>
+struct TeletypeProgramT {
     uint8_t dialectVersion;
     uint8_t bootScriptIndex;
     uint8_t bootEnabled;
@@ -95,9 +99,9 @@ struct TeletypeProgram {
     int16_t clockDivisor;
     int16_t clockMultiplier;
     uint8_t resetMetroOnLoad;
-    TT2Script scripts[TT2_SCRIPT_COUNT];
+    TT2Script scripts[Cfg::ScriptCount];
     TT2Pattern patterns[TT2_PATTERN_COUNT];
-    TT2TriggerSource triggerSource[TT2_TRIGGER_INPUT_COUNT];
+    TT2TriggerSource triggerSource[Cfg::TriggerInputCount];
     TT2CvInputSource cvInputSource[TT2_CV_INPUT_COUNT];
     // Per-CV-output shaping (mirrors TT1 TeletypeTrack); applied in TT2TrackEngine::cvOutput.
     Types::VoltageRange cvOutputRange[TT2_CV_OUTPUT_COUNT];
@@ -107,10 +111,13 @@ struct TeletypeProgram {
     MidiSourceConfig midiSource;  // per-track MIDI filter (port + channel); UI deferred
 };
 
-inline void init(TeletypeProgram &p) {
-    memset(&p, 0, sizeof(TeletypeProgram));
+using TeletypeProgram = TeletypeProgramT<TT2ConfigFull>;
+
+template<typename Cfg>
+inline void init(TeletypeProgramT<Cfg> &p) {
+    memset(&p, 0, sizeof(TeletypeProgramT<Cfg>));
     p.dialectVersion = 2;
-    p.bootScriptIndex = TT2_INIT_SCRIPT;
+    p.bootScriptIndex = Cfg::InitScript >= 0 ? Cfg::InitScript : 0;
     p.bootEnabled = 0;
     p.timeBase = uint8_t(TT2TimeBase::Ms);
     p.clockDivisor = 12;
@@ -123,7 +130,7 @@ inline void init(TeletypeProgram &p) {
         p.patterns[i].end = TT2_PATTERN_LENGTH - 1;
     }
     // Default each trigger input to its matching CV input (CvIn1-4).
-    for (int i = 0; i < TT2_TRIGGER_INPUT_COUNT; i++) {
+    for (int i = 0; i < Cfg::TriggerInputCount; i++) {
         p.triggerSource[i] = TT2TriggerSource(int(TT2TriggerSource::CvIn1) + i);
     }
     // Default IN/PARAM/X/Y to CvIn1-4; Z/T unmapped (memset leaves them None).

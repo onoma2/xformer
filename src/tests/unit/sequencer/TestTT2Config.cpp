@@ -1,6 +1,9 @@
 #include "UnitTest.h"
 
 #include "model/TT2Config.h"
+#include "model/TeletypeProgram.h"
+
+#include <type_traits>
 
 UNIT_TEST("TT2Config") {
 
@@ -11,6 +14,11 @@ CASE("TT2ConfigFull traits match today's values") {
     expectEqual(TT2ConfigFull::MetroScript, 8, "MetroScript");
     expectEqual(TT2ConfigFull::InitScript, 9, "InitScript");
     expectEqual(TT2ConfigFull::SceneCount, 1, "SceneCount");
+}
+
+CASE("TeletypeProgramT<Full> layout is unchanged") {
+    static_assert(sizeof(TeletypeProgramT<TT2ConfigFull>) == 3638, "");
+    expect(std::is_trivially_copyable<TeletypeProgramT<TT2ConfigFull>>::value, "trivially copyable");
 }
 
 }
