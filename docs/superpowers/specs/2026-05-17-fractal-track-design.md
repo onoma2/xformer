@@ -12,8 +12,6 @@
 > melodic material mirror, not a high-fidelity CV recorder. It should not aim to capture
 > every CV movement inside a section. Fractal does not know why the parent output changed:
 > parent sequencing state, mutes, routing, resetMeasure, held notes, curves, and scripts are all opaque.
-> Older sections below that mention heap buffers, `_recordArmed`, 32-bit step words,
-> no gate length, tick-rate fidelity, or a separate manual recorder phase are superseded.
 
 ## Summary
 
@@ -55,57 +53,32 @@ The Fractal Track is a **step-sampled CV/Gate looper with mutation**. It samples
 - No cross-track feedback is possible by construction. This matches the existing Performer convention where linked tracks must be earlier in the track array.
 - Alternative (rejected for MVP): read from previous tick's latched output. This would allow any source index but requires a per-engine output latch — too much architectural change for MVP.
 
-### KD-2: Buffer Format — Bitpacked Single Array (IndexedSequence Pattern)
+### KD-2: Buffer Format — Inline Bitpacked uint16 Array (in-engine, CCMRAM)
 
-**Decision:** Heap-allocate a single array of `uint32_t`, one per step, bitpacked following the IndexedSequence::Step pattern:
+**Decision:** The trunk is a single **inline** `uint16_t` array — one cell per fractal section — held as a member of FractalTrackEngine (which lives in `CCMRAM_BSS`). **No heap.** Bitpacked:
 
 ```cpp
-uint32_t *_stepBuffer;  // One uint32_t per step, bitpacked:
+uint16_t _trunk[CONFIG_FRACTAL_MAX_CELLS];  // inline engine member, CCMRAM BSS
 
-// bits 0-15:  CV (16-bit fixed-point, signed int16 centered at 0V = 0,
-//             resolution ~0.15 mV over 10V range)
-// bit 16:     gate (1 bit)
-// bit 17:     valid (1 bit, set when step has been recorded)
-// bit 18:     slide/slew (1 bit, smooth transition from previous step)
-// bits 19-31: reserved (13 bits)
+// bits 0-10:  CV (11-bit fixed-point, semitones rel root, ~5.9 cents/LSB)
+// bits 11-14: gate length (4-bit: 0=rest, 1=trigger, 2-14=proportional, 15=full/tie)
+// bit 15:     valid (uncaptured cells output the project root, gate off)
 ```
 
-Configurable length: 16/32/64/128/256 steps. Default 64.
+Configurable length: default **64 cells**, max **128**.
 
-**Why bitpacking instead of split arrays:**
-- IndexedSequence already proves this pattern works: 32-bit step words with getters/setters using shift+mask, serialized directly by `VersionedSerializedWriter`. No alignment padding waste. Single heap allocation instead of three.
-- 16-bit CV resolution (~0.15 mV per LSB) exceeds the ~1 mV resolution of a 16-bit DAC and the ~3 mV noise floor of Eurorack. Float is overkill for V/Oct recording: 7 octaves at 1V/oct = 7V range, 16-bit gives 0.15 mV resolution = ~0.0015 semitones. More than adequate.
-- The 13 unused bits provide headroom for future per-step flags (retrigger, accent, legato, gate mode, ornament override) without ever needing a second word.
+**Why inline, not heap:** the engine is a discriminated-union member in `CCMRAM_BSS`. An inline array is pre-allocated BSS — it costs nothing beyond the engine's union slot, needs no allocator, and honours Stage Gate D ("no heap in the tick path"). A heap buffer would change the rail, require OOM handling, and break that gate.
 
-**RAM budget at max length (256 steps):**
-- Step buffer: 256 × 4 B = 1024 B
-- **Total: 1024 B heap** — a 6% savings over split arrays (1088 B), and a single allocation.
+**RAM:**
+- Default 64 cells × 2 B = **128 B**
+- Max 128 cells × 2 B = **256 B**
+- In **CCMRAM**, inside the FractalTrackEngine union slot → **net-zero** while the engine stays under the engine-union max (944 B). Not in SRAM, not on the heap.
 
-**RAM budget at default length (64 steps):**
-- Step buffer: 64 × 4 B = 256 B
-- **Total: 256 B heap** — same as split arrays' CV alone, with gate/valid/slide included for free.
+**Why bitpacked uint16:** one cell = one section snapshot. 11-bit CV (~5.9 cents/LSB) is ample for a mirrored melodic line; the 4-bit gate-length field carries rest / trig / proportional / tie in a single word. 16 bits/cell with no split arrays and no padding.
 
-**CV encoding:**
-```cpp
-// Encode float CV to 16-bit fixed-point
-int16_t encodeCv(float cv) {
-    // Clamp to ~±8V range (safe for Eurorack)
-    cv = clamp(cv, -8.0f, 8.0f);
-    return static_cast<int16_t>(std::round(cv * 4096.0f));  // 1V = 4096
-}
+**Why no per-cell duration:** one cell per section on a uniform grid — each cell *is* one section. Intra-section motion is intentionally discarded (the mirror identity). Sub-section microtiming is the deferred **Feel** mode (KD-14b), which would widen the cell to carry an onset-phase field (a CCMRAM cost, gated there).
 
-// Decode 16-bit fixed-point to float CV
-float decodeCv(int16_t encoded) {
-    return static_cast<float>(encoded) / 4096.0f;
-}
-```
-Resolution: 1/4096 V ≈ 0.244 mV. Over 7 octaves (7V) that's 28,672 steps — ~2.4 cents per step at 12-EDO.
-
-**Rationale:** Per-step gate length, note index, and independent duration are NOT stored because FractalTrack records step-sampled snapshots on a uniform divisor grid. Each step is exactly one divisor tick. Per-step duration would imply variable-length steps, which contradicts the recording model. If per-step gate length or variable timing is needed later, there are 13 reserved bits in the current layout; adding micro-timing would require a second word.
-
-**Buffer persistence (MVP):** The recorded buffer is **volatile engine state**, not model state. One buffer per active FractalTrackEngine, heap-allocated, not serialized. Project save stores configuration only (model params, no buffer data). The buffer survives transport reset and pattern change (config-only changes). The buffer is cleared on: track mode change, buffer length change, explicit user clear action, or power cycle.
-
-> **Note:** Buffer persistence (saving/loading recorded loops as project data) may be revisited post-MVP. Options include: one saved buffer per pattern, one shared buffer per track, or external sample import. This decision affects project file format, flash wear, and RAM budget and should not be made until the volatile engine proves the concept.
+**Persistence:** the trunk is **volatile engine state**, not serialized. Project save stores model config only; the trunk starts empty on power cycle and clears on track-mode change, buffer-length change, or explicit user clear. (Saving recorded loops as project data is a possible post-MVP revisit — it would affect file format and flash wear.)
 
 **Buffer length change:** Changing `bufferLength` clears the entire buffer. No attempt to preserve overlapping steps — the new buffer starts empty.
 
@@ -245,14 +218,12 @@ On trunk-phase loop boundary:
 
 ### KD-9: Engine Container Impact + RAM Allocation Policy
 
-**Decision:** FractalTrackEngine must stay at or below the current engine container gate (912 B = TeletypeTrackEngine).
+**Decision:** FractalTrackEngine must stay at or below the engine-union max (944 B = TT2TrackEngine). It is a union member in `CCMRAM_BSS`, so staying under that max means **zero net CCMRAM** (no additive ×8 allocation).
 
 **RAM allocation policy:**
-1. **Buffer length cap:** Default 64 steps (272 B heap). Maximum 256 steps (1,088 B heap per active engine). This caps worst-case per-engine heap at ~1 KB.
-2. **Active Fractal engine limit:** At most 4 FractalTrack engines can allocate buffers simultaneously. This limits worst-case heap for Fractal buffers to ~4 KB (at 256 steps each).
-3. **Allocation failure:** If `new` returns nullptr (OOM), the engine enters idle mode — gate=false, cv=0 — and sets an internal OOM flag. The list UI can surface this as a "Buffer OOM" warning. Fractal does NOT crash or assert on heap exhaustion. This matches the existing codebase pattern where Stochastic's `initLockedSteps` allocates with `std::nothrow`.
-4. **ARM sizeof probe required before Phase 4-5:** A skeleton FractalTrackEngine must be built on STM32 and `sizeof` reported before adding MutationHistory (256 B), branch counters, or ornamentation state. This validates the ~600 B estimate before committing to the 912 B gate. If the estimate is wrong, these features must be re-budgeted or cut.
-5. **No heap per-pattern buffers:** One heap buffer per engine instance, period. Pattern switching does not swap or reallocate buffers. This avoids 17x heap amplification.
+1. **Inline trunk, no heap:** the trunk is an inline `uint16_t` member (KD-2) — default 64 cells (128 B), max 128 cells (256 B), in the engine's CCMRAM slot. No allocator, no OOM path, no per-engine heap cap.
+2. **One trunk per engine, not per pattern:** pattern switching changes config only; the single inline trunk is not swapped or reallocated. No 17× amplification.
+3. **ARM `sizeof` probe required before Phase 4-5:** build a skeleton FractalTrackEngine on STM32 and report `sizeof` before adding deferred state (e.g. the KD-14b onset-phase cell widening, or MutationHistory if it un-defers). This validates the ~600 B estimate against the 944 B gate; if it's wrong, re-budget or cut.
 
 **Engine members estimate:**
 - TrackEngine base (~100 B)
@@ -260,8 +231,8 @@ On trunk-phase loop boundary:
 - RNG, loop counters, boredom counter, trunk/branch counters (~50 B)
 - MutationHistory: 16 records x ~16 B = ~256 B inline
 - SelectionPressure mode + EvolutionDepth (2 B on model, 0 B in engine)
-- No lockedSteps — the main buffer IS the loop (heap-allocated)
-- **Target: ~600–700 B** — under the 912 B gate. The history system adds ~256 B but stays inline and does not inflate the container.
+- Inline `uint16_t` trunk (KD-2): 128 cells × 2 B = 256 B, in the engine's CCMRAM slot
+- **Target: ~600 B** — under the 944 B engine-union gate. (MutationHistory is deferred with the rest of the evolution subsystem; if it un-defers it adds ~256 B inline and must be re-probed against the gate.)
 
 ### KD-10: Mutation Zone — Scoped Transform Range
 
@@ -617,7 +588,7 @@ else:
 
 ### Phase 2: Engine Foundation — Record & Loop + Minimal List UI (Before Hardware)
 
-**Goal:** Record CV/Gate from 1-2 parent tracks into a heap-allocated loop buffer, play it back on loop. **All engine features immediately accessible from existing TrackPage list view.**
+**Goal:** Record CV/Gate from 1-2 parent tracks into the inline trunk buffer (KD-2), play it back on loop. **All engine features immediately accessible from existing TrackPage list view.**
 
 **Files:**
 - NEW `engine/FractalTrackEngine.h`
@@ -629,8 +600,8 @@ else:
 - **Timing computation (new):** If `clockSource == Internal` and `loopBars > 0`, derive effective loop window: `winLast = loopFirst + (loopBars * engine.measureDivisor() / divisor) - 1`, apply `beatOffset` shift to both winFirst and winLast, clamp to buffer bounds. Otherwise use `loopFirst`/`loopLast` directly. Apply `loopPhase` for fractional rotation of the playback read position: `phasedPos = fmodf(stepFraction + loopPhase, 1.0f)` maps to a readStep within the window. Record writes go to stepIndex normally; readStep determines what is heard on output.
 - When recording (recordArmed=true, not locked):
   - PunchIn wait: if punchMode=PunchIn and `_punchWait` is set, replay buffer normally and don't record until source gate fires.
-  - Otherwise: write source gate+CV into `_stepBuffer[stepIndex]`. If recordQuantize=On, snap CV to sequence scale first. If recordMode=Latch, only write when source gate=1.
-- When playing: read and decode `_stepBuffer[stepIndex]` — extract CV, gate, valid, slide via shift+mask.
+  - Otherwise: write source gate+CV into `_trunk[cell]` (raw, S&H). If recordMode=Latch, only write when source gate=1.
+- When playing: read and decode `_trunk[cell]` — extract CV, gateLen, valid via shift+mask.
 - Playback boundary: if loopMode=Loop, wrap derived loopLast to derived loopFirst. If loopMode=Once, set `_onceDone`, gates off, stop advance.
 - Sequence advancement: when clockSource==Internal, follows aligned/free playMode pattern (StochasticTrackEngine pattern). When External, no advancement — step position comes from routedScan CV.
 - Gate/CV queue system (same as all engines).
@@ -747,8 +718,8 @@ else:
 
 **Checks:**
 - `sizeof(FractalTrack)` under 9544 B.
-- `sizeof(FractalTrackEngine)` under 912 B.
-- Heap-allocated buffer: 64 steps × 4 B = 256 B.
+- `sizeof(FractalTrackEngine)` under the 944 B engine-union gate (TT2TrackEngine).
+- Inline trunk (CCMRAM): 64 cells × 2 B = 128 B default, 128 cells = 256 B max.
 - Full `.data + .bss` stays under 120 KB.
 - Config serialization round-trip (model params only — buffer is volatile).
 - Routing CV modulation of mutation/density/patience.
@@ -825,7 +796,7 @@ Sources audited: `temp-ref/o_c/O_C-Phazerville/` (applets, enigma, util), `temp-
 
 The following Compass-derived features are noted for future consideration, not in any phased plan:
 
-**Command palette for mutation dispatch (Phase 5+):** Compass's 18-command palette with enable/disable per step suggests a similar approach for ornamentation. Instead of a global `ornamentProb`, each FractalTrack step could index into a palette of ornament types (anticipation, suspension, mordent, run, etc.), with each ornament type having an enable flag. The per-step palette index is set during recording or editing. This would make ornamentation step-accurate rather than probabilistic. **Model cost:** 4 bits per step for palette index (16 entries) — fits in the 13 reserved bits of the `_stepBuffer` word. No extra RAM.
+**Command palette for ornament dispatch (future):** Compass's 18-command palette with enable/disable per step suggests a similar approach for ornamentation. Instead of the global `ornamentRate`/`ornamentIntensity`, each cell could index a palette of ornament types (anticipation, suspension, mordent, run, etc.) — making ornamentation cell-accurate rather than probabilistic. **Model cost:** the 16-bit trunk cell is full (11 CV + 4 gateLen + 1 valid), so a per-cell palette index would require widening the cell — the same CCMRAM cost gated under KD-14b's Feel mode.
 
 **Discrete rate table (Phase 5+):** Compass uses 6 discrete rates {-2, -1, -0.5, 0.5, 1, 2} with slew smoothing. FractalTrack could support a playback speed multiplier, enabling half-speed (2 octaves down), double-speed (1 octave up), or reverse-speed loop playback. **Model cost:** uint8_t rate index (1 B). **Engine cost:** float accumulator per engine (4 B). **Trade-off:** Speed modulation changes the step-time relationship — the FractalTrack tick fires at the master clock rate, so speed would skip or repeat buffer reads, not change the recording. This is a fundamentally different timing model than the current step-aligned approach.
 
