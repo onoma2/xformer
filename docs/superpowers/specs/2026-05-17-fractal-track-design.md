@@ -240,13 +240,15 @@ On trunk-phase loop boundary:
 3. **ARM `sizeof` probe required before Phase 4-5:** build a skeleton FractalTrackEngine on STM32 and report `sizeof` before adding deferred state (e.g. the KD-14b onset-phase cell widening, or MutationHistory if it un-defers). This validates the ~600 B estimate against the 912 B gate; if it's wrong, re-budget or cut.
 
 **Engine members estimate:**
+**Active engine (MVP + in-scope + Feel):**
 - TrackEngine base (~100 B)
 - SequenceState, linkData, queues (~200 B)
-- RNG, loop counters, boredom counter, trunk/branch counters (~50 B)
-- MutationHistory: 16 records x ~16 B = ~256 B inline
-- SelectionPressure mode + EvolutionDepth (2 B on model, 0 B in engine)
-- Inline `uint16_t` trunk (KD-2): 128 cells × 2 B = 256 B, in the engine's CCMRAM slot
-- **Target: ~600 B** — under the 912 B engine-union gate. (MutationHistory is deferred with the rest of the evolution subsystem; if it un-defers it adds ~256 B inline and must be re-probed against the gate.)
+- RNG, loop counters, trunk/branch counters (~50 B)
+- Inline `uint16_t` trunk (KD-2): max 128 cells × 2 B = **256 B** (CCMRAM)
+- Feel onset array (KD-14b): max 128 × 1 B = **128 B** (CCMRAM)
+- **Active target: ~730 B** — under the 912 B gate (~180 B headroom).
+
+**Deferred mutation build (NOT in the active number):** MutationHistory (16 × ~16 B ≈ 256 B) + SelectionPressure/EvolutionDepth would push the engine to ~990 B — **over** the 912 gate. So mutation **cannot co-exist with Feel** (KD-3/6 deferred); building it later requires re-probing and dropping Feel or shrinking the trunk.
 
 ### KD-10: Mutation Zone — Scoped Transform Range
 
@@ -355,7 +357,9 @@ Each segment is one loop-window length; total played length = loopLen × (1 + br
 
 **RAM impact:** Negligible. Evaluated in tick path, no per-step storage. ~4 B model params (ornamentRate, ornamentIntensity, ornFirst, ornLast) + the inherited scale group.
 
-### KD-14: Recording Features — Replace vs Latch, Punch-In, Loop Mode, Record Quantize
+### KD-14: Recording Features — Replace vs Latch (in scope) + Punch-In / Once / Quantize (deferred)
+
+> **In scope: Replace vs Latch only.** **Deferred** (capture variants, 1-pager ledger): PunchIn, LoopMode Once, RecordQuantize. The detail below documents all four; only Replace/Latch (+ Lock + arm) are built for the MVP — the "belong in Phase 2" framing further down is superseded by the ledger.
 
 **Decision:** Four recording-focused features modeled after common Eurorack CV recorder patterns (Hermod Hard Rec/Rec Wait, Flame Quad's loop modes, o_C Hemisphere's quantized capture).
 
@@ -388,7 +392,7 @@ RecordQuantize: bool (1 bit on model)
 
 **Total model cost:** 6 bits (fits in 1 uint8_t). Two engine bools: `_punchWait`, `_onceDone`.
 
-**Why these belong in Phase 2, not deferred:**
+**Original rationale (superseded — Punch/Once/Quantize are now deferred per the KD-14 status note; kept for context):**
 - RecordMode (Replace vs Latch) is a fundamental recording paradigm choice. Without it, every record pass clears the loop entirely. Latch makes the recorder usable for live performance where you want to replace specific steps.
 - PunchIn makes recording interactive -- you can start a loop, hear it cycle, then trigger capture at the right moment.
 - LoopMode=Once is essential for "capture one loop and hold" -- the most common recorder workflow. Without it, the buffer keeps repeating and you can't inspect a single captured pass.
@@ -442,7 +446,9 @@ The toggles share the harmony track's Rings (`cv_scaler`) trigger code (§4 of h
 
 **Cost:** Event cadence is ~free (reuses harmony's trigger). **Feel** keeps the 16-bit cell intact and adds a **parallel onset byte array** `uint8 _onset[CELLS]` (4-bit onset phase per cell): +1 B × 128 cells = **+128 B** on the engine's **CCMRAM** trunk, bringing the engine to ~730 B — under the 912 B union gate (~182 B headroom; net-zero so long as mutation, the other ~256 B grower, stays deferred; the two cannot both land — KD-9). `model` params: `captureCadence` (uint8), `captureFidelity` (uint8).
 
-### KD-15: Timing Alignment — Bar-Quantized Loop Length, Beat Offset, Track Delay
+### KD-15: Timing Alignment — Track Delay (in scope) + Bar-Quantize / Beat Offset (deferred)
+
+> **Track Delay is in scope.** **Bar-quantized loop length** (`loopBars`), **beat offset** (`beatOffset`), and **loop phase** (`loopPhase`) are **deferred** (1-pager ledger). The detail below documents all three; only track-delay is built for now.
 
 **Decision:** Add timing alignment features for locking loop length to bars, shifting loop position relative to the master transport, and microtiming nudging.
 
@@ -547,6 +553,8 @@ recordLast (uint16_t, default bufferLength-1): last step of the recording extent
 
 ### KD-17: ClockSource — CV-Driven Playback Step (DiscreteMap Pattern)
 
+> **Status: DEFERRED** (CV-scan, 1-pager ledger). `clockSource` and `routedScan` are reserved fields, not built; the engine has no External branch yet. Documented here as the future design.
+
 **Decision:** Add a `ClockSource` enum to `FractalSequence` (Internal/External), matching DiscreteMapSequence's pattern. When External, a routed CV directly determines the playback step position within the loop window — no clock advancement, no divisor, no PlayMode.
 
 **Components:**
@@ -586,6 +594,8 @@ else:
 
 ## Phased Implementation Plan
 
+> **Sequencing authority = the 1-pager phase order.** In short: **Phase 1** model (all in-scope fields declared/serialized) → **Phase 2** the *minimal MVP looper* (one parent source, Replace/Latch capture, forward playback via loop window + Order, lock, minimal list UI) → **Phase 3** hardware verification → *stop, hand off*. The **in-scope extras are post-hardware phases**, in this order: two-source mix → branches (count/path/pool) → ornaments + ornament zone → two-axis capture (Event/Feel) → track-delay → visual UI. **Deferred and not phased:** mutation/evolution, CV-scan, capture variants (Punch/Once/Quantize), bar-quantize/beat-offset, density/tilt. The detailed phase bodies below predate this re-staging — where they place a deferred feature in an early phase, the per-KD status + this note win.
+
 ### Phase 1: Model & Serialization
 
 **Goal:** `FractalTrack` and `FractalSequence` in the Track container, serializable.
@@ -604,7 +614,7 @@ else:
 
 ### Phase 2: Engine Foundation — Record & Loop + Minimal List UI (Before Hardware)
 
-**Goal:** Record CV/Gate from 1-2 parent tracks into the inline trunk buffer (KD-2), play it back on loop. **All engine features immediately accessible from existing TrackPage list view.**
+**Goal (minimal MVP looper):** Record CV/Gate from **one** parent (sourceA) into the inline trunk (KD-2) with **Replace/Latch + Lock + arm**, play it back through the loop window with **Order** (forward to start). Minimal list UI only. *Two-source mix, branches, ornaments, two-axis capture, and track-delay are post-hardware in-scope phases — not built here.*
 
 **Files:**
 - NEW `engine/FractalTrackEngine.h`
@@ -627,13 +637,16 @@ else:
 - `reset()`: reset sequence state, clear queues. Do NOT clear buffer on transport reset — only on explicit "clear" action.
 - `update()`: slide interpolation, monitoring.
 
-**Cycle safety:** Engine checks source track indices < Fractal track index at creation time. Warns and treats invalid sources as idle.
+**Cycle safety:** Engine checks source track indices < Fractal track index. It **silently treats an invalid/out-of-range source as idle (gate=false, cv=0) — no warning, no log** (per KD-1); the list UI clamps the selection so a broken config never reaches the engine.
 
-**List UI integration (Phase 2):** `FractalTrackListModel` with the **in-scope** params: Divisor, Clock Mult, Reset Measure, Run Mode, Scale, Root, Source A/B, Gate/CV Logic, BufferLength, Record Arm (recordTrigger), Clear Buffer (action), Record Mode (Replace/Latch), Capture Cadence (Section/Event), Capture Fidelity (Quantized/Feel), Lock, Loop First/Last, Order, Rotate, Ornament Zone First/Last, Branch Count, Path, Branch Pool, Ornament Rate/Intensity, Track Delay, SlideTime, Octave, Transpose. This list lives in TrackPage.cpp's existing list routing — no new page type needed. *(Deferred, not shown: Clock Source/CV-scan, Punch Mode, Loop Mode Once, Rec Quantize, Loop Bars, Beat Offset, Loop Phase, Density, Tilt, and all mutation/evolution params.)*
+**List UI integration (Phase 2 — minimal core):** `FractalTrackListModel` with just the MVP-looper params: Divisor, Clock Mult, Reset Measure, Run Mode, Scale, Root, **Source A**, BufferLength, Record Arm (recordTrigger), Clear Buffer (action), Record Mode (Replace/Latch), Lock, Loop First/Last, Order, Rotate, SlideTime, Octave, Transpose. Lives in TrackPage.cpp's existing list routing — no new page type. *Added in later in-scope phases:* Source B + Gate/CV Logic (two-source), Branch Count/Path/Pool, Ornament Rate/Intensity + zone, Capture Cadence/Fidelity, Track Delay. *Never shown (deferred):* Clock Source/CV-scan, Punch Mode, Loop Mode Once, Rec Quantize, Loop Bars, Beat Offset, Loop Phase, Density, Tilt, mutation/evolution.
 
 **Verification:** STM32 build, manual test via list UI: assign NoteTrack as parent, record one loop, hear it repeat.
 
-### Phase 3: Loop Controls — Windowing, Rotation, Lock, Mutation Zone
+### Phase 3: Loop Controls — Windowing, Rotation, Lock, Ornament Zone
+
+> The "mutation zone" here is the **ornament eligibility zone** (`ornFirst`/`ornLast`, KD-13) — mutation/evolution is deferred. Read this phase's zone content as the ornament zone.
+
 
 **Goal:** Loop windowing (first/last step), rotation, lock (freeze buffer from further mutation/recording), and mutation zone (scoped transform range).
 
@@ -654,6 +667,9 @@ else:
 **Verification:** Record into long buffer, narrow loop window to subset, confirm playback is constrained. Extend loop window across record extent boundary — confirm list model enforces constraint.
 
 ### Phase 4: Proteus Mutation — Loop-Boundary Lifecycle
+
+> **Status: DEFERRED — not a build phase.** The entire mutation/evolution subsystem (KD-3/6/10) is out of scope (duplicates Stochastic; can't co-exist with Feel under the 912 gate). Kept as future design only; the in-scope post-hardware phases are two-source → branches → ornaments → two-axis capture → track-delay.
+
 
 **Goal:** Add Proteus-inspired mutation/evolution that modifies the captured buffer at loop boundaries.
 
@@ -680,7 +696,10 @@ else:
 
 **Verification:** Set moderate patience + mutation, observe buffer evolving over multiple loops. Confirm lock prevents mutation.
 
-### Phase 5: Branches + Ornamentation + Density
+### Phase 5: Branches + Ornamentation (in-scope, post-hardware)
+
+> **Density/tilt is deferred** — read this phase as branches (count/path/pool, KD-12) + ornaments (rate/intensity + zone, KD-13) only. Two-source mix, two-axis capture, and track-delay are sibling in-scope post-hardware phases.
+
 
 **Goal:** Branch transforms (trunk+math at playback), ornamentation (per-step flourishes), and deterministic density masking.
 

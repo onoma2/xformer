@@ -69,7 +69,7 @@ Engine gate is **912 B** (TeletypeTrackEngine, PROJECT.md:299; the TT2 `static_a
 
 | Gate | Must pass |
 |------|-----------|
-| **A — Contract** | TASK + DICTIONARY agree. Every field has owner + active/reserved/deferred status. |
+| **A — Contract** | 1-pager + design doc agree. Every field has owner + active/reserved/deferred status. |
 | **B — RAM** | STM32 sizeof probes under container gates. |
 | **C — Serialization** | Round-trip test for all model fields. Invalid enums sanitize. |
 | **D — Engine** | No STL, no heap in tick path. Source reads guarded. |
