@@ -48,7 +48,9 @@ A Mini track is one `TT2MiniTrack` = `programs[4]` (per-scene) + **one shared** 
 
 Consequences (intended): switching scenes is continuous — the metro keeps its current tempo and phase, counters/delays keep running, you're simply now executing the new scene's scripts against the new scene's tt-patterns. A scene's script0 config (`M`/`MO.*`) applies only at **track start** (boot) or when script0 is otherwise fired; to change tempo/config *on* a switch, put it in the **metro script** (runs each tick on the active scene). tt-pattern edits a script makes persist in that scene's program; variables are a shared space across scenes (by design — that's what "seamless" buys).
 
-`changePattern()` is therefore trivial — just retarget the active scene (Task 6). The only hard reset is transport `reset()` (stop/load), which re-arms boot and clears the runtime as today.
+`changePattern()` is therefore trivial — just retarget the active scene (Task 6).
+
+**Transport `reset()` is partial, mirroring TT2** (`TT2TrackEngine.h:38-44`): it clears `_output`, the delay queue (`tt2DelayClear`), the metro accumulator (`_msAccum`/`_metroAccumMs`), and re-arms boot (`_firstTick=true` → script0 re-runs at next `update()`). It does **NOT** `init(runtime)` — so variables, the script stack, MIDI bindings, RNG, and `scriptLastMs` **persist through a transport stop**, exactly as Full TT2 today. script0 resets whatever it explicitly sets on the re-boot. (If a full runtime wipe on stop is ever wanted, that's a deliberate `init(_miniTrack.runtime())` added to Mini's `reset()` — NOT the default; the default mirrors TT2.)
 
 ---
 
@@ -130,6 +132,31 @@ template<> const TT2OpFuncT<TT2ConfigMini>* tt2OpTable<TT2ConfigMini>() { return
 **Step 7 — run, expect PASS.**
 **Step 8 — budget the second op table (ARM `.map`).** The engine `≤944` check does NOT cover this — `opTableBuilderMini` is a global in `.ccmram_bss`, and the Mini op bodies are a second `.text` set. `make -C build/stm32/release sequencer`, then: `grep -E 'opTableBuilderMini|tt2NativeOpTableMini' build/stm32/release/*.map` and check the section totals. Expect `.ccmram_bss` +`E_OP__LENGTH`×4 B (~1.7 KB; ~11 KB was free) and `.text` +~42 KB (~360 KB free). Record both deltas in the commit body.
 **Step 9 — commit:** `feat(tt2): instantiate Mini config (op table, trait decl+def, serializer)`
+
+### Task 1b: make init-index ops config-safe for `InitScript = -1`
+
+**Files:** `engine/TeletypeNativeOps.cpp`; Test extend `TestTeletypeMini.cpp`. **Why:** several ops use `Cfg::InitScript` as a *value* or *bound*. With Mini's `InitScript=-1` they index `[-1]` or disable everything. These are shared templated ops — the fixes are **equivalent for Full** (Full's `InitScript=9 == ScriptCount-1`), so Full behavior and tests are unchanged. **Audit first:** `grep -nE 'Cfg::InitScript' src/apps/sequencer/engine/TeletypeNativeOps.cpp` — today that's `opLast` (`:238`) and `opMiDollar` (`:2445`); fix every hit and re-grep after.
+
+**Step 1 — failing tests** (in `TestTeletypeMini.cpp`, using a `TT2RuntimeT<Mini>` + the Mini ops):
+- `LAST 0` (init script): with no init script, must **return 0**, not read `scriptLastMs[-1]`. Assert `opLast`-via-`runScript` on Mini with arg 0 pushes 0 and doesn't OOB.
+- `MI.$ 1 1` (bind MIDI on-event to script 1): on Mini must **bind script 0** (`1-1`), not disable. Assert `runtime.midi.on_script == 0` after, and a script in `0..ScriptCount-1` is accepted.
+**Step 2 — run, expect FAIL/UB** (the LAST case is an OOB read; the MI.$ case binds -1).
+**Step 3 — fix `opLast`** (`:236-238`): guard the init mapping —
+```cpp
+int sn = a - 1;
+if (sn < -1 || sn >= Cfg::ScriptCount) { pushStack(stack, stackSize, 0, error); return; }
+if (sn == -1) {
+    if (Cfg::InitScript < 0) { pushStack(stack, stackSize, 0, error); return; }  // no init script
+    sn = Cfg::InitScript;
+}
+```
+**Step 4 — fix `opMiDollar`** (`:2445`): bound by script count, not the init index —
+```cpp
+if (script < 0 || script >= Cfg::ScriptCount) script = -1;   // was: script > Cfg::InitScript
+```
+(For Full, `ScriptCount-1 == InitScript`, so identical behavior.)
+**Step 5 — run Mini + Full TT2 suites, expect PASS** (`ctest --test-dir build -R 'TestTeletypeMini|TestTeletypeV2|TestTT2'`). Re-grep `Cfg::InitScript` — every remaining use must be provably safe for `< 0` (e.g. `opInitTime` loops `0..ScriptCount`, fine).
+**Step 6 — commit:** `fix(tt2): init-index ops (LAST 0, MI.\$) safe when InitScript<0`
 
 ---
 
@@ -217,6 +244,7 @@ CASE("script0 boot sets M (track-start init via script0)") {
 - `update(float dt)`: `ScopedHost host(this);` then **boot block first** (`if (_firstTick){ _firstTick=false; runScript(uint8_t(_miniTrack.program(_activeScene).bootScriptIndex)); }`), then the metro/delay/input body — copy `TT2TrackEngine.h:71-...` verbatim, retemplated.
 - `tick()` returns `NoUpdate` (no boot here).
 - Implement the three Seam-2 `override`s (`triggerScript`/`toggleScriptMute`/`toggleMetroActive`), bounded to `TT2ConfigMini::ScriptCount`.
+- **Swap hardcoded Full constants** in the mirrored `.cpp`: `TT2_SCRIPT_COUNT` (`TT2TrackEngine.cpp:137` script-index guard, `:358` MIDI fire path) → `TT2ConfigMini::ScriptCount`; any `TT2_METRO_SCRIPT` → `MetroScript`. `InitScript=-1` has no slot — guard any init-index use with `>= 0` first. Grep the mirror: `grep -nE 'TT2_SCRIPT_COUNT|TT2_INIT_SCRIPT|TT2_METRO_SCRIPT' ` your new `.cpp` must return nothing.
 - `static_assert(sizeof(TT2MiniTrackEngine) <= 944, "");`
 **Step 4 — run, expect PASS** (the free-function boot test). **Engine `update()`/boot wiring is sim/manual — note in commit.**
 **Step 5 — commit:** `feat(engine): TT2MiniTrackEngine (boot-in-update, ScopedHost)`
