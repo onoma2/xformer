@@ -5,6 +5,7 @@
 #include "engine/TT2TrackEngine.h"
 #include "engine/TT2Printer.h"
 #include "engine/TT2ScriptLoader.h"
+#include "engine/TT2UiAccess.h"
 #include "ui/LedPainter.h"
 #include "ui/MatrixMap.h"
 #include "ui/KeyboardManager.h"
@@ -87,7 +88,7 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
     auto &track = _project.selectedTrack().tt2Track();
     auto &program = track.program();
     const int scriptIndex = _scriptIndex;
-    const uint8_t len = program.scripts[scriptIndex].length;
+    const uint8_t len = uint8_t(tt2ScriptLength(_project.selectedTrack(), scriptIndex));
 
     FixedStringBuilder<4> scriptLabel;
     if (_liveMode) {
@@ -145,7 +146,7 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
                 lineText[0] = '\0';
             }
         } else if (i < len) {
-            tt2PrintCommand(program.scripts[scriptIndex].commands[i], lineText, sizeof(lineText));
+            tt2PrintCommand(*tt2ScriptCommand(_project.selectedTrack(), scriptIndex, i), lineText, sizeof(lineText));
         }
 
         if (_liveMode) {
@@ -154,7 +155,7 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
             } else {
                 canvas.setColor(Color::Medium);
             }
-        } else if (i < len && program.scripts[scriptIndex].commands[i].commented) {
+        } else if (i < len && tt2ScriptCommand(_project.selectedTrack(), scriptIndex, i)->commented) {
             canvas.setColor(Color::Low);
         } else {
             canvas.setColor(i == _selectedLine ? Color::Bright : Color::Medium);
@@ -251,7 +252,7 @@ void TeletypeScriptViewPage::drawHud(Canvas &canvas) {
     }
     // TI: 8 trigger-input squares as 2 rows (1-4 top, 5-8 bottom) under columns
     // 0-3, brought up so the dashboard stays clear of the IN/PARAM/BUS bars.
-    for (int i = 0; i < TT2_TRIGGER_INPUT_COUNT; ++i) {
+    for (int i = 0; i < tt2TriggerInputCount(_project.selectedTrack()); ++i) {
         int x = kHudX + (i % 4) * kHudColPitch;
         int y = 38 + (i / 4) * 7;
         canvas.setColor(Color::Low);
@@ -625,18 +626,16 @@ void TeletypeScriptViewPage::loadEditBuffer(int line) {
     _editBuffer[0] = '\0';
     _cursor = 0;
 
-    auto &track = _project.selectedTrack().tt2Track();
-    auto &program = track.program();
     const int scriptIndex = _scriptIndex;
-    const uint8_t len = program.scripts[scriptIndex].length;
+    const uint8_t len = uint8_t(tt2ScriptLength(_project.selectedTrack(), scriptIndex));
     if (_selectedLine < len) {
-        tt2PrintCommand(program.scripts[scriptIndex].commands[_selectedLine], _editBuffer, EditBufferSize);
+        tt2PrintCommand(*tt2ScriptCommand(_project.selectedTrack(), scriptIndex, _selectedLine), _editBuffer, EditBufferSize);
         _cursor = int(std::strlen(_editBuffer));
     }
 }
 
 void TeletypeScriptViewPage::setScriptIndex(int scriptIndex) {
-    if (scriptIndex < 0 || scriptIndex >= TT2_SCRIPT_COUNT) {
+    if (scriptIndex < 0 || scriptIndex >= tt2ScriptCount(_project.selectedTrack())) {
         return;
     }
     _liveMode = false;
@@ -1088,7 +1087,7 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
         return;
     }
     if (event.ch() == ']') {
-        if (_scriptIndex < TT2_SCRIPT_COUNT - 1) {
+        if (_scriptIndex < tt2ScriptCount(_project.selectedTrack()) - 1) {
             setScriptIndex(_scriptIndex + 1);
         }
         event.consume();

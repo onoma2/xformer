@@ -3,6 +3,8 @@
 #include "ui/pages/Pages.h"
 #include "ui/painters/WindowPainter.h"
 
+#include "engine/TT2UiAccess.h"
+
 #include "model/TeletypeProgram.h"
 #include "model/Types.h"
 #include "model/Scale.h"
@@ -99,7 +101,7 @@ int TT2IoConfigPage::columnCount() const {
 int TT2IoConfigPage::rowCount() const {
     if (_view == View::Outputs) return TT2_CV_OUTPUT_COUNT;
     switch (_col) {
-    case 0: return TT2_TRIGGER_INPUT_COUNT;
+    case 0: return tt2TriggerInputCount(_project.selectedTrack());
     case 1: return TT2_CV_INPUT_COUNT;
     default: return 1;  // MIDI
     }
@@ -112,31 +114,31 @@ void TT2IoConfigPage::moveRow(int delta) {
 
 void TT2IoConfigPage::editCell(int delta) {
     if (!isTt2()) return;
-    auto &program = _project.selectedTrack().tt2Track().program();
+    auto &track = _project.selectedTrack();
     _engine.lock();
     if (_view == View::Outputs) {
         int i = _row;
         switch (_col) {
         case 0:
-            program.cvOutputRange[i] = ModelUtils::adjustedEnum(program.cvOutputRange[i], delta);
+            tt2SetCvOutputRange(track, i, ModelUtils::adjustedEnum(tt2CvOutputRange(track, i), delta));
             break;
         case 1:
-            program.cvOutputQuantizeScale[i] = clamp(int(program.cvOutputQuantizeScale[i]) + delta, -1, Scale::Count - 1);
+            tt2SetCvOutputQuantizeScale(track, i, int8_t(clamp(int(tt2CvOutputQuantizeScale(track, i)) + delta, -1, Scale::Count - 1)));
             break;
         case 2:
-            program.cvOutputOffset[i] = clamp(int(program.cvOutputOffset[i]) + delta * 5, -500, 500);
+            tt2SetCvOutputOffset(track, i, int16_t(clamp(int(tt2CvOutputOffset(track, i)) + delta * 5, -500, 500)));
             break;
         case 3:
-            program.cvOutputRootNote[i] = clamp(int(program.cvOutputRootNote[i]) + delta, -1, 11);
+            tt2SetCvOutputRootNote(track, i, int8_t(clamp(int(tt2CvOutputRootNote(track, i)) + delta, -1, 11)));
             break;
         }
     } else {
         switch (_col) {
         case 0:
-            program.triggerSource[_row] = ModelUtils::adjustedEnum(program.triggerSource[_row], delta);
+            tt2SetTriggerSource(track, _row, ModelUtils::adjustedEnum(tt2TriggerSource(track, _row), delta));
             break;
         case 1:
-            program.cvInputSource[_row] = ModelUtils::adjustedEnum(program.cvInputSource[_row], delta);
+            tt2SetCvInputSource(track, _row, ModelUtils::adjustedEnum(tt2CvInputSource(track, _row), delta));
             break;
         default:
             break;  // MIDI source edit deferred
@@ -162,7 +164,7 @@ void TT2IoConfigPage::draw(Canvas &canvas) {
         WindowPainter::drawFooter(canvas);
         return;
     }
-    auto &program = _project.selectedTrack().tt2Track().program();
+    auto &track = _project.selectedTrack();
 
     const int top = 17, rowH = 7;
 
@@ -191,13 +193,13 @@ void TT2IoConfigPage::draw(Canvas &canvas) {
             char buf[8];
             for (int c = 0; c < 4; ++c) {
                 bool sel = (r == _row && c == _col);
-                if (c == 0) rangeCode(program.cvOutputRange[r], buf);
+                if (c == 0) rangeCode(tt2CvOutputRange(track, r), buf);
                 else if (c == 1) {
-                    int q = program.cvOutputQuantizeScale[r];
+                    int q = tt2CvOutputQuantizeScale(track, r);
                     if (q < 0) std::snprintf(buf, sizeof(buf), "-");
                     else { const char *nm = Scale::name(q); buf[0] = nm[0]; buf[1] = nm[1]; buf[2] = nm[2]; buf[3] = '\0'; }
-                } else if (c == 2) stbsp_snprintf(buf, sizeof(buf), "%+.2f", program.cvOutputOffset[r] * 0.01f);  // newlib-nano has no float printf; stb does
-                else { int rn = program.cvOutputRootNote[r]; if (rn < 0) std::snprintf(buf, sizeof(buf), "*"); else std::snprintf(buf, sizeof(buf), "%s", kNoteNames[rn]); }
+                } else if (c == 2) stbsp_snprintf(buf, sizeof(buf), "%+.2f", tt2CvOutputOffset(track, r) * 0.01f);  // newlib-nano has no float printf; stb does
+                else { int rn = tt2CvOutputRootNote(track, r); if (rn < 0) std::snprintf(buf, sizeof(buf), "*"); else std::snprintf(buf, sizeof(buf), "%s", kNoteNames[rn]); }
                 if (sel) { canvas.setColor(cellColor(true)); canvas.fillRect(colX[c] - 2, y, 30, rowH); canvas.setBlendMode(BlendMode::Sub); }
                 canvas.setColor(sel ? Color::Bright : Color::Medium);
                 canvas.drawText(colX[c], y + 5, buf);
@@ -220,14 +222,14 @@ void TT2IoConfigPage::draw(Canvas &canvas) {
         canvas.drawText(208, top + 4, "MIDI");
         char buf[8];
         const char *cvNames[6] = { "IN", "PRM", "X", "Y", "Z", "T" };
-        for (int r = 0; r < TT2_TRIGGER_INPUT_COUNT; ++r) {
+        for (int r = 0; r < tt2TriggerInputCount(track); ++r) {
             int col = r / 4, row = r % 4;  // 2-up: T1-4 | T5-8
             int nx = 2 + col * 42, vx = nx + 16;
             int y = gridTop + row * rowH;
             FixedStringBuilder<4> nm("T%d", r + 1);
             canvas.setColor(Color::Low); canvas.drawText(nx, y + 5, nm);
             bool sel = (_col == 0 && r == _row);
-            trigSourceCode(program.triggerSource[r], buf);
+            trigSourceCode(tt2TriggerSource(track, r), buf);
             if (sel) { canvas.setColor(cellColor(true)); canvas.fillRect(vx - 2, y, 18, rowH); canvas.setBlendMode(BlendMode::Sub); }
             canvas.setColor(sel ? Color::Bright : Color::Medium); canvas.drawText(vx, y + 5, buf);
             if (sel) canvas.setBlendMode(BlendMode::Set);
@@ -238,7 +240,7 @@ void TT2IoConfigPage::draw(Canvas &canvas) {
             int y = gridTop + subrow * rowH;
             canvas.setColor(Color::Low); canvas.drawText(nx, y + 5, cvNames[r]);
             bool sel = (_col == 1 && r == _row);
-            cvSourceCode(program.cvInputSource[r], buf);
+            cvSourceCode(tt2CvInputSource(track, r), buf);
             if (sel) { canvas.setColor(cellColor(true)); canvas.fillRect(vx - 2, y, 18, rowH); canvas.setBlendMode(BlendMode::Sub); }
             canvas.setColor(sel ? Color::Bright : Color::Medium); canvas.drawText(vx, y + 5, buf);
             if (sel) canvas.setBlendMode(BlendMode::Set);
