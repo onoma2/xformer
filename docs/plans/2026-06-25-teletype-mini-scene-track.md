@@ -22,16 +22,33 @@
 The whole TT2 core is `template<typename Cfg>`: `TeletypeProgramT<Cfg>`/`TT2RuntimeT<Cfg>`/`TT2PatternT<Cfg>`, `TT2Runner.h`/`TT2Evaluator.h`/`TeletypeNativeOps.cpp` (~272 ops)/`TT2SceneSerializer`/`TT2ScriptLoader`, the `tt2OpTable<Cfg>()` trait with the `TT2ConfigFull` specialization, UI Seam-1 accessors (`TT2UiAccess.h`), Seam-2 base virtuals (`TrackEngine.h:68-70`). `TT2ConfigFull` has **8 traits**: `ScriptCount, DelayDepth, TriggerInputCount, MetroScript, InitScript, SceneCount, PatternCount, PatternLength`.
 
 **Two facts to honor:**
-1. **Boot/INIT runs in `update()` on `_firstTick`, NOT `tick()`** (`TT2TrackEngine.h:67-69`) — the metro free-runs on wall-clock, so init must apply transport-independently. The Mini engine boots the same way; scene-switch re-arms `_firstTick`.
+1. **Boot/INIT runs in `update()` on `_firstTick`, NOT `tick()`** (`TT2TrackEngine.h:67-69`) — the metro free-runs on wall-clock, so init must apply transport-independently. The Mini engine boots the same way: script0 runs once at **track start** (and on transport `reset()`). **Scene switch does NOT re-arm `_firstTick`** — switching is seamless (see the contract below).
 2. **`X/Y/Z/T` default to `None`** (scratch) — the Mini program inherits this; scripts can use X/Y as counters.
 
 ## Config decision — `ScriptCount=3`, no init slot (RESOLVED)
 
-The real `Track`-union cap is **NoteTrack = 9544 B**, not TT2Track's 9520 (PROJECT.md:251,293 — the 8-track `Track::_container` is sized by NoteTrack; a model below 9544 B adds no Model RAM). So `ScriptCount=4` (TT2MiniTrack=9522 ≤ 9544) *would* fit for free. We still choose **`ScriptCount=3`**: boot runs `runScript(bootScriptIndex)` unconditionally and `bootScriptIndex = InitScript>=0 ? InitScript : 0` (`TeletypeProgram.h:122`) → with `InitScript=-1`, **script0 runs on boot/scene-load**, so script0 IS the per-scene init hook (set `M`/`MO.*`/output shaping there). **script0 also fires as trigger-1** — triggering input 1 re-runs the scene's setup; that's the accepted trade for the smaller layout.
+The real `Track`-union cap is **NoteTrack = 9544 B**, not TT2Track's 9520 (PROJECT.md:251,293 — the 8-track `Track::_container` is sized by NoteTrack; a model below 9544 B adds no Model RAM). So `ScriptCount=4` (TT2MiniTrack=9522 ≤ 9544) *would* fit for free. We still choose **`ScriptCount=3`**: boot runs `runScript(bootScriptIndex)` unconditionally and `bootScriptIndex = InitScript>=0 ? InitScript : 0` (`TeletypeProgram.h:122`) → with `InitScript=-1`, **script0 runs once at track start** (the boot/init hook — set the *initial* `M`/`MO.*`/output shaping there). **script0 also fires as trigger-1.**
+
+Because scene switching is **seamless** (no re-boot — see the contract), script0 does NOT re-run on switch. So **per-scene config that must change on switch belongs in the metro script** (index 2), which runs every metro tick on the *active* scene: e.g. a scene that needs a different tempo sets `M` in its metro script, applied on the next tick after the switch. script0 is just the one-time track boot.
 
 **`TT2ConfigMini`:** `ScriptCount=3, DelayDepth=8, TriggerInputCount=2, MetroScript=2, InitScript=-1, SceneCount=4, PatternCount=4, PatternLength=64`. Sizes: `TeletypeProgramT<Mini>`≈1518, `TT2RuntimeT<Mini>`≈2192, `TT2MiniTrack`≈8.3 KB (≤9544 NoteTrack cap — ample headroom; the `<=9520` asserts below are a conservative TT2-family cap, not the union cliff). Pattern dims stay 4×64.
 
 **Execution note:** the per-task `commit` steps require the user's explicit go-ahead **at execution time** — this plan text does not itself grant commit permission (repo policy requires confirmation for `git add`/`commit`). The controller obtains that go-ahead before starting the run.
+
+## Scene-switch contract — SEAMLESS (the behavioral spec for `changePattern()`)
+
+A Mini track is one `TT2MiniTrack` = `programs[4]` (per-scene) + **one shared** `runtime`. The w-pattern selector picks `scene = pattern() % 4`. Switching scenes is **seamless**: it changes *only which program is active*; it does **not** reset anything.
+
+| State | Where it lives | On scene switch |
+|---|---|---|
+| 3 scripts, 4×64 tt-patterns, trigger/CV-in sources, output shaping | per-scene, in `programs[scene]` | **swapped** (the new scene's now active) |
+| variables (A/B/X/…), 8-deep delay queue, metro accumulator + period `M`, `M.ACT` | shared, in the single `runtime` | **carry unchanged** (NOT reset) |
+| CV/gate outputs (`_output`) | engine | hold last value until a script rewrites them |
+| `_firstTick` / boot | engine | **not re-armed** — script0 does NOT re-run on switch |
+
+Consequences (intended): switching scenes is continuous — the metro keeps its current tempo and phase, counters/delays keep running, you're simply now executing the new scene's scripts against the new scene's tt-patterns. A scene's script0 config (`M`/`MO.*`) applies only at **track start** (boot) or when script0 is otherwise fired; to change tempo/config *on* a switch, put it in the **metro script** (runs each tick on the active scene). tt-pattern edits a script makes persist in that scene's program; variables are a shared space across scenes (by design — that's what "seamless" buys).
+
+`changePattern()` is therefore trivial — just retarget the active scene (Task 6). The only hard reset is transport `reset()` (stop/load), which re-arms boot and clears the runtime as today.
 
 ---
 
@@ -183,7 +200,7 @@ CASE("program(scene) wraps modulo SceneCount") {
 // + the same engine/runner headers TestTeletypeV2Metro.cpp includes
 
 UNIT_TEST("TT2MiniEngine") {
-CASE("script0 boot sets M (scene-load init via script0)") {
+CASE("script0 boot sets M (track-start init via script0)") {
     TeletypeProgramT<TT2ConfigMini> p; init(p);
     // load "M 500" into script0 using the same loader TestTeletypeV2Metro uses
     TT2RuntimeT<TT2ConfigMini> rt; init(rt);
@@ -218,19 +235,17 @@ CASE("tt2SceneIndex wraps modulo") {
 ```
 (Include the engine header for the free helper declaration.)
 **Step 2 — run, expect FAIL** (`tt2SceneIndex` undefined).
-**Step 3 — implement.** Free helper in the engine header: `inline int tt2SceneIndex(int pattern, int sceneCount) { return pattern % sceneCount; }`. Then:
+**Step 3 — implement (SEAMLESS — see the Scene-switch contract).** Free helper in the engine header: `inline int tt2SceneIndex(int pattern, int sceneCount) { return pattern % sceneCount; }`. Then `changePattern()` only retargets the active scene — **no `init(runtime)`, no `_firstTick`**; the shared runtime (variables/delay/metro/`M`) carries across the switch:
 ```cpp
 void TT2MiniTrackEngine::changePattern() {
-    int scene = tt2SceneIndex(pattern(), TT2ConfigMini::SceneCount);
-    if (scene == _activeScene) return;
-    _activeScene = scene;
-    init(_miniTrack.runtime());
-    _firstTick = true;   // re-run scene's script0 on next update()
+    _activeScene = tt2SceneIndex(pattern(), TT2ConfigMini::SceneCount);
+    // seamless: runtime carries, no re-boot. Metro keeps tempo/phase;
+    // a scene changes config via its metro script, not on switch.
 }
 ```
-Ctor: `_activeScene=-1`, then call `changePattern()` once to seed (base ctor's virtual won't reach the override; the runtime dispatch at `Engine.cpp:1067` does).
-**Step 4 — run, expect PASS.** (Idempotency guard + init-on-switch is engine-level → sim/manual.)
-**Step 5 — commit:** `feat(engine): idempotent mini scene switch (modulo wrap)`
+Ctor: `_activeScene=-1`, then call `changePattern()` once to seed the active scene (base ctor's virtual won't reach the override; the runtime dispatch at `Engine.cpp:1067` does). Boot (`_firstTick`) is armed by `reset()`/ctor and runs script0 once at first `update()` — Task 5.
+**Step 4 — run, expect PASS** (the pure helper). The seamless-carry behavior (switch mid-run → metro tempo + variables + delays continue; new scene's scripts now active) is engine-level → **sim/manual**.
+**Step 5 — commit:** `feat(engine): seamless mini scene switch (modulo wrap, runtime carries)`
 
 ### Task 7: engine `Container` + construction + routing + external dispatch
 
@@ -306,7 +321,7 @@ Drive all three from the config (via Seam-1: `tt2MetroScriptIndex()`/`tt2InitScr
 - `sizeof`: `TeletypeProgramT<Mini>`<1700, `TT2RuntimeT<Mini>`<2600, `TT2MiniTrack`≤9520 (conservative; real union cap is NoteTrack 9544 per PROJECT.md:293), `TT2MiniTrackEngine`≤944.
 - **Second op table budget:** ARM `.map` shows `.ccmram_bss` and `.text` deltas within free space (Task 1 Step 8) — the engine `≤944` check does NOT cover the global op table.
 - Op-table coverage parity (Mini non-null wherever Full is).
-- Scene-switch: `p % SceneCount`; same-pattern `changePattern()` no-op; script0 runs on boot/scene-load so the metro period is the scene's, not 1000 (sim).
+- Scene-switch is **seamless**: `changePattern()` retargets `p % SceneCount` only; the shared runtime (variables/delay/metro tempo+phase) carries across — switching mid-run does NOT reset or reboot (sim). script0 boots once at track start (and on transport `reset()`); per-scene tempo/config lives in the metro script.
 - Output on the TT2 jack layer; serialization round-trip; Mini does NOT persist as the fall-through mode.
 - `make -C build/stm32/release sequencer` + `make -C build/sim/debug sequencer` clean.
 - Then: **superpowers:finishing-a-development-branch**.
