@@ -14,7 +14,7 @@ In scope: the TT2 model structs, the interpreter (runner/evaluator/ops), seriali
 
 ## The config model
 
-A traits struct carries **only the values that will differ between configurations**. The audit confirms exactly six:
+A traits struct carries **only the values that will differ between configurations**. Eight (the original six + the two pattern dimensions, added by the pattern de-hardcode follow-up — see `docs/plans/2026-06-25-tt2-pattern-dehardcode-plan.md`):
 
 ```cpp
 // model/TT2Config.h
@@ -25,10 +25,12 @@ struct TT2ConfigFull {
     static constexpr int MetroScript      = 8;
     static constexpr int InitScript       = 9;
     static constexpr int SceneCount       = 1;
+    static constexpr int PatternCount     = 4;    // tt-patterns (TT2PatternT)
+    static constexpr int PatternLength    = 64;
 };
 ```
 
-Everything else is identical across configurations and **stays a plain shared constant** (no Cfg member, untouched at its use sites): `TT2_COMMANDS_PER_SCRIPT=6`, `TT2_COMMAND_MAX_LENGTH=16`, `TT2_PATTERN_COUNT=4`, `TT2_PATTERN_LENGTH=64`, `TT2_STACK_DEPTH=16`, `TT2_EXEC_DEPTH=8`, `TT2_Q_LENGTH=64`, `TT2_CV_INPUT_COUNT=6`, `TT2_CV_OUTPUT_COUNT=8`, `TT2_CV_COUNT=8`, `TT2_TR_COUNT=8`, `TT2_RNG_COUNT=5`, `TT2_NB_SCALES=16`, `TT2_PRINT_SLOT_COUNT=16`, `TT2_MIDI_EVENTS=10`, `TT2_VARIABLE_COUNT=20`, plus `TT2_OUTPUT_CV_COUNT=8` / `TT2_OUTPUT_TR_COUNT=8` (`TeletypeOutputState.h:6-7` — fixed by hardware: 8 CV + 8 gate jacks; `TeletypeOutputState` and `TT2OutputState` are not templated).
+Everything else is identical across configurations and **stays a plain shared constant** (no Cfg member, untouched at its use sites): `TT2_COMMANDS_PER_SCRIPT=6`, `TT2_COMMAND_MAX_LENGTH=16`, `TT2_STACK_DEPTH=16`, `TT2_EXEC_DEPTH=8`, `TT2_Q_LENGTH=64`, `TT2_CV_INPUT_COUNT=6`, `TT2_CV_OUTPUT_COUNT=8`, `TT2_CV_COUNT=8`, `TT2_TR_COUNT=8`, `TT2_RNG_COUNT=5`, `TT2_NB_SCALES=16`, `TT2_PRINT_SLOT_COUNT=16`, `TT2_MIDI_EVENTS=10`, `TT2_VARIABLE_COUNT=20`, plus `TT2_OUTPUT_CV_COUNT=8` / `TT2_OUTPUT_TR_COUNT=8` (`TeletypeOutputState.h:6-7` — fixed by hardware: 8 CV + 8 gate jacks; `TeletypeOutputState` and `TT2OutputState` are not templated).
 
 **Metro/init stay explicit Cfg members, not derived** (`count-2`/`count-1`). Full is metro=8/init=9/count=10; Mini will be metro=2/init=−1/count=3 — the derivation does not survive a config with no init, so explicit is correct.
 
@@ -39,7 +41,7 @@ Everything else is identical across configurations and **stays a plain shared co
 Replace every use of the six varying constants with the `Cfg::` member. **The authoritative site list is the grep, not a hand-enumeration** (hand lists drift — they already did):
 
 ```
-grep -rn 'TT2_SCRIPT_COUNT\|TT2_DELAY_DEPTH\|TT2_TRIGGER_INPUT_COUNT\|TT2_TRIGGER_INPUTS\|TT2_METRO_SCRIPT\|TT2_INIT_SCRIPT' src/apps/sequencer/{engine,model,ui}
+grep -rn 'TT2_SCRIPT_COUNT\|TT2_DELAY_DEPTH\|TT2_TRIGGER_INPUT_COUNT\|TT2_TRIGGER_INPUTS\|TT2_METRO_SCRIPT\|TT2_INIT_SCRIPT\|TT2_PATTERN_COUNT\|TT2_PATTERN_LENGTH' src/apps/sequencer/{engine,model,ui}
 ```
 
 Current totals as a sanity figure (verified): `TT2_SCRIPT_COUNT` **33**, `TT2_DELAY_DEPTH` 4 (1 def + 3 uses), `TT2_TRIGGER_INPUT_COUNT`/`TT2_TRIGGER_INPUTS` ~19, `TT2_METRO_SCRIPT` ~12, `TT2_INIT_SCRIPT` ~6. Every hit converts; the static_asserts in `TeletypeProgram.h`/`TeletypeRuntime.h` are the only definitional sites that stay. Collapse the `TT2_TRIGGER_INPUTS` alias into the one `Cfg::TriggerInputCount`.
