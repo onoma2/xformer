@@ -10,6 +10,7 @@
 #include "PhaseFluxTrack.h"
 #include "Serialize.h"
 #include "StochasticTrack.h"
+#include "TT2MiniTrack.h"
 #include "TT2Track.h"
 #include "TuesdayTrack.h"
 #include "Types.h"
@@ -49,6 +50,7 @@ public:
     Stochastic,
     PhaseFlux,
     TeletypeV2,
+    TeletypeMini,
     Last,
     Default = Note
   };
@@ -73,6 +75,8 @@ public:
       return "PhaseFlux";
     case TrackMode::TeletypeV2:
       return "T++ (v2)";
+    case TrackMode::TeletypeMini:
+      return "TT-Mini";
     case TrackMode::Last:
       break;
     }
@@ -91,6 +95,7 @@ public:
     case TrackMode::Stochastic:  return 'S';
     case TrackMode::PhaseFlux:   return 'P';
     case TrackMode::TeletypeV2:  return '2';
+    case TrackMode::TeletypeMini: return 'm';
     case TrackMode::Last:        break;
     }
     return '?';
@@ -116,6 +121,8 @@ public:
       return 7;
     case TrackMode::TeletypeV2:
       return 8;
+    case TrackMode::TeletypeMini:
+      return 9;
     case TrackMode::Last:
       break;
     }
@@ -261,6 +268,17 @@ public:
     return _container.as<TT2Track>();
   }
 
+  // tt2MiniTrack
+
+  const TT2MiniTrack &tt2MiniTrack() const {
+    SANITIZE_TRACK_MODE(_trackMode, TrackMode::TeletypeMini);
+    return _container.as<TT2MiniTrack>();
+  }
+  TT2MiniTrack &tt2MiniTrack() {
+    SANITIZE_TRACK_MODE(_trackMode, TrackMode::TeletypeMini);
+    return _container.as<TT2MiniTrack>();
+  }
+
   //----------------------------------------
   // Methods
   //----------------------------------------
@@ -317,6 +335,9 @@ private:
     case TrackMode::TeletypeV2:
       _container.as<TT2Track>().setTrackIndex(trackIndex);
       break;
+    case TrackMode::TeletypeMini:
+      _container.as<TT2MiniTrack>().setTrackIndex(trackIndex);
+      break;
     case TrackMode::Last:
       break;
     }
@@ -367,6 +388,10 @@ private:
       _track.tt2 = _container.create<TT2Track>();
       _track.tt2->setTrackIndex(_trackIndex);
       break;
+    case TrackMode::TeletypeMini:
+      _track.miniTt2 = _container.create<TT2MiniTrack>();
+      _track.miniTt2->setTrackIndex(_trackIndex);
+      break;
     case TrackMode::Last:
       break;
     }
@@ -378,7 +403,7 @@ private:
   Routable<int8_t> _cvOutputRotate;
   Routable<int8_t> _gateOutputRotate;
 
-  Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack, StochasticTrack, PhaseFluxTrack, TT2Track> _container;
+  Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack, StochasticTrack, PhaseFluxTrack, TT2Track, TT2MiniTrack> _container;
   union {
     NoteTrack *note;
     CurveTrack *curve;
@@ -389,6 +414,7 @@ private:
     StochasticTrack *stochastic;
     PhaseFluxTrack *phaseFlux;
     TT2Track *tt2;
+    TT2MiniTrack *miniTt2;
   } _track;
 
   friend class Project;
