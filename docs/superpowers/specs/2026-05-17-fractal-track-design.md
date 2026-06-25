@@ -229,7 +229,7 @@ On trunk-phase loop boundary:
 **RAM allocation policy:**
 1. **Inline trunk, no heap:** the trunk is an inline `uint16_t` member (KD-2) — default 64 cells (128 B), max 128 cells (256 B), in the engine's CCMRAM slot. No allocator, no OOM path, no per-engine heap cap.
 2. **One trunk per engine, not per pattern:** pattern switching changes config only; the single inline trunk is not swapped or reallocated. No 17× amplification.
-3. **ARM `sizeof` probe required before adding growers:** build a skeleton FractalTrackEngine on STM32 and report `sizeof` before adding deferred state (e.g. the KD-14b onset-phase cell widening, or MutationHistory if it un-defers). This validates the ~600 B estimate against the 912 B gate; if it's wrong, re-budget or cut.
+3. **ARM `sizeof` probe required before adding growers:** build a skeleton FractalTrackEngine on STM32 and report `sizeof` before adding deferred state (e.g. the KD-14b onset-phase cell widening, or MutationHistory if it un-defers). This validates the ~800 B active estimate against the 912 B gate; if it's wrong, re-budget or cut.
 
 **Engine members estimate:**
 **Active engine (MVP + in-scope + Feel):**
@@ -587,14 +587,14 @@ else:
 
 ## Phased Implementation Plan
 
-> **Sequencing authority = the 1-pager phase order.** **Phase 1** model (all in-scope fields declared/serialized) → **Phase 2** the *minimal MVP looper* (one parent source, Replace/Latch capture, forward playback via loop window + Order, lock, minimal list UI) → **Phase 3** hardware verification → *stop, hand off*. After that there are **no phase numbers** — the in-scope extras are named post-hardware sections, built in this order: Loop Controls → Two-Source Mix → Branches (count/path/pool) → Ornamentation + zone → Two-Axis Capture (Event/Feel) → Track-Delay → Visual UI. **Deferred and not phased:** mutation/evolution, CV-scan, capture variants (Punch/Once/Quantize), bar-quantize/beat-offset, density/tilt.
+> **Sequencing authority = the 1-pager phase order.** **Phase 1** model (all in-scope fields declared/serialized) → **Phase 2** the *minimal MVP looper* (one parent source, Replace/Latch capture, forward playback via loop window + Order, lock, minimal list UI) → **Phase 3** hardware verification → *stop, hand off*. After that there are **no phase numbers** — the in-scope extras are named post-hardware sections, built in the 1-pager ledger order: **Branches (count/path/pool) → Ornamentation + zone → Two-Source Mix → Track-Delay → Two-Axis Capture (Event/Feel) → Visual UI**. (Loop Controls are **not** here — they're Phase 2.) **Deferred and not phased:** mutation/evolution, CV-scan, capture variants (Punch/Once/Quantize), bar-quantize/beat-offset, density/tilt.
 
 ### Phase 1: Model & Serialization
 
 **Goal:** `FractalTrack` and `FractalSequence` in the Track container, serializable.
 
 **Files:**
-- NEW `model/FractalSequence.h` — minimal sequence: divisor, clockMultiplier, resetMeasure, runMode, scale group, firstStep, lastStep, loopFirst, loopLast, rotate, orderMode, loopMode (Loop), recordFirst, recordLast, recordMode (~28 B). *(Deferred: clockSource, punchMode, recordQuantize, loopBars, beatOffset, loopPhase.)*
+- NEW `model/FractalSequence.h` — minimal sequence: divisor, clockMultiplier, resetMeasure, runMode, loopFirst, loopLast, rotate, orderMode, loopMode (Loop), recordFirst, recordLast, recordMode (~24 B). *(The loop window **is** loopFirst/loopLast — no separate firstStep/lastStep. Scale is track-wide on FractalTrack, not per-sequence. Deferred: clockSource, punchMode, recordQuantize, loopBars, beatOffset, loopPhase.)*
 - NEW `model/FractalTrack.h` — 17 sequences + track params (**in scope**): sourceA, sourceB, gateLogic, cvLogic (two-source mix), bufferLength, recordTrigger (Routable), lock, octave, transpose, slideTime, cvUpdateMode, scale group (inherit), ornFirst, ornLast, branchCount, path, branchSeed, branchPool, ornamentRate, ornamentIntensity, captureCadence, captureFidelity, trackDelay. **Routable:** recordTrigger, branchCount, path, ornamentRate, ornamentIntensity. *(Deferred — reserved, not built: routedScan/clockSource (CV-scan), density, tilt, complexity, patience, mutationProb, octaveShiftProb, mutateFirst, mutateLast, evolutionDepth, pressureMode, and the Blend/Once/PunchIn capture variants.)*
 - EDIT `model/Track.h` — add `Fractal` to TrackMode enum, Container, union, accessors, initContainer.
 - EDIT `model/Routing.h` — add `FractalFirst..FractalLast` routing targets.
@@ -624,13 +624,13 @@ else:
 
 **Cycle safety:** Engine checks source track indices < Fractal track index. It **silently treats an invalid/out-of-range source as idle (gate=false, cv=0) — no warning, no log** (per KD-1); the list UI clamps the selection so a broken config never reaches the engine.
 
-**List UI integration (Phase 2 — minimal core):** `FractalTrackListModel` with just the MVP-looper params: Divisor, Clock Mult, Reset Measure, Run Mode, Scale, Root, **Source A**, BufferLength, Record Arm (recordTrigger), Clear Buffer (action), Record Mode (Replace/Latch), Lock, Loop First/Last, Order, Rotate, SlideTime, Octave, Transpose. Lives in TrackPage.cpp's existing list routing — no new page type. *Added in later in-scope phases:* Source B + Gate/CV Logic (two-source), Branch Count/Path/Pool, Ornament Rate/Intensity + zone, Capture Cadence/Fidelity, Track Delay. *Never shown (deferred):* Clock Source/CV-scan, Punch Mode, Loop Mode Once, Rec Quantize, Loop Bars, Beat Offset, Loop Phase, Density, Tilt, mutation/evolution.
+**List UI integration (Phase 2 — minimal core):** `FractalTrackListModel` with just the MVP-looper params: Divisor, Clock Mult, Reset Measure, Run Mode, Root (playback reference — the trunk is rel-root), **Source A**, BufferLength, Record Arm (recordTrigger), Clear Buffer (action), Record Mode (Replace/Latch), Lock, Loop First/Last, Order, Rotate, SlideTime, Octave, Transpose. Lives in TrackPage.cpp's existing list routing — no new page type. *Added in later in-scope phases:* Source B + Gate/CV Logic (two-source), Branch Count/Path/Pool, **Scale (inherited, ornament-only — no effect until Ornamentation)** + Ornament Rate/Intensity + zone, Capture Cadence/Fidelity, Track Delay. *Never shown (deferred):* Clock Source/CV-scan, Punch Mode, Loop Mode Once, Rec Quantize, Loop Bars, Beat Offset, Loop Phase, Density, Tilt, mutation/evolution.
 
 **Verification:** STM32 build, manual test via list UI: assign NoteTrack as parent, record one loop, hear it repeat.
 
 ### Phase 3: Hardware Verification → Stop, Hand Off
 
-After Phase 2 builds and hardware-validates the minimal MVP looper, **stop and hand off to the user.** The sections below are **post-hardware, in-scope** work (no phase numbers — order is the 1-pager ledger): Loop Controls → Two-Source Mix → Branches → Ornamentation → Two-Axis Capture → Track-Delay → Visual UI. Deferred features are never phased.
+After Phase 2 builds and hardware-validates the minimal MVP looper, **stop and hand off to the user.** The sections below are **post-hardware, in-scope** work (no phase numbers — order is the 1-pager ledger): **Branches → Ornamentation + zone → Two-Source Mix → Track-Delay → Two-Axis Capture → Visual UI**. (Loop Controls are Phase 2, not here.) Deferred features are never phased.
 
 ### Loop Window, Record Extent, Rotation, Lock — Phase 2 detail (single owner)
 
