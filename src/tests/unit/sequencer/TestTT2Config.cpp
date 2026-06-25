@@ -2,6 +2,7 @@
 
 #include "model/TT2Config.h"
 #include "model/TeletypeProgram.h"
+#include "model/TeletypeRuntime.h"
 
 #include <type_traits>
 
@@ -19,6 +20,11 @@ CASE("TT2ConfigFull traits match today's values") {
 CASE("TeletypeProgramT<Full> layout is unchanged") {
     static_assert(sizeof(TeletypeProgramT<TT2ConfigFull>) == 3638, "");
     expect(std::is_trivially_copyable<TeletypeProgramT<TT2ConfigFull>>::value, "trivially copyable");
+}
+
+CASE("TT2RuntimeT<Full> layout is unchanged") {
+    static_assert(sizeof(TT2RuntimeT<TT2ConfigFull>) == 5880, "");
+    expect(std::is_trivially_copyable<TT2RuntimeT<TT2ConfigFull>>::value, "trivially copyable");
 }
 
 }

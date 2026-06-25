@@ -24,10 +24,11 @@ struct TT2RuntimeCommand {
     int16_t value[TT2_COMMAND_MAX_LENGTH];
 };
 
-struct TT2Variables {
+template<typename Cfg>
+struct TT2VariablesT {
     int16_t a, x, b, y, c, z, d, t;
-    int16_t j[TT2_SCRIPT_COUNT];
-    int16_t k[TT2_SCRIPT_COUNT];
+    int16_t j[Cfg::ScriptCount];
+    int16_t k[Cfg::ScriptCount];
     int16_t cv[TT2_CV_COUNT];
     int16_t cv_off[TT2_CV_COUNT];
     int16_t cv_slew[TT2_CV_COUNT];
@@ -57,7 +58,7 @@ struct TT2Variables {
     int16_t r_max;
     int16_t n_scale_bits[TT2_NB_SCALES];
     int16_t n_scale_root[TT2_NB_SCALES];
-    uint8_t script_pol[TT2_TRIGGER_INPUTS];
+    uint8_t script_pol[Cfg::TriggerInputCount];
     int64_t time;
     uint8_t time_act;
     int16_t tr[TT2_TR_COUNT];
@@ -87,8 +88,9 @@ struct TT2DelayEntry {
     int16_t originFParam2;
 };
 
-struct TT2DelayQueue {
-    TT2DelayEntry entries[TT2_DELAY_DEPTH];
+template<typename Cfg>
+struct TT2DelayQueueT {
+    TT2DelayEntry entries[Cfg::DelayDepth];
     uint8_t count;
 };
 
@@ -98,8 +100,9 @@ struct TT2EveryCount {
     uint8_t skip;
 };
 
-struct TT2EveryState {
-    TT2EveryCount every[TT2_SCRIPT_COUNT][TT2_COMMANDS_PER_SCRIPT];
+template<typename Cfg>
+struct TT2EveryStateT {
+    TT2EveryCount every[Cfg::ScriptCount][TT2_COMMANDS_PER_SCRIPT];
 };
 
 struct TT2Metro {
@@ -245,26 +248,30 @@ inline void tt2MidiCc(TT2Midi &m, uint8_t ch, uint8_t controller, uint8_t value)
     m.last_event_type = 2; m.last_channel = ch; m.last_controller = controller; m.last_cc = value;
 }
 
-struct TT2Runtime {
-    TT2Variables variables;
+template<typename Cfg>
+struct TT2RuntimeT {
+    TT2VariablesT<Cfg> variables;
     TT2Stack stack;
-    TT2DelayQueue delay;
-    TT2EveryState every;
+    TT2DelayQueueT<Cfg> delay;
+    TT2EveryStateT<Cfg> every;
     TT2Metro metro;
     TT2Rng rng;
     TT2ExecState exec;
     TT2Turtle turtle;
-    uint8_t inputLevel[TT2_TRIGGER_INPUT_COUNT];  // latched trigger levels for STATE
+    uint8_t inputLevel[Cfg::TriggerInputCount];   // latched trigger levels for STATE
     uint32_t clockMs;                             // engine ms clock for TIME / LAST
-    uint32_t scriptLastMs[TT2_SCRIPT_COUNT];      // clockMs at each script's last run
+    uint32_t scriptLastMs[Cfg::ScriptCount];      // clockMs at each script's last run
     uint8_t metroResetReq;                        // M.RESET -> engine zeroes the metro phase
     TT2Midi midi;                                 // MIDI event buffer for MI.* ops
 };
 
+using TT2Runtime = TT2RuntimeT<TT2ConfigFull>;
+
 // Variable defaults (shared by init() and the INIT.DATA op). Zeroes the
 // variables block first, then applies the kept Teletype core defaults.
-inline void tt2InitVariables(TT2Variables &v) {
-    memset(&v, 0, sizeof(TT2Variables));
+template<typename Cfg>
+inline void tt2InitVariables(TT2VariablesT<Cfg> &v) {
+    memset(&v, 0, sizeof(TT2VariablesT<Cfg>));
     v.a = 1;
     v.b = 2;
     v.c = 3;
@@ -284,7 +291,7 @@ inline void tt2InitVariables(TT2Variables &v) {
     v.q_grow = 0;
     v.r_min = 0;
     v.r_max = 16383;
-    for (int i = 0; i < TT2_TRIGGER_INPUTS; ++i) {
+    for (int i = 0; i < Cfg::TriggerInputCount; ++i) {
         v.script_pol[i] = 1;
     }
     v.time_act = 1;
@@ -305,8 +312,9 @@ inline void tt2InitVariables(TT2Variables &v) {
     }
 }
 
-inline void init(TT2Runtime &r) {
-    memset(&r, 0, sizeof(TT2Runtime));
+template<typename Cfg>
+inline void init(TT2RuntimeT<Cfg> &r) {
+    memset(&r, 0, sizeof(TT2RuntimeT<Cfg>));
 
     tt2InitVariables(r.variables);
 
@@ -329,16 +337,16 @@ inline void init(TT2Runtime &r) {
     r.turtle.mode = TT2TurtleMode::Bump;
     r.turtle.heading = 180;
     r.turtle.speed = 100;
-    r.turtle.scriptNumber = TT2_SCRIPT_COUNT;  // NO_SCRIPT equivalent
+    r.turtle.scriptNumber = Cfg::ScriptCount;  // NO_SCRIPT equivalent
 }
 
 // sizeof guards are <= bounds verified on ARM STM32 release builds.
-static_assert(sizeof(TT2Variables) <= 496, "TT2Variables size drift");
+static_assert(sizeof(TT2VariablesT<TT2ConfigFull>) <= 496, "TT2Variables size drift");
 static_assert(sizeof(TT2RuntimeCommand) <= 52, "TT2RuntimeCommand size drift");
 static_assert(sizeof(TT2Stack) <= 804, "TT2Stack size drift");
 static_assert(sizeof(TT2DelayEntry) <= 62, "TT2DelayEntry size drift");
-static_assert(sizeof(TT2DelayQueue) <= 3850, "TT2DelayQueue size drift");  // 64x60+2 = 3842
-static_assert(sizeof(TT2EveryState) <= 372, "TT2EveryState size drift");
+static_assert(sizeof(TT2DelayQueueT<TT2ConfigFull>) <= 3850, "TT2DelayQueue size drift");  // 64x60+2 = 3842
+static_assert(sizeof(TT2EveryStateT<TT2ConfigFull>) <= 372, "TT2EveryState size drift");
 static_assert(sizeof(TT2Metro) <= 14, "TT2Metro size drift");
 static_assert(sizeof(TT2Rng) <= 22, "TT2Rng size drift");
 static_assert(sizeof(TT2ExecFrame) <= 22, "TT2ExecFrame size drift");
@@ -349,22 +357,26 @@ static_assert(sizeof(TT2Runtime) <= 5900, "TT2Runtime size drift");
 // depth must be > 0 (set by runScript or future nested execution).
 // Callers must ensure depth > 0 before calling; accessing I without a
 // frame is undefined behavior.
-inline int16_t &tt2ActiveI(TT2Runtime &runtime) {
+template<typename Cfg>
+inline int16_t &tt2ActiveI(TT2RuntimeT<Cfg> &runtime) {
     assert(runtime.exec.depth > 0 && "tt2ActiveI called without exec frame");
     return runtime.exec.frames[runtime.exec.depth - 1].i;
 }
 
-inline uint8_t &tt2ActiveScriptNumber(TT2Runtime &runtime) {
+template<typename Cfg>
+inline uint8_t &tt2ActiveScriptNumber(TT2RuntimeT<Cfg> &runtime) {
     return runtime.exec.frames[runtime.exec.depth > 0
                                 ? runtime.exec.depth - 1 : 0].script_number;
 }
 
 // Active execution frame — for function params (I1/I2) and result (FR).
-inline TT2ExecFrame &tt2ActiveFrame(TT2Runtime &runtime) {
+template<typename Cfg>
+inline TT2ExecFrame &tt2ActiveFrame(TT2RuntimeT<Cfg> &runtime) {
     return runtime.exec.frames[runtime.exec.depth > 0 ? runtime.exec.depth - 1 : 0];
 }
 
-inline uint8_t &tt2ActiveLineNumber(TT2Runtime &runtime) {
+template<typename Cfg>
+inline uint8_t &tt2ActiveLineNumber(TT2RuntimeT<Cfg> &runtime) {
     return runtime.exec.frames[runtime.exec.depth > 0
                                ? runtime.exec.depth - 1 : 0].line_number;
 }
@@ -372,14 +384,16 @@ inline uint8_t &tt2ActiveLineNumber(TT2Runtime &runtime) {
 // IF/ELIF/ELSE chain flag — lives on the exec frame (like upstream
 // es_variables->if_else_condition) so it persists across script lines, not
 // just across segments of one command. Only IF resets it.
-inline uint8_t &tt2ActiveIfElse(TT2Runtime &runtime) {
+template<typename Cfg>
+inline uint8_t &tt2ActiveIfElse(TT2RuntimeT<Cfg> &runtime) {
     return runtime.exec.frames[runtime.exec.depth > 0
                                ? runtime.exec.depth - 1 : 0].if_else_condition;
 }
 
 // BREAK flag on the active exec frame — set by BREAK/BRK, checked + reset by
 // the L loop (upstream es_variables->breaking).
-inline uint8_t &tt2ActiveBreaking(TT2Runtime &runtime) {
+template<typename Cfg>
+inline uint8_t &tt2ActiveBreaking(TT2RuntimeT<Cfg> &runtime) {
     return runtime.exec.frames[runtime.exec.depth > 0
                                ? runtime.exec.depth - 1 : 0].breaking;
 }
@@ -388,11 +402,12 @@ inline uint8_t &tt2ActiveBreaking(TT2Runtime &runtime) {
 // time==0 empty sentinel, delay clamped to >= 1 ms, caller context (script /
 // I / fparams) snapshotted for restore at fire time. tt2DelayAdd returns
 // false if the queue is full.
-inline bool tt2DelayAdd(TT2Runtime &runtime, const TT2RuntimeCommand &command,
+template<typename Cfg>
+inline bool tt2DelayAdd(TT2RuntimeT<Cfg> &runtime, const TT2RuntimeCommand &command,
                         int16_t timeMs, uint8_t originScript, int16_t originI,
                         int16_t originFParam1, int16_t originFParam2) {
     if (timeMs < 1) timeMs = 1;
-    for (int i = 0; i < TT2_DELAY_DEPTH; ++i) {
+    for (int i = 0; i < Cfg::DelayDepth; ++i) {
         TT2DelayEntry &e = runtime.delay.entries[i];
         if (e.time == 0) {
             e.command = command;
@@ -408,8 +423,9 @@ inline bool tt2DelayAdd(TT2Runtime &runtime, const TT2RuntimeCommand &command,
     return false;
 }
 
-inline void tt2DelayClear(TT2Runtime &runtime) {
-    for (int i = 0; i < TT2_DELAY_DEPTH; ++i) {
+template<typename Cfg>
+inline void tt2DelayClear(TT2RuntimeT<Cfg> &runtime) {
+    for (int i = 0; i < Cfg::DelayDepth; ++i) {
         runtime.delay.entries[i].time = 0;
     }
     runtime.delay.count = 0;
