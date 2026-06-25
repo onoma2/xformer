@@ -394,7 +394,7 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
             if (key.shiftModifier()) {          // shift+page+F1..F4 -> fire S5..S8
                 if (fn >= 0 && fn < kTriggerScriptCount &&
                     _engine.selectedTrackEngine().trackMode() == Track::TrackMode::TeletypeV2) {
-                    _engine.selectedTrackEngine().as<TT2TrackEngine>().triggerScript(4 + fn);
+                    _engine.selectedTrackEngine().triggerScript(4 + fn);
                 }
                 event.consume();
             } else if (fn == 4) {               // page+F5 -> live/pattern
@@ -418,7 +418,7 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
                     event.consume();
                     return;
                 }
-                _engine.selectedTrackEngine().as<TT2TrackEngine>().triggerScript(fn);
+                _engine.selectedTrackEngine().triggerScript(fn);
                 event.consume();
                 return;
             }
@@ -905,7 +905,7 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
         if (keycode >= KeyboardEvent::KeyF1 && keycode <= KeyboardEvent::KeyF8) {
             const int scriptIdx = keycode - KeyboardEvent::KeyF1;  // F1 → 0, F2 → 1, ...
             if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::TeletypeV2) {
-                auto &trackEngine = _engine.selectedTrackEngine().as<TT2TrackEngine>();
+                auto &trackEngine = _engine.selectedTrackEngine();
                 trackEngine.triggerScript(scriptIdx);
             }
             event.consume();
@@ -913,7 +913,7 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
         }
         if (keycode == KeyboardEvent::KeyF9) {
             if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::TeletypeV2) {
-                auto &trackEngine = _engine.selectedTrackEngine().as<TT2TrackEngine>();
+                auto &trackEngine = _engine.selectedTrackEngine();
                 trackEngine.triggerScript(TT2_METRO_SCRIPT);
             }
             event.consume();
@@ -921,7 +921,7 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
         }
         if (keycode == KeyboardEvent::KeyF10) {
             if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::TeletypeV2) {
-                auto &trackEngine = _engine.selectedTrackEngine().as<TT2TrackEngine>();
+                auto &trackEngine = _engine.selectedTrackEngine();
                 trackEngine.triggerScript(TT2_INIT_SCRIPT);
             }
             event.consume();
@@ -964,14 +964,14 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
         // Ctrl+F1-F8: mute/unmute trigger script; Ctrl+F9: stop/start metro
         if (keycode >= KeyboardEvent::KeyF1 && keycode <= KeyboardEvent::KeyF8) {
             if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::TeletypeV2) {
-                _engine.selectedTrackEngine().as<TT2TrackEngine>().toggleScriptMute(keycode - KeyboardEvent::KeyF1);
+                _engine.selectedTrackEngine().toggleScriptMute(keycode - KeyboardEvent::KeyF1);
             }
             event.consume();
             return;
         }
         if (keycode == KeyboardEvent::KeyF9) {
             if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::TeletypeV2) {
-                _engine.selectedTrackEngine().as<TT2TrackEngine>().toggleMetroActive();
+                _engine.selectedTrackEngine().toggleMetroActive();
             }
             event.consume();
             return;
