@@ -145,6 +145,13 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
     int scriptX = Width - 2 - scriptWidth;
     canvas.drawText(scriptX, 8, scriptLabel);
 
+    if (isMini()) {
+        FixedStringBuilder<8> sceneLabel("S%d/%d", scene, TT2ConfigMini::SceneCount);
+        canvas.setColor(Color::Medium);
+        int sceneX = scriptX - 8 - canvas.textWidth(sceneLabel);
+        canvas.drawText(sceneX, 8, sceneLabel);
+    }
+
     if (_liveMode) {
         bool states[4] = {};
         if (isMini()) {

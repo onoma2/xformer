@@ -48,7 +48,7 @@ def draw_vbar(canvas, x, y, w, h, value_raw, fill, outline):
 
 
 def render_tt2_script(canvas, lines, edit_text, script_label,
-                      cv, tr, ti, cv_in, param, bus):
+                      cv, tr, ti, cv_in, param, bus, scene_label=None):
     canvas.set_color(Color.None_)
     canvas.fill()
     canvas.set_blend_mode(BlendMode.Set)
@@ -57,7 +57,14 @@ def render_tt2_script(canvas, lines, edit_text, script_label,
     canvas.set_font(Font.Tiny)
     canvas.set_color(Color.Medium)
     lbl_w = canvas.text_width(script_label)
-    canvas.draw_text(WIDTH - 2 - lbl_w, 8, script_label)
+    script_x = WIDTH - 2 - lbl_w
+    canvas.draw_text(script_x, 8, script_label)
+
+    # --- mini scene chip (left of script label, Mini only) ---
+    if scene_label is not None:
+        canvas.set_color(Color.Medium)
+        scene_x = script_x - 8 - canvas.text_width(scene_label)
+        canvas.draw_text(scene_x, 8, scene_label)
 
     # --- script lines (edit mode) ---
     max_text_w = HUD_X - 2 - TEXT_X
@@ -145,6 +152,17 @@ def main():
     path = os.path.join(out_dir, "tt2-script-hud-2row.png")
     img.save(path)
     print("Saved", path)
+
+    # Mini variant: scene chip (S<n>/4) shown left of the script label.
+    fb2 = FrameBuffer(WIDTH, HEIGHT)
+    canvas2 = Canvas(fb2, brightness=1.0)
+    render_tt2_script(canvas2, lines, edit_text, "S1", cv, tr, ti,
+                      cv_in=11000, param=5000, bus=[9000, 8192, 12500, 3000],
+                      scene_label="S2/4")
+    img2 = framebuffer_to_image(fb2, scale=4)
+    path2 = os.path.join(out_dir, "tt2-script-mini-scene.png")
+    img2.save(path2)
+    print("Saved", path2)
 
 
 if __name__ == "__main__":
