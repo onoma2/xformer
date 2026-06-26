@@ -162,6 +162,7 @@ set(sources
     ui/pages/PhaseFluxEditPage.cpp
     ui/pages/PhaseFluxSequencePage.cpp
     ui/pages/FractalTrunkPage.cpp
+    ui/pages/FractalBranchPage.cpp
     ui/pages/TempoPage.cpp
     ui/pages/TextInputPage.cpp
     ui/pages/TopPage.cpp

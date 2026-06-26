@@ -160,7 +160,7 @@ void FractalTrunkPage::keyPress(KeyPressEvent &event) {
         case 2: _bracket = Bracket::Ornament; break;
         case 4: {
             auto &pages = _manager.pages();
-            _manager.replace(_manager.stackSize() - 1, &pages.fractalTrunk);
+            _manager.replace(_manager.stackSize() - 1, &pages.fractalBranch);
             break;
         }
         default: break;
