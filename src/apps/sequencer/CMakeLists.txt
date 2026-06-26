@@ -161,10 +161,7 @@ set(sources
     ui/pages/StochasticSequenceEditPage.cpp
     ui/pages/PhaseFluxEditPage.cpp
     ui/pages/PhaseFluxSequencePage.cpp
-    ui/pages/FractalTrunkPage.cpp
-    ui/pages/FractalBranchPage.cpp
-    ui/pages/FractalOrnamentPage.cpp
-    ui/pages/FractalSourcePage.cpp
+    ui/pages/FractalSequenceEditPage.cpp
     ui/pages/TempoPage.cpp
     ui/pages/TextInputPage.cpp
     ui/pages/TopPage.cpp

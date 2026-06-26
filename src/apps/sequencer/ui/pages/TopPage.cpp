@@ -329,7 +329,7 @@ void TopPage::setSequenceView(SequenceView view) {
         break;
     case Track::TrackMode::Fractal:
         // Hero ring entry (Trunk); F5=NEXT cycles to Branch/Ornament/Source.
-        setMainPage(pages.fractalTrunk);
+        setMainPage(pages.fractalSequenceEdit);
         break;
     case Track::TrackMode::PhaseFlux:
         setMainPage(pages.phaseFluxSequence);
@@ -371,7 +371,7 @@ void TopPage::setSequenceEditPage() {
         break;
     case Track::TrackMode::Fractal:
         // Hero ring entry (Trunk); F5=NEXT cycles to Branch/Ornament/Source.
-        setMainPage(pages.fractalTrunk);
+        setMainPage(pages.fractalSequenceEdit);
         break;
     case Track::TrackMode::PhaseFlux:
         setMainPage(pages.phaseFluxEdit);
