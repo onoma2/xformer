@@ -11,7 +11,12 @@
 
 ## Why this mirrors existing mechanisms (the patterns to copy)
 
-- **`BUS` is the exact shape** — one indexed op over an `Engine` array, reached through the host. `BUS i` reads `Engine::_busCv[4]` (`engine/Engine.h:135-160`) via `hostBusCv` (`TT2TrackEngine.cpp:258` → `_engine.busCv(index)`). `TV` is the same, with three differences: an `int16` store (no volts conversion), **no `Routing` bridge** (so it stays TT-only — `BUS` is system-wide *because* of `CvRoute::InputSource/OutputDest::Bus`, `Routing.h:131`), and **no per-frame re-seed** (`_busCvWriters` is re-filled each frame at `Engine.cpp:110`; `_tv` is not — that's what makes it a persistent variable rather than a summed lane).
+- **`BUS` is the closest shape** — one indexed op over an `Engine` array, reached through the host. `BUS i` reads `Engine::_busCv[4]` (`engine/Engine.h:135-160`) via `hostBusCv` (`TT2TrackEngine.cpp:258` → `_engine.busCv(index)`). `TV` copies that wiring but differs in **five** ways:
+  1. **`int16` store**, no volts conversion (BUS is CV/float ±5V).
+  2. **No `Routing` bridge** → TT-only (BUS is system-wide *because* of `CvRoute::InputSource/OutputDest::Bus`, `Routing.h:131`).
+  3. **No per-frame re-seed** — `_busCvWriters` is re-filled each frame (`Engine.cpp:110`); `_tv` is not, so it's a persistent variable, not a summed lane.
+  4. **0-based** (`TV 0..15`); BUS is 1-based.
+  5. **No `popOutputIndex`** — `opTv` pops the raw index; out-of-range is a **silent no-op / 0, error stays `None`** (BUS returns `OutOfRange`). Do NOT route `TV` through `popOutputIndex`.
 - The op body mirrors `opBus`/`opWp` (pop the index, null-guard the host, branch get/set on `isSetPosition`).
 
 ## The store — `Engine`
