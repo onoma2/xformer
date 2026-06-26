@@ -164,6 +164,15 @@ public:
         StochasticBurstRate,
         StochasticLast = StochasticBurstRate,
 
+        // Fractal Track Targets
+        FractalFirst,
+        FractalBranchCount = FractalFirst,
+        FractalPath,
+        FractalOrnamentRate,
+        FractalOrnamentIntensity,
+        FractalRecordArm,
+        FractalLast = FractalRecordArm,
+
         Last,
     };
 
@@ -241,6 +250,12 @@ public:
         case Target::StochasticMarblesSpread:   return "Spread";
         case Target::StochasticBurstCount:      return "Burst Count";
         case Target::StochasticBurstRate:       return "Burst Rate";
+
+        case Target::FractalBranchCount:        return "Branch Count";
+        case Target::FractalPath:               return "Path";
+        case Target::FractalOrnamentRate:       return "Orn Rate";
+        case Target::FractalOrnamentIntensity:  return "Orn Intens";
+        case Target::FractalRecordArm:          return "Record Arm";
 
         case Target::ChaosAmount:               return "Chaos Amount";
         case Target::ChaosRate:                 return "Chaos Rate";
@@ -345,6 +360,13 @@ public:
         case Target::StochasticBurstCount:      return 83;
         case Target::StochasticBurstRate:       return 84;
 
+        // Fractal Targets (86-90)
+        case Target::FractalBranchCount:        return 86;
+        case Target::FractalPath:               return 87;
+        case Target::FractalOrnamentRate:       return 88;
+        case Target::FractalOrnamentIntensity:  return 89;
+        case Target::FractalRecordArm:          return 90;
+
         // Chaos Targets (39-42)
         case Target::ChaosAmount:               return 39;
         case Target::ChaosRate:                 return 40;
@@ -409,6 +431,10 @@ public:
                target <= Target::StochasticLast;
     }
 
+    static bool isFractalTarget(Target target) {
+        return target >= Target::FractalFirst && target <= Target::FractalLast;
+    }
+
     static bool isChaosTarget(Target target) {
         return target >= Target::ChaosFirst && target <= Target::ChaosLast;
     }
@@ -438,7 +464,7 @@ public:
     static bool isPerTrackTarget(Target target) {
         return isPlayStateTarget(target) || isTrackTarget(target) || isSequenceTarget(target) ||
                isTuesdayTarget(target) || isStochasticTarget(target) || isChaosTarget(target) || isWavefolderTarget(target) ||
-               isDiscreteMapTarget(target) || isIndexedTarget(target);
+               isDiscreteMapTarget(target) || isIndexedTarget(target) || isFractalTarget(target);
     }
 
     enum class Shaper : uint8_t {

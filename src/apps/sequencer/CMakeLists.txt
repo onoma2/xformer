@@ -85,6 +85,7 @@ set(sources
     model/ParamTableTuesday.cpp
     model/ParamTableStochastic.cpp
     model/ParamTablePhaseFlux.cpp
+    model/ParamTableFractal.cpp
     model/Project.cpp
     model/Routing.cpp
     model/Scale.cpp

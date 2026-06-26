@@ -221,19 +221,18 @@ public:
     void editCaptureFidelity(int value, bool shift) { setCaptureFidelity(ModelUtils::adjustedEnum(captureFidelity(), value)); }
     void printCaptureFidelity(StringBuilder &str) const { str(captureFidelityName(captureFidelity())); }
 
-    // recordTrigger (arm). Routing destination deferred until the engine
-    // capture path lands; raw field only for now.
-    int recordTrigger() const { return _recordTrigger; }
+    // recordTrigger (arm). Routable per-sequence.
+    int recordTrigger() const { return Routing::routedValueInt(ParamKey::FractalRecordTrigger, _trackIndex, _recordTrigger, 0, 1); }
     void setRecordTrigger(int v) { _recordTrigger = clamp(v, 0, 1); }
     void editRecordTrigger(int value, bool shift) { setRecordTrigger(value > 0 ? 1 : 0); }
     void printRecordTrigger(StringBuilder &str) const { str(recordTrigger() ? "On" : "Off"); }
 
-    // branchCount (0..7). Routing deferred.
-    int branchCount() const { return _branchCount; }
+    // branchCount (0..7). Routable per-sequence.
+    int branchCount() const { return Routing::routedValueInt(ParamKey::FractalBranchCount, _trackIndex, _branchCount, 0, 7); }
     void setBranchCount(int v) { _branchCount = clamp(v, 0, 7); }
 
-    // path (bit-word, 0..255). Routing deferred.
-    int path() const { return _path; }
+    // path (bit-word, 0..255). Routable per-sequence.
+    int path() const { return Routing::routedValueInt(ParamKey::FractalPath, _trackIndex, _path, 0, 255); }
     void setPath(int v) { _path = clamp(v, 0, 255); }
 
     // branchSeed
@@ -244,12 +243,12 @@ public:
     int branchPool() const { return _branchPool; }
     void setBranchPool(int v) { _branchPool = clamp(v, 0, 255); }
 
-    // ornamentRate (0..100). Routing deferred.
-    int ornamentRate() const { return _ornamentRate; }
+    // ornamentRate (0..100). Routable per-sequence.
+    int ornamentRate() const { return Routing::routedValueInt(ParamKey::FractalOrnamentRate, _trackIndex, _ornamentRate, 0, 100); }
     void setOrnamentRate(int v) { _ornamentRate = clamp(v, 0, 100); }
 
-    // ornamentIntensity (0..100). Routing deferred.
-    int ornamentIntensity() const { return _ornamentIntensity; }
+    // ornamentIntensity (0..100). Routable per-sequence.
+    int ornamentIntensity() const { return Routing::routedValueInt(ParamKey::FractalOrnamentIntensity, _trackIndex, _ornamentIntensity, 0, 100); }
     void setOrnamentIntensity(int v) { _ornamentIntensity = clamp(v, 0, 100); }
 
     //----------------------------------------

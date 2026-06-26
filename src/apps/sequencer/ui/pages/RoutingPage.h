@@ -44,7 +44,7 @@ private:
     // Static tab ring (fixed positions for muscle memory): 3 fixed bands, then 7 engine
     // pages (MidiCv excluded — its params are all shared band keys), then Bus.
     static constexpr int kBandCount = 3;
-    static constexpr int kEngineCount = 7;
+    static constexpr int kEngineCount = 8;
     static constexpr int kBusTab = kBandCount + kEngineCount;   // 10
     static constexpr int kMidiTab = kBusTab + 1;               // 11
     static constexpr int kTabCount = kMidiTab + 1;             // 12

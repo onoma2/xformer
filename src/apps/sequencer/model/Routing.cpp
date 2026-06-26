@@ -436,6 +436,12 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     [int(Routing::Target::StochasticMarblesSpread)]         = { 0,      100,    0,      100,    10      },
     [int(Routing::Target::StochasticBurstCount)]            = { 0,      100,    0,      100,    10      },
     [int(Routing::Target::StochasticBurstRate)]             = { 0,      100,    0,      100,    10      },
+    // Fractal targets
+    [int(Routing::Target::FractalBranchCount)]              = { 0,      7,      0,      7,      1       },
+    [int(Routing::Target::FractalPath)]                     = { 0,      255,    0,      255,    16      },
+    [int(Routing::Target::FractalOrnamentRate)]             = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::FractalOrnamentIntensity)]        = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::FractalRecordArm)]                = { 0,      1,      0,      1,      1       },
 };
 
 float Routing::normalizeTargetValue(Routing::Target target, float value) {

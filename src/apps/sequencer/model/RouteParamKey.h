@@ -135,5 +135,12 @@ struct ParamKey {
         LenNudge       = 152,
         CyclePhaseWarp = 153,
         PulseNudge     = 154,
+
+        // --- Fractal signature block (160..) ---
+        FractalBranchCount       = 160,
+        FractalPath              = 161,
+        FractalOrnamentRate      = 162,
+        FractalOrnamentIntensity = 163,
+        FractalRecordTrigger     = 164,
     };
 };

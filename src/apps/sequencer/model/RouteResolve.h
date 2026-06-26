@@ -15,6 +15,7 @@
 #include "ParamTableIndexed.h"
 #include "ParamTableMidiCv.h"
 #include "ParamTableGlobal.h"
+#include "ParamTableFractal.h"
 
 // Apply-fork decision for the routing mod-matrix slice (plan 005, step 3).
 //
@@ -108,6 +109,12 @@ namespace RouteResolve {
         // FirstStep/RunMode bridged above via the shared keys)
         case Routing::Target::IndexedA:                  return ParamKey::IndexedA;
         case Routing::Target::IndexedB:                  return ParamKey::IndexedB;
+        // Fractal signature block (per-sequence performance controls + record arm)
+        case Routing::Target::FractalBranchCount:        return ParamKey::FractalBranchCount;
+        case Routing::Target::FractalPath:               return ParamKey::FractalPath;
+        case Routing::Target::FractalOrnamentRate:       return ParamKey::FractalOrnamentRate;
+        case Routing::Target::FractalOrnamentIntensity:  return ParamKey::FractalOrnamentIntensity;
+        case Routing::Target::FractalRecordArm:          return ParamKey::FractalRecordTrigger;
         // global (project) targets — no track dimension
         case Routing::Target::Tempo:                     return ParamKey::Tempo;
         case Routing::Target::Swing:                     return ParamKey::Swing;
@@ -157,6 +164,7 @@ namespace RouteResolve {
         case Track::TrackMode::DiscreteMap: return &DiscreteMapParamTable::table();
         case Track::TrackMode::Indexed:   return &IndexedParamTable::table();
         case Track::TrackMode::MidiCv:    return &MidiCvParamTable::table();
+        case Track::TrackMode::Fractal:   return &FractalParamTable::table();
         default:                          return nullptr;
         }
     }
