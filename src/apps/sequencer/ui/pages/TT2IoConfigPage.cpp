@@ -4,6 +4,7 @@
 #include "ui/painters/WindowPainter.h"
 
 #include "engine/TT2UiAccess.h"
+#include "engine/TrackEngine.h"
 
 #include "model/TeletypeProgram.h"
 #include "model/Types.h"
@@ -83,7 +84,18 @@ TT2IoConfigPage::TT2IoConfigPage(PageManager &manager, PageContext &context) :
 }
 
 bool TT2IoConfigPage::isTt2() const {
-    return _project.selectedTrack().trackMode() == Track::TrackMode::TeletypeV2;
+    const auto mode = _project.selectedTrack().trackMode();
+    return mode == Track::TrackMode::TeletypeV2 || mode == Track::TrackMode::TeletypeMini;
+}
+
+bool TT2IoConfigPage::isMini() const {
+    return _project.selectedTrack().trackMode() == Track::TrackMode::TeletypeMini;
+}
+
+// Active scene = engine pattern % SceneCount, matching the Mini engine.
+int TT2IoConfigPage::activeScene() const {
+    if (!isMini()) return 0;
+    return _engine.selectedTrackEngine().pattern() % TT2ConfigMini::SceneCount;
 }
 
 void TT2IoConfigPage::enter() {
@@ -115,30 +127,31 @@ void TT2IoConfigPage::moveRow(int delta) {
 void TT2IoConfigPage::editCell(int delta) {
     if (!isTt2()) return;
     auto &track = _project.selectedTrack();
+    const int scene = activeScene();
     _engine.lock();
     if (_view == View::Outputs) {
         int i = _row;
         switch (_col) {
         case 0:
-            tt2SetCvOutputRange(track, i, ModelUtils::adjustedEnum(tt2CvOutputRange(track, i), delta));
+            tt2SetCvOutputRange(track, i, ModelUtils::adjustedEnum(tt2CvOutputRange(track, i, scene), delta), scene);
             break;
         case 1:
-            tt2SetCvOutputQuantizeScale(track, i, int8_t(clamp(int(tt2CvOutputQuantizeScale(track, i)) + delta, -1, Scale::Count - 1)));
+            tt2SetCvOutputQuantizeScale(track, i, int8_t(clamp(int(tt2CvOutputQuantizeScale(track, i, scene)) + delta, -1, Scale::Count - 1)), scene);
             break;
         case 2:
-            tt2SetCvOutputOffset(track, i, int16_t(clamp(int(tt2CvOutputOffset(track, i)) + delta * 5, -500, 500)));
+            tt2SetCvOutputOffset(track, i, int16_t(clamp(int(tt2CvOutputOffset(track, i, scene)) + delta * 5, -500, 500)), scene);
             break;
         case 3:
-            tt2SetCvOutputRootNote(track, i, int8_t(clamp(int(tt2CvOutputRootNote(track, i)) + delta, -1, 11)));
+            tt2SetCvOutputRootNote(track, i, int8_t(clamp(int(tt2CvOutputRootNote(track, i, scene)) + delta, -1, 11)), scene);
             break;
         }
     } else {
         switch (_col) {
         case 0:
-            tt2SetTriggerSource(track, _row, ModelUtils::adjustedEnum(tt2TriggerSource(track, _row), delta));
+            tt2SetTriggerSource(track, _row, ModelUtils::adjustedEnum(tt2TriggerSource(track, _row, scene), delta), scene);
             break;
         case 1:
-            tt2SetCvInputSource(track, _row, ModelUtils::adjustedEnum(tt2CvInputSource(track, _row), delta));
+            tt2SetCvInputSource(track, _row, ModelUtils::adjustedEnum(tt2CvInputSource(track, _row, scene), delta), scene);
             break;
         default:
             break;  // MIDI source edit deferred
@@ -165,6 +178,7 @@ void TT2IoConfigPage::draw(Canvas &canvas) {
         return;
     }
     auto &track = _project.selectedTrack();
+    const int scene = activeScene();
 
     const int top = 17, rowH = 7;
 
@@ -193,13 +207,13 @@ void TT2IoConfigPage::draw(Canvas &canvas) {
             char buf[8];
             for (int c = 0; c < 4; ++c) {
                 bool sel = (r == _row && c == _col);
-                if (c == 0) rangeCode(tt2CvOutputRange(track, r), buf);
+                if (c == 0) rangeCode(tt2CvOutputRange(track, r, scene), buf);
                 else if (c == 1) {
-                    int q = tt2CvOutputQuantizeScale(track, r);
+                    int q = tt2CvOutputQuantizeScale(track, r, scene);
                     if (q < 0) std::snprintf(buf, sizeof(buf), "-");
                     else { const char *nm = Scale::name(q); buf[0] = nm[0]; buf[1] = nm[1]; buf[2] = nm[2]; buf[3] = '\0'; }
-                } else if (c == 2) stbsp_snprintf(buf, sizeof(buf), "%+.2f", tt2CvOutputOffset(track, r) * 0.01f);  // newlib-nano has no float printf; stb does
-                else { int rn = tt2CvOutputRootNote(track, r); if (rn < 0) std::snprintf(buf, sizeof(buf), "*"); else std::snprintf(buf, sizeof(buf), "%s", kNoteNames[rn]); }
+                } else if (c == 2) stbsp_snprintf(buf, sizeof(buf), "%+.2f", tt2CvOutputOffset(track, r, scene) * 0.01f);  // newlib-nano has no float printf; stb does
+                else { int rn = tt2CvOutputRootNote(track, r, scene); if (rn < 0) std::snprintf(buf, sizeof(buf), "*"); else std::snprintf(buf, sizeof(buf), "%s", kNoteNames[rn]); }
                 if (sel) { canvas.setColor(cellColor(true)); canvas.fillRect(colX[c] - 2, y, 30, rowH); canvas.setBlendMode(BlendMode::Sub); }
                 canvas.setColor(sel ? Color::Bright : Color::Medium);
                 canvas.drawText(colX[c], y + 5, buf);
@@ -229,7 +243,7 @@ void TT2IoConfigPage::draw(Canvas &canvas) {
             FixedStringBuilder<4> nm("T%d", r + 1);
             canvas.setColor(Color::Low); canvas.drawText(nx, y + 5, nm);
             bool sel = (_col == 0 && r == _row);
-            trigSourceCode(tt2TriggerSource(track, r), buf);
+            trigSourceCode(tt2TriggerSource(track, r, scene), buf);
             if (sel) { canvas.setColor(cellColor(true)); canvas.fillRect(vx - 2, y, 18, rowH); canvas.setBlendMode(BlendMode::Sub); }
             canvas.setColor(sel ? Color::Bright : Color::Medium); canvas.drawText(vx, y + 5, buf);
             if (sel) canvas.setBlendMode(BlendMode::Set);
@@ -240,7 +254,7 @@ void TT2IoConfigPage::draw(Canvas &canvas) {
             int y = gridTop + subrow * rowH;
             canvas.setColor(Color::Low); canvas.drawText(nx, y + 5, cvNames[r]);
             bool sel = (_col == 1 && r == _row);
-            cvSourceCode(tt2CvInputSource(track, r), buf);
+            cvSourceCode(tt2CvInputSource(track, r, scene), buf);
             if (sel) { canvas.setColor(cellColor(true)); canvas.fillRect(vx - 2, y, 18, rowH); canvas.setBlendMode(BlendMode::Sub); }
             canvas.setColor(sel ? Color::Bright : Color::Medium); canvas.drawText(vx, y + 5, buf);
             if (sel) canvas.setBlendMode(BlendMode::Set);
@@ -300,7 +314,13 @@ void TT2IoConfigPage::contextShow(bool doubleClick) {
         sceneMenuItems,
         int(SceneAction::Last),
         [&] (int index) { contextAction(index); },
-        [&] (int index) { return SceneAction(index) != SceneAction::Paste || _model.clipBoard().canPasteTrack(); },
+        [&] (int index) {
+            SceneAction a = SceneAction(index);
+            // SD scene file uses the Full single-program format; disable for Mini
+            // before any tt2Track() deref. Copy/Paste act on the whole track.
+            if (isMini() && (a == SceneAction::Load || a == SceneAction::Save)) return false;
+            return a != SceneAction::Paste || _model.clipBoard().canPasteTrack();
+        },
         doubleClick
     ));
 }

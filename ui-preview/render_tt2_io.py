@@ -136,7 +136,7 @@ def _inputs_grouped(c, trig, cvin_c1, cvin_c2, cur, midi):
     _footer(c, ["TRIG", "CV IN", "MIDI", "", "NEXT"], highlight=grp)
 
 
-def _inputs_spread(c, trig, cvin_c1, cvin_c2, cur, midi):
+def _inputs_spread(c, trig, cvin_c1, cvin_c2, cur, midi, trig_count=8):
     # Same content as _inputs_grouped but distributed across the full 256px so
     # nothing is cramped and the right gutter isn't black: TRIG left, CV IN
     # centre, MIDI far right.
@@ -162,7 +162,7 @@ def _inputs_spread(c, trig, cvin_c1, cvin_c2, cur, midi):
     c.draw_text(98, top + 4, "CV IN")
     c.draw_text(208, top + 4, "MIDI")
 
-    for i in range(8):
+    for i in range(trig_count):
         col, row = i // 4, i % 4
         cellY = top + 8 + row * rowH
         nx = 2 + col * 42
@@ -219,6 +219,14 @@ def main():
     fb = FrameBuffer(PW, PH); c = Canvas(fb)
     _matrix(c, "OUTPUTS", gut, ["RNG", "QNT", "OFF", "ROOT"], cells, 2, 0, foot)
     framebuffer_to_image(fb, 4).save(os.path.join(out, "tt2-io-out-proposed.png")); print("out-proposed")
+
+    # MINI INPUTS — TT2ConfigMini draws only 2 trigger rows (T1/T2); CV-in (6) and
+    # MIDI are unchanged. Active scene's program supplies the source codes.
+    fb = FrameBuffer(PW, PH); c = Canvas(fb)
+    _inputs_spread(c, ["IN1", "IN2", "", "", "", "", "", ""],
+                   cvin_c1=["IN1", "IN2", "--"], cvin_c2=["--", "--", "--"],
+                   cur=("T", 0), midi="OMNI", trig_count=2)
+    framebuffer_to_image(fb, 4).save(os.path.join(out, "tt2-io-in-mini.png")); print("in-mini")
 
 
 if __name__ == "__main__":

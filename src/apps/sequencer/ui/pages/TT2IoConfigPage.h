@@ -24,6 +24,8 @@ private:
     void moveRow(int delta);
     void editCell(int delta);
     bool isTt2() const;
+    bool isMini() const;
+    int activeScene() const;
 
     void contextShow(bool doubleClick = false) override;
     void contextAction(int index);

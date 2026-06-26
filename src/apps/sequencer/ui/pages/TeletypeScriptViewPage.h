@@ -43,6 +43,9 @@ private:
     void drawHud(Canvas &canvas);
     void drawBipolarBar(Canvas &canvas, int x, int y, int w, int h, int raw, Color fill, Color outline);
 
+    bool isMini() const;
+    int activeScene() const;
+
     void contextShow(bool doubleClick = false) override;
     void contextAction(int index);
     bool contextActionEnabled(int index) const;
