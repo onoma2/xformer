@@ -1,14 +1,18 @@
 #include "FractalSequenceEditPage.h"
 
 #include "ui/painters/WindowPainter.h"
+#include "ui/painters/SequencePainter.h"
 #include "Pages.h"
 
 #include "model/FractalTrack.h"
+#include "model/ModelUtils.h"
 #include "model/Project.h"
 #include "model/Scale.h"
+#include "model/Track.h"
 #include "model/Types.h"
 #include "engine/FractalTrackEngine.h"
 
+#include "core/math/Math.h"
 #include "core/utils/StringBuilder.h"
 #include "core/utils/Random.h"
 
@@ -17,8 +21,10 @@
 // 8-slot transform pool (matches branchPool bitmask order, KD-12).
 static const char *kPoolNames[8] = { "Tr", "Rv", "In", "RI", "Ro", "Co", "Ex", "Gt" };
 
-static const char *kGateLogic[6] = { "A", "B", "And", "Or", "Xor", "Nand" };
-static const char *kCvLogic[7]   = { "A", "B", "Min", "Max", "Sum", "Avg", "Gat" };
+// Source-page segmented logic rows source their labels from
+// FractalTrack::gateLogicName/cvLogicName via these wrappers.
+static const char *gateLogicLabel(int i) { return FractalTrack::gateLogicName(FractalTrack::GateLogic(i)); }
+static const char *cvLogicLabel(int i) { return FractalTrack::cvLogicName(FractalTrack::CvLogic(i)); }
 
 // Outlined bar with a filled portion (0..100) and optional tier ticks.
 static void drawBar(Canvas &canvas, int x, int y, int w, int h, int pct, bool highlight) {
@@ -29,25 +35,23 @@ static void drawBar(Canvas &canvas, int x, int y, int w, int h, int pct, bool hi
     canvas.fillRect(x + 1, y + 1, fw, h - 2);
 }
 
-// Compact track ref: "<3-letter mode> T<n>" or "-" for none.
+// Compact track ref: "<mode-letter> T<n>" or "-" for none.
 static void printSourceRef(StringBuilder &str, const Project &project, int index) {
     if (index < 0) { str("-"); return; }
-    static const char *kShort[] = { "Not", "Crv", "Mid", "Tue", "Map", "Idx", "Sto", "Frc", "Ttv", "Ttm", "Phx" };
-    int mode = int(project.track(index).trackMode());
-    const char *m = (mode >= 0 && mode < int(sizeof(kShort) / sizeof(kShort[0]))) ? kShort[mode] : "?";
-    str("%s T%d", m, index + 1);
+    str("%c T%d", Track::trackModeLetter(project.track(index).trackMode()), index + 1);
 }
 
 // Single-select row of cells (mirrors the mockup _seg_row).
-static void drawSegRow(Canvas &canvas, int x, int y, int w, const char **items, int n, int sel, bool focus) {
+static void drawSegRow(Canvas &canvas, int x, int y, int w, const char *(*label)(int), int n, int sel, bool focus) {
     int cw = w / n;
     for (int i = 0; i < n; ++i) {
         int bx = x + i * cw;
         bool on = i == sel;
+        const char *text = label(i);
         canvas.setColor(on ? Color::Bright : Color::Low);
         canvas.drawRect(bx, y, cw - 1, 9);
         canvas.setColor(on ? (focus ? Color::Bright : Color::MediumBright) : Color::MediumLow);
-        canvas.drawText(bx + (cw - 1 - canvas.textWidth(items[i])) / 2, y + 7, items[i]);
+        canvas.drawText(bx + (cw - 1 - canvas.textWidth(text)) / 2, y + 7, text);
     }
 }
 
@@ -113,6 +117,9 @@ void FractalSequenceEditPage::drawTrunk(Canvas &canvas) {
     canvas.setColor(Color::Low);
     canvas.drawRect(x0, tapeTop, used, tapeH);
 
+    // Pitch-height/gate-width tape bars: no SequencePainter primitive renders a
+    // filled bar at an arbitrary pitch height with a gate-derived width, so this
+    // step rendering stays custom (drawLength/drawProbability don't fit).
     for (int i = 0; i < N; ++i) {
         if (!eng.cellValid(i)) continue;
         float semis; int gateLen; bool valid;
@@ -138,15 +145,15 @@ void FractalSequenceEditPage::drawTrunk(Canvas &canvas) {
     canvas.setColor(_bracket == Bracket::Ornament ? Color::Bright : Color::MediumBright);
     canvas.hline(x0 + ornFirst * stepW, tapeTop - 3, (ornLast - ornFirst + 1) * stepW);
 
-    // record extent — bracket ticks below the tape
+    // record extent — loop brackets below the tape
     canvas.setColor(_bracket == Bracket::Record ? Color::Bright : Color::Medium);
-    canvas.vline(x0 + recFirst * stepW, tapeBot + 1, 3);
-    canvas.vline(x0 + (recLast + 1) * stepW - 1, tapeBot + 1, 3);
+    SequencePainter::drawLoopStart(canvas, x0 + recFirst * stepW, tapeBot + 2, (recLast - recFirst + 1) * stepW);
+    SequencePainter::drawLoopEnd(canvas, x0 + recFirst * stepW, tapeBot + 2, (recLast - recFirst + 1) * stepW);
 
-    // loop window — bracket ticks on the tape top edge
+    // loop window — loop brackets on the tape top edge
     canvas.setColor(_bracket == Bracket::Loop ? Color::Bright : Color::MediumBright);
-    canvas.vline(x0 + loopFirst * stepW, tapeTop - 2, 4);
-    canvas.vline(x0 + (loopLast + 1) * stepW - 1, tapeTop - 2, 4);
+    SequencePainter::drawLoopStart(canvas, x0 + loopFirst * stepW, tapeTop - 1, (loopLast - loopFirst + 1) * stepW);
+    SequencePainter::drawLoopEnd(canvas, x0 + loopFirst * stepW, tapeTop - 1, (loopLast - loopFirst + 1) * stepW);
 
     // playhead
     canvas.setColor(Color::Bright);
@@ -315,17 +322,17 @@ void FractalSequenceEditPage::drawSource(Canvas &canvas) {
     // Gate logic row
     canvas.setColor(Color::Medium);
     canvas.drawText(2, 29, "Gate");
-    drawSegRow(canvas, 40, 22, 214, kGateLogic, 6, int(track.gateLogic()), _sourceFocus == SourceFocus::Gate);
+    drawSegRow(canvas, 40, 22, 214, gateLogicLabel, int(FractalTrack::GateLogic::Last), int(track.gateLogic()), _sourceFocus == SourceFocus::Gate);
 
     // CV logic row
     canvas.setColor(Color::Medium);
     canvas.drawText(2, 40, "CV");
-    drawSegRow(canvas, 40, 33, 214, kCvLogic, 7, int(track.cvLogic()), _sourceFocus == SourceFocus::Cv);
+    drawSegRow(canvas, 40, 33, 214, cvLogicLabel, int(FractalTrack::CvLogic::Last), int(track.cvLogic()), _sourceFocus == SourceFocus::Cv);
 
     // Result readout
     canvas.setColor(Color::Medium);
     str.reset();
-    str("%s + %s", kGateLogic[int(track.gateLogic())], kCvLogic[int(track.cvLogic())]);
+    str("%s + %s", FractalTrack::gateLogicName(track.gateLogic()), FractalTrack::cvLogicName(track.cvLogic()));
     canvas.drawText(2, 51, str);
 }
 
@@ -343,24 +350,22 @@ void FractalSequenceEditPage::editBracket(int value, bool shift) {
     int loopF = seq.loopFirst(), loopL = seq.loopLast();
     int ornF = seq.ornFirst(), ornL = seq.ornLast();
 
-    auto clampi = [](int v, int lo, int hi) { return std::max(lo, std::min(hi, v)); };
-
     // Move the targeted edge, then enforce the nesting invariant:
     //   recF <= loopF <= ornF <= ornL <= loopL <= recL
     // Inner edges clamp against their outer neighbour; moving an outer edge
     // pushes the inners it would otherwise cross.
     switch (_bracket) {
     case Bracket::Record:
-        if (!shift) { recF = clampi(recF + value, 0, recL); if (loopF < recF) loopF = recF; if (ornF < loopF) ornF = loopF; }
-        else        { recL = clampi(recL + value, recF, maxCell); if (loopL > recL) loopL = recL; if (ornL > loopL) ornL = loopL; }
+        if (!shift) { recF = clamp(recF + value, 0, recL); if (loopF < recF) loopF = recF; if (ornF < loopF) ornF = loopF; }
+        else        { recL = clamp(recL + value, recF, maxCell); if (loopL > recL) loopL = recL; if (ornL > loopL) ornL = loopL; }
         break;
     case Bracket::Loop:
-        if (!shift) { loopF = clampi(loopF + value, recF, loopL); if (ornF < loopF) ornF = loopF; }
-        else        { loopL = clampi(loopL + value, loopF, recL); if (ornL > loopL) ornL = loopL; }
+        if (!shift) { loopF = clamp(loopF + value, recF, loopL); if (ornF < loopF) ornF = loopF; }
+        else        { loopL = clamp(loopL + value, loopF, recL); if (ornL > loopL) ornL = loopL; }
         break;
     case Bracket::Ornament:
-        if (!shift) ornF = clampi(ornF + value, loopF, ornL);
-        else        ornL = clampi(ornL + value, ornF, loopL);
+        if (!shift) ornF = clamp(ornF + value, loopF, ornL);
+        else        ornL = clamp(ornL + value, ornF, loopL);
         break;
     }
 
@@ -400,7 +405,7 @@ void FractalSequenceEditPage::encoderBranch(EncoderEvent &event) {
         seq.setPath(seq.path() + v);
         break;
     case BranchFocus::Pool:
-        _poolIndex = std::max(0, std::min(7, _poolIndex + v));
+        _poolIndex = clamp(_poolIndex + v, 0, 7);
         break;
     case BranchFocus::Seed:
         seq.setBranchSeed(seq.branchSeed() + v);
@@ -427,8 +432,8 @@ void FractalSequenceEditPage::encoderSource(EncoderEvent &event) {
     switch (_sourceFocus) {
     case SourceFocus::SourceA: track.setSourceA(track.sourceA() + v); break;
     case SourceFocus::SourceB: track.setSourceB(track.sourceB() + v); break;
-    case SourceFocus::Gate:    track.setGateLogic(FractalTrack::GateLogic(std::max(0, std::min(int(FractalTrack::GateLogic::Last) - 1, int(track.gateLogic()) + v)))); break;
-    case SourceFocus::Cv:      track.setCvLogic(FractalTrack::CvLogic(std::max(0, std::min(int(FractalTrack::CvLogic::Last) - 1, int(track.cvLogic()) + v)))); break;
+    case SourceFocus::Gate:    track.setGateLogic(ModelUtils::adjustedEnum(track.gateLogic(), v)); break;
+    case SourceFocus::Cv:      track.setCvLogic(ModelUtils::adjustedEnum(track.cvLogic(), v)); break;
     }
 }
 

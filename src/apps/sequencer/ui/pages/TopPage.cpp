@@ -234,7 +234,6 @@ void TopPage::setTrackView(TrackView view) {
         setMainPage(pages.stochasticConfig);
         break;
     case Track::TrackMode::Fractal:
-        // Skeleton — reuse the generic track config page until Fractal pages land.
         setMainPage(pages.track);
         break;
     case Track::TrackMode::DiscreteMap:
