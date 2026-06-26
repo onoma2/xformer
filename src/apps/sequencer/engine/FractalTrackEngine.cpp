@@ -43,16 +43,6 @@ static constexpr int kOrn2StepCount = 7;    // ids 0..6
 static constexpr int kOrn4StepCount = 7;    // ids 7..13
 static constexpr int kOrnTrillCount = 1;    // id 14
 
-// Deterministic 32-bit hash → float in [0,1). Ports the sim's hash01(seed,s,p):
-// the seeded transform assignment + per-op params stay stable, no RNG content.
-static float hash01(uint32_t seed, uint32_t s, uint32_t p) {
-    uint32_t h = seed * 2654435761u + s * 40503u + p * 2246822519u;
-    h ^= h >> 15; h *= 2246822519u;
-    h ^= h >> 13; h *= 3266489917u;
-    h ^= h >> 16;
-    return float(h) / 4294967296.f;
-}
-
 uint16_t FractalTrackEngine::encodeCell(float semitonesRelRoot, int gateLen, bool valid) {
     int c = int(std::lround(semitonesRelRoot * kCvCodeScale / kCvRangeSemitones));
     c = clamp(c, -1024, 1023);
@@ -74,7 +64,8 @@ void FractalTrackEngine::decodeCell(uint16_t cell, float &semitonesRelRoot, int 
 FractalTrackEngine::FractalTrackEngine(Engine &engine, const Model &model, Track &track) :
     TrackEngine(engine, model, track),
     _fractalTrack(track.fractalTrack()),
-    _rng(0x6f7261 + track.trackIndex())
+    _rng(0x6f7261 + track.trackIndex()),
+    _branchRng(0)
 {
 #ifndef PLATFORM_STM32
     // Codec round-trip self-check: gateLen exact, CV within one LSB.
@@ -202,16 +193,16 @@ FractalTrackEngine::FractalTrackEngine(Engine &engine, const Model &model, Track
         _fractalTrack.setTrackDelay(0);
         _globalPos = 0; _orderState.reset(); clearSchedule(); clearDelayRing();
         replaySection(0, div);
-        assert(_gateCount > 0 && _delayCount == 0);
+        assert(_gateCount > 0 && _delayRing.readable() == 0);
         float cv0 = _cvEvents[0].cv;
 
         // delay 3: first 3 sections defer (ring fills, nothing scheduled); the
         // 4th surfaces section 0's note with the same playback CV.
         _fractalTrack.setTrackDelay(3);
         _globalPos = 0; _orderState.reset(); clearSchedule(); clearDelayRing();
-        replaySection(0, div);   assert(_gateCount == 0 && _delayCount == 1);
-        replaySection(0, div);   assert(_gateCount == 0 && _delayCount == 2);
-        replaySection(0, div);   assert(_gateCount == 0 && _delayCount == 3);
+        replaySection(0, div);   assert(_gateCount == 0 && _delayRing.readable() == 1);
+        replaySection(0, div);   assert(_gateCount == 0 && _delayRing.readable() == 2);
+        replaySection(0, div);   assert(_gateCount == 0 && _delayRing.readable() == 3);
         replaySection(0, div);
         assert(_gateCount > 0 && std::abs(_cvEvents[0].cv - cv0) < 1e-4f);
 
@@ -421,11 +412,18 @@ float FractalTrackEngine::inversionCenter() const {
     return 0.f;   // empty trunk → root (rel-root 0)
 }
 
+// Cache signature: rebuild only when {branchSeed, branchPool, loopLen} changes.
+int FractalTrackEngine::branchSignature() const {
+    const auto &seq = sequence();
+    return int((uint32_t(seq.branchSeed()) * 131u
+                + uint32_t(seq.branchPool()) * 17u + uint32_t(loopLen())) & 0x7fffffff);
+}
+
 // Derive one chained transform per branch from branchSeed, drawn only from the
-// enabled branchPool (empty → all Transpose). Per-op params are seed-derived.
+// enabled branchPool (empty → all Transpose). The branch RNG is reseeded from
+// branchSeed each rebuild, so the same seed always yields the same chain.
 void FractalTrackEngine::rebuildBranchTransforms() {
     const auto &seq = sequence();
-    uint32_t seed = uint32_t(seq.branchSeed());
     int pool = seq.branchPool();
     int len = loopLen();
 
@@ -435,33 +433,32 @@ void FractalTrackEngine::rebuildBranchTransforms() {
     }
     if (nEligible == 0) { eligible[0] = OpTranspose; nEligible = 1; }
 
+    _branchRng = Random(uint32_t(seq.branchSeed()));
     int n = clamp(seq.branchCount(), 0, 7);
     for (int s = 1; s <= n; ++s) {
         BranchTransform &b = _branches[s - 1];
-        b.kind = uint8_t(eligible[int(hash01(seed, s, 0) * nEligible) % nEligible]);
+        b.kind = uint8_t(eligible[_branchRng.nextRange(uint32_t(nEligible))]);
         b.t = 0; b.k = 0; b.fx100 = 100; b.n = 2;
         if (b.kind == OpTranspose) {
-            int mag = kTransposeIntervals[int(hash01(seed, s, 1) * 3) % 3];
-            b.t = int8_t((hash01(seed, s, 2) < 0.5f ? -1 : 1) * mag);
+            int mag = kTransposeIntervals[_branchRng.nextRange(3)];
+            b.t = int8_t((_branchRng.nextBinary() ? -1 : 1) * mag);
         } else if (b.kind == OpRotate) {
-            b.k = uint8_t(len > 1 ? (1 + int(hash01(seed, s, 3) * (len - 1))) : 0);
+            b.k = uint8_t(len > 1 ? (1 + int(_branchRng.nextRange(uint32_t(len - 1)))) : 0);
         } else if (b.kind == OpCompress) {
-            b.fx100 = uint16_t(kCompressFactorsX100[int(hash01(seed, s, 4) * 2) % 2]);
+            b.fx100 = uint16_t(kCompressFactorsX100[_branchRng.nextRange(2)]);
         } else if (b.kind == OpExpand) {
-            b.fx100 = uint16_t(kExpandFactorsX100[int(hash01(seed, s, 4) * 2) % 2]);
+            b.fx100 = uint16_t(kExpandFactorsX100[_branchRng.nextRange(2)]);
         } else if (b.kind == OpGateThin) {
-            b.n = uint8_t(2 + int(hash01(seed, s, 5) * 3));   // 2..4
+            b.n = uint8_t(2 + _branchRng.nextRange(3));   // 2..4
         }
     }
-    _branchHash = int((seed * 131u + uint32_t(pool) * 17u + uint32_t(len)) & 0x7fffffff);
+    _branchHash = branchSignature();
     _branchCountCache = n;
 }
 
 void FractalTrackEngine::maybeRebuildBranchTransforms() {
-    const auto &seq = sequence();
-    int sig = int((uint32_t(seq.branchSeed()) * 131u
-                   + uint32_t(seq.branchPool()) * 17u + uint32_t(loopLen())) & 0x7fffffff);
-    if (sig != _branchHash || clamp(seq.branchCount(), 0, 7) != _branchCountCache) {
+    if (branchSignature() != _branchHash
+            || clamp(sequence().branchCount(), 0, 7) != _branchCountCache) {
         rebuildBranchTransforms();
     }
 }
@@ -580,20 +577,12 @@ static float fractalPlaybackCv(float semitonesRelRoot, const FractalTrack &track
     return cv;
 }
 
-// Nearest scale degree to a raw rel-root semitone (degree 0 = scale tonic).
-// Ports the sim's nearestDegree by scanning degrees over ±1 octave.
+// Scale degree for a raw rel-root semitone (degree 0 = scale tonic) via the
+// shared Scale::noteFromVolts snap. Floor-style: snaps to the degree at or
+// below the target (the prior hand-scan rounded to nearest — see test note).
 int FractalTrackEngine::nearestDegree(float semitonesRelRoot) const {
     const auto scale = sequence().selectedScale(_model.project().scale(), _model.project().scaleRotate());
-    int n = scale.notesPerOctave();
-    float targetVolts = semitonesRelRoot * (1.f / kSemitonesPerOctave);
-    int oct = int(std::floor(targetVolts));
-    int base = oct * n;
-    int best = base; float bestErr = 1e9f;
-    for (int d = base - n; d <= base + 2 * n; ++d) {
-        float err = std::abs(scale.noteToVolts(d) - targetVolts);
-        if (err < bestErr) { bestErr = err; best = d; }
-    }
-    return best;
+    return scale.noteFromVolts(semitonesRelRoot * (1.f / kSemitonesPerOctave));
 }
 
 // Step `steps` scale degrees from the raw note's nearest degree → rel-root semitones.
@@ -726,21 +715,21 @@ void FractalTrackEngine::scheduleSection(uint32_t tick, uint32_t divisor, float 
 // rel-root semitone (×256 fixed-point) + gateLen + ornEligible bit; ornaments are
 // re-rolled when the entry surfaces. Cap is the max delay, so never overflows.
 void FractalTrackEngine::pushDelay(float mainSemi, int gateLen, bool ornEligible, int sections) {
-    if (_delayCount >= kDelayRingSize) return;
-    DelayEntry &e = _delayRing[_delayCount++];
-    int q = clamp(int(std::lround(mainSemi * 256.f)), -32768, 32767);
-    e.cv = int16_t(q);
+    if (_delayRing.full()) return;
+    DelayEntry e;
+    e.cv = int16_t(clamp(int(std::lround(mainSemi * 256.f)), -32768, 32767));
     e.gatePacked = uint8_t((gateLen & 0xf) | (ornEligible ? 0x80 : 0));
     e.sectionsLeft = uint8_t(clamp(sections, 0, 255));
+    _delayRing.write(e);
 }
 
 // Decrement every live entry; entries reaching 0 schedule their note now (with a
 // fresh ornament roll). nextSemi has no cross-delay lookahead, so it equals the
-// main note (ornament direction defaults). Compacts the ring in place.
+// main note (ornament direction defaults). Survivors are re-queued in order.
 void FractalTrackEngine::drainDelayRing(uint32_t tick, uint32_t divisor) {
-    uint8_t w = 0;
-    for (uint8_t r = 0; r < _delayCount; ++r) {
-        DelayEntry &e = _delayRing[r];
+    size_t pending = _delayRing.readable();
+    for (size_t i = 0; i < pending; ++i) {
+        DelayEntry e = _delayRing.read();
         if (e.sectionsLeft > 0) e.sectionsLeft--;
         if (e.sectionsLeft == 0) {
             float semi = float(e.cv) * (1.f / 256.f);
@@ -748,10 +737,9 @@ void FractalTrackEngine::drainDelayRing(uint32_t tick, uint32_t divisor) {
             bool ornEligible = (e.gatePacked & 0x80) != 0;
             scheduleSection(tick, divisor, semi, semi, gateLen, ornEligible);
         } else {
-            _delayRing[w++] = e;
+            _delayRing.write(e);
         }
     }
-    _delayCount = w;
 }
 
 void FractalTrackEngine::update(float dt) {

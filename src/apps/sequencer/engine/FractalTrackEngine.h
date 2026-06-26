@@ -6,6 +6,7 @@
 #include "model/FractalTrack.h"
 
 #include "core/utils/Random.h"
+#include "core/utils/RingBuffer.h"
 
 #include <cstdint>
 
@@ -57,6 +58,18 @@ public:
     // Test seam: run one section's traversal (capture-free, no Engine deref) so
     // unit tests can read the runMode-ordered trunk index sequence.
     void replaySectionForTest(uint32_t tick, uint32_t divisor) { replaySection(tick, divisor); }
+
+    // Test seams for the Random/RingBuffer/Scale-snap refactor characterization.
+    void setTrunkCellForTest(int i, uint16_t cell) { _trunk[i] = cell; }
+    void rebuildBranchTransformsForTest() { rebuildBranchTransforms(); }
+    float segmentSemiForTest(int seg, int pos) const {
+        float st; int gl; bool v; segmentCell(seg, pos, st, gl, v); return st;
+    }
+    uint8_t branchKindForTest(int seg) const { return _branches[seg - 1].kind; }
+    size_t delayPendingForTest() const { return _delayRing.readable(); }
+    int cvEventCountForTest() const { return _cvCount; }
+    float cvEventForTest(int i) const { return _cvEvents[i].cv; }
+    int nearestDegreeForTest(float semi) const { return nearestDegree(semi); }
 #endif
 
 private:
@@ -95,10 +108,11 @@ private:
         uint8_t gatePacked;  // bits 0..3 gateLen; bit 7 ornEligible; onset nibble 0
         uint8_t sectionsLeft;
     };
-    static constexpr int kDelayRingSize = 16;
-    DelayEntry _delayRing[kDelayRingSize];
-    uint8_t _delayCount = 0;
-    void clearDelayRing() { _delayCount = 0; }
+    // RingBuffer's modular cursor math only holds for power-of-2 sizes; 32 gives
+    // capacity 31, comfortably above the 16-section max delay (one entry/section).
+    static constexpr int kDelayRingSize = 32;
+    RingBuffer<DelayEntry, kDelayRingSize> _delayRing;
+    void clearDelayRing() { while (!_delayRing.empty()) _delayRing.read(); }
     void pushDelay(float mainSemi, int gateLen, bool ornEligible, int sections);
     void drainDelayRing(uint32_t tick, uint32_t divisor);
 
@@ -115,6 +129,7 @@ private:
     int _branchHash = -1;          // signature of the cached assignment
     int _branchCountCache = 0;     // branchCount the cache was built for
 
+    int branchSignature() const;   // {seed,pool,len} → cache signature
     void rebuildBranchTransforms();
     void maybeRebuildBranchTransforms();
     // Resolve segment seg (0 = trunk) at within-position pos → trunk cell fields.
@@ -171,6 +186,7 @@ private:
     // freezes _lastOrnament: Rate still gates whether a flourish fires, Lock
     // fixes which one. -1 = none rolled yet.
     Random _rng;
+    Random _branchRng;        // seeded from branchSeed per rebuild — deterministic
     int _lastOrnament = -1;
 };
 
