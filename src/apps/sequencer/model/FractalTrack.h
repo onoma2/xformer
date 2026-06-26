@@ -36,10 +36,37 @@ public:
         A, B, And, Or, Xor, Nand, Last
     };
 
+    static const char *gateLogicName(GateLogic logic) {
+        switch (logic) {
+        case GateLogic::A:    return "A";
+        case GateLogic::B:    return "B";
+        case GateLogic::And:  return "And";
+        case GateLogic::Or:   return "Or";
+        case GateLogic::Xor:  return "Xor";
+        case GateLogic::Nand: return "Nand";
+        case GateLogic::Last: break;
+        }
+        return nullptr;
+    }
+
     // CvLogic — combine the two source CVs (KD-4)
     enum class CvLogic : uint8_t {
         A, B, Min, Max, Sum, Avg, Gated, Last
     };
+
+    static const char *cvLogicName(CvLogic logic) {
+        switch (logic) {
+        case CvLogic::A:     return "A";
+        case CvLogic::B:     return "B";
+        case CvLogic::Min:   return "Min";
+        case CvLogic::Max:   return "Max";
+        case CvLogic::Sum:   return "Sum";
+        case CvLogic::Avg:   return "Avg";
+        case CvLogic::Gated: return "Gat";
+        case CvLogic::Last:  break;
+        }
+        return nullptr;
+    }
 
     //----------------------------------------
     // Properties
@@ -48,9 +75,13 @@ public:
     // sourceA / sourceB (parent track indices; -1 = none)
     int sourceA() const { return _sourceA; }
     void setSourceA(int v) { _sourceA = clamp(v, -1, CONFIG_TRACK_COUNT - 1); }
+    void editSourceA(int value, bool shift) { setSourceA(sourceA() + value); }
+    void printSourceA(StringBuilder &str) const { printSource(str, sourceA()); }
 
     int sourceB() const { return _sourceB; }
     void setSourceB(int v) { _sourceB = clamp(v, -1, CONFIG_TRACK_COUNT - 1); }
+    void editSourceB(int value, bool shift) { setSourceB(sourceB() + value); }
+    void printSourceB(StringBuilder &str) const { printSource(str, sourceB()); }
 
     // gateLogic / cvLogic
     GateLogic gateLogic() const { return _gateLogic; }
@@ -195,6 +226,14 @@ public:
     }
 
 private:
+    static void printSource(StringBuilder &str, int source) {
+        if (source < 0) {
+            str("None");
+        } else {
+            str("Track %d", source + 1);
+        }
+    }
+
     void setTrackIndex(int trackIndex) {
         _trackIndex = trackIndex;
         for (auto &sequence : _sequences) {

@@ -117,11 +117,7 @@ private:
     void formatValue(Item item, const FractalSequence &sequence, StringBuilder &str) const {
         switch (item) {
         case SourceA:
-            if (_track->sourceA() < 0) {
-                str("None");
-            } else {
-                str("Track %d", _track->sourceA() + 1);
-            }
+            _track->printSourceA(str);
             break;
         case BufferLength:
             str("%d", _track->bufferLength());
@@ -165,38 +161,34 @@ private:
             sequence.printDivisor(str);
             break;
         case ClockMultiplier:
-            str("%.2fx", sequence.clockMultiplier() * 0.01f);
+            sequence.printClockMultiplier(str);
             break;
         case ResetMeasure:
-            if (sequence.resetMeasure() == 0) {
-                str("off");
-            } else {
-                str("%d %s", sequence.resetMeasure(), sequence.resetMeasure() > 1 ? "bars" : "bar");
-            }
+            sequence.printResetMeasure(str);
             break;
         case RunMode:
-            str(Types::runModeName(sequence.runMode()));
+            sequence.printRunMode(str);
             break;
         case LoopFirst:
-            str("%d", sequence.loopFirst() + 1);
+            sequence.printLoopFirst(str);
             break;
         case LoopLast:
-            str("%d", sequence.loopLast() + 1);
+            sequence.printLoopLast(str);
             break;
         case RecordFirst:
-            str("%d", sequence.recordFirst() + 1);
+            sequence.printRecordFirst(str);
             break;
         case RecordLast:
-            str("%d", sequence.recordLast() + 1);
+            sequence.printRecordLast(str);
             break;
         case RecordMode:
-            str(sequence.recordMode() == 1 ? "Latch" : "Replace");
+            sequence.printRecordMode(str);
             break;
         case RecordSkip:
-            str("%d", sequence.recordSkip());
+            sequence.printRecordSkip(str);
             break;
         case Record:
-            str(sequence.recordTrigger() ? "On" : "Off");
+            sequence.printRecordTrigger(str);
             break;
         case Last:
             break;
@@ -206,7 +198,7 @@ private:
     void editValue(Item item, FractalSequence &sequence, int value, bool shift) {
         switch (item) {
         case SourceA:
-            _track->setSourceA(_track->sourceA() + value);
+            _track->editSourceA(value, shift);
             break;
         case BufferLength:
             _track->setBufferLength(_track->bufferLength() + value);
@@ -242,34 +234,34 @@ private:
             sequence.editDivisor(value, shift);
             break;
         case ClockMultiplier:
-            sequence.setClockMultiplier(sequence.clockMultiplier() + value * (shift ? 10 : 1));
+            sequence.editClockMultiplier(value, shift);
             break;
         case ResetMeasure:
-            sequence.setResetMeasure(ModelUtils::adjustedByPowerOfTwo(sequence.resetMeasure(), value, shift));
+            sequence.editResetMeasure(value, shift);
             break;
         case RunMode:
-            sequence.setRunMode(ModelUtils::adjustedEnum(sequence.runMode(), value));
+            sequence.editRunMode(value, shift);
             break;
         case LoopFirst:
-            sequence.setLoopFirst(sequence.loopFirst() + value);
+            sequence.editLoopFirst(value, shift);
             break;
         case LoopLast:
-            sequence.setLoopLast(sequence.loopLast() + value);
+            sequence.editLoopLast(value, shift);
             break;
         case RecordFirst:
-            sequence.setRecordFirst(sequence.recordFirst() + value);
+            sequence.editRecordFirst(value, shift);
             break;
         case RecordLast:
-            sequence.setRecordLast(sequence.recordLast() + value);
+            sequence.editRecordLast(value, shift);
             break;
         case RecordMode:
-            sequence.setRecordMode(clamp(sequence.recordMode() + value, 0, 1));
+            sequence.editRecordMode(value, shift);
             break;
         case RecordSkip:
-            sequence.setRecordSkip(sequence.recordSkip() + value);
+            sequence.editRecordSkip(value, shift);
             break;
         case Record:
-            sequence.setRecordTrigger(value > 0 ? 1 : 0);
+            sequence.editRecordTrigger(value, shift);
             break;
         case Last:
             break;

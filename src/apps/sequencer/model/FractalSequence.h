@@ -17,6 +17,85 @@
 class FractalSequence {
 public:
     //----------------------------------------
+    // Types
+    //----------------------------------------
+
+    // OrderMode — per-segment read order (KD-12 path traversal)
+    enum class OrderMode : uint8_t {
+        Forward, Reverse, Pendulum, Random, Converge, Diverge, Page, Last
+    };
+
+    static const char *orderModeName(OrderMode mode) {
+        switch (mode) {
+        case OrderMode::Forward:  return "Fwd";
+        case OrderMode::Reverse:  return "Rev";
+        case OrderMode::Pendulum: return "Pend";
+        case OrderMode::Random:   return "Rand";
+        case OrderMode::Converge: return "Conv";
+        case OrderMode::Diverge:  return "Div";
+        case OrderMode::Page:     return "Page";
+        case OrderMode::Last:     break;
+        }
+        return nullptr;
+    }
+
+    // LoopMode — replay the captured loop forever or once
+    enum class LoopMode : uint8_t {
+        Loop, Once, Last
+    };
+
+    static const char *loopModeName(LoopMode mode) {
+        switch (mode) {
+        case LoopMode::Loop: return "Loop";
+        case LoopMode::Once: return "Once";
+        case LoopMode::Last: break;
+        }
+        return nullptr;
+    }
+
+    // RecordMode — overwrite the existing cell or latch onto it
+    enum class RecordMode : uint8_t {
+        Replace, Latch, Last
+    };
+
+    static const char *recordModeName(RecordMode mode) {
+        switch (mode) {
+        case RecordMode::Replace: return "Replace";
+        case RecordMode::Latch:   return "Latch";
+        case RecordMode::Last:    break;
+        }
+        return nullptr;
+    }
+
+    // CaptureCadence — capture per loop section or per parent event
+    enum class CaptureCadence : uint8_t {
+        Section, Event, Last
+    };
+
+    static const char *captureCadenceName(CaptureCadence mode) {
+        switch (mode) {
+        case CaptureCadence::Section: return "Section";
+        case CaptureCadence::Event:   return "Event";
+        case CaptureCadence::Last:    break;
+        }
+        return nullptr;
+    }
+
+    // CaptureFidelity — quantize the captured timing or keep the raw feel
+    enum class CaptureFidelity : uint8_t {
+        Quantized, Feel, Last
+    };
+
+    static const char *captureFidelityName(CaptureFidelity mode) {
+        switch (mode) {
+        case CaptureFidelity::Quantized: return "Quantized";
+        case CaptureFidelity::Feel:      return "Feel";
+        case CaptureFidelity::Last:      break;
+        }
+        return nullptr;
+    }
+
+    //----------------------------------------
     // Properties
     //----------------------------------------
 
@@ -52,44 +131,70 @@ public:
     // clockMultiplier
     int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier, 50, 150); }
     void setClockMultiplier(int clockMultiplier) { _clockMultiplier = clamp(clockMultiplier, 50, 150); }
+    void editClockMultiplier(int value, bool shift) { setClockMultiplier(clockMultiplier() + value * (shift ? 10 : 1)); }
+    void printClockMultiplier(StringBuilder &str) const { str("%.2fx", clockMultiplier() * 0.01f); }
 
     // resetMeasure
     int resetMeasure() const { return _resetMeasure; }
     void setResetMeasure(int resetMeasure) { _resetMeasure = clamp(resetMeasure, 0, 128); }
+    void editResetMeasure(int value, bool shift) { setResetMeasure(ModelUtils::adjustedByPowerOfTwo(resetMeasure(), value, shift)); }
+    void printResetMeasure(StringBuilder &str) const {
+        if (resetMeasure() == 0) {
+            str("off");
+        } else {
+            str("%d %s", resetMeasure(), resetMeasure() > 1 ? "bars" : "bar");
+        }
+    }
 
     // runMode
     Types::RunMode runMode() const { return _runMode; }
     void setRunMode(Types::RunMode runMode) { _runMode = ModelUtils::clampedEnum(runMode); }
+    void editRunMode(int value, bool shift) { setRunMode(ModelUtils::adjustedEnum(runMode(), value)); }
+    void printRunMode(StringBuilder &str) const { str(Types::runModeName(runMode())); }
 
     // loopFirst / loopLast
     int loopFirst() const { return _loopFirst; }
     void setLoopFirst(int v) { _loopFirst = clamp(v, 0, CONFIG_FRACTAL_MAX_CELLS - 1); }
+    void editLoopFirst(int value, bool shift) { setLoopFirst(loopFirst() + value); }
+    void printLoopFirst(StringBuilder &str) const { str("%d", loopFirst() + 1); }
 
     int loopLast() const { return _loopLast; }
     void setLoopLast(int v) { _loopLast = clamp(v, 0, CONFIG_FRACTAL_MAX_CELLS - 1); }
+    void editLoopLast(int value, bool shift) { setLoopLast(loopLast() + value); }
+    void printLoopLast(StringBuilder &str) const { str("%d", loopLast() + 1); }
 
     // rotate
     int rotate() const { return Routing::routedValueInt(ParamKey::Rotate, _trackIndex, _rotate, -64, 64); }
     void setRotate(int rotate) { _rotate = clamp(rotate, -64, 64); }
 
-    // orderMode (per-segment read order, 0..6)
-    int orderMode() const { return _orderMode; }
-    void setOrderMode(int v) { _orderMode = clamp(v, 0, 6); }
+    // orderMode (per-segment read order)
+    OrderMode orderMode() const { return _orderMode; }
+    void setOrderMode(OrderMode v) { _orderMode = ModelUtils::clampedEnum(v); }
+    void editOrderMode(int value, bool shift) { setOrderMode(ModelUtils::adjustedEnum(orderMode(), value)); }
+    void printOrderMode(StringBuilder &str) const { str(orderModeName(orderMode())); }
 
-    // loopMode (0 = Loop, 1 = Once)
-    int loopMode() const { return _loopMode; }
-    void setLoopMode(int v) { _loopMode = clamp(v, 0, 1); }
+    // loopMode
+    LoopMode loopMode() const { return _loopMode; }
+    void setLoopMode(LoopMode v) { _loopMode = ModelUtils::clampedEnum(v); }
+    void editLoopMode(int value, bool shift) { setLoopMode(ModelUtils::adjustedEnum(loopMode(), value)); }
+    void printLoopMode(StringBuilder &str) const { str(loopModeName(loopMode())); }
 
     // recordSkip (capture stride / Pack, 0..15). Plain setup field, not routable.
     int recordSkip() const { return _recordSkip; }
     void setRecordSkip(int v) { _recordSkip = clamp(v, 0, 15); }
+    void editRecordSkip(int value, bool shift) { setRecordSkip(recordSkip() + value); }
+    void printRecordSkip(StringBuilder &str) const { str("%d", recordSkip()); }
 
     // recordFirst / recordLast
     int recordFirst() const { return _recordFirst; }
     void setRecordFirst(int v) { _recordFirst = clamp(v, 0, CONFIG_FRACTAL_MAX_CELLS - 1); }
+    void editRecordFirst(int value, bool shift) { setRecordFirst(recordFirst() + value); }
+    void printRecordFirst(StringBuilder &str) const { str("%d", recordFirst() + 1); }
 
     int recordLast() const { return _recordLast; }
     void setRecordLast(int v) { _recordLast = clamp(v, 0, CONFIG_FRACTAL_MAX_CELLS - 1); }
+    void editRecordLast(int value, bool shift) { setRecordLast(recordLast() + value); }
+    void printRecordLast(StringBuilder &str) const { str("%d", recordLast() + 1); }
 
     // ornFirst / ornLast (ornament eligibility zone)
     int ornFirst() const { return _ornFirst; }
@@ -98,22 +203,30 @@ public:
     int ornLast() const { return _ornLast; }
     void setOrnLast(int v) { _ornLast = clamp(v, 0, CONFIG_FRACTAL_MAX_CELLS - 1); }
 
-    // recordMode (0 = Replace, 1 = Latch)
-    int recordMode() const { return _recordMode; }
-    void setRecordMode(int v) { _recordMode = clamp(v, 0, 1); }
+    // recordMode
+    RecordMode recordMode() const { return _recordMode; }
+    void setRecordMode(RecordMode v) { _recordMode = ModelUtils::clampedEnum(v); }
+    void editRecordMode(int value, bool shift) { setRecordMode(ModelUtils::adjustedEnum(recordMode(), value)); }
+    void printRecordMode(StringBuilder &str) const { str(recordModeName(recordMode())); }
 
-    // captureCadence (0 = Section, 1 = Event)
-    int captureCadence() const { return _captureCadence; }
-    void setCaptureCadence(int v) { _captureCadence = clamp(v, 0, 1); }
+    // captureCadence
+    CaptureCadence captureCadence() const { return _captureCadence; }
+    void setCaptureCadence(CaptureCadence v) { _captureCadence = ModelUtils::clampedEnum(v); }
+    void editCaptureCadence(int value, bool shift) { setCaptureCadence(ModelUtils::adjustedEnum(captureCadence(), value)); }
+    void printCaptureCadence(StringBuilder &str) const { str(captureCadenceName(captureCadence())); }
 
-    // captureFidelity (0 = Quantized, 1 = Feel)
-    int captureFidelity() const { return _captureFidelity; }
-    void setCaptureFidelity(int v) { _captureFidelity = clamp(v, 0, 1); }
+    // captureFidelity
+    CaptureFidelity captureFidelity() const { return _captureFidelity; }
+    void setCaptureFidelity(CaptureFidelity v) { _captureFidelity = ModelUtils::clampedEnum(v); }
+    void editCaptureFidelity(int value, bool shift) { setCaptureFidelity(ModelUtils::adjustedEnum(captureFidelity(), value)); }
+    void printCaptureFidelity(StringBuilder &str) const { str(captureFidelityName(captureFidelity())); }
 
     // recordTrigger (arm). Routing destination deferred until the engine
     // capture path lands; raw field only for now.
     int recordTrigger() const { return _recordTrigger; }
     void setRecordTrigger(int v) { _recordTrigger = clamp(v, 0, 1); }
+    void editRecordTrigger(int value, bool shift) { setRecordTrigger(value > 0 ? 1 : 0); }
+    void printRecordTrigger(StringBuilder &str) const { str(recordTrigger() ? "On" : "Off"); }
 
     // branchCount (0..7). Routing deferred.
     int branchCount() const { return _branchCount; }
@@ -168,16 +281,16 @@ public:
         writer.write(_loopFirst);
         writer.write(_loopLast);
         writer.write(_rotate);
-        writer.write(_orderMode);
-        writer.write(_loopMode);
+        writer.write(static_cast<uint8_t>(_orderMode));
+        writer.write(static_cast<uint8_t>(_loopMode));
         writer.write(_recordSkip);
         writer.write(_recordFirst);
         writer.write(_recordLast);
         writer.write(_ornFirst);
         writer.write(_ornLast);
-        writer.write(_recordMode);
-        writer.write(_captureCadence);
-        writer.write(_captureFidelity);
+        writer.write(static_cast<uint8_t>(_recordMode));
+        writer.write(static_cast<uint8_t>(_captureCadence));
+        writer.write(static_cast<uint8_t>(_captureFidelity));
         writer.write(_recordTrigger);
         writer.write(_branchCount);
         writer.write(_path);
@@ -208,16 +321,26 @@ public:
         reader.read(_loopFirst);
         reader.read(_loopLast);
         reader.read(_rotate);
-        reader.read(_orderMode);
-        reader.read(_loopMode);
+        uint8_t orderMode;
+        reader.read(orderMode);
+        _orderMode = ModelUtils::clampedEnum(static_cast<OrderMode>(orderMode));
+        uint8_t loopMode;
+        reader.read(loopMode);
+        _loopMode = ModelUtils::clampedEnum(static_cast<LoopMode>(loopMode));
         reader.read(_recordSkip);
         reader.read(_recordFirst);
         reader.read(_recordLast);
         reader.read(_ornFirst);
         reader.read(_ornLast);
-        reader.read(_recordMode);
-        reader.read(_captureCadence);
-        reader.read(_captureFidelity);
+        uint8_t recordMode;
+        reader.read(recordMode);
+        _recordMode = ModelUtils::clampedEnum(static_cast<RecordMode>(recordMode));
+        uint8_t captureCadence;
+        reader.read(captureCadence);
+        _captureCadence = ModelUtils::clampedEnum(static_cast<CaptureCadence>(captureCadence));
+        uint8_t captureFidelity;
+        reader.read(captureFidelity);
+        _captureFidelity = ModelUtils::clampedEnum(static_cast<CaptureFidelity>(captureFidelity));
         reader.read(_recordTrigger);
         reader.read(_branchCount);
         reader.read(_path);
@@ -240,16 +363,16 @@ private:
         _loopFirst = 0;
         _loopLast = CONFIG_FRACTAL_DEFAULT_CELLS - 1;
         _rotate = 0;
-        _orderMode = 0;
-        _loopMode = 0;
+        _orderMode = OrderMode::Forward;
+        _loopMode = LoopMode::Loop;
         _recordSkip = 0;
         _recordFirst = 0;
         _recordLast = CONFIG_FRACTAL_DEFAULT_CELLS - 1;
         _ornFirst = 0;
         _ornLast = CONFIG_FRACTAL_DEFAULT_CELLS - 1;
-        _recordMode = 0;
-        _captureCadence = 0;
-        _captureFidelity = 0;
+        _recordMode = RecordMode::Replace;
+        _captureCadence = CaptureCadence::Section;
+        _captureFidelity = CaptureFidelity::Quantized;
         _recordTrigger = 0;
         _branchCount = 0;
         _path = 0;
@@ -274,16 +397,16 @@ private:
     uint8_t _loopFirst = 0;
     uint8_t _loopLast = 0;
     int8_t _rotate = 0;
-    uint8_t _orderMode = 0;
-    uint8_t _loopMode = 0;
+    OrderMode _orderMode = OrderMode::Forward;
+    LoopMode _loopMode = LoopMode::Loop;
     uint8_t _recordSkip = 0;
     uint8_t _recordFirst = 0;
     uint8_t _recordLast = 0;
     uint8_t _ornFirst = 0;
     uint8_t _ornLast = 0;
-    uint8_t _recordMode = 0;
-    uint8_t _captureCadence = 0;
-    uint8_t _captureFidelity = 0;
+    RecordMode _recordMode = RecordMode::Replace;
+    CaptureCadence _captureCadence = CaptureCadence::Section;
+    CaptureFidelity _captureFidelity = CaptureFidelity::Quantized;
     uint8_t _recordTrigger = 0;
     uint8_t _branchCount = 0;
     uint8_t _path = 0;

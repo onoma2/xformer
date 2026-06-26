@@ -249,7 +249,7 @@ void Project::clear() {
         ft.setGateLogic(FractalTrack::GateLogic::Or);
         ft.setCvLogic(FractalTrack::CvLogic::Gated);
         for (int p = 0; p < CONFIG_PATTERN_COUNT; ++p) {
-            ft.sequence(p).setRecordMode(0);    // Replace
+            ft.sequence(p).setRecordMode(FractalSequence::RecordMode::Replace);
             ft.sequence(p).setRecordTrigger(1); // armed
         }
     }
