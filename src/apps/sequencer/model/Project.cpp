@@ -211,11 +211,13 @@ void Project::clear() {
         noteSequence(t, 0).setGates({ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 });
     }
 #elif PLATFORM_SIM
-    // Track 1: TeletypeV2 showcase - 6 scripts spanning the op surface so the sim
-    // boots an auditable TT2 patch (classic / Performer W. + BUS / MO / Geode).
+    // Fractal test project: track 8 mirrors parents on tracks 6 & 7.
+    // Teletype tracks stay present but UNSEEDED — empty scripts emit no gate/CV,
+    // so teletype doesn't interfere with the fractal capture (re-seed via the
+    // seedTeletypeV2Demo/seedTeletypeMiniDemo helpers when you want them back).
     track(0).setTrackMode(Track::TrackMode::TeletypeV2);
-    seedTeletypeV2Demo(track(0).tt2Track().program());
 
+    // Tracks 2-5: Note, ambient gate patterns (not parents, just context).
     noteSequence(1, 0).setLastStep(15);
     noteSequence(1, 0).setGates({ 0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0 });
     noteSequence(2, 0).setLastStep(15);
@@ -224,21 +226,33 @@ void Project::clear() {
     noteSequence(3, 0).setGates({ 0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0 });
     noteSequence(4, 0).setLastStep(15);
     noteSequence(4, 0).setGates({ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 });
+
+    // Parent A — track 6 (index 5): Note, on-beat gates + an ascending line.
+    track(5).setTrackMode(Track::TrackMode::Note);
     noteSequence(5, 0).setLastStep(15);
-    noteSequence(5, 0).setGates({ 0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0 });
+    noteSequence(5, 0).setGates({ 1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0 });
+    for (int i = 0; i < 16; ++i) noteSequence(5, 0).step(i).setNote(i % 8);
 
-    // Track 7 (index 6): TeletypeMini — 4 scenes on CV2 / gate TR4 (free of the
-    // full TT2 demo's auto-path). Switch the track's w-pattern (pattern % 4) to
-    // A/B the scenes; solo it to isolate Mini against track 1's full TT2.
-    track(6).setTrackMode(Track::TrackMode::TeletypeMini);
-    seedTeletypeMiniDemo(track(6).tt2MiniTrack());
+    // Parent B — track 7 (index 6): Note, off-beat gates + a contrasting line.
+    track(6).setTrackMode(Track::TrackMode::Note);
+    noteSequence(6, 0).setLastStep(15);
+    noteSequence(6, 0).setGates({ 0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1 });
+    for (int i = 0; i < 16; ++i) noteSequence(6, 0).step(i).setNote((i * 3) % 12);
 
-    // Track 8: PhaseFlux — boots to a NoteTrack-equivalent metronome straight
-    // from Sequence::clear(): stages 0..3 active (4 pulses each) over a 1-bar
-    // cycle at the 1/16 divisor = 16 sixteenths across the bar, in sync with
-    // the NoteTracks above. No per-stage override needed.
-    track(7).setTrackMode(Track::TrackMode::PhaseFlux);
-    track(7).phaseFluxTrack().setOctave(+1);
+    // Track 8 (index 7): Fractal — mirrors A(track 6) + B(track 7), gate-OR /
+    // gated-CV, armed on every pattern so it captures as soon as you hit play.
+    track(7).setTrackMode(Track::TrackMode::Fractal);
+    {
+        auto &ft = track(7).fractalTrack();
+        ft.setSourceA(5);
+        ft.setSourceB(6);
+        ft.setGateLogic(FractalTrack::GateLogic::Or);
+        ft.setCvLogic(FractalTrack::CvLogic::Gated);
+        for (int p = 0; p < CONFIG_PATTERN_COUNT; ++p) {
+            ft.sequence(p).setRecordMode(0);    // Replace
+            ft.sequence(p).setRecordTrigger(1); // armed
+        }
+    }
 
     setTempo(80.f);
     setScale(2); // 2 corresponds to H.Minor scale
