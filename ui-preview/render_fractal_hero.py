@@ -8,7 +8,7 @@ Fractal Track OLED hero pages (proposals) — standard edit-page idiom.
   2) branches — Trunk->B1..BN chain, Path route, transform pool (scales to 8)
   3) ornament — rate/intensity bars (tier ticks), scale/root, zone, last-fired
 
-Three-stop F5=NEXT hero ring (Trunk -> Branches -> Ornament).
+Four-stop F5=NEXT hero ring (Trunk -> Branches -> Ornament -> Source/Mix).
 Outputs to ui-preview/fractal-hero/.
 """
 
@@ -185,6 +185,42 @@ def render_ornament(c):
     c.draw_text(40, 50, "Mordent ^")
 
 
+# ---------------------------------------------------------------------------
+# 4) Source / Mix — two parents + gate logic × cv logic (KD-4)
+# ---------------------------------------------------------------------------
+def _seg_row(c, x, ytop, w, items, sel):
+    n = len(items)
+    cw = w // n
+    for i, it in enumerate(items):
+        bx = x + i * cw
+        on = (i == sel)
+        c.set_color(Color.Bright if on else Color.Low)
+        c.draw_rect(bx, ytop, cw - 1, 9)
+        _tc(c, bx, ytop + 2, cw - 1, it, Color.Bright if on else Color.MediumLow)
+
+
+def render_source(c):
+    WindowPainter.clear(c)
+    WindowPainter.draw_header(c, track=5, mode="FRACTAL")
+    WindowPainter.draw_active_function(c, "MIX")
+    WindowPainter.draw_footer(c, ["SrcA", "SrcB", "GATE", "CV", "NEXT"], highlight=2)
+
+    _tt(c, 2, 11, "A", Color.Medium)
+    _tt(c, 14, 11, "Note T1", Color.Bright)
+    _tr(c, 200, 11, "B", Color.Medium)
+    _tr(c, 254, 11, "Stoch T3", Color.Bright)
+
+    gate = ["A", "B", "And", "Or", "Xor", "Nand"]
+    _tt(c, 2, 22, "Gate", Color.Medium)
+    _seg_row(c, 40, 22, 214, gate, 2)               # And
+
+    cvl = ["A", "B", "Min", "Max", "Sum", "Avg", "Gat"]
+    _tt(c, 2, 33, "CV", Color.Medium)
+    _seg_row(c, 40, 33, 214, cvl, 4)                # Sum
+
+    _tt(c, 2, 44, "And + Sum = fire on both, pitch = interval", Color.Medium)
+
+
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     outdir = os.path.join(here, "fractal-hero")
@@ -201,6 +237,7 @@ def main():
         "branches": lambda c: render_branches(c, 3),
         "branches-8": lambda c: render_branches(c, 7),
         "ornament": render_ornament,
+        "source": render_source,
     }
     for slug, fn in pages.items():
         fb, c = _new()
