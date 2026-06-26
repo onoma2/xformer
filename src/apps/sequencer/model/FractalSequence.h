@@ -80,9 +80,9 @@ public:
     int loopMode() const { return _loopMode; }
     void setLoopMode(int v) { _loopMode = clamp(v, 0, 1); }
 
-    // sleep
-    int sleep() const { return Routing::routedValueInt(ParamKey::Sleep, _trackIndex, _sleep, 0, 100); }
-    void setSleep(int sleep) { _sleep = clamp(sleep, 0, 100); }
+    // recordSkip (capture stride / Pack, 0..15). Plain setup field, not routable.
+    int recordSkip() const { return _recordSkip; }
+    void setRecordSkip(int v) { _recordSkip = clamp(v, 0, 15); }
 
     // recordFirst / recordLast
     int recordFirst() const { return _recordFirst; }
@@ -170,7 +170,7 @@ public:
         writer.write(_rotate);
         writer.write(_orderMode);
         writer.write(_loopMode);
-        writer.write(_sleep);
+        writer.write(_recordSkip);
         writer.write(_recordFirst);
         writer.write(_recordLast);
         writer.write(_ornFirst);
@@ -210,7 +210,7 @@ public:
         reader.read(_rotate);
         reader.read(_orderMode);
         reader.read(_loopMode);
-        reader.read(_sleep);
+        reader.read(_recordSkip);
         reader.read(_recordFirst);
         reader.read(_recordLast);
         reader.read(_ornFirst);
@@ -242,7 +242,7 @@ private:
         _rotate = 0;
         _orderMode = 0;
         _loopMode = 0;
-        _sleep = 0;
+        _recordSkip = 0;
         _recordFirst = 0;
         _recordLast = CONFIG_FRACTAL_DEFAULT_CELLS - 1;
         _ornFirst = 0;
@@ -276,7 +276,7 @@ private:
     int8_t _rotate = 0;
     uint8_t _orderMode = 0;
     uint8_t _loopMode = 0;
-    uint8_t _sleep = 0;
+    uint8_t _recordSkip = 0;
     uint8_t _recordFirst = 0;
     uint8_t _recordLast = 0;
     uint8_t _ornFirst = 0;

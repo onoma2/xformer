@@ -11,8 +11,8 @@
 // Looper engine: capture sourceA's emitted gate+CV per section into an inline
 // trunk buffer, replay it through the loop window. Branches (KD-12) concatenate
 // chained transforms of the trunk after it. Ornaments (KD-13) inject scale-snapped
-// flourish notes inside a section via a sub-section gate/CV event queue. Sleep,
-// two-source mix, track-delay and capture variants are deferred —
+// flourish notes inside a section via a sub-section gate/CV event queue.
+// Two-source mix, track-delay and capture variants are deferred —
 // see docs/superpowers/specs/2026-05-17-fractal-track-design.md.
 class FractalTrackEngine final : public TrackEngine {
 public:
@@ -103,6 +103,8 @@ private:
     // Section timing.
     uint32_t _relativeTick = 0;
     uint8_t _recordPos = 0;   // capture cursor (recordFirst..recordLast)
+    uint8_t _recordSkipRemaining = 0;   // KD-20 Pack: sections to skip before next write
+    bool _wasArmed = false;   // arm rising-edge detect → fresh run starts on a write
     uint8_t _readPos = 0;     // trunk read index of the sounding cell (UI highlight)
     uint16_t _globalPos = 0;  // KD-12 walk over the concatenated length 0..total-1
 

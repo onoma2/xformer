@@ -151,6 +151,23 @@ FractalTrackEngine::FractalTrackEngine(Engine &engine, const Model &model, Track
         _lastOrnament = -1;
     }
     reset();
+
+    // KD-20 Pack: over 2N sections, recordSkip=1 writes half as many cells as
+    // recordSkip=0. Replays captureSection's skip/write/reset counter rule.
+    {
+        auto writesOver = [](int skip, int sections) {
+            int remaining = 0, writes = 0;
+            for (int i = 0; i < sections; ++i) {
+                if (remaining > 0) { remaining--; continue; }
+                ++writes;
+                remaining = skip;
+            }
+            return writes;
+        };
+        const int N = 32;
+        assert(writesOver(0, 2 * N) == 2 * N);
+        assert(writesOver(1, 2 * N) == N);
+    }
 #endif
 }
 
@@ -158,6 +175,8 @@ void FractalTrackEngine::reset() {
     _sequence = &(_fractalTrack.sequence(pattern()));
     _relativeTick = 0;
     _recordPos = sequence().recordFirst();
+    _recordSkipRemaining = 0;
+    _wasArmed = false;
     _readPos = sequence().loopFirst();
     _globalPos = 0;
     _branchHash = -1;
@@ -172,6 +191,8 @@ void FractalTrackEngine::reset() {
 void FractalTrackEngine::restart() {
     _relativeTick = 0;
     _recordPos = sequence().recordFirst();
+    _recordSkipRemaining = 0;
+    _wasArmed = false;
     _readPos = sequence().loopFirst();
     _globalPos = 0;
 }
@@ -236,6 +257,8 @@ void FractalTrackEngine::advanceSection(uint32_t tick, uint32_t divisor) {
     // effectively one section stale. Acceptable for MVP.
     bool armed = seq.recordTrigger() != 0;
     int srcA = _fractalTrack.sourceA();
+    if (armed && !_wasArmed) _recordSkipRemaining = 0;   // fresh run starts on a write
+    _wasArmed = armed;
     if (armed && !_fractalTrack.lock() && srcA >= 0) {
         captureSection();
     }
@@ -246,6 +269,12 @@ void FractalTrackEngine::advanceSection(uint32_t tick, uint32_t divisor) {
 void FractalTrackEngine::captureSection() {
     const auto &seq = sequence();
     int srcA = _fractalTrack.sourceA();
+
+    // KD-20 Pack: skip recordSkip sections between writes; cells pack consecutively.
+    if (_recordSkipRemaining > 0) {
+        _recordSkipRemaining--;
+        return;
+    }
 
     const TrackEngine &parent = _engine.trackEngine(srcA);
     bool parentGate = parent.gateOutput(0);
@@ -262,6 +291,8 @@ void FractalTrackEngine::captureSection() {
     if (last < first) last = first;
     if (_recordPos >= last) _recordPos = first;
     else _recordPos++;
+
+    _recordSkipRemaining = uint8_t(seq.recordSkip());
 }
 
 int FractalTrackEngine::loopLen() const {
