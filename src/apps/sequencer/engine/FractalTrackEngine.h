@@ -10,9 +10,12 @@
 
 #include <cstdint>
 
-// Looper engine: capture the source tracks' emitted gate+CV per section into an
-// inline trunk buffer, replay it through the loop window. With sourceB set, the
-// two parents combine via gateLogic × cvLogic (KD-4). Branches (KD-12) concatenate
+// Looper engine: observe the source tracks' emitted gate+CV every tick across a
+// section (KD-1) and commit one summarized cell — proportional gate length, plus
+// (Feel, KD-14b) the first rising-edge onset phase — into an inline trunk buffer,
+// then replay it through the loop window. Cadence picks when a cell is written
+// (Section boundary vs Event note-change); Fidelity picks whether onset is kept.
+// With sourceB set, the two parents combine via gateLogic × cvLogic (KD-4). Branches (KD-12) concatenate
 // chained transforms of the trunk after it. Ornaments (KD-13) inject scale-snapped
 // flourish notes inside a section via a sub-section gate/CV event queue.
 // Track-delay (KD-15) shifts the resolved output trackDelay sections later via a
@@ -72,6 +75,13 @@ public:
     int branchKind(int seg) const { return _branches[seg - 1].kind; }
     int branchParam(int seg) const;
 
+    // KD-1 observe-over-section summary: gate-high tick count over the section's
+    // total ticks → proportional 4-bit gateLen (0 = rest). Pure, side-effect free,
+    // shared by the live capture path and unit tests.
+    static int gateLenFromObservation(int gateHighTicks, int sectionTicks);
+    // KD-14b: first rising-edge tick over the section → 4-bit onset phase (0..15).
+    static int onsetNibbleFromObservation(int onsetTick, int sectionTicks);
+
 #ifndef PLATFORM_STM32
     // Test seam: run one section's traversal (capture-free, no Engine deref) so
     // unit tests can read the runMode-ordered trunk index sequence.
@@ -87,7 +97,11 @@ public:
     size_t delayPendingForTest() const { return _delayRing.readable(); }
     int cvEventCountForTest() const { return _cvCount; }
     float cvEventForTest(int i) const { return _cvEvents[i].cv; }
+    uint32_t gateEventTickForTest(int i) const { return _gateEvents[i].tick; }
     int nearestDegreeForTest(float semi) const { return nearestDegree(semi); }
+    int onsetNibbleForTest(int cell) const { return onsetNibble(cell); }
+    void setOnsetNibbleForTest(int cell, int v) { setOnsetNibble(cell, v); }
+    uint16_t trunkCellForTest(int cell) const { return _trunk[cell]; }
 #endif
 
 private:
@@ -100,6 +114,16 @@ private:
 
     void advanceSection(uint32_t tick, uint32_t divisor);
     void captureSection();
+
+    // KD-1/14b observe-over-section. Sample the mixed parent every tick while
+    // armed: accumulate gate-high ticks → proportional gateLen, first rising-edge
+    // phase → onset, S&H the CV at the first edge (Feel) / boundary (Quantized).
+    // Event cadence commits on the parent's hysteretic note-change here instead.
+    bool resolveParentMix(bool &gate, float &cv) const;
+    void observeParent(uint32_t divisor);
+    void resetObservation();
+    void commitCell(float semitonesRelRoot, int gateLen, int onsetNibble, bool valid);
+    void advanceRecordPos();
 
     // KD-4 two-source mix. gateLogic/cvLogic combine the two parents'
     // gate+CV (volts). cvLogic Gated picks whichever just fired, A-priority.
@@ -162,11 +186,39 @@ private:
     // Inline trunk (KD-2/KD-8/9): 128 cells × 2 B = 256 B, CCMRAM.
     uint16_t _trunk[CONFIG_FRACTAL_MAX_CELLS] = {};
 
+    // KD-14b Feel onset side-array: a 4-bit onset phase per cell (when in the
+    // section the gate first fired), packed two cells per byte → 64 B (CCMRAM).
+    // Always 0 in Quantized (replay no delay); the +sizeof grower budgeted by KD-9.
+    uint8_t _onset[CONFIG_FRACTAL_MAX_CELLS / 2] = {};
+    int onsetNibble(int cell) const {
+        uint8_t b = _onset[cell >> 1];
+        return (cell & 1) ? (b >> 4) : (b & 0xf);
+    }
+    void setOnsetNibble(int cell, int v) {
+        uint8_t &b = _onset[cell >> 1];
+        v &= 0xf;
+        b = (cell & 1) ? uint8_t((b & 0x0f) | (v << 4)) : uint8_t((b & 0xf0) | v);
+    }
+
     // Section timing.
     uint32_t _relativeTick = 0;
     uint8_t _recordPos = 0;   // capture cursor (recordFirst..recordLast)
     uint8_t _recordSkipRemaining = 0;   // KD-20 Pack: sections to skip before next write
     bool _wasArmed = false;   // arm rising-edge detect → fresh run starts on a write
+
+    // KD-1/14b observe-over-section accumulators. Reset each section boundary,
+    // updated every armed tick by observeParent().
+    uint16_t _obsTickCount = 0;    // ticks elapsed in this section so far
+    uint16_t _obsGateHighTicks = 0; // count of ticks the mixed gate was high
+    int16_t _obsOnsetTick = -1;    // tick-within-section of the first rising edge (-1 none)
+    float _obsEdgeCv = 0.f;        // mixed CV sampled at the first rising edge
+    float _obsLastCv = 0.f;        // most recent mixed CV (S&H for Quantized boundary)
+    bool _obsPrevGate = false;     // previous tick's mixed gate (edge detect)
+    bool _obsAnyGate = false;      // any gate-high seen this section
+    // KD-14b Event cadence hysteresis state (Rings cv_scaler port).
+    float _eventRefSemi = 0.f;     // last fired quantized semitone reference
+    bool _eventHasRef = false;     // reference armed (first note seen)
+    int16_t _eventInhibit = 0;     // inhibit-window ticks remaining
     uint8_t _readPos = 0;     // trunk read index of the sounding cell (UI highlight)
     uint16_t _globalPos = 0;  // KD-12 walk over the concatenated length 0..total-1
 

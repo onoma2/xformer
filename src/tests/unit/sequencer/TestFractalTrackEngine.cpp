@@ -190,4 +190,82 @@ CASE("scale_snap_uses_noteFromVolts") {
                 "tonic snaps to degree 0");
 }
 
+CASE("observe_over_section_gate_length_proportional") {
+    // KD-1: gateLen comes from accumulated gate-high ticks over the section, not
+    // a fixed 8. A held gate (full section high) → 15; a brief gate (≤18%) → 1; a
+    // half-held gate → a proportional middle value; never high → rest (0).
+    using FTE = FractalTrackEngine;
+    const int sec = 48;
+    expectEqual(FTE::gateLenFromObservation(48, sec), 15, "held gate → full");
+    expectEqual(FTE::gateLenFromObservation(0, sec), 0, "silent → rest");
+    expectEqual(FTE::gateLenFromObservation(4, sec), 1, "very short → trig");
+    int half = FTE::gateLenFromObservation(24, sec);
+    expectEqual(half >= 2 && half <= 14, true, "half-held → proportional middle");
+    // A longer held gate must yield a strictly larger gateLen than a short one.
+    expectEqual(FTE::gateLenFromObservation(36, sec) > FTE::gateLenFromObservation(12, sec),
+                true, "longer hold → larger gateLen");
+}
+
+CASE("onset_phase_maps_first_edge_to_nibble") {
+    // KD-14b: the first rising-edge tick maps to a 4-bit onset phase over the
+    // section. Edge at the start → 0; edge at the midpoint → ~8; late → toward 15.
+    using FTE = FractalTrackEngine;
+    const int sec = 48;
+    expectEqual(FTE::onsetNibbleFromObservation(0, sec), 0, "edge at start → 0");
+    expectEqual(FTE::onsetNibbleFromObservation(-1, sec), 0, "no edge → 0");
+    expectEqual(FTE::onsetNibbleFromObservation(24, sec), 8, "edge at mid → 8");
+    int late = FTE::onsetNibbleFromObservation(45, sec);
+    expectEqual(late >= 14 && late <= 15, true, "late edge → near 15");
+}
+
+CASE("feel_onset_side_array_packs_two_per_byte") {
+    // KD-14b: the onset side-array holds a 4-bit phase per cell, packed two cells
+    // per byte. Round-trip the low and high nibble independently; Quantized cells
+    // (never written) read 0.
+    Model model;
+    setupLoop(model, 0, 7, Types::RunMode::Forward);
+    Track &track = model.project().track(0);
+    FractalTrackEngine fractal(placeholderEngine(), model, track);
+
+    expectEqual(fractal.onsetNibbleForTest(3), 0, "unwritten onset reads 0");
+    fractal.setOnsetNibbleForTest(4, 11);   // even cell → low nibble
+    fractal.setOnsetNibbleForTest(5, 6);    // odd cell  → high nibble (same byte)
+    expectEqual(fractal.onsetNibbleForTest(4), 11, "even cell round-trips");
+    expectEqual(fractal.onsetNibbleForTest(5), 6, "odd cell round-trips");
+    // Writing one nibble must not corrupt its byte-mate.
+    fractal.setOnsetNibbleForTest(4, 2);
+    expectEqual(fractal.onsetNibbleForTest(5), 6, "byte-mate nibble preserved");
+}
+
+CASE("feel_onset_delays_replay_gate") {
+    // KD-14b replay: in Feel, the sounding cell's gate is delayed by its onset
+    // phase (onset/16 of the section). Quantized (onset 0) fires at tick 0.
+    Model model;
+    FractalSequence &seq = setupLoop(model, 0, 7, Types::RunMode::Forward);
+    seq.setOrnFirst(1); seq.setOrnLast(0);   // ornaments off → plain note
+    Track &track = model.project().track(0);
+    FractalTrackEngine fractal(placeholderEngine(), model, track);
+    const uint32_t div = 48;
+
+    // gate-on is the first gate edge scheduleSection pushes (index 0).
+    auto firstGateOnTick = [&]() { return fractal.gateEventTickForTest(0); };
+
+    // Quantized: onset array is 0 → gate at section tick 0.
+    seq.setCaptureFidelity(FractalSequence::CaptureFidelity::Quantized);
+    fractal.reset();
+    for (int i = 0; i < 8; ++i)
+        fractal.setTrunkCellForTest(i, FractalTrackEngine::encodeCell(float(i + 1), 8, true));
+    fractal.replaySectionForTest(0, div);
+    expectEqual(int(firstGateOnTick()), 0, "Quantized fires at the section start");
+
+    // Feel: trunk index 0 gets onset nibble 8 → half-section delay (48*8/16 = 24).
+    seq.setCaptureFidelity(FractalSequence::CaptureFidelity::Feel);
+    fractal.reset();
+    for (int i = 0; i < 8; ++i)
+        fractal.setTrunkCellForTest(i, FractalTrackEngine::encodeCell(float(i + 1), 8, true));
+    fractal.setOnsetNibbleForTest(0, 8);
+    fractal.replaySectionForTest(0, div);
+    expectEqual(int(firstGateOnTick()), 24, "Feel delays the gate by the onset phase");
+}
+
 } // UNIT_TEST("FractalTrackEngine")

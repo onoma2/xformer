@@ -231,10 +231,16 @@ void FractalTrackEngine::reset() {
     clearDelayRing();
     _lastOrnament = -1;
     for (auto &cell : _trunk) cell = 0;
+    for (auto &o : _onset) o = 0;
+    resetObservation();
+    _eventHasRef = false;
+    _eventRefSemi = 0.f;
+    _eventInhibit = 0;
 }
 
 void FractalTrackEngine::clearTrunk() {
     for (auto &cell : _trunk) cell = 0;
+    for (auto &o : _onset) o = 0;
     _recordPos = sequence().recordFirst();
     _recordSkipRemaining = 0;
     _wasArmed = false;
@@ -246,6 +252,9 @@ void FractalTrackEngine::clearTrunk() {
     clearSchedule();
     clearDelayRing();
     _lastOrnament = -1;
+    resetObservation();
+    _eventHasRef = false;
+    _eventInhibit = 0;
 }
 
 void FractalTrackEngine::restart() {
@@ -295,6 +304,17 @@ TrackEngine::TickResult FractalTrackEngine::tick(uint32_t tick) {
         advanceSection(tick, divisor);
     }
 
+    // KD-1/14b: observe the parent every tick across the section so capture can
+    // summarize gate length + first-edge onset. The boundary tick (handled in
+    // advanceSection above) reset the window; this samples it into the fresh one.
+    {
+        const auto &seq2 = sequence();
+        bool armed = seq2.recordTrigger() != 0;
+        if (armed && !_fractalTrack.lock() && _fractalTrack.sourceA() >= 0) {
+            observeParent(divisor);
+        }
+    }
+
     // Drain the sub-section CV/gate schedule at this tick. Each section fills a
     // main note plus any ornament flourish notes here, generated in time order.
     while (_cvHead < _cvCount && tick >= _cvEvents[_cvHead].tick) {
@@ -315,19 +335,48 @@ TrackEngine::TickResult FractalTrackEngine::tick(uint32_t tick) {
 void FractalTrackEngine::advanceSection(uint32_t tick, uint32_t divisor) {
     const auto &seq = sequence();
 
-    // Capture (KD-1). Read the parent's currently-emitted gate+CV at the
-    // boundary (sample-and-hold — MVP fidelity). Note: this reads the
-    // parent's output for THIS tick, so a parent at a higher track index is
-    // effectively one section stale. Acceptable for MVP.
+    // KD-1/14b: at the boundary, commit the section that just ended from the
+    // observe-over-section accumulators (Section cadence only — Event cadence
+    // commits per parent note-change inside observeParent). Then reset the window
+    // for the section now beginning. Lock/disarm suspend capture entirely.
     bool armed = seq.recordTrigger() != 0;
     int srcA = _fractalTrack.sourceA();
-    if (armed && !_wasArmed) _recordSkipRemaining = 0;   // fresh run starts on a write
+    if (armed && !_wasArmed) { _recordSkipRemaining = 0; resetObservation(); }
     _wasArmed = armed;
-    if (armed && !_fractalTrack.lock() && srcA >= 0) {
+    bool capturing = armed && !_fractalTrack.lock() && srcA >= 0;
+    bool sectionCadence = seq.captureCadence() == FractalSequence::CaptureCadence::Section;
+    if (capturing && sectionCadence) {
         captureSection();
     }
+    resetObservation();
 
     replaySection(tick, divisor);
+}
+
+void FractalTrackEngine::resetObservation() {
+    _obsTickCount = 0;
+    _obsGateHighTicks = 0;
+    _obsOnsetTick = -1;
+    _obsEdgeCv = 0.f;
+    _obsAnyGate = false;
+    _obsPrevGate = false;
+}
+
+// KD-1/14b: ÷ the section into 16 onset buckets; first-edge tick → 4-bit phase.
+int FractalTrackEngine::onsetNibbleFromObservation(int onsetTick, int sectionTicks) {
+    if (onsetTick < 0 || sectionTicks <= 0) return 0;
+    int n = (onsetTick * 16) / sectionTicks;
+    return clamp(n, 0, 15);
+}
+
+// KD-1: gate-high tick fraction → proportional 4-bit gateLen. Mirrors the sim's
+// frac→gateLen buckets: full ≥0.97 → 15, very short ≤0.18 → 1, else 2..14.
+int FractalTrackEngine::gateLenFromObservation(int gateHighTicks, int sectionTicks) {
+    if (gateHighTicks <= 0 || sectionTicks <= 0) return 0;
+    float frac = float(gateHighTicks) / float(sectionTicks);
+    if (frac >= 0.97f) return 15;
+    if (frac <= 0.18f) return 1;
+    return clamp(int(std::lround(frac * 14.f)), 2, 14);
 }
 
 bool FractalTrackEngine::combineGate(bool a, bool b) const {
@@ -353,9 +402,67 @@ float FractalTrackEngine::combineCv(float aCv, float bCv, bool aGate, bool bGate
     }
 }
 
+// KD-4 mix resolve. Reads the parents' emitted gate+CV (volts) and combines them.
+// recordMuted (KD-21 ghost) taps the pre-mute gate. Returns false if no source.
+bool FractalTrackEngine::resolveParentMix(bool &gate, float &cv) const {
+    int srcA = _fractalTrack.sourceA();
+    if (srcA < 0) { gate = false; cv = 0.f; return false; }
+    bool recordMuted = _fractalTrack.recordMuted();
+    const TrackEngine &parentA = _engine.trackEngine(srcA);
+    bool aGate = recordMuted ? parentA.recordGate() : parentA.gateOutput(0);
+    float aCv = parentA.cvOutput(0);
+
+    int srcB = _fractalTrack.sourceB();
+    if (srcB < 0) { gate = aGate; cv = aCv; return true; }
+    const TrackEngine &parentB = _engine.trackEngine(srcB);
+    bool bGate = recordMuted ? parentB.recordGate() : parentB.gateOutput(0);
+    float bCv = parentB.cvOutput(0);
+    gate = combineGate(aGate, bGate);
+    cv = combineCv(aCv, bCv, aGate, bGate);
+    return true;
+}
+
+// KD-1/14b: one tick of observation. Accumulate gate-high ticks, the first
+// rising-edge phase + its CV (Feel), and S&H the latest CV. Event cadence fires
+// a commit here on a hysteretic note-change (Rings cv_scaler port).
+void FractalTrackEngine::observeParent(uint32_t divisor) {
+    const auto &seq = sequence();
+    bool gate; float cv;
+    if (!resolveParentMix(gate, cv)) return;
+    float semi = cv * kSemitonesPerOctave;
+
+    _obsLastCv = cv;
+    if (gate) {
+        _obsGateHighTicks++;
+        _obsAnyGate = true;
+        if (!_obsPrevGate && _obsOnsetTick < 0) {
+            _obsOnsetTick = int16_t(_obsTickCount);
+            _obsEdgeCv = cv;
+        }
+    }
+    if (_eventInhibit > 0) _eventInhibit--;
+
+    // KD-14b Event cadence: commit on a hysteretic semitone change outside the
+    // inhibit window. recordPos advances per parent note event → compact note-list.
+    if (seq.captureCadence() == FractalSequence::CaptureCadence::Event) {
+        if (!_eventHasRef) {
+            if (gate) { _eventRefSemi = std::round(semi); _eventHasRef = true; }
+        } else if (std::abs(semi - _eventRefSemi) >= (1.f - 1.f / 3.f)
+                   && _eventInhibit == 0) {
+            _eventRefSemi = std::round(semi);
+            _eventInhibit = int16_t(std::max<uint32_t>(1u, divisor / 8u));   // ~⅛ section
+            int gateLen = gate ? 8 : 0;
+            commitCell(semi, gateLen, 0, true);   // Event lands on the cell, onset 0
+            advanceRecordPos();
+        }
+    }
+
+    _obsPrevGate = gate;
+    _obsTickCount++;
+}
+
 void FractalTrackEngine::captureSection() {
     const auto &seq = sequence();
-    int srcA = _fractalTrack.sourceA();
 
     // KD-20 Pack: skip recordSkip sections between writes; cells pack consecutively.
     if (_recordSkipRemaining > 0) {
@@ -363,46 +470,41 @@ void FractalTrackEngine::captureSection() {
         return;
     }
 
-    // KD-21 Ghost source: tap the pre-mute gate so a muted parent still feeds
-    // the trunk. CV rides the parent's cvUpdateMode=Always (no code).
-    bool recordMuted = _fractalTrack.recordMuted();
+    bool feel = seq.captureFidelity() == FractalSequence::CaptureFidelity::Feel;
+    int sectionTicks = std::max(1, int(_obsTickCount));
 
-    const TrackEngine &parentA = _engine.trackEngine(srcA);
-    bool aGate = recordMuted ? parentA.recordGate() : parentA.gateOutput(0);
-    float aCv = parentA.cvOutput(0);   // volts, 1V/oct, rel project root
+    // KD-1: gateLen from accumulated gate-high duration; rest if never high.
+    int gateLen = gateLenFromObservation(_obsGateHighTicks, sectionTicks);
+    // CV: Feel S&Hs at the first rising edge; Quantized holds the last sample.
+    float cv = (feel && _obsAnyGate) ? _obsEdgeCv : _obsLastCv;
+    float semi = cv * kSemitonesPerOctave;
+    int onset = (feel && _obsOnsetTick >= 0)
+        ? onsetNibbleFromObservation(_obsOnsetTick, sectionTicks) : 0;
 
-    int srcB = _fractalTrack.sourceB();
-    bool parentGate;
-    float parentCv;
-    if (srcB < 0) {
-        parentGate = aGate;
-        parentCv = aCv;
-    } else {
-        const TrackEngine &parentB = _engine.trackEngine(srcB);
-        bool bGate = recordMuted ? parentB.recordGate() : parentB.gateOutput(0);
-        float bCv = parentB.cvOutput(0);
-        parentGate = combineGate(aGate, bGate);
-        parentCv = combineCv(aCv, bCv, aGate, bGate);
-    }
-
-    // KD-14 Latch: only write when the source gates — silent sections keep their
+    // KD-14 Latch: only write when the section gated — silent sections keep their
     // prior content (overdub). Replace (default) overwrites every section.
     bool latch = seq.recordMode() == FractalSequence::RecordMode::Latch;
-    if (!(latch && !parentGate)) {
-        float semitonesRelRoot = parentCv * kSemitonesPerOctave;
-        // gate high → fixed proportional gateLen (MVP); rest → gateLen 0.
-        // TODO(fractal): observe-over-section gate length + onset (KD-1/14b).
-        int gateLen = parentGate ? 8 : 0;
-        _trunk[_recordPos] = encodeCell(semitonesRelRoot, gateLen, true);
+    if (!(latch && gateLen == 0)) {
+        commitCell(semi, gateLen, onset, true);
     }
 
+    advanceRecordPos();
+    _recordSkipRemaining = uint8_t(seq.recordSkip());
+}
+
+void FractalTrackEngine::commitCell(float semitonesRelRoot, int gateLen, int onsetNibbleVal, bool valid) {
+    _trunk[_recordPos] = encodeCell(semitonesRelRoot, gateLen, valid);
+    setOnsetNibble(_recordPos, onsetNibbleVal);
+}
+
+void FractalTrackEngine::advanceRecordPos() {
+    const auto &seq = sequence();
     int first = seq.recordFirst();
     int last = seq.recordLast();
     if (last < first) last = first;
-    if (_recordPos >= last) _recordPos = first;
+    if (_recordPos < first || _recordPos > last) { _recordPos = uint8_t(first); return; }
+    if (_recordPos >= last) _recordPos = uint8_t(first);
     else _recordPos++;
-
-    _recordSkipRemaining = uint8_t(seq.recordSkip());
 }
 
 int FractalTrackEngine::loopLen() const {
@@ -597,10 +699,18 @@ void FractalTrackEngine::replaySection(uint32_t tick, uint32_t divisor) {
     bool ornEligible = valid && gateLen > 0
         && readIdx >= seq.ornFirst() && readIdx <= seq.ornLast();
 
+    // KD-14b Feel replay: delay the cell's gate by its stored onset phase
+    // (onset/16 of the section) → swing/microtiming. Quantized onset is 0 → no
+    // delay (the array stays 0 there). Onset is keyed to the trunk index read.
+    uint32_t onsetTicks = 0;
+    if (seq.captureFidelity() == FractalSequence::CaptureFidelity::Feel) {
+        onsetTicks = (uint32_t(onsetNibble(readIdx)) * divisor) / 16u;
+    }
+
     int delay = _fractalTrack.trackDelay();
     if (delay <= 0) {
-        // Immediate path (byte-identical to no-delay playback); ring stays empty.
-        scheduleSection(tick, divisor, semitonesRelRoot, nextSemi, valid ? gateLen : 0, ornEligible);
+        // Immediate path (byte-identical to no-delay playback when onset 0).
+        scheduleSection(tick + onsetTicks, divisor, semitonesRelRoot, nextSemi, valid ? gateLen : 0, ornEligible);
     } else {
         // Surface notes due this section first, then defer this section's note.
         drainDelayRing(tick, divisor);
