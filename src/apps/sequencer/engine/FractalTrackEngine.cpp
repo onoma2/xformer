@@ -385,11 +385,16 @@ void FractalTrackEngine::captureSection() {
         parentCv = combineCv(aCv, bCv, aGate, bGate);
     }
 
-    float semitonesRelRoot = parentCv * kSemitonesPerOctave;
-    // gate high → fixed proportional gateLen (MVP); rest → gateLen 0.
-    // TODO(fractal): observe-over-section gate length + onset (KD-1/14b).
-    int gateLen = parentGate ? 8 : 0;
-    _trunk[_recordPos] = encodeCell(semitonesRelRoot, gateLen, true);
+    // KD-14 Latch: only write when the source gates — silent sections keep their
+    // prior content (overdub). Replace (default) overwrites every section.
+    bool latch = seq.recordMode() == FractalSequence::RecordMode::Latch;
+    if (!(latch && !parentGate)) {
+        float semitonesRelRoot = parentCv * kSemitonesPerOctave;
+        // gate high → fixed proportional gateLen (MVP); rest → gateLen 0.
+        // TODO(fractal): observe-over-section gate length + onset (KD-1/14b).
+        int gateLen = parentGate ? 8 : 0;
+        _trunk[_recordPos] = encodeCell(semitonesRelRoot, gateLen, true);
+    }
 
     int first = seq.recordFirst();
     int last = seq.recordLast();
