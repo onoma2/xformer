@@ -72,6 +72,24 @@ void seedTeletypeV2Demo(TeletypeProgram &p) {
         "M 500\n"
         "M.ACT 1\n");
 }
+
+// Seed a TeletypeMini track: 4 scenes switched seamlessly by the w-pattern
+// selector (scene = pattern % 4). Per-scene tempo+pitch live in the metro
+// script (runs each tick on the active scene); script0 boots the metro once.
+void seedTeletypeMiniDemo(TT2MiniTrack &mt) {
+    static const char *metro[TT2ConfigMini::SceneCount] = {
+        "M 500\nCV 2 N 0\nTR.P 4\n",     // scene 0: medium, root
+        "M 250\nCV 2 N 7\nTR.P 4\n",     // scene 1: faster, fifth
+        "M 1000\nCV 2 N 12\nTR.P 4\n",   // scene 2: slow, octave
+        "M 125\nCV 2 N 3\nTR.P 4\n",     // scene 3: fastest, minor third
+    };
+    for (int s = 0; s < TT2ConfigMini::SceneCount; ++s) {
+        auto &p = mt.program(s);
+        loadScriptText(p, 0, "M 500\nM.ACT 1\n");                // script0/trigger1: boot the metro
+        loadScriptText(p, 1, "CV 2 N 9\nTR.P 4\n");              // script1/trigger2: manual accent
+        loadScriptText(p, TT2ConfigMini::MetroScript, metro[s]); // metro: per-scene tempo/pitch on CV2/TR4
+    }
+}
 } // namespace
 #endif
 
@@ -209,7 +227,11 @@ void Project::clear() {
     noteSequence(5, 0).setLastStep(15);
     noteSequence(5, 0).setGates({ 0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0 });
 
-    // Track 7: Note with empty sequence (gates all off — NoteSequence::clear default).
+    // Track 7 (index 6): TeletypeMini — 4 scenes on CV2 / gate TR4 (free of the
+    // full TT2 demo's auto-path). Switch the track's w-pattern (pattern % 4) to
+    // A/B the scenes; solo it to isolate Mini against track 1's full TT2.
+    track(6).setTrackMode(Track::TrackMode::TeletypeMini);
+    seedTeletypeMiniDemo(track(6).tt2MiniTrack());
 
     // Track 8: PhaseFlux — boots to a NoteTrack-equivalent metronome straight
     // from Sequence::clear(): stages 0..3 active (4 pulses each) over a 1-bar
