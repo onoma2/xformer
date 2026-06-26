@@ -2,8 +2,8 @@
 
 **Goal:** Two new cross-track Teletype ops so any TT2-family track (full **or** Mini) can reach into another TT2-family track's data — the parity-with-`WNG`/`WNN` the NoteTrack ops already have, but for TT2 targets:
 
-- **`WPN <track> <bank> <idx> [<v>]`** — get/set cell `idx` of pattern `bank` on track `track` (the target's *active* program — for a Mini target, its active scene). The cross-track form of the existing same-track `PN bank idx [v]`.
-- **`W.SCRIPT <track> <n>`** — trigger script `n` on track `track` (full: scripts 1–8; Mini: scripts 1–2 + metro).
+- **`WPN <track> <bank> <idx> [<v>]`** — get/set cell `idx` of pattern `bank` on track `track` (the target's *active* program — for a Mini target, its active scene). The cross-track form of same-track `PN bank idx [v]`, with **identical bank/idx normalisation** (see below) so it's a true `PN` parity op.
+- **`W.SCRIPT <track> <n>`** — trigger script `n` on track `track`. Range matches native `SCRIPT` = `1..Cfg::ScriptCount` (**Full 1–10** = 8 trigger + Metro 9 + Init 10; **Mini 1–3** = 2 trigger + Metro), out-of-range sets `OutOfRange` like `SCRIPT`.
 
 Both work in every direction (full↔full, full↔Mini, Mini↔Mini) because the op functions are `template<Cfg>` and instantiate for both configs automatically. (Op names are proposals — they follow the `W*` "reach another track" family; adjust if you prefer `W.PN`/`W.SCR`.)
 
@@ -22,10 +22,11 @@ TT2 ops reach other tracks through the **`TT2Host` virtual interface** (`engine/
 Add to `TT2Host` (`engine/TT2Host.h`, pure virtual) and override in **both** engines. To avoid duplicating the body in two `.cpp`s, put the real logic in **free helpers in a shared header** (e.g. `engine/TT2HostCrossTrack.h`) that each override calls in one line — mirroring `tt2NoteSequence` but written once.
 
 ```cpp
-// returns the cell, or 0 if the target track isn't a TT2-family track / out of range
-int16_t  hostTrackPatternVal(uint8_t track, uint8_t bank, uint8_t idx);
-void     hostSetTrackPatternVal(uint8_t track, uint8_t bank, uint8_t idx, int16_t v);
-void     hostTriggerTrackScript(uint8_t track, uint8_t script);
+// bank/idx are SIGNED — normalised exactly like PN (clamp bank, normalise idx); 0 if not a TT2 track
+int16_t       hostTrackPatternVal(uint8_t track, int16_t bank, int16_t idx);
+void          hostSetTrackPatternVal(uint8_t track, int16_t bank, int16_t idx, int16_t v);
+// returns the error (None / OutOfRange / ExecDepthOverflow) so the op can report it
+TT2EvalError  hostTriggerTrackScript(uint8_t track, int16_t script);
 ```
 
 That's **3 host methods**, each at 5 sites (1 `TT2Host.h` pure-virtual decl + 2 engine `.h` override decls + 2 engine `.cpp` one-line defs forwarding to the shared helper). (My earlier "~2" estimate undercounted — pattern needs get+set, script needs trigger.)
@@ -35,44 +36,49 @@ That's **3 host methods**, each at 5 sites (1 `TT2Host.h` pure-virtual decl + 2 
 Reach another track's TT2 program by index, branching on its mode (the two program types are distinct templates, but `patterns[b].val[i]` is `int16_t` in both — so one `int16_t` signature covers both):
 
 ```cpp
-// pseudo — in TT2HostCrossTrack.h
-static inline int16_t* tt2CrossPatternCell(Model &model, int t, int bank, int idx) {
-    if (t < 0 || t >= CONFIG_TRACK_COUNT || bank < 0 || bank >= TT2_PATTERN_COUNT) return nullptr;
+// pseudo — in TT2HostCrossTrack.h. bank/idx SIGNED; returns the cell ptr after PN-style
+// normalisation, or nullptr if the target isn't a TT2-family track (op then reads/writes nothing).
+static inline int16_t* tt2CrossPatternCell(Model &model, int t, int16_t bank, int16_t idx) {
+    if (t < 0 || t >= CONFIG_TRACK_COUNT) return nullptr;
     Track &tk = model.project().track(t);
-    if (tk.trackMode() == Track::TrackMode::TeletypeV2) {
-        auto &p = tk.tt2Track().program();
-        if (idx < 0 || idx >= TT2ConfigFull::PatternLength) return nullptr;
-        return &p.patterns[bank].val[idx];
-    }
+    if (tk.trackMode() == Track::TrackMode::TeletypeV2)
+        return tt2PatternCell<TT2ConfigFull>(tk.tt2Track().program(), bank, idx);   // see below
     if (tk.trackMode() == Track::TrackMode::TeletypeMini) {
         int scene = model.project().playState().trackState(t).pattern() % TT2ConfigMini::SceneCount;
-        auto &p = tk.tt2MiniTrack().program(scene);   // active scene = selected w-pattern % 4
-        if (idx < 0 || idx >= TT2ConfigMini::PatternLength) return nullptr;
-        return &p.patterns[bank].val[idx];
+        return tt2PatternCell<TT2ConfigMini>(tk.tt2MiniTrack().program(scene), bank, idx); // active scene
     }
-    return nullptr;   // not a TT2-family track — op is a safe no-op (returns 0)
+    return nullptr;   // not a TT2-family track — safe no-op
 }
 ```
-- Mini's active scene is recomputed from `playState().trackState(t).pattern() % SceneCount` — the **same formula** the Mini engine uses (`tt2SceneIndex`, `TT2MiniTrackEngine.h:20,48`) and the same selection style as `tt2NoteSequence`. Do NOT reach the other engine's private `_activeScene`.
-- Both configs share `TT2_PATTERN_COUNT == 4` (`model/TeletypeProgram.h:20` const / `:34` assert) and `PatternLength == 64`, so `bank`/`idx` bounds are uniform; still bound by the concrete config's `PatternLength`.
+- **Bank/idx normalisation must match same-track `PN` exactly** (this is the parity claim). `PN` clamps the bank via `normalisePn<Cfg>` (`TeletypeNativeOps.cpp:3287`: `<0→0`, `>=PatternCount→PatternCount-1`) and reads/writes through `patternGetVal`/`patternSetVal` (`:3385/3387`), which normalise the index. The cross-track `tt2PatternCell<Cfg>(program, bank, idx)` helper must reuse that same normalisation — **do NOT cast to `uint8_t` or hard-reject out-of-range** (that would break `PN`'s negative-index/clamp semantics). Easiest: refactor `normalisePn` + the `patternGetVal`/`patternSetVal` index logic into a shared header both the ops TU and the cross-track helper include (they're currently `static` in the ops TU), so WPN and PN are guaranteed identical; or replicate the exact clamp/normalise in `tt2PatternCell`.
+- Mini's active scene is recomputed from `playState().trackState(t).pattern() % SceneCount` — the **same formula** the Mini engine uses (`tt2SceneIndex`, `TT2MiniTrackEngine.h:20,48`). Do NOT reach the other engine's private `_activeScene`.
+- Both configs share `TT2_PATTERN_COUNT == 4` (`model/TeletypeProgram.h:20`/:34) and `PatternLength == 64`.
 
 ### Script-trigger reaches the other engine
 
 `_engine.trackEngine(t)` returns a base `TrackEngine&` (`Engine.h:195`). **Do NOT call `runScript` bare** — the triggered script's own `W*`/`BUS`/`MO` ops resolve against `tt2ActiveHost()`, which is still the *caller's* engine. The target's script must run with the **target** installed as active host. `ScopedHost` is private (`TT2TrackEngine.h:196`), so add a small **public** method on each engine that wraps its own `ScopedHost` (a host-pointer swap only) — mirroring the update-path firing at `TT2TrackEngine.cpp:359`:
 ```cpp
-// public, on TT2TrackEngine + TT2MiniTrackEngine
-void triggerScriptFromHost(uint8_t idx) { ScopedHost host(this); if (idx < Cfg::ScriptCount) runScript(idx); }
+// public, on TT2TrackEngine + TT2MiniTrackEngine — returns the eval error so the op can report it
+TT2EvalError triggerScriptFromHost(int16_t oneBased) {
+    int idx = oneBased - 1;
+    if (idx < 0 || idx >= Cfg::ScriptCount) return TT2EvalError::OutOfRange;   // matches SCRIPT range
+    ScopedHost host(this);                                                     // run with THIS track as active host
+    return runScript(_track.program(...), _runtime, _output, uint8_t(idx)).error;  // ExecDepthOverflow propagates
+}
 ```
-`hostTriggerTrackScript` branches on mode, downcasts, and calls it (the `as<>()` pattern is already used, e.g. `TT2TrackEngine.cpp:243`):
+`hostTriggerTrackScript` checks the global cross-track cap, then branches + downcasts (the `as<>()` pattern is already used, e.g. `TT2TrackEngine.cpp:243`) and returns the error:
 ```cpp
+if (crossDepth >= TT2_CROSS_DEPTH) return TT2EvalError::ExecDepthOverflow;   // global cap (see Recursion)
 auto m = model.project().track(t).trackMode();
-if (m == TeletypeV2)        engine.trackEngine(t).as<TT2TrackEngine>().triggerScriptFromHost(n-1);
-else if (m == TeletypeMini) engine.trackEngine(t).as<TT2MiniTrackEngine>().triggerScriptFromHost(n-1);
+if (m == TeletypeV2)        return engine.trackEngine(t).as<TT2TrackEngine>().triggerScriptFromHost(n);
+if (m == TeletypeMini)      return engine.trackEngine(t).as<TT2MiniTrackEngine>().triggerScriptFromHost(n);
+return TT2EvalError::None;   // non-TT2 target: silent no-op
 ```
+(`n` stays 1-based into `triggerScriptFromHost`, which does the `-1` + range check itself — single source of truth for the range.)
 
 > **Locking — RESOLVED, no deferral (corrects the earlier worry).** `ScopedHost` does **NOT** take `Engine::lock()` — it only swaps the active-host pointer (`tt2SetActiveHost`, `TT2TrackEngine.h:196-199`). `Engine::lock()` is held only by the UI-thread entry points (`runLiveCommand`/`triggerScript`, `TT2TrackEngine.cpp:126,140`), never on the op-execution path (which already runs inside `Engine::update()`). So a cross-track trigger fired from inside an op touches no lock → no deadlock → **inline trigger is feasible, no deferral.** (`Engine::lock()` is a non-reentrant busy-spin at `Engine.cpp:326`, but it is simply not in play here.) The real requirement is the **active-host swap** above, which a bare `runScript` would miss.
 >
-> **Recursion — already bounded by the existing guard; add one global cap for stack safety.** `W.SCRIPT` goes through the same `runScript`, which increments the *target's* per-runtime `exec.depth` (`TT2_EXEC_DEPTH = 8`, `model/TeletypeRuntime.h:16`). Re-entering a track accumulates its own depth (the prior invocation is still on the C++ stack), so each track still caps at 8 → A↔B ping-pong is **bounded, not infinite**. The only residual is the *aggregate* C++ stack depth across a cycle of N distinct tracks (≈ N×8), which can exceed what the single-track depth-8 budget assumed. **Decision: reuse the per-runtime guard AND add a small global cross-track-nesting counter** (engine-level, e.g. ≤4 cross-track hops) checked in `hostTriggerTrackScript`, bailing with `TT2EvalError` past it — caps aggregate stack depth regardless of track count, inline, no deferral needed. `WPN` (data read/write) has no recursion at all.
+> **Recursion — already bounded by the existing guard; add one global cap for stack safety.** `W.SCRIPT` goes through the same `runScript`, which increments the *target's* per-runtime `exec.depth` (`TT2_EXEC_DEPTH = 8`, `model/TeletypeRuntime.h:16`). Re-entering a track accumulates its own depth (the prior invocation is still on the C++ stack), so each track still caps at 8 → A↔B ping-pong is **bounded, not infinite**. The only residual is the *aggregate* C++ stack depth across a cycle of N distinct tracks (≈ N×8), which can exceed what the single-track depth-8 budget assumed. **Decision: reuse the per-runtime guard AND add a small engine-level counter `crossDepth`** (cap `TT2_CROSS_DEPTH` ≈ 4): bump it before the cross-track call, restore after; past the cap `hostTriggerTrackScript` returns `ExecDepthOverflow` (the op propagates it via its `error` param). Caps aggregate stack depth regardless of track count — inline, no deferral. `WPN` (data read/write) has no recursion at all.
 
 ## The two op functions (`engine/TeletypeNativeOps.cpp`, templated)
 
@@ -88,9 +94,9 @@ static void opWpn(TT2RuntimeT<Cfg>&, TT2OutputState&, const TeletypeProgramT<Cfg
     TT2Host *h = tt2ActiveHost();
     if (isSet && stackSize >= 1) {
         int16_t v=0; if (!popStack(stack,stackSize,v,error)) return;
-        if (h) h->hostSetTrackPatternVal(uint8_t(t-1), uint8_t(b), uint8_t(i), v);
+        if (h) h->hostSetTrackPatternVal(uint8_t(t-1), b, i, v);   // b/i SIGNED → PN normalisation
     } else {
-        pushStack(stack,stackSize, h ? h->hostTrackPatternVal(uint8_t(t-1),uint8_t(b),uint8_t(i)) : 0, error);
+        pushStack(stack,stackSize, h ? h->hostTrackPatternVal(uint8_t(t-1), b, i) : 0, error);
     }
 }
 template<typename Cfg>
@@ -99,7 +105,7 @@ static void opWScript(TT2RuntimeT<Cfg>&, TT2OutputState&, const TeletypeProgramT
     int16_t t=0,n=0;
     if (!popStack(stack,stackSize,t,error)) return;
     if (!popStack(stack,stackSize,n,error)) return;
-    if (TT2Host *h = tt2ActiveHost()) h->hostTriggerTrackScript(uint8_t(t-1), uint8_t(n));
+    if (TT2Host *h = tt2ActiveHost()) error = h->hostTriggerTrackScript(uint8_t(t-1), n);  // propagate OutOfRange/ExecDepthOverflow
 }
 ```
 
