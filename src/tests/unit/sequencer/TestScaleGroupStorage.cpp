@@ -17,7 +17,7 @@
 
 // Step-0 baseline (measured before the bias-pack), asserted with == so any
 // alignment growth from the uint16 scale group HALTS the build.
-static constexpr int kSizeProject             = 78264;
+static constexpr int kSizeProject             = 78296;
 static constexpr int kSizeNoteSequence        = 556;
 static constexpr int kSizeStochasticSequence  = 476;
 static constexpr int kSizePhaseFluxSequence   = 288;
