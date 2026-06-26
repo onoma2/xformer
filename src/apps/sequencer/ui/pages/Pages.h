@@ -55,6 +55,7 @@
 #include "PhaseFluxSequencePage.h"
 #include "FractalTrunkPage.h"
 #include "FractalBranchPage.h"
+#include "FractalOrnamentPage.h"
 
 #ifdef CONFIG_ENABLE_INTRO
 #include "IntroPage.h"
@@ -105,6 +106,7 @@ struct Pages {
     PhaseFluxSequencePage phaseFluxSequence;
     FractalTrunkPage fractalTrunk;
     FractalBranchPage fractalBranch;
+    FractalOrnamentPage fractalOrnament;
     SystemPage system;
     // modal pages
     TempoPage tempo;
@@ -171,6 +173,7 @@ struct Pages {
         phaseFluxSequence(manager, context),
         fractalTrunk(manager, context),
         fractalBranch(manager, context),
+        fractalOrnament(manager, context),
         system(manager, context),
         // modal pages
         tempo(manager, context),

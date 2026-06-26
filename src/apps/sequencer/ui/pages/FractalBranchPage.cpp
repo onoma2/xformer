@@ -136,7 +136,7 @@ void FractalBranchPage::keyPress(KeyPressEvent &event) {
         }
         case 4: {
             auto &pages = _manager.pages();
-            _manager.replace(_manager.stackSize() - 1, &pages.fractalBranch);
+            _manager.replace(_manager.stackSize() - 1, &pages.fractalOrnament);
             break;
         }
         default: break;
