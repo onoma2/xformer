@@ -218,7 +218,7 @@ On trunk-phase loop boundary:
 **Budget strategy:**
 - No per-step probability grid (unlike StochasticSequence's 512 B per pattern).
 - FractalSequence (~28 B): divisor, clockMultiplier, resetMeasure, runMode, loopFirst/loopLast/rotate/orderMode/loopMode, recordFirst/recordLast, recordMode.
-- Track-level FractalTrack (~60 B): sourceA/B, gate/cv logic, bufferLength, recordTrigger (Routable), lock, octave, transpose, slideTime, cvUpdateMode, trackDelay, scale group, ornFirst/ornLast, branchCount, path, branchSeed, branchPool, ornamentRate/Intensity, captureCadence/Fidelity (+ the four Routables).
+- Track-level FractalTrack (~58 B): sourceA/B, gate/cv logic, bufferLength, recordTrigger (Routable), lock, octave, transpose, slideTime, cvUpdateMode, trackDelay, scale group, branchCount, path, branchSeed, branchPool, ornamentRate/Intensity, captureCadence/Fidelity (+ the four Routables). *(ornFirst/ornLast are per-sequence — counted in FractalSequence.)*
 - 17 sequences × ~28 B ≈ 476 B + ~60 B track-level + ~overhead ≈ **~560 B total**.
 - Well under the 9544 B gate. No container inflation risk. *(All deferred fields — density/tilt, mutation params, punchMode/recordQuantize, loopBars/beatOffset/loopPhase, clockSource — are excluded from this estimate; they are reserved, not allocated.)*
 
@@ -346,11 +346,11 @@ Each segment is one loop-window length; total played length = loopLen × (1 + br
 
 **User control — standalone, two Routable axes.** Decoupled from the (deferred) mutation system: `ornamentRate` (uint8_t, 0-100%) = P(fire) per gated cell — *how often*; `ornamentIntensity` (uint8_t, 0-100%) = the complexity tier — *how fancy* (off → 2-step → +4-step ≥40% → +8-step trill ≥75%). The two are independent, so flourishes can be elaborate-but-occasional (Bloom fuses both into one Mutate-knob zone; we split them). **Both are Routable** — with Branch count + Path (KD-12) they are the four live performance controls, a 1:1 with Bloom's Branch / Path / Mutate CV inputs (Ornament fills the Mutate slot, since mutation is deferred).
 
-**Ornament eligibility zone.** Ornaments fire only when the sounding trunk cell falls within `ornFirst`/`ornLast` — `recordFirst ≤ loopFirst ≤ ornFirst ≤ ornLast ≤ loopLast ≤ recordLast`. The zone is defined on trunk within-positions, so the same "live region" stays expressive across every branch repetition (B1…BN). This was the mutation zone; with mutation/evolution deferred, it survives as the ornament eligibility region.
+**Ornament eligibility zone.** Ornaments fire only when the sounding trunk cell falls within `ornFirst`/`ornLast` — `recordFirst ≤ loopFirst ≤ ornFirst ≤ ornLast ≤ loopLast ≤ recordLast`. `ornFirst`/`ornLast` are **per-sequence** (FractalSequence), alongside the loop/record edges, so the whole invariant holds within each pattern. The zone is defined on trunk within-positions, so the same "live region" stays expressive across every branch repetition (B1…BN). This was the mutation zone; with mutation/evolution deferred, it survives as the ornament eligibility region.
 
 **Scale source — inherited, ornament-only.** FractalTrack inherits the **project Scale + `scaleRotate`** (a setup field, standard `-1`=inherit, like every other track — `selectedScale(projectScale, projectRotate)`). The scale is applied **only to ornaments**: the flourish notes (runs, arps, half-turns, mordents, octave/fifth, trills) move by **scale degrees** off it. The **trunk stays raw** — captured CV is never quantised (the looper mirrors the parent's literal output). A raw cell that lands off-scale references its **nearest scale degree** for the ornament steps; the main note still plays raw, only the ornament notes snap to the scale around it. "Toward/Away" walks scale degrees toward/away the next cell's nearest degree.
 
-**RAM impact:** Negligible. Evaluated in tick path, no per-step storage. ~4 B model params (ornamentRate, ornamentIntensity, ornFirst, ornLast) + the inherited scale group.
+**RAM impact:** Negligible. Evaluated in tick path, no per-step storage. ~2 B track-wide (ornamentRate, ornamentIntensity) + the **ornament zone `ornFirst`/`ornLast` per-sequence** (2 B × 17 ≈ 34 B in FractalSequence — so the zone nests inside each pattern's loop window) + the inherited scale group.
 
 ### KD-14: Recording Features — Replace vs Latch (in scope) + Punch-In / Once / Quantize (deferred)
 
@@ -629,8 +629,8 @@ else:
 **Goal:** `FractalTrack` and `FractalSequence` in the Track container, serializable.
 
 **Files:**
-- NEW `model/FractalSequence.h` — minimal sequence: divisor, clockMultiplier, resetMeasure, runMode, loopFirst, loopLast, rotate, orderMode, loopMode (Loop), recordFirst, recordLast, recordMode (~24 B). *(The loop window **is** loopFirst/loopLast — no separate firstStep/lastStep. Scale is track-wide on FractalTrack, not per-sequence. Deferred: clockSource, punchMode, recordQuantize, loopBars, beatOffset, loopPhase.)*
-- NEW `model/FractalTrack.h` — 17 sequences + track params (**in scope**): sourceA, sourceB, gateLogic, cvLogic (two-source mix), bufferLength, recordTrigger (Routable), lock, octave, transpose, slideTime, cvUpdateMode, scale group (inherit), ornFirst, ornLast, branchCount, path, branchSeed, branchPool, ornamentRate, ornamentIntensity, captureCadence, captureFidelity, trackDelay. **Routable:** recordTrigger, branchCount, path, ornamentRate, ornamentIntensity. *(Deferred — reserved, not built: routedScan/clockSource (CV-scan), density, tilt, complexity, patience, mutationProb, octaveShiftProb, mutateFirst, mutateLast, evolutionDepth, pressureMode, and the Blend/Once/PunchIn capture variants.)*
+- NEW `model/FractalSequence.h` — minimal sequence: divisor, clockMultiplier, resetMeasure, runMode, loopFirst, loopLast, rotate, orderMode, loopMode (Loop), recordFirst, recordLast, **ornFirst, ornLast**, recordMode (~26 B). *(The loop window **is** loopFirst/loopLast — no separate firstStep/lastStep. **All six window edges (rec/loop/orn first/last) are per-sequence** so the nesting invariant holds per pattern. Scale is track-wide on FractalTrack, not per-sequence. Deferred: clockSource, punchMode, recordQuantize, loopBars, beatOffset, loopPhase.)*
+- NEW `model/FractalTrack.h` — 17 sequences + track params (**in scope**): sourceA, sourceB, gateLogic, cvLogic (two-source mix), bufferLength, recordTrigger (Routable), lock, octave, transpose, slideTime, cvUpdateMode, scale group (inherit), branchCount, path, branchSeed, branchPool, ornamentRate, ornamentIntensity, captureCadence, captureFidelity, trackDelay. **Routable:** recordTrigger, branchCount, path, ornamentRate, ornamentIntensity. *(Deferred — reserved, not built: routedScan/clockSource (CV-scan), density, tilt, complexity, patience, mutationProb, octaveShiftProb, mutateFirst, mutateLast, evolutionDepth, pressureMode, and the Blend/Once/PunchIn capture variants.)*
 - EDIT `model/Track.h` — add `Fractal` to TrackMode enum, Container, union, accessors, initContainer.
 - EDIT `model/Routing.h` — add the `FractalFirst..FractalLast` target block (KD-18).
 - EDIT `engine/Engine.h` — add `FractalTrackEngine` to TrackEngineContainer typedef.
@@ -879,7 +879,7 @@ The following Compass-derived features are noted for future consideration, not i
 | 10 | Complexity scope | Complexity controls mutation pitch selection only. Recording/recapture always from source outputs. |
 | 11 | overdubMode in Phase 1 | Removed from model. Added when blend mode is implemented (post-MVP). |
 | 12 | Branches storage | Branches are trunk+math at playback time. No separate buffers. Zero branch buffer RAM. |
-| 13 | Ornamentation storage | Ornamentation is tick-path evaluation. No per-step storage, ~4 B model params (ornamentRate, ornamentIntensity, ornFirst, ornLast). |
+| 13 | Ornamentation storage | Ornamentation is tick-path evaluation. No per-step storage. ~2 B track-wide (ornamentRate, ornamentIntensity); the ornFirst/ornLast zone is per-sequence (with loop/record edges). |
 | 14 | Evolution system RAM | MutationHistory 256 B inline in engine, SelectionPressure mode 2 bits on model, EvolutionDepth 1 byte on model. |
 | 15 | Timing features | KD-15: track-delay in scope. Bar-quantized loop length (loopBars), beat offset (beatOffset), free phase rotation (loopPhase) deferred. 6 B model. |
 | 16 | Recording extent vs loop window | KD-16: recordFirst/recordLast separate from loopFirst/loopLast. 4 B model (uint16_t+uint16_t). Phase 2 (with the loop window). |
