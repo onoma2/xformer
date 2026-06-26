@@ -585,6 +585,25 @@ else:
 
 **Rationale:** DiscreteMapTrack already proves this pattern — its `clockSource == External` branch reads `getRoutedInput()` and maps to stage position directly, ignoring PlayMode entirely. For FractalTrack, External mode turns the loop buffer into a CV-indexed wavetable: any CV source (LFO, envelope, sequencer, modulation track) directly selects the playback step. This enables tape-head-style scanning, LFO-driven wobbly loops, or step selection from a master track's CV output.
 
+### KD-18: Routing — Fractal Target Block + Inherited Generic Targets
+
+**Decision:** Routing reaches the fractal two ways — a small **bespoke target block** for its own controls, plus the **generic per-track targets** it inherits by handling them in `writeRouting()`.
+
+**Bespoke block.** Add `FractalFirst..FractalLast` to `Routing::Target` (`model/Routing.h`), mirroring `TuesdayFirst..TuesdayLast`:
+- `BranchCount`, `Path`, `OrnamentRate`, `OrnamentIntensity` — the four live performance controls (KD-12 / KD-13).
+- `RecordArm` — the fractal-local record trigger (KD-7), distinct from the global `Record`/`RecordToggle`.
+- *(Deferred-reserved: `Scan` — the CV-scan read position, KD-17.)*
+
+**Inherited generic targets** (handled in the fractal's `writeRouting()` because they map to owned fields):
+- **Track block:** Run, Reset, Octave, Transpose, SlideTime, Rotate.
+- **Sequence block:** Divisor, ClockMult, RunMode, Scale, RootNote.
+- **PlayState block (track-generic, applied above the engine):** Mute, Pattern, Fill / FillAmount.
+- *Not mapped:* the probability biases (no per-step probability), FirstStep/LastStep (the playable range is `loopFirst`/`loopLast`), and Phase (`loopPhase` is deferred).
+
+**Routing semantics.** The conflict guard is **per-target only** (`Routing.cpp:190` rejects two routes sharing a target, never a source). So **one source can drive many fractal targets** — a single CV/LFO into all four live controls at once, or each split to its own route, every route with independent **depth scaled to the destination range** (§6). What's blocked is two sources into one target.
+
+**Cost:** enum entries + `writeRouting()` cases — no per-track RAM beyond the existing routing infrastructure; the routed fields are the uint8 model params already counted (branchCount / path / ornamentRate / ornamentIntensity) plus `recordTrigger`.
+
 ## Phased Implementation Plan
 
 > **Sequencing authority = the 1-pager phase order.** **Phase 1** model (all in-scope fields declared/serialized) → **Phase 2** the *minimal MVP looper* (one parent source, Replace/Latch capture, forward playback via loop window + Order, lock, minimal list UI) → **Phase 3** hardware verification → *stop, hand off*. After that there are **no phase numbers** — the in-scope extras are named post-hardware sections, built in the 1-pager ledger order: **Branches (count/path/pool) → Ornamentation + zone → Two-Source Mix → Track-Delay → Two-Axis Capture (Event/Feel) → Visual UI**. (Loop Controls are **not** here — they're Phase 2.) **Deferred and not phased:** mutation/evolution, CV-scan, capture variants (Punch/Once/Quantize), bar-quantize/beat-offset, density/tilt.
@@ -597,7 +616,7 @@ else:
 - NEW `model/FractalSequence.h` — minimal sequence: divisor, clockMultiplier, resetMeasure, runMode, loopFirst, loopLast, rotate, orderMode, loopMode (Loop), recordFirst, recordLast, recordMode (~24 B). *(The loop window **is** loopFirst/loopLast — no separate firstStep/lastStep. Scale is track-wide on FractalTrack, not per-sequence. Deferred: clockSource, punchMode, recordQuantize, loopBars, beatOffset, loopPhase.)*
 - NEW `model/FractalTrack.h` — 17 sequences + track params (**in scope**): sourceA, sourceB, gateLogic, cvLogic (two-source mix), bufferLength, recordTrigger (Routable), lock, octave, transpose, slideTime, cvUpdateMode, scale group (inherit), ornFirst, ornLast, branchCount, path, branchSeed, branchPool, ornamentRate, ornamentIntensity, captureCadence, captureFidelity, trackDelay. **Routable:** recordTrigger, branchCount, path, ornamentRate, ornamentIntensity. *(Deferred — reserved, not built: routedScan/clockSource (CV-scan), density, tilt, complexity, patience, mutationProb, octaveShiftProb, mutateFirst, mutateLast, evolutionDepth, pressureMode, and the Blend/Once/PunchIn capture variants.)*
 - EDIT `model/Track.h` — add `Fractal` to TrackMode enum, Container, union, accessors, initContainer.
-- EDIT `model/Routing.h` — add `FractalFirst..FractalLast` routing targets.
+- EDIT `model/Routing.h` — add the `FractalFirst..FractalLast` target block (KD-18).
 - EDIT `engine/Engine.h` — add `FractalTrackEngine` to TrackEngineContainer typedef.
 - EDIT `engine/Engine.cpp` — add `case TrackMode::Fractal` to creation switch.
 
