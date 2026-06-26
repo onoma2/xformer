@@ -12,6 +12,7 @@
 #include "ui/model/IndexedSequenceListModel.h"
 #include "ui/model/IndexedTrackListModel.h"
 #include "ui/model/StochasticPerformanceListModel.h"
+#include "ui/model/FractalTrackListModel.h"
 #include "ui/model/PhaseFluxTrackListModel.h"
 
 #include <array>
@@ -53,5 +54,6 @@ private:
     IndexedSequenceListModel _indexedSequenceListModel;
     IndexedTrackListModel _indexedTrackListModel;
     StochasticPerformanceListModel _stochasticTrackListModel;
+    FractalTrackListModel _fractalTrackListModel;
     PhaseFluxTrackListModel _phaseFluxTrackListModel;
 };
