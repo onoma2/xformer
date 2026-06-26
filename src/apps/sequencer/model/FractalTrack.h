@@ -98,6 +98,12 @@ public:
     bool lock() const { return _lock; }
     void setLock(bool lock) { _lock = lock; }
 
+    // recordMuted — ghost source: capture parent even while it's muted (KD-21)
+    bool recordMuted() const { return _recordMuted; }
+    void setRecordMuted(bool recordMuted) { _recordMuted = recordMuted; }
+    void printRecordMuted(StringBuilder &str) const { ModelUtils::printYesNo(str, _recordMuted); }
+    void editRecordMuted(int value, bool shift) { setRecordMuted(value > 0); }
+
     // octave
     int octave() const { return Routing::routedValueInt(ParamKey::Octave, _trackIndex, _octave, -10, 10); }
     void setOctave(int octave) { _octave = clamp(octave, -10, 10); }
@@ -171,6 +177,7 @@ public:
         setRootNote(-1);
         setScaleRotate(-1);
         _playMode = Types::PlayMode::Aligned;
+        _recordMuted = false;
 
         for (auto &sequence : _sequences) {
             sequence.clear();
@@ -191,6 +198,7 @@ public:
         writer.write(_trackDelay);
         writer.write(_scaleGroup.raw);
         writer.write(static_cast<uint8_t>(_playMode));
+        writer.write(_recordMuted);
 
         for (const auto &sequence : _sequences) {
             sequence.write(writer);
@@ -219,6 +227,7 @@ public:
         uint8_t playMode;
         reader.read(playMode);
         _playMode = playMode < uint8_t(Types::PlayMode::Last) ? static_cast<Types::PlayMode>(playMode) : Types::PlayMode::Aligned;
+        reader.read(_recordMuted);
 
         for (auto &sequence : _sequences) {
             sequence.read(reader);
@@ -261,6 +270,7 @@ private:
         BitField<uint16_t, 9, 6> scaleRotate;
     } _scaleGroup = { 0 };
     Types::PlayMode _playMode;
+    bool _recordMuted;
 
     FractalSequenceArray _sequences;
 

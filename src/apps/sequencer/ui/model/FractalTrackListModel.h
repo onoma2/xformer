@@ -66,6 +66,7 @@ private:
         RootNote,
         ScaleRotate,
         Lock,
+        RecordMuted,
         // per-sequence (active pattern)
         Divisor,
         ClockMultiplier,
@@ -94,6 +95,7 @@ private:
         case RootNote:          return "Root Note";
         case ScaleRotate:       return "Scale Rotate";
         case Lock:              return "Lock";
+        case RecordMuted:       return "Rec Muted";
         case Divisor:           return "Divisor";
         case ClockMultiplier:   return "Clock Mult";
         case ResetMeasure:      return "Reset Measure";
@@ -156,6 +158,9 @@ private:
             break;
         case Lock:
             ModelUtils::printYesNo(str, _track->lock());
+            break;
+        case RecordMuted:
+            _track->printRecordMuted(str);
             break;
         case Divisor:
             sequence.printDivisor(str);
@@ -229,6 +234,9 @@ private:
             break;
         case Lock:
             _track->setLock(value > 0);
+            break;
+        case RecordMuted:
+            _track->editRecordMuted(value, shift);
             break;
         case Divisor:
             sequence.editDivisor(value, shift);

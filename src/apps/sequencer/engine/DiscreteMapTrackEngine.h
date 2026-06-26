@@ -31,6 +31,7 @@ public:
         }
         return !mute() && _gateTimer > 0 && _activeStage >= 0;
     }
+    virtual bool recordGate() const override { return _gateTimer > 0 && _activeStage >= 0; }
     virtual float cvOutput(int index) const override {
         if (_monitorOverrideActive) {
             return _cvOutput;

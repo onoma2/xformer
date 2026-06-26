@@ -638,6 +638,22 @@ This **decouples capture rate from playback rate** (unlike `divisor`, which move
 
 **Cost:** 1 B per sequence (`recordSkip`) + one engine capture counter. Negligible.
 
+### KD-21: Ghost Source — Record a Muted Parent
+
+**Decision (in scope).** `recordMuted` (bool, track-wide on `FractalTrack`, default false). When set, the capture path reads each parent's gate from `TrackEngine::recordGate()` (the **pre-mute** intended gate) instead of `gateOutput(0)` — for both sourceA and sourceB. The parent stays silent in the mix (muted) while the Fractal still mirrors it: a ghost source.
+
+`recordGate()` is a new `TrackEngine` virtual. Base default returns `activity()`, which is already the pre-mute per-section gate for Note/Stochastic/Tuesday/Indexed/Curve. Engines whose `activity()` is not a clean per-section gate override it:
+
+| Engine | `recordGate()` returns |
+| --- | --- |
+| (default) Note / Stochastic / Tuesday / Indexed / Curve | `activity()` |
+| PhaseFlux | `_gateState` (raw gate; `gateOutput` is `!mute() && _gateState`) |
+| DiscreteMap | `_gateTimer > 0 && _activeStage >= 0` (the pre-mute factors of `gateOutput`) |
+
+**CV needs no code.** The muted parent's CV stays live when its `cvUpdateMode = Always` (Note/DiscreteMap/PhaseFlux all expose it). The capture path reads `cvOutput(0)` unchanged; the user sets the parent to `cvUpdateMode = Always` so a muted parent keeps emitting CV. Setting-only.
+
+**Cost:** 1 B per track (`recordMuted`) + one virtual. Negligible.
+
 ## Phased Implementation Plan
 
 > **Sequencing authority = the 1-pager phase order.** **Phase 1** model (all in-scope fields declared/serialized) → **Phase 2** the *minimal MVP looper* (one parent source, Replace/Latch capture, forward playback via loop window + Order, lock, minimal list UI) → **Phase 3** hardware verification → *stop, hand off*. After that there are **no phase numbers** — the in-scope extras are named post-hardware sections, built in the 1-pager ledger order: **Branches (count/path/pool) → Ornamentation + zone → Two-Source Mix → Track-Delay → Two-Axis Capture (Event/Feel) → Visual UI**. (Loop Controls are **not** here — they're Phase 2.) **Deferred and not phased:** mutation/evolution, CV-scan, capture variants (Punch/Once/Quantize), bar-quantize/beat-offset, density/tilt.

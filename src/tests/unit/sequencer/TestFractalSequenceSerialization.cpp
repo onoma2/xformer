@@ -25,6 +25,22 @@ static void readSequence(FractalSequence &seq, const uint8_t *buf, size_t len) {
     seq.read(reader);
 }
 
+static void writeTrack(const FractalTrack &track, uint8_t *buf, size_t len) {
+    MemoryWriter memoryWriter(buf, len);
+    VersionedSerializedWriter writer([&memoryWriter](const void *data, size_t sz) {
+        memoryWriter.write(data, sz);
+    }, ProjectVersion::Latest);
+    track.write(writer);
+}
+
+static void readTrack(FractalTrack &track, const uint8_t *buf, size_t len) {
+    MemoryReader memoryReader(buf, len);
+    VersionedSerializedReader reader([&memoryReader](void *data, size_t sz) {
+        memoryReader.read(data, sz);
+    }, ProjectVersion::Latest);
+    track.read(reader);
+}
+
 UNIT_TEST("FractalSequenceSerialization") {
 
 CASE("all_fields_round_trip") {
@@ -138,6 +154,24 @@ CASE("clamped_enum_rejects_out_of_range") {
 
     seq.setCaptureFidelity(FractalSequence::CaptureFidelity(99));
     expectEqual(int(seq.captureFidelity()), int(FractalSequence::CaptureFidelity::Last) - 1, "captureFidelity clamps to last valid");
+}
+
+CASE("track_record_muted_round_trip") {
+    FractalTrack track;
+    track.clear();
+    expectTrue(!track.recordMuted(), "recordMuted defaults false");
+
+    track.setRecordMuted(true);
+
+    uint8_t buf[8192];
+    std::memset(buf, 0, sizeof(buf));
+    writeTrack(track, buf, sizeof(buf));
+
+    FractalTrack r;
+    r.clear();
+    readTrack(r, buf, sizeof(buf));
+
+    expectTrue(r.recordMuted(), "recordMuted persists");
 }
 
 } // UNIT_TEST("FractalSequenceSerialization")

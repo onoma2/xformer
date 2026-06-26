@@ -37,6 +37,7 @@ public:
         (void)index;
         return !mute() && _gateState;
     }
+    virtual bool recordGate() const override { return _gateState; }
     virtual float cvOutput(int index) const override {
         (void)index;
         // §9 mute behavior: DAC holds previous voltage when track is muted.

@@ -363,8 +363,12 @@ void FractalTrackEngine::captureSection() {
         return;
     }
 
+    // KD-21 Ghost source: tap the pre-mute gate so a muted parent still feeds
+    // the trunk. CV rides the parent's cvUpdateMode=Always (no code).
+    bool recordMuted = _fractalTrack.recordMuted();
+
     const TrackEngine &parentA = _engine.trackEngine(srcA);
-    bool aGate = parentA.gateOutput(0);
+    bool aGate = recordMuted ? parentA.recordGate() : parentA.gateOutput(0);
     float aCv = parentA.cvOutput(0);   // volts, 1V/oct, rel project root
 
     int srcB = _fractalTrack.sourceB();
@@ -375,7 +379,7 @@ void FractalTrackEngine::captureSection() {
         parentCv = aCv;
     } else {
         const TrackEngine &parentB = _engine.trackEngine(srcB);
-        bool bGate = parentB.gateOutput(0);
+        bool bGate = recordMuted ? parentB.recordGate() : parentB.gateOutput(0);
         float bCv = parentB.cvOutput(0);
         parentGate = combineGate(aGate, bGate);
         parentCv = combineCv(aCv, bCv, aGate, bGate);

@@ -79,6 +79,11 @@ public:
     virtual bool gateOutput(int index) const = 0;
     virtual float cvOutput(int index) const = 0;
 
+    // Pre-mute intended gate (Fractal ghost source). Default = activity(),
+    // correct for Note/Stochastic/Tuesday/Indexed; engines whose activity()
+    // isn't a clean per-section gate override this.
+    virtual bool recordGate() const { return activity(); }
+
     virtual float sequenceProgress() const { return -1.f; }
 
     // helpers
