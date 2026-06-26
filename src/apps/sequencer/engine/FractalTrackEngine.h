@@ -66,6 +66,12 @@ public:
     int lastOrnament() const { return _lastOrnament; }
     static const char *ornamentName(int id);
 
+    // Branch transform readout for the UI Branch page. seg 1..branchCount.
+    // branchKind → op code 0..7; branchParam → kind-relevant resolved value:
+    // Transpose semitones, Rotate offset, Compress/Expand factor ×100, else 0.
+    int branchKind(int seg) const { return _branches[seg - 1].kind; }
+    int branchParam(int seg) const;
+
 #ifndef PLATFORM_STM32
     // Test seam: run one section's traversal (capture-free, no Engine deref) so
     // unit tests can read the runMode-ordered trunk index sequence.

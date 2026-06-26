@@ -475,6 +475,16 @@ void FractalTrackEngine::rebuildBranchTransforms() {
     _branchCountCache = n;
 }
 
+int FractalTrackEngine::branchParam(int seg) const {
+    const BranchTransform &b = _branches[seg - 1];
+    switch (b.kind) {
+    case OpTranspose:            return b.t;
+    case OpRotate:               return b.k;
+    case OpCompress: case OpExpand: return b.fx100;
+    default:                     return 0;
+    }
+}
+
 void FractalTrackEngine::maybeRebuildBranchTransforms() {
     if (branchSignature() != _branchHash
             || clamp(sequence().branchCount(), 0, 7) != _branchCountCache) {

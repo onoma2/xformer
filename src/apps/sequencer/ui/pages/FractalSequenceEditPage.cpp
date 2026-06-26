@@ -28,6 +28,25 @@ static const ContextMenuModel::Item contextMenuItems[] = {
 // 8-slot transform pool (matches branchPool bitmask order, KD-12).
 static const char *kPoolNames[8] = { "Tr", "Rv", "In", "RI", "Ro", "Co", "Ex", "Gt" };
 
+// Branch-block label: pool abbrev + resolved param (KD-12). Paramless ops
+// (Reverse/Inverse/RetInverse/GateThin) yield abbrev only. fx100 → compact
+// ASCII factor (50→.5, 67→.67, 150→1.5, 200→2).
+static void branchBlockLabel(StringBuilder &str, int kind, int param) {
+    const char *ab = kPoolNames[kind];
+    switch (kind) {
+    case 0: str("%s%+d", ab, param); break;                 // Transpose
+    case 4: str("%s%d", ab, param); break;                  // Rotate
+    case 5: case 6: {                                        // Compress / Expand
+        int whole = param / 100, frac = param % 100;
+        if (frac == 0) str("%s%d", ab, whole);
+        else if (frac % 10 == 0) { if (whole) str("%s%d.%d", ab, whole, frac / 10); else str("%s.%d", ab, frac / 10); }
+        else { if (whole) str("%s%d.%d", ab, whole, frac); else str("%s.%d", ab, frac); }
+        break;
+    }
+    default: str("%s", ab); break;                          // paramless
+    }
+}
+
 // Source-page segmented logic rows source their labels from
 // FractalTrack::gateLogicName/cvLogicName via these wrappers.
 static const char *gateLogicLabel(int i) { return FractalTrack::gateLogicName(FractalTrack::GateLogic(i)); }
@@ -188,6 +207,7 @@ void FractalSequenceEditPage::drawTrunk(Canvas &canvas) {
 
 void FractalSequenceEditPage::drawBranch(Canvas &canvas) {
     auto &seq = _project.selectedTrack().fractalTrack().sequence(_project.selectedPatternIndex());
+    const auto &eng = _engine.selectedTrackEngine().as<FractalTrackEngine>();
 
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "FRACTAL");
@@ -225,7 +245,13 @@ void FractalSequenceEditPage::drawBranch(Canvas &canvas) {
         canvas.setColor(isTrunk ? Color::Bright : Color::Medium);
         canvas.drawRect(x + 1, y, bw - 2, 10);
         str.reset();
-        if (isTrunk) str("T"); else str("B%d", j);
+        if (isTrunk) {
+            str("T");
+        } else {
+            int kind = eng.branchKind(j), param = eng.branchParam(j);
+            branchBlockLabel(str, kind, param);
+            if (canvas.textWidth(str) > bw - 3) { str.reset(); str("%s", kPoolNames[kind]); }
+        }
         canvas.setColor(isTrunk ? Color::Bright : Color::MediumBright);
         canvas.drawText(x + 1 + (bw - 2 - canvas.textWidth(str)) / 2, y + 6, str);
     }
