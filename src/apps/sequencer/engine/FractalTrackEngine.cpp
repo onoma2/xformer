@@ -30,6 +30,19 @@ static constexpr int kTransposeIntervals[] = { 5, 7, 12 };   // P4, P5, octave
 static constexpr int kCompressFactorsX100[] = { 50, 67 };    // f < 1
 static constexpr int kExpandFactorsX100[] = { 150, 200 };    // f > 1
 
+// KD-13 ornament ids, grouped by intensity tier (graded complexity ramp).
+// Ported from the sim's ORN_2STEP / ORN_4STEP / ORN_TRILL.
+enum Ornament {
+    OrnAnticipation = 0, OrnSuspension, OrnSyncopation, OrnOctaveUp, OrnFifthUp,
+    OrnHalfTurnToward, OrnHalfTurnAway,                                  // 2-step
+    OrnRunToward, OrnRunAway, OrnTurn, OrnArpToward, OrnArpAway,
+    OrnMordentUp, OrnMordentDown,                                       // 4-step
+    OrnTrill,                                                           // trill
+};
+static constexpr int kOrn2StepCount = 7;    // ids 0..6
+static constexpr int kOrn4StepCount = 7;    // ids 7..13
+static constexpr int kOrnTrillCount = 1;    // id 14
+
 // Deterministic 32-bit hash → float in [0,1). Ports the sim's hash01(seed,s,p):
 // the seeded transform assignment + per-op params stay stable, no RNG content.
 static float hash01(uint32_t seed, uint32_t s, uint32_t p) {
@@ -60,7 +73,8 @@ void FractalTrackEngine::decodeCell(uint16_t cell, float &semitonesRelRoot, int 
 
 FractalTrackEngine::FractalTrackEngine(Engine &engine, const Model &model, Track &track) :
     TrackEngine(engine, model, track),
-    _fractalTrack(track.fractalTrack())
+    _fractalTrack(track.fractalTrack()),
+    _rng(0x6f7261 + track.trackIndex())
 {
 #ifndef PLATFORM_STM32
     // Codec round-trip self-check: gateLen exact, CV within one LSB.
@@ -115,6 +129,28 @@ FractalTrackEngine::FractalTrackEngine(Engine &engine, const Model &model, Track
         seq.setBranchCount(sc); seq.setBranchSeed(ssd); seq.setBranchPool(sp);
     }
     reset();
+
+    // KD-13 ornament self-checks: rate 0 never fires; the eligible pool grows
+    // by intensity tier; lock freezes the roll to the last-fired ornament.
+    {
+        for (int i = 0; i < 200; ++i) assert(rollOrnament(0, 100) == -1);
+
+        int ids[kOrn2StepCount + kOrn4StepCount + kOrnTrillCount];
+        assert(eligibleOrnaments(ids, 0) == kOrn2StepCount);
+        assert(eligibleOrnaments(ids, 39) == kOrn2StepCount);
+        assert(eligibleOrnaments(ids, 40) == kOrn2StepCount + kOrn4StepCount);
+        assert(eligibleOrnaments(ids, 74) == kOrn2StepCount + kOrn4StepCount);
+        assert(eligibleOrnaments(ids, 100) == kOrn2StepCount + kOrn4StepCount + kOrnTrillCount);
+
+        // Lock freeze: prime _lastOrnament unlocked, then locked rolls hold it.
+        _lastOrnament = OrnTrill;
+        bool wasLocked = _fractalTrack.lock();
+        _fractalTrack.setLock(true);
+        for (int i = 0; i < 50; ++i) assert(rollOrnament(100, 100) == OrnTrill);
+        _fractalTrack.setLock(wasLocked);
+        _lastOrnament = -1;
+    }
+    reset();
 #endif
 }
 
@@ -128,8 +164,9 @@ void FractalTrackEngine::reset() {
     _gate = false;
     _cv = 0.f;
     _activity = false;
-    _gateActive = false;
-    _gateOffTick = 0;
+    _gateQueue.clear();
+    _cvQueue.clear();
+    _lastOrnament = -1;
     for (auto &cell : _trunk) cell = 0;
 }
 
@@ -142,8 +179,9 @@ void FractalTrackEngine::restart() {
 
 void FractalTrackEngine::stop() {
     _gate = false;
-    _gateActive = false;
     _activity = false;
+    _gateQueue.clear();
+    _cvQueue.clear();
 }
 
 uint32_t FractalTrackEngine::effectiveDivisor() const {
@@ -172,13 +210,19 @@ TrackEngine::TickResult FractalTrackEngine::tick(uint32_t tick) {
 
     if (relativeTick % divisor == 0) {
         advanceSection(tick, divisor);
-        result |= TickResult::GateUpdate | TickResult::CvUpdate;
     }
 
-    // Drop the held gate when its proportional length elapses.
-    if (_gateActive && tick >= _gateOffTick) {
-        _gate = false;
-        _gateActive = false;
+    // Drain the sub-section CV/gate event queues at this tick. Each section
+    // schedules a main note plus any ornament flourish notes here.
+    while (!_cvQueue.empty() && tick >= _cvQueue.front().tick) {
+        _cv = _cvQueue.front().cv;
+        _cvQueue.pop();
+        result |= TickResult::CvUpdate;
+    }
+    while (!_gateQueue.empty() && tick >= _gateQueue.front().tick) {
+        _gate = _gateQueue.front().gate;
+        _gateQueue.pop();
+        _activity = _gate;
         result |= TickResult::GateUpdate;
     }
 
@@ -371,28 +415,169 @@ void FractalTrackEngine::replaySection(uint32_t tick, uint32_t divisor) {
 
     _readPos = uint8_t(trunkReadIndex(within));   // UI highlight = trunk index read
 
-    // Octave/transpose applied at playback (octave = 1V; transpose semitones
-    // → volts). Trunk stays raw — captured CV is never quantized (KD-13).
-    float cv = semitonesRelRoot * (1.f / kSemitonesPerOctave);
-    cv += float(_fractalTrack.octave());
-    cv += float(_fractalTrack.transpose()) * (1.f / kSemitonesPerOctave);
-    _cv = cv;
+    // Lookahead for direction-aware ornaments: the next sounding cell's raw note.
+    float nextSemi; int nextGateLen; bool nextValid;
+    segmentCell(segment, within + 1, nextSemi, nextGateLen, nextValid);
 
-    if (gateLen > 0 && valid) {
-        _gate = true;
-        _gateActive = true;
-        _activity = true;
-        // Hold gate for gateLen/15 of the section, scheduled off the section
-        // tick. Mirrors NoteTrack's proportional gate-length handling.
-        uint32_t holdTicks = std::max<uint32_t>(1u, (divisor * uint32_t(gateLen)) / 15u);
-        _gateOffTick = tick + holdTicks;
-    } else {
-        _gate = false;
-        _gateActive = false;
-        _activity = false;
-    }
+    // Ornament eligibility (KD-13): sounding cell gated and trunk read index
+    // inside the ornament zone. Rests and out-of-zone cells never ornament.
+    int readIdx = trunkReadIndex(within);
+    bool ornEligible = valid && gateLen > 0
+        && readIdx >= seq.ornFirst() && readIdx <= seq.ornLast();
+
+    scheduleSection(tick, divisor, semitonesRelRoot, nextSemi, valid ? gateLen : 0, ornEligible);
 
     _globalPos = uint16_t((gp + 1) % total);
+}
+
+// rel-root semitones → playback volts. octave = 1V; transpose semitones → volts.
+// Trunk stays raw — captured CV is never quantized (KD-13). Ornament notes are
+// already scale-snapped before reaching here; the main note is literal.
+static float fractalPlaybackCv(float semitonesRelRoot, const FractalTrack &track) {
+    float cv = semitonesRelRoot * (1.f / kSemitonesPerOctave);
+    cv += float(track.octave());
+    cv += float(track.transpose()) * (1.f / kSemitonesPerOctave);
+    return cv;
+}
+
+// Nearest scale degree to a raw rel-root semitone (degree 0 = scale tonic).
+// Ports the sim's nearestDegree by scanning degrees over ±1 octave.
+int FractalTrackEngine::nearestDegree(float semitonesRelRoot) const {
+    const auto scale = sequence().selectedScale(_model.project().scale(), _model.project().scaleRotate());
+    int n = scale.notesPerOctave();
+    float targetVolts = semitonesRelRoot * (1.f / kSemitonesPerOctave);
+    int oct = int(std::floor(targetVolts));
+    int base = oct * n;
+    int best = base; float bestErr = 1e9f;
+    for (int d = base - n; d <= base + 2 * n; ++d) {
+        float err = std::abs(scale.noteToVolts(d) - targetVolts);
+        if (err < bestErr) { bestErr = err; best = d; }
+    }
+    return best;
+}
+
+// Step `steps` scale degrees from the raw note's nearest degree → rel-root semitones.
+float FractalTrackEngine::stepDegrees(float semitonesRelRoot, int steps) const {
+    const auto scale = sequence().selectedScale(_model.project().scale(), _model.project().scaleRotate());
+    return scale.noteToVolts(nearestDegree(semitonesRelRoot) + steps) * kSemitonesPerOctave;
+}
+
+// Fill ids[] with the ornament pool unlocked by intensity (0..100): 2-step
+// always, +4-step at ≥40%, +trill at ≥75%. Returns the pool size.
+int FractalTrackEngine::eligibleOrnaments(int ids[], int intensity) const {
+    int k = 0;
+    for (int i = 0; i < kOrn2StepCount; ++i) ids[k++] = OrnAnticipation + i;
+    if (intensity >= 40) for (int i = 0; i < kOrn4StepCount; ++i) ids[k++] = OrnRunToward + i;
+    if (intensity >= 75) for (int i = 0; i < kOrnTrillCount; ++i) ids[k++] = OrnTrill + i;
+    return k;
+}
+
+// Roll an ornament. rate (0..100) = P(fire) per gated cell. Returns -1 (none) or
+// an ornament id picked uniformly from the eligible tier. Lock freezes which one:
+// Rate still gates whether a flourish fires, Lock holds the last-fired ornament.
+int FractalTrackEngine::rollOrnament(int rate, int intensity) {
+    if (rate <= 0) return -1;
+    if (int(_rng.nextRange(100)) >= rate) return -1;
+    if (_fractalTrack.lock()) {
+        return _lastOrnament;   // frozen: repeat last-fired (may be -1 until first roll)
+    }
+    int ids[kOrn2StepCount + kOrn4StepCount + kOrnTrillCount];
+    int pool = eligibleOrnaments(ids, intensity);
+    int orn = ids[_rng.nextRange(uint32_t(pool))];
+    _lastOrnament = orn;
+    return orn;
+}
+
+// Push one mono note (gate-on at `at`, gate-off at at+dur, CV at `at`) onto the
+// queues. Notes are emitted in time order so the queue stays a clean envelope.
+void FractalTrackEngine::scheduleSection(uint32_t tick, uint32_t divisor, float mainSemi,
+                                         float nextSemi, int gateLen, bool ornEligible) {
+    auto pushNote = [&](float semi, uint32_t at, uint32_t dur) {
+        _cvQueue.push({ at, fractalPlaybackCv(semi, _fractalTrack) });
+        _gateQueue.push({ at, true });
+        _gateQueue.push({ at + std::max<uint32_t>(1u, dur), false });
+    };
+
+    if (gateLen <= 0) {
+        // Rest: hold CV, gate stays low. Still set CV so glides/scope track it.
+        _cvQueue.push({ tick, fractalPlaybackCv(mainSemi, _fractalTrack) });
+        _gateQueue.push({ tick, false });
+        return;
+    }
+
+    // Proportional gate length: gateLen/15 of the section. Mirrors NoteTrack.
+    uint32_t fullDur = std::max<uint32_t>(1u, (divisor * uint32_t(gateLen)) / 15u);
+    uint32_t e = std::max<uint32_t>(1u, divisor / 8u);   // one eighth of the section
+
+    int name = ornEligible ? rollOrnament(_sequence->ornamentRate(), _sequence->ornamentIntensity()) : -1;
+    if (name < 0) {
+        pushNote(mainSemi, tick, fullDur);
+        return;
+    }
+
+    int dir = (nextSemi >= mainSemi) ? 1 : -1;   // toward the next cell
+
+    // Grace: main held, then a one-eighth grace note at the tail.
+    auto grace = [&](float semi) {
+        pushNote(mainSemi, tick, fullDur - e);
+        pushNote(semi, tick + fullDur - e, e);
+    };
+
+    switch (name) {
+    case OrnAnticipation:
+        pushNote(nextSemi, tick, e);
+        pushNote(mainSemi, tick + e, fullDur - e);
+        break;
+    case OrnSuspension:                          // no prior-cell handle in the looper
+        pushNote(mainSemi, tick, fullDur);
+        break;
+    case OrnSyncopation:                         // rest one eighth, then play
+        pushNote(mainSemi, tick + e, fullDur - e);
+        break;
+    case OrnOctaveUp:    grace(mainSemi + 12.f); break;
+    case OrnFifthUp:     grace(stepDegrees(mainSemi, 4)); break;
+    case OrnHalfTurnToward: grace(stepDegrees(mainSemi, dir)); break;
+    case OrnHalfTurnAway:   grace(stepDegrees(mainSemi, -dir)); break;
+    case OrnTurn:
+        pushNote(mainSemi, tick, e);
+        pushNote(stepDegrees(mainSemi, 1), tick + e, e);
+        pushNote(stepDegrees(mainSemi, -1), tick + 2 * e, e);
+        pushNote(mainSemi, tick + 3 * e, fullDur - 3 * e);
+        break;
+    case OrnMordentUp:
+    case OrnMordentDown: {
+        int d = (name == OrnMordentUp) ? 1 : -1;
+        pushNote(mainSemi, tick, e);
+        pushNote(stepDegrees(mainSemi, d), tick + e, e);
+        pushNote(mainSemi, tick + 2 * e, fullDur - 2 * e);
+        break;
+    }
+    case OrnRunToward:
+    case OrnRunAway: {
+        int d = (name == OrnRunToward) ? dir : -dir;
+        uint32_t s = std::max<uint32_t>(1u, divisor / 5u);
+        pushNote(mainSemi, tick, s);
+        for (int kk = 1; kk <= 4; ++kk) pushNote(stepDegrees(mainSemi, d * kk), tick + kk * s, s);
+        break;
+    }
+    case OrnArpToward:
+    case OrnArpAway: {
+        int d = (name == OrnArpToward) ? dir : -dir;
+        uint32_t s = std::max<uint32_t>(1u, divisor / 4u);
+        int degs[3] = { 0, 2, 4 };
+        for (int kk = 0; kk < 3; ++kk) pushNote(stepDegrees(mainSemi, d * degs[kk]), tick + kk * s, s);
+        break;
+    }
+    case OrnTrill: {
+        float up = stepDegrees(mainSemi, 1);
+        uint32_t sp = std::max<uint32_t>(1u, divisor / 8u);
+        for (int kk = 0; kk < 8; ++kk) pushNote((kk & 1) ? up : mainSemi, tick + kk * sp, sp);
+        break;
+    }
+    default:
+        pushNote(mainSemi, tick, fullDur);
+        break;
+    }
 }
 
 void FractalTrackEngine::update(float dt) {

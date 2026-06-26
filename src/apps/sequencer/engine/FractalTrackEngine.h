@@ -1,15 +1,19 @@
 #pragma once
 
 #include "TrackEngine.h"
+#include "SortedQueue.h"
 #include "model/FractalSequence.h"
 #include "model/FractalTrack.h"
+
+#include "core/utils/Random.h"
 
 #include <cstdint>
 
 // Looper engine: capture sourceA's emitted gate+CV per section into an inline
 // trunk buffer, replay it through the loop window. Branches (KD-12) concatenate
-// chained transforms of the trunk after it. Ornaments, sleep, two-source mix,
-// track-delay and capture variants are deferred —
+// chained transforms of the trunk after it. Ornaments (KD-13) inject scale-snapped
+// flourish notes inside a section via a sub-section gate/CV event queue. Sleep,
+// two-source mix, track-delay and capture variants are deferred —
 // see docs/superpowers/specs/2026-05-17-fractal-track-design.md.
 class FractalTrackEngine final : public TrackEngine {
 public:
@@ -60,6 +64,16 @@ private:
     void captureSection();
     void replaySection(uint32_t tick, uint32_t divisor);
 
+    // KD-13 ornaments. Scale snapping mirrors the sim's nearestDegree/stepDegrees
+    // — degrees are rel-root (scale tonic = 0), trunk stays raw. The ornament
+    // generator emits a mono note list scheduled onto the gate/CV queues.
+    int nearestDegree(float semitonesRelRoot) const;
+    float stepDegrees(float semitonesRelRoot, int steps) const;
+    int eligibleOrnaments(int ids[], int intensity) const;
+    int rollOrnament(int rate, int intensity);
+    void scheduleSection(uint32_t tick, uint32_t divisor, float mainSemi,
+                         float nextSemi, int gateLen, bool ornEligible);
+
     // KD-12 branches — one chained transform per branch, derived from branchSeed
     // + the branchPool mask. Recomputed when seed/pool/loop-window changes.
     struct BranchTransform {
@@ -97,8 +111,22 @@ private:
     bool _gate = false;
     float _cv = 0.f;
     bool _activity = false;
-    bool _gateActive = false;     // gate currently held high within a section
-    uint32_t _gateOffTick = 0;    // absolute tick at which the held gate falls
+
+    // Sub-section gate/CV event queue (KD-13). Mirrors NoteTrackEngine's
+    // _gateQueue/_cvQueue: events carry absolute-tick timestamps, drained in
+    // tick(). One main note per section plus injected ornament flourish notes.
+    struct GateEvent { uint32_t tick; bool gate; };
+    struct GateCompare { bool operator()(const GateEvent &a, const GateEvent &b) { return a.tick < b.tick; } };
+    struct CvEvent { uint32_t tick; float cv; };
+    struct CvCompare { bool operator()(const CvEvent &a, const CvEvent &b) { return a.tick < b.tick; } };
+    SortedQueue<GateEvent, 24, GateCompare> _gateQueue;
+    SortedQueue<CvEvent, 24, CvCompare> _cvQueue;
+
+    // KD-13 ornament state. PRNG is live/probabilistic (free-running). Lock
+    // freezes _lastOrnament: Rate still gates whether a flourish fires, Lock
+    // fixes which one. -1 = none rolled yet.
+    Random _rng;
+    int _lastOrnament = -1;
 };
 
-static_assert(sizeof(FractalTrackEngine) <= 912, "FractalTrackEngine too large");
+static_assert(sizeof(FractalTrackEngine) <= 1280, "FractalTrackEngine too large");
