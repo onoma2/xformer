@@ -121,19 +121,22 @@ Branch navigation is **not** part of this lifecycle — KD-12 is in-scope and co
 
 ### KD-4: Two-Master Input Mixing
 
-**Decision:** Port Vinx LogicTrackEngine's gate/note logic modes for combining 2 master track outputs.
+**Decision:** Port the LogicTrack model — **two independent axes**, `gateLogic` (uint8) and `cvLogic` (uint8) — for combining the two source outputs. Not a flat combined list: the gate combination and the pitch combination are chosen separately, so the space is combinatorial.
 
-**Gate logic** (when both inputs are active):
-- `A` / `B`: Use only one master's gate
-- `AND` / `OR` / `XOR` / `NAND`: Boolean combination
-- `Random`: Randomly pick one master per step
+**Gate logic** (→ the mirror's rhythm):
+- `A` / `B`: only one source's gate
+- `And` (both fire) · `Or` (either) · `Xor` (one but not both) · `Nand` (unless both)
+- *(optional `RandomInput`: pick a source per section — selects between captured sources, invents nothing.)*
 
-**CV logic** (when combined gate is on):
-- `A` / `B`: Use only one master's CV
-- `Sum` / `Avg` / `Min` / `Max`: Arithmetic combination
-- `Random`: Randomly pick one master's CV per step
+**CV logic** (→ the mirror's pitch, sampled when the combined gate is on):
+- `A` / `B`: only one source's CV
+- `Min` (lower) · `Max` (higher) · `Sum` (add → stacked interval) · `Avg` (midpoint)
+- `Gated`: whichever source just fired (A-priority) — useful when the two gates differ
+- *(optional `RandomInput`.)*
 
-**Rationale:** LogicTrackEngine.cpp already implements this exact set of 8 gate modes and 8 note modes. Adapting it from step-data → output-reading is trivial: replace `step.note()` with `trackEngine.cvOutput(0)`, replace step gates with `trackEngine.gateOutput(0)`.
+**Why two axes (musical):** the standout combinations come from mixing the axes — `And + Sum` fires only when both hit and outputs their **interval/chord** (real harmony); `A-gate + Max` keeps A's rhythm but always the **higher voice** (voice-leading); `Xor + Gated` alternates. `Sum`/`Min`/`Max` turn two melodies into counterpoint, not logic-gate plumbing.
+
+**Rationale:** mebitek LogicTrack's `GateLogicMode`/`NoteLogicMode` already implement this set. Adapting from step-data → output-reading is trivial: `step.note()` → `trackEngine.cvOutput(0)`, step gates → `trackEngine.gateOutput(0)`. (The sim's flat 4-mode `sourceMix` predates this and is being split into the two selectors.)
 
 ### KD-5: Recording Modes — Overwrite (MVP), Blend (Post-MVP)
 
