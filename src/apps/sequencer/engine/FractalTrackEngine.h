@@ -8,11 +8,12 @@
 
 #include <cstdint>
 
-// Looper engine: capture sourceA's emitted gate+CV per section into an inline
-// trunk buffer, replay it through the loop window. Branches (KD-12) concatenate
+// Looper engine: capture the source tracks' emitted gate+CV per section into an
+// inline trunk buffer, replay it through the loop window. With sourceB set, the
+// two parents combine via gateLogic × cvLogic (KD-4). Branches (KD-12) concatenate
 // chained transforms of the trunk after it. Ornaments (KD-13) inject scale-snapped
 // flourish notes inside a section via a sub-section gate/CV event queue.
-// Two-source mix, track-delay and capture variants are deferred —
+// Track-delay and capture variants are deferred —
 // see docs/superpowers/specs/2026-05-17-fractal-track-design.md.
 class FractalTrackEngine final : public TrackEngine {
 public:
@@ -61,6 +62,11 @@ private:
 
     void advanceSection(uint32_t tick, uint32_t divisor);
     void captureSection();
+
+    // KD-4 two-source mix. gateLogic/cvLogic combine the two parents'
+    // gate+CV (volts). cvLogic Gated picks whichever just fired, A-priority.
+    bool combineGate(bool a, bool b) const;
+    float combineCv(float aCv, float bCv, bool aGate, bool bGate) const;
     void replaySection(uint32_t tick, uint32_t divisor);
 
     // KD-13 ornaments. Scale snapping mirrors the sim's nearestDegree/stepDegrees

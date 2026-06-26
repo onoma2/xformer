@@ -168,6 +168,22 @@ FractalTrackEngine::FractalTrackEngine(Engine &engine, const Model &model, Track
         assert(writesOver(0, 2 * N) == 2 * N);
         assert(writesOver(1, 2 * N) == N);
     }
+
+    // KD-4 two-source mix: And gate is A&B, Sum cv is A+B; default A/A passes A.
+    {
+        auto sg = _fractalTrack.gateLogic();
+        auto sc = _fractalTrack.cvLogic();
+        _fractalTrack.setGateLogic(FractalTrack::GateLogic::A);
+        _fractalTrack.setCvLogic(FractalTrack::CvLogic::A);
+        assert(combineGate(true, false) == true);
+        assert(std::abs(combineCv(2.f, 5.f, true, true) - 2.f) < 1e-4f);
+        _fractalTrack.setGateLogic(FractalTrack::GateLogic::And);
+        _fractalTrack.setCvLogic(FractalTrack::CvLogic::Sum);
+        assert(combineGate(true, true) == true && combineGate(true, false) == false);
+        assert(std::abs(combineCv(2.f, 5.f, true, true) - 7.f) < 1e-4f);
+        _fractalTrack.setGateLogic(sg);
+        _fractalTrack.setCvLogic(sc);
+    }
 #endif
 }
 
@@ -266,6 +282,29 @@ void FractalTrackEngine::advanceSection(uint32_t tick, uint32_t divisor) {
     replaySection(tick, divisor);
 }
 
+bool FractalTrackEngine::combineGate(bool a, bool b) const {
+    switch (_fractalTrack.gateLogic()) {
+    case FractalTrack::GateLogic::B:    return b;
+    case FractalTrack::GateLogic::And:  return a && b;
+    case FractalTrack::GateLogic::Or:   return a || b;
+    case FractalTrack::GateLogic::Xor:  return a != b;
+    case FractalTrack::GateLogic::Nand: return !(a && b);
+    default:                            return a;   // A
+    }
+}
+
+float FractalTrackEngine::combineCv(float aCv, float bCv, bool aGate, bool bGate) const {
+    switch (_fractalTrack.cvLogic()) {
+    case FractalTrack::CvLogic::B:     return bCv;
+    case FractalTrack::CvLogic::Min:   return std::min(aCv, bCv);
+    case FractalTrack::CvLogic::Max:   return std::max(aCv, bCv);
+    case FractalTrack::CvLogic::Sum:   return aCv + bCv;
+    case FractalTrack::CvLogic::Avg:   return (aCv + bCv) * 0.5f;
+    case FractalTrack::CvLogic::Gated: return aGate ? aCv : (bGate ? bCv : aCv);
+    default:                           return aCv;   // A
+    }
+}
+
 void FractalTrackEngine::captureSection() {
     const auto &seq = sequence();
     int srcA = _fractalTrack.sourceA();
@@ -276,9 +315,23 @@ void FractalTrackEngine::captureSection() {
         return;
     }
 
-    const TrackEngine &parent = _engine.trackEngine(srcA);
-    bool parentGate = parent.gateOutput(0);
-    float parentCv = parent.cvOutput(0);   // volts, 1V/oct, rel project root
+    const TrackEngine &parentA = _engine.trackEngine(srcA);
+    bool aGate = parentA.gateOutput(0);
+    float aCv = parentA.cvOutput(0);   // volts, 1V/oct, rel project root
+
+    int srcB = _fractalTrack.sourceB();
+    bool parentGate;
+    float parentCv;
+    if (srcB < 0) {
+        parentGate = aGate;
+        parentCv = aCv;
+    } else {
+        const TrackEngine &parentB = _engine.trackEngine(srcB);
+        bool bGate = parentB.gateOutput(0);
+        float bCv = parentB.cvOutput(0);
+        parentGate = combineGate(aGate, bGate);
+        parentCv = combineCv(aCv, bCv, aGate, bGate);
+    }
 
     float semitonesRelRoot = parentCv * kSemitonesPerOctave;
     // gate high → fixed proportional gateLen (MVP); rest → gateLen 0.
