@@ -220,7 +220,7 @@ On trunk-phase loop boundary:
 
 **Budget strategy:**
 - No per-step probability grid (unlike StochasticSequence's 512 B per pattern).
-- FractalSequence (~45 B): timing + loop lenses + sleep + all six window edges + recordMode + captureCadence/Fidelity + recordTrigger + branchCount/path/branchSeed/branchPool + ornamentRate/Intensity-pool (the per-pattern preset, incl. the four per-sequence Routables).
+- FractalSequence (~45 B): timing + loop lenses + all six window edges + recordMode + recordSkip + captureCadence/Fidelity + recordTrigger + branchCount/path/branchSeed/branchPool + ornamentRate/Intensity (the per-pattern preset, incl. the four per-sequence Routables).
 - Track-level FractalTrack (~30 B): sourceA/B, gate/cv logic, bufferLength, lock, octave, transpose, slideTime, cvUpdateMode, trackDelay, scale group.
 - 17 × ~45 B ≈ 765 B + ~30 B track-level ≈ **~795 B model** — far under the 9544 B model gate (the per-sequence ×17 routables fit easily; the model rail, unlike the engine, has ample room).
 - 17 sequences × ~28 B ≈ 476 B + ~60 B track-level + ~overhead ≈ **~560 B total**.
@@ -628,11 +628,15 @@ else:
 
 **Branch playback on the Trunk page.** Branches are non-destructive, so the stored material is never redrawn; the contour **re-skins to the segment currently sounding** — raw in the trunk segment, *transformed* in B*k* — morphing at each segment boundary (you see Reverse flip it, Interval-Expand stretch the pitch range, Transpose shift it, Gate-thin drop bars, Rotate slide it). A label shows the current limb + its transform + route position (`B2 · Exp×2 · 3 of 4`). The **loop/ornament brackets stay fixed** (defined on trunk within-positions). The playhead sweeps the segment (loopLen cells) and jumps to the next limb per Path; the page is one segment-wide window, not a `loopLen × (1+N)` scroll.
 
-### KD-20: Sleep — Stochastic Rest Model
+### KD-20: R.Skip — Record Stride (Pack)
 
-**Decision (in scope).** `sleep` (uint8, 0-7, per-sequence): a played cell **fires once, then rests `sleep` sections** — silent, the read cursor held on the cell (no re-fire) — before advancing. Each cell occupies `sleep+1` sections, stretching the loop with **gaps** (it is a rest, *not* a repeat — no echo of the note). Cribbed from Stochastic/harmony's absorb-N-triggers rest (`sleepRemaining`): on a section, while `sleepRemaining > 0` decrement and emit nothing; otherwise play, then arm `sleepRemaining = sleep`. Capture is unaffected (it strobes per section regardless); sleep gates only the playback advance + gate.
+**Decision (in scope).** `recordSkip` (uint8, per-sequence — joins the record group `recordFirst`/`recordLast`/`recordMode`/`recordTrigger`, hence the `R.` UI prefix). While armed, capture samples the parent every **`recordSkip + 1` sections** and writes them into **consecutive** trunk cells (**Pack** — no holes). The record cursor advances **only on a write**; skipped sections are not sampled. Mechanically: one capture counter — each section, if `_recordSkipRemaining > 0` decrement and skip, else sample the parent → write the cell → advance the record cursor → reset to `recordSkip`.
 
-**Cost:** 1 B per sequence (`sleep`). Engine: one `sleepRemaining` counter. Negligible.
+This **decouples capture rate from playback rate** (unlike `divisor`, which moves both): the buffer mirrors `recordSkip+1`× more of the parent's timeline, thinned — a **time-lapse** of the source that still plays back one cell per section. It is a capture-side control, distinct from the playback `divisor`/`rotate` lens.
+
+(Replaces an earlier per-cell playback "sleep" idea — that borrowed Stochastic's *name* but not its per-cycle proportional semantics, so it was dropped to avoid confusion. R.Skip shapes **what goes into** the trunk; it is not a playback rest.)
+
+**Cost:** 1 B per sequence (`recordSkip`) + one engine capture counter. Negligible.
 
 ## Phased Implementation Plan
 
@@ -643,7 +647,7 @@ else:
 **Goal:** `FractalTrack` and `FractalSequence` in the Track container, serializable.
 
 **Files:**
-- NEW `model/FractalSequence.h` — a **per-pattern performance preset** over the shared trunk: divisor, clockMultiplier, resetMeasure, runMode, loopFirst, loopLast, rotate, orderMode, loopMode (Loop), sleep, recordFirst, recordLast, **ornFirst, ornLast**, recordMode, captureCadence, captureFidelity, **recordTrigger** (Routable), **branchCount, path** (Routable), branchSeed, branchPool, **ornamentRate, ornamentIntensity** (Routable) (~45 B). *(The loop window **is** loopFirst/loopLast — no separate firstStep/lastStep. The whole expressive layer — windows, branches, ornaments, capture config — is per-sequence so each pattern is a self-contained preset; the bespoke Routables (branchCount · path · ornamentRate · ornamentIntensity · recordTrigger) route per-sequence. Scale is track-wide. Deferred: clockSource, punchMode, recordQuantize, loopBars, beatOffset, loopPhase.)*
+- NEW `model/FractalSequence.h` — a **per-pattern performance preset** over the shared trunk: divisor, clockMultiplier, resetMeasure, runMode, loopFirst, loopLast, rotate, orderMode, loopMode (Loop), recordFirst, recordLast, recordSkip, **ornFirst, ornLast**, recordMode, captureCadence, captureFidelity, **recordTrigger** (Routable), **branchCount, path** (Routable), branchSeed, branchPool, **ornamentRate, ornamentIntensity** (Routable) (~45 B). *(The loop window **is** loopFirst/loopLast — no separate firstStep/lastStep. The whole expressive layer — windows, branches, ornaments, capture config — is per-sequence so each pattern is a self-contained preset; the bespoke Routables (branchCount · path · ornamentRate · ornamentIntensity · recordTrigger) route per-sequence. Scale is track-wide. Deferred: clockSource, punchMode, recordQuantize, loopBars, beatOffset, loopPhase.)*
 - NEW `model/FractalTrack.h` — the **track-wide identity**: sourceA, sourceB, gateLogic, cvLogic (two-source mix), bufferLength, lock, octave, transpose, slideTime, cvUpdateMode, scale group (inherit), trackDelay. *(Branches, ornaments, and capture config are per-sequence — see FractalSequence. Deferred — reserved: routedScan/clockSource (CV-scan), density, tilt, mutation params, Blend/Once/PunchIn.)*
 - EDIT `model/Track.h` — add `Fractal` to TrackMode enum, Container, union, accessors, initContainer.
 - EDIT `model/Routing.h` — add the `FractalFirst..FractalLast` target block (KD-18).

@@ -25,7 +25,7 @@ It is not a stochastic generator, not a note sequencer, and not a high-fidelity 
 
 | Owner | What it owns |
 |-------|-------------|
-| **FractalSequence** (×17 patterns — a full performance preset over the shared trunk) | Timing (divisor, clockMultiplier, resetMeasure, runMode), loop lenses (loopFirst, loopLast, rotate, orderMode, loopMode-Loop, **sleep**), record extent (recordFirst, recordLast), **ornament zone (ornFirst, ornLast)**, capture (recordMode, captureCadence, captureFidelity, **recordTrigger**), branches (**branchCount, path**, branchSeed, branchPool), ornaments (**ornamentRate**, ornamentIntensity/pool). **branchCount · path · ornamentRate · recordTrigger are Routable — per-sequence** (each pattern routes its own value). *(All window edges + the whole expressive layer live here so per-pattern presets are self-contained.)* *Deferred-reserved: punchMode, recordQuantize, clockSource, loopBars, beatOffset, loopPhase.* |
+| **FractalSequence** (×17 patterns — a full performance preset over the shared trunk) | Timing (divisor, clockMultiplier, resetMeasure, runMode), loop lenses (loopFirst, loopLast, rotate, orderMode, loopMode-Loop), record extent (recordFirst, recordLast, **recordSkip**), **ornament zone (ornFirst, ornLast)**, capture (recordMode, captureCadence, captureFidelity, **recordTrigger**), branches (**branchCount, path**, branchSeed, branchPool), ornaments (**ornamentRate, ornamentIntensity**). **branchCount · path · ornamentRate · ornamentIntensity · recordTrigger are Routable — per-sequence** (each pattern routes its own value). *(All window edges + the whole expressive layer live here so per-pattern presets are self-contained.)* *Deferred-reserved: punchMode, recordQuantize, clockSource, loopBars, beatOffset, loopPhase.* |
 | **FractalTrack** (×1, track-wide identity) | 17 sequences, sourceA, sourceB, gateLogic, cvLogic, bufferLength, lock, octave, transpose, slideTime, cvUpdateMode, trackDelay, **scale group (scale+scaleRotate, inherit) — ornament-only, trunk stays raw**. *Deferred-reserved: routedScan/clockSource, density, tilt, mutation params.* |
 | **FractalTrackEngine** (×1, volatile) | Trunk buffer + Feel onset array, parent resolution, observe-over-section gate/CV measurement, capture/read/loop-boundary rule execution, branch state, track-delay queue, RNG (branch-seed). *Deferred: evolution history.* |
 
@@ -90,7 +90,7 @@ Engine gate is **912 B** (TeletypeTrackEngine, PROJECT.md:299; the TT2 `static_a
 After Phase 3 there are **no phase numbers** — the post-hardware in-scope work is named (order below).
 
 Post-MVP, in scope (the playable identity — each lands in reserved fields/hooks):
-branches (concatenated, chained, generative, bit-word Path) → ornaments (rate/intensity, scale-aware) + ornament zone → two-source mixing → track-delay → **two-axis capture (Section/Event cadence × Quantized/Feel fidelity — KD-14b)** → sleep (Stochastic rest — KD-20) → visual page.
+branches (concatenated, chained, generative, bit-word Path) → ornaments (rate/intensity, scale-aware) + ornament zone → two-source mixing → track-delay → **two-axis capture (Section/Event cadence × Quantized/Feel fidelity — KD-14b)** → R.Skip (record stride, Pack — KD-20) → visual page.
 Live performance controls (Routable): branch count · path · ornament rate · ornament intensity.
 
 Deferred (later phase, nice-to-have):
