@@ -30,10 +30,13 @@ Mandatory checks before opening an abstract design conversation:
 - For new sequence/track fields → diff against NoteSequence / NoteTrack and Stochastic equivalents to surface what's already conventionalised.
 - For new phase, ramp, or per-step continuous state → check DiscreteMap's stateless-ramp pattern before inventing a stateful one.
 - For new traversal or cursor logic → check Re:Rene's seekX/seekY pattern, NoteSequenceState advance modes, runMode handling.
+- For ANY new engine/UI/model mechanism (event scheduling, rings, RNG, runMode traversal, OLED drawing, field formatting, hero-page rings) → consult **`docs/performer-architecture.md` §0 reuse-before-invent map** and name the existing primitive (SortedQueue / RingBuffer / Random / SequenceState / SequencePainter / printX-editX / single-page-enum) before writing or briefing a line of it.
 
 Surfacing an existing precedent late in the conversation ("oh, DiscreteMap already does it this way") wastes the prior rounds of design discussion the user already invested in. The precedent should be in the *first* response on the topic, not the fifth. If the existing implementation is the right answer, propose adopting it directly. If it's wrong for this case, name *why* it doesn't fit before sketching a new design.
 
 This rule is in tension with "answer first" — both still hold. Research is the answer when the answer lives in the codebase. Cite the file and the pattern, then synthesise.
+
+**Reuse must survive into the subagent brief — this is where it actually fails.** CLAUDE.md governs the main loop, not a fresh subagent; an agent reuses what the *brief* points it at. A brief that says "port the sim" or "build N pages / a new X" without naming the existing primitive *by file* is the exact defect that ships hand-rolled event arrays, dead `runMode` fields, bespoke page-swaps, and raw `canvas.draw*`. Before delegating any implementation: for each piece, answer "which existing primitive covers this job?" against `docs/performer-architecture.md` §0, route the agent through that map in the brief, and forbid rolling its own until it reports — with what it searched — that no primitive exists. "Port X" / "build a new X" is never an implementation instruction on its own.
 
 ## Headline contract violations. Do not bury them.
 

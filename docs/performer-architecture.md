@@ -8,6 +8,31 @@ if the codebase has moved on. Last reconciled: 2026-05-21.
 
 ---
 
+## 0. Reuse-before-invent map (read this first)
+
+Almost every job a new TrackMode needs already has a battle-tested primitive. **Reaching for a hand-rolled array, loop, hash, ring, or raw `canvas.draw*` when a row below covers it is a defect, not a style choice.** Before writing engine/UI/model code — and before writing any subagent brief — find the job here and name the primitive you'll use. "Port the sim" / "build a new X" is not an implementation plan.
+
+| Job | Use this | Where |
+|---|---|---|
+| Schedule gate/CV events across ticks | `SortedQueue<Gate,16>` / `<Cv,16>` | `engine/SortedQueue.h`, §8.1; Note/Stochastic/Curve/Tuesday |
+| Bounded FIFO / delay ring | `RingBuffer<T,N>` | `core/utils/RingBuffer.h` |
+| Random / deterministic seeded RNG | `Random` (`nextRange`, `nextFloat`) | `core/utils/Random.h`; engines hold an `_rng` |
+| runMode / order / loop traversal | `SequenceState` `advanceFree`/`advanceAligned` | `engine/SequenceState.h`, §8.4 — **do not hand-roll forward+rotate; honor the stored runMode** |
+| resetMeasure / bar alignment | `resetMeasure` pattern + `_engine.measureDivisor()` | §8.3, §8.6 |
+| Cross-track output read | `_engine.trackEngine(i).gateOutput/cvOutput` | §7.6 |
+| Scale snap (volts↔degree) | `Scale::noteFromVolts` / `noteToVolts`, `RotatedScaleView` | `model/Scale.h`, `RotatedScale.h` |
+| Draw bars / loop markers / gate length / playhead | `SequencePainter` / `WindowPainter` | `ui/painters/`, §12.4 — not raw `canvas.draw*` |
+| Clamp / format / enum-adjust | `ModelUtils` (`clampDivisor`, `adjustedByStep`, `adjustedByPowerOfTwo`, `adjustedEnum`, `clampedEnum`, `printYesNo`) | `model/ModelUtils.h` |
+| Display a sequence field in a list model | model `printX()` / `editX()` helpers | NoteSequence/StochasticSequence convention — put the formatting on the model, not inline in the ListModel |
+| Typed mode field | `enum class … { …, Last }` + `clampedEnum` | not an int-coded `0..N` with magic ranges |
+| Packed multi-field storage | `BitField` union | NoteSequence/FractalSequence `_scaleGroup` |
+| Enum → display string | a name table on the model (e.g. `cvUpdateModeName`) | not a string array in the page |
+| Hero-page ring of sub-views (F5=NEXT) | **one** page + `_currentPage` enum + `nextPage()` | `StochasticSequenceEditPage` — never four pages swapping the stack with `_manager.replace(stackSize()-1)` |
+
+If a job genuinely has no primitive, say so explicitly (name what you searched) before rolling your own — that's the bar for a new mechanism.
+
+---
+
 ## 1. Process model
 
 The hardware/simulator runs on FreeRTOS. Three periodic tasks at 1 ms each:
