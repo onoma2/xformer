@@ -328,7 +328,8 @@ void TopPage::setSequenceView(SequenceView view) {
         setMainPage(pages.stochasticPerformance);
         break;
     case Track::TrackMode::Fractal:
-        setMainPage(pages.track);
+        // Hero ring entry (Trunk); F5=NEXT cycles to Branch/Ornament/Source.
+        setMainPage(pages.fractalTrunk);
         break;
     case Track::TrackMode::PhaseFlux:
         setMainPage(pages.phaseFluxSequence);
@@ -369,7 +370,8 @@ void TopPage::setSequenceEditPage() {
         setMainPage(pages.stochasticSequenceEdit);
         break;
     case Track::TrackMode::Fractal:
-        setMainPage(pages.track);
+        // Hero ring entry (Trunk); F5=NEXT cycles to Branch/Ornament/Source.
+        setMainPage(pages.fractalTrunk);
         break;
     case Track::TrackMode::PhaseFlux:
         setMainPage(pages.phaseFluxEdit);

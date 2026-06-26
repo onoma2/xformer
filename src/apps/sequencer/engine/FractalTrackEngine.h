@@ -43,6 +43,10 @@ public:
     // Trunk accessor for the UI tape page (later phase).
     const uint16_t *trunk() const { return _trunk; }
 
+    // Cursors for the UI hero pages.
+    int readPos() const { return _readPos; }
+    int recordPos() const { return _recordPos; }
+
 private:
     FractalSequence &sequence()             { return *_sequence; }
     const FractalSequence &sequence() const { return *_sequence; }

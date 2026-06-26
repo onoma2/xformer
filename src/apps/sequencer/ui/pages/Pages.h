@@ -53,6 +53,7 @@
 #include "StochasticSequenceEditPage.h"
 #include "PhaseFluxEditPage.h"
 #include "PhaseFluxSequencePage.h"
+#include "FractalTrunkPage.h"
 
 #ifdef CONFIG_ENABLE_INTRO
 #include "IntroPage.h"
@@ -101,6 +102,7 @@ struct Pages {
     StochasticSequenceEditPage stochasticSequenceEdit;
     PhaseFluxEditPage phaseFluxEdit;
     PhaseFluxSequencePage phaseFluxSequence;
+    FractalTrunkPage fractalTrunk;
     SystemPage system;
     // modal pages
     TempoPage tempo;
@@ -165,6 +167,7 @@ struct Pages {
         stochasticSequenceEdit(manager, context),
         phaseFluxEdit(manager, context),
         phaseFluxSequence(manager, context),
+        fractalTrunk(manager, context),
         system(manager, context),
         // modal pages
         tempo(manager, context),
