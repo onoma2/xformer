@@ -19,18 +19,92 @@ Before starting this tutorial, you should have:
 
 The Teletype Track in Performer provides:
 
-- 4 Scripts + Metro + 4 TT-Patterns.
 - USB Keyboard support (see Keyboard Shortcuts section below).
-- 4 CV outputs (CV 1-4) freely mapped to Performer's CV outputs
-- 4 Gate outputs (TR A-D) freely mapped to Performer's gate outputs
-- 4 trigger inputs (TI-TR1-4) to trigger scripts
-- 2 CV inputs (TI-IN and TI-PARAM) from Performer's CV inputs, X/Y/Z/T variables mapped from Performers inputs.
-- Integration with Performer's clock system
-- Pattern and variable storage
-- Two slots (P1/P2) for S4 + Metro + I/O mapping + TT patterns
-  - Slot = Performer pattern index % 2
-  - Script/Pattern View shows the active slot label before the script name (or top right in Pattern View)
-- Performer-only CV modulation ops: per-CV envelopes (`E.*`) and per-CV LFOs (`LFO.*`), G.* modulator
+- CV outputs freely mapped to Performer's CV outputs.
+- Gate outputs (TR) freely mapped to Performer's gate outputs.
+- Trigger inputs (TI-TR) to fire scripts.
+- CV inputs (TI-IN and TI-PARAM) from Performer's CV inputs.
+- Integration with Performer's clock system.
+- Pattern and variable storage.
+- Performer-only CV modulation ops: per-CV envelopes (`E.*`) and per-CV LFOs (`LFO.*`), `G.*` modulator.
+
+Exactly what you get depends on which of the two track types you load — see **Track Types** below.
+
+## Track Types
+
+Performer ships **two** Teletype track modes. They share the same parser, the same op set, and the same I/O grid; they differ in how much program lives on the track and how the pattern selector is used.
+
+### TT2 (full) — `TrackMode::TeletypeV2`
+
+The classic full Teletype on a track. One large program:
+
+- **10 scripts**: 8 trigger scripts + Metro (`M`) + Init (`I`).
+- **8 trigger inputs**, **8 CV outputs** + **8 gate outputs**.
+- **2 CV-input mappings** (IN, PARAM) plus the X/Y/Z/T scratch inputs (see *I/O Setup*).
+- **4 tt-pattern banks** of 64 steps each (the `P`/`PN` data).
+- **Live command eval** (type a command and run it from LIVE view) and **SD scene save/load**.
+
+Use full TT2 when you want one big patch with the whole Teletype surface available.
+
+### TT2-Mini — `TrackMode::TeletypeMini`
+
+A compact variant that stores **4 scenes** in the track and switches between them with the w-pattern selector (see *Scenes (TT2-Mini)*). Each scene is a small, complete program:
+
+- **3 scripts**: Script 1 + Script 2 + Metro. **No dedicated Init slot** — instead **Script 1 doubles as the boot/init script**: it runs once at track start *and* is also the TI-TR1 trigger script.
+- **2 trigger inputs**.
+- **8-deep delay queue** (`DEL`).
+- **4 scenes**, each with its own 3 scripts, its own **4 tt-patterns × 64 steps**, and its own I/O config.
+
+Live command eval and SD scene save/load are **not** available on Mini (v1).
+
+Use Mini when you want several small, switchable scenes on one track; use full TT2 when you want one large patch.
+
+### When to use which
+
+| | TT2 (full) | TT2-Mini |
+|---|---|---|
+| Scripts | 8 + Metro + Init | Script 1 (boot+TI-TR1) + Script 2 + Metro |
+| Trigger inputs | 8 | 2 |
+| CV / gate outputs | 8 / 8 | mapped per I/O grid |
+| Scenes on the track | 1 | 4 (w-pattern selects) |
+| tt-patterns | 4 × 64 | 4 × 64 per scene |
+| Live eval / SD scenes | yes | no (v1) |
+
+---
+
+## Patterns: w-patterns vs tt-patterns
+
+Two different things are casually called "patterns." Keep them apart:
+
+- **tt-patterns** — the Teletype `P` / `PN` data: **4 banks × 64 steps**, read and written by scripts (`P.NEXT`, `P.PUSH`, `PN b i v`, `P.L`, `P.I`, …). This is per-program musical data. The *Pattern View* / TRACKER editor and the `WP`-adjacent pattern ops all operate on tt-patterns.
+- **w-patterns** — Performer's **16+1 pattern snapshots** (the per-track pattern selector / song construct, the same selector every track type uses).
+
+How the **w-pattern** selector is used differs by track type:
+
+- **TT2-Mini**: the w-pattern selects the **active scene** — `scene = w-pattern % 4`. So w-patterns 0/4/8/12 → scene 0, 1/5/9/13 → scene 1, 2/6/10/14 → scene 2, 3/7/11/15 → scene 3.
+- **Full TT2**: there is one scene, so the w-pattern is simply the track's single program slot.
+
+> Note: the `WP` opcode (Part 5) reads the **w-pattern** index of any track. It is not a tt-pattern op.
+
+## Scenes (TT2-Mini)
+
+A **scene** is a complete program: its own **3 scripts** (Script 1 + Script 2 + Metro), its own **4 tt-patterns × 64 steps**, and its own **I/O config**. A TT2-Mini track holds **4 scenes**. All four scenes share **one runtime**.
+
+### Seamless switching
+
+Changing the w-pattern retargets the active scene with **no reset**. The shared runtime — **variables, the delay queue, and the metro tempo + phase** — **carries across** the switch. Scripts simply start running from the new scene's program. Nothing reboots: Script 1 (boot) does **not** re-run on a scene change.
+
+### Put per-scene config in the Metro script
+
+Because the runtime carries across and boot does not re-run, a scene cannot rely on Script 1 to apply its own tempo or setup — Script 1 runs only **once** at track start. The Metro script runs **every tick on the active scene**, so per-scene differences belong there. A scene that wants its own tempo sets `M <ms>` in its Metro script; it takes effect on the next tick after you switch.
+
+### Active-scene chip
+
+The Script View shows the active scene as a chip **`S1/4` … `S4/4`** (1-based) in the top-right; it tracks the w-pattern. Editing scripts edits the **active scene's** program.
+
+### Transport stop
+
+A transport stop (`reset`) is a **partial** reset: it clears outputs, the delay queue, and the metro accumulator, and re-runs the boot script — but it does **not** wipe variables. (Full TT2 behaves the same way.)
 
 ---
 
@@ -190,7 +264,10 @@ If your Teletype track is new, set up its I/O first so scripts can see the corre
    - **TI-TR1..TI-TR4**: assign trigger sources (CV inputs or gate outputs).
    - **TI-IN**: select the CV source for `IN`.
    - **TI-PARAM**: select the CV source for `PARAM`.
+   - **TI-X / TI-Y / TI-Z / TI-T**: optional CV sources for the `X`/`Y`/`Z`/`T` variables.
    - **Note**: CV inputs here are direct hardware inputs (no routing needed).
+
+   **Defaults on a new track:** only **IN → CvIn1** and **PARAM → CvIn2** are mapped. **X/Y/Z/T default to None** — they are plain scratch variables until you assign a CV-input source to them. To read CV into X/Y/Z/T, set their source explicitly here in the I/O grid.
 
 4. **Map Teletype outputs**
    - **TO-TRA..TO-TRD**: map Teletype trigger outputs A-D to Performer gate outputs.
@@ -281,6 +358,8 @@ When a Teletype track has no scripts, it seeds two defaults:
 - **M (Metro)**: `CV 1 N 48 ; TR.P 1` (C3 on CV1 + trigger pulse)
 
 You can overwrite these immediately in Script View.
+
+**Boot runs transport-independent.** The Init/boot script runs once on the first engine refresh, not when you press play. So a metro period set in Init/boot (full TT2) — or in Script 1 (TT2-Mini, where Script 1 is the boot script) — is already in effect before transport starts.
 
 ---
 
@@ -719,6 +798,81 @@ TR.W 1 50    # 50% width based on post-div interval
 TR.P 1       # emit (subject to divider/width)
 TR.W 1 0     # disable width mode (back to TR.TIME)
 ```
+
+## Performer-Added Ops (beyond stock Teletype)
+
+These op families are Performer additions and do not exist in stock Teletype. Entries below are one-liners; for full per-op detail see `docs/new-teleops.md`. (Stock-Teletype ops are documented in the upstream `teletype/tl-manual.md`.)
+
+### Signal Generation
+
+- `PERLIN` — smooth Perlin noise, 0-16383. `CV 1 V PERLIN`
+- `NORMAL` — Gaussian (Box-Muller) value, 0-16383, clamped ±3σ. `CV 1 V NORMAL`
+- `PINK` — 1/f pink noise (Voss-McCartney). `CV 1 V PINK`
+- `WALK step start` — bounded random walk as a CV source. `CV 1 V WALK 100 8192`
+- `LFO.V n` — read LFO n's output into a variable. `X LFO.V 1`
+
+### Algorithmic Generators (`P.*`)
+
+Fill the active tt-pattern from an algorithm.
+
+- `P.LSYS axiom` — L-system string rewriting (e.g. Fibonacci word). `P.LSYS A`
+- `P.THUE n` — Thue-Morse aperiodic sequence. `P.THUE 16`
+- `P.CA1D rule n` — 1D Wolfram cellular automaton. `P.CA1D 30 16`
+- `P.CA2D B/S w h` — 2D Life-like automaton (rows=voices). `P.CA2D B3/S23 8 8`
+- `P.MARKOV ...` — first-order Markov chain. `P.MARKOV (0 60 0.7)(1 64 0.3)`
+- `P.LORENZ s r b` — Lorenz attractor → values. `P.LORENZ 10 28 2.667`
+- `P.DBRU win` — De Bruijn sequence (every N-gram once). `P.DBRU 2`
+- `P.REAC feed kill` — reaction-diffusion (Gray-Scott) rhythm. `P.REAC 0.037 0.06`
+- `P.FIB n len` — golden-angle event spacing. `P.FIB 8 16`
+- `FIB n` — nth Fibonacci number as a value. `CV 1 V FIB 10`
+- `BIN val len` — integer's bits cycled as a gate pattern. `BIN 13 16`
+
+### Rhythm Logic
+
+- `CANE.TR.AND / OR / XOR p1 p2` — bitwise combine two trigger patterns. `CANE.TR.AND P1 P2`
+- `CANE.TR.NOT p1` — invert a trigger pattern. `CANE.TR.NOT P1`
+- `P.BRES hits steps` — Bresenham-line rhythm (Euclidean alternative). `P.BRES 3 8`
+- `P.GHOST prob bias` — rhythm-aware probability fill. `P.GHOST 0.3 offbeat`
+- `P.THIN bias prob` — rhythm-aware note removal. `P.THIN sixteenths 0.2`
+- `LCM a b` / `GCD a b` — polyrhythm math helpers. `LCM 3 4` → 12
+
+### Pattern Transforms (`P.*`)
+
+Operate on the active tt-pattern range.
+
+- `P.PAL` — palindrome: alternate forward/reverse each cycle. `P.PAL`
+- `P.WTH a b XFORM` — apply a transform to only steps a..b. `P.WTH 2 6 REV`
+- `P.STR len` — stretch/resample to a target length. `P.STR 16`
+- `P.URN n` — pick n distinct values (sample without replacement). `P.URN 4`
+- `P.INV center` — mirror values around a center point. `P.INV 8192`
+- `P.WALK maxstep start` — fill via random walk. `P.WALK 4096 0`
+- `P.SAWALK lo hi` — self-avoiding walk fill (no immediate repeats). `P.SAWALK 0 127`
+- `P.COMP mask...` — keep values where mask is 1. `P.COMP 1 0 1 0`
+- `P.UNDUP` — remove consecutive duplicates. `P.UNDUP`
+- `P.ACCUM` — cumulative sum (running total). `P.ACCUM`
+- `P.STUTT n` — ratchet: repeat each value n times. `P.STUTT 3`
+- `P.OFF amt delay` — delayed transformed copy combined in. `P.OFF 7 0.5`
+- `P.SINE / P.COS / P.SQR len periods lo hi` — wave-fill a pattern. `P.SINE 16 1 0 16383`
+
+### Timing / Phase
+
+- `FLIP ratio` — true for first ratio% of each chunk, false after. `IF FLIP 50: TR.P 1`
+- `ODDS n beats` — time-windowed probability (clock-rate normalized). `ODDS 0.5 1: TR.P 1`
+- `INTOX mode amt` — named timing jitter: BEER / HASH / COFFEE / LSD / DETOX. `INTOX BEER 5`
+- `FUTURE bars:reps CMD` — schedule a command N bars out, M times. `FUTURE 4:2 SCRIPT 1`
+
+### CV Mapping
+
+SuperCollider-style mapping curves.
+
+- `LINLIN / LINEXP / EXPLIN / EXPEXP / LINCURVE` — linear/exponential value remap. `CV 1 N SCALE 0 127 LINLIN 10 100`
+- `SMOOTHSTEP x` — cubic smooth interpolation, [0,1]→[0,1]. `CV 1 V SMOOTHSTEP 0.5`
+
+### Control Flow
+
+- `CHOOSE a b c ...` — pick one of N args with equal probability. `CHOOSE 60 64 67 72`
+- `WCHOOSE v w v w ...` — weighted pick from (value, weight) pairs. `WCHOOSE 60 50 64 30 67 20`
+- `SUPERIMPOSE out XFORM` — sum original + transformed onto one output. `SUPERIMPOSE 2 REV`
 
 ---
 
