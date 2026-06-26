@@ -434,8 +434,8 @@ void IndexedTrackEngine::triggerStep() {
         _slideActive = false;
     }
 
-    // Activity indicator
-    _activity = true;
+    // Activity reflects the pre-mute intended gate (mute only gates the output).
+    _activity = (gateTicks > 0);
 }
 
 float IndexedTrackEngine::noteIndexToVoltage(int8_t noteIndex) const {

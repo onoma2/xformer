@@ -1741,8 +1741,9 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
 }
 
 TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
-    if (mute()) { _gateOutput=false; _cvOutput=0.f; _activity=false; return TickResult::NoUpdate; }
-    
+    // Mute no longer early-returns: the algorithm advances every tick so a muted
+    // track stays in sync. Mute gates only the physical outputs, applied in the
+    // gateOutput()/cvOutput() accessors; _activity reports the pre-mute intent.
     const auto &sequence = tuesdayTrack().sequence(pattern());
     // int power = sequence.power(); 
     // Power check moved inside stepTrigger to allow for Skew modulation
@@ -2241,7 +2242,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                   _cvOutput = volts;
              }
         }
-        
+
         return TickResult::CvUpdate | TickResult::GateUpdate;
     }
 

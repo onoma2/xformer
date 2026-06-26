@@ -24,8 +24,8 @@ public:
     virtual void update(float dt) override;
 
     virtual bool activity() const override { return _activity; }
-    virtual bool gateOutput(int index) const override { return _gateOutput; }
-    virtual float cvOutput(int index) const override { return _cvOutput; }
+    virtual bool gateOutput(int index) const override { return (!mute() || fill()) && _gateOutput; }
+    virtual float cvOutput(int index) const override { return mute() ? 0.f : _cvOutput; }
 
     const TuesdayTrack &tuesdayTrack() const {
         return _track.tuesdayTrack();
