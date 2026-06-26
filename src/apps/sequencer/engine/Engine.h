@@ -15,6 +15,7 @@
 #include "StochasticTrackEngine.h"
 #include "PhaseFluxTrackEngine.h"
 #include "TT2TrackEngine.h"
+#include "TT2MiniTrackEngine.h"
 #include "CvInput.h"
 #include "CvOutput.h"
 #include "RoutingEngine.h"
@@ -43,7 +44,7 @@
 
 class Engine : private Clock::Listener {
 public:
-    using TrackEngineContainer = Container<NoteTrackEngine, CurveTrackEngine, MidiCvTrackEngine, TuesdayTrackEngine, DiscreteMapTrackEngine, IndexedTrackEngine, StochasticTrackEngine, PhaseFluxTrackEngine, TT2TrackEngine>;
+    using TrackEngineContainer = Container<NoteTrackEngine, CurveTrackEngine, MidiCvTrackEngine, TuesdayTrackEngine, DiscreteMapTrackEngine, IndexedTrackEngine, StochasticTrackEngine, PhaseFluxTrackEngine, TT2TrackEngine, TT2MiniTrackEngine>;
     using TrackEngineContainerArray = std::array<TrackEngineContainer, CONFIG_TRACK_COUNT>;
     using TrackEngineArray = std::array<TrackEngine *, CONFIG_TRACK_COUNT>;
 

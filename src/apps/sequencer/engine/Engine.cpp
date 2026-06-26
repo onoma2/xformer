@@ -613,6 +613,9 @@ void Engine::updateTrackSetups() {
             case Track::TrackMode::TeletypeV2:
                 trackEngine = trackContainer.create<TT2TrackEngine>(*this, _model, track);
                 break;
+            case Track::TrackMode::TeletypeMini:
+                trackEngine = trackContainer.create<TT2MiniTrackEngine>(*this, _model, track);
+                break;
             case Track::TrackMode::Last:
                 break;
             }
@@ -629,7 +632,8 @@ void Engine::updateTrackOutputs() {
     bool isTt2[CONFIG_TRACK_COUNT];
     bool anyTt2 = false;
     for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
-        isTt2[t] = _project.track(t).trackMode() == Track::TrackMode::TeletypeV2;
+        auto mode = _project.track(t).trackMode();
+        isTt2[t] = (mode == Track::TrackMode::TeletypeV2 || mode == Track::TrackMode::TeletypeMini);
         anyTt2 = anyTt2 || isTt2[t];
     }
 

@@ -125,6 +125,7 @@ void TrackPage::setTrack(Track &track) {
         newListModel = &_indexedTrackListModel;
         break;
     case Track::TrackMode::TeletypeV2:
+    case Track::TrackMode::TeletypeMini:
         // No TT2 track-config list model yet (I/O grid deferred); TT2 routes its track
         // view to the script editor. Cover the enum to keep the switch exhaustive.
         break;

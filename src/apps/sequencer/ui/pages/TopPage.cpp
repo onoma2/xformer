@@ -225,6 +225,7 @@ void TopPage::setTrackView(TrackView view) {
         setMainPage(pages.track);
         break;
     case Track::TrackMode::TeletypeV2:
+    case Track::TrackMode::TeletypeMini:
         // Page+S2 (Track) — TT2 I/O config page (script/pattern live on Sequence).
         setMainPage(pages.tt2IoConfig);
         break;
@@ -315,6 +316,7 @@ void TopPage::setSequenceView(SequenceView view) {
         }
         break;
     case Track::TrackMode::TeletypeV2:
+    case Track::TrackMode::TeletypeMini:
         setMainPage(pages.teletypeScriptView);
         break;
     case Track::TrackMode::Stochastic:
@@ -352,6 +354,7 @@ void TopPage::setSequenceEditPage() {
         setMainPage(pages.indexedSequenceEdit);
         break;
     case Track::TrackMode::TeletypeV2:
+    case Track::TrackMode::TeletypeMini:
         setMainPage(pages.teletypeScriptView);
         break;
     case Track::TrackMode::Stochastic:
