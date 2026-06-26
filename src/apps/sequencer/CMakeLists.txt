@@ -164,6 +164,7 @@ set(sources
     ui/pages/FractalTrunkPage.cpp
     ui/pages/FractalBranchPage.cpp
     ui/pages/FractalOrnamentPage.cpp
+    ui/pages/FractalSourcePage.cpp
     ui/pages/TempoPage.cpp
     ui/pages/TextInputPage.cpp
     ui/pages/TopPage.cpp

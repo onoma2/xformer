@@ -56,6 +56,7 @@
 #include "FractalTrunkPage.h"
 #include "FractalBranchPage.h"
 #include "FractalOrnamentPage.h"
+#include "FractalSourcePage.h"
 
 #ifdef CONFIG_ENABLE_INTRO
 #include "IntroPage.h"
@@ -107,6 +108,7 @@ struct Pages {
     FractalTrunkPage fractalTrunk;
     FractalBranchPage fractalBranch;
     FractalOrnamentPage fractalOrnament;
+    FractalSourcePage fractalSource;
     SystemPage system;
     // modal pages
     TempoPage tempo;
@@ -174,6 +176,7 @@ struct Pages {
         fractalTrunk(manager, context),
         fractalBranch(manager, context),
         fractalOrnament(manager, context),
+        fractalSource(manager, context),
         system(manager, context),
         // modal pages
         tempo(manager, context),

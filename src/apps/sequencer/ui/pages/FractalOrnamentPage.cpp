@@ -117,7 +117,7 @@ void FractalOrnamentPage::keyPress(KeyPressEvent &event) {
         case 2: _focus = _focus == Focus::Scale ? Focus::Root : Focus::Scale; break;
         case 4: {
             auto &pages = _manager.pages();
-            _manager.replace(_manager.stackSize() - 1, &pages.fractalOrnament);
+            _manager.replace(_manager.stackSize() - 1, &pages.fractalSource);
             break;
         }
         default: break;
