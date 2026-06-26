@@ -50,6 +50,7 @@ private:
     Page _currentPage = Page::Trunk;
 
     Bracket _bracket = Bracket::Loop;
+    bool _editRecordSkip = false;
     BranchFocus _branchFocus = BranchFocus::Count;
     int _poolIndex = 0;
     OrnamentFocus _ornamentFocus = OrnamentFocus::Rate;

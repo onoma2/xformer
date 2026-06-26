@@ -54,6 +54,14 @@ public:
     int readPos() const { return _readPos; }
     int recordPos() const { return _recordPos; }
 
+    // KD-12 Path navigation order: trunk first, then outward branches (path bit 0)
+    // ascending, then held branches (bit 1) descending. routeIndex 0 = trunk.
+    static int routeOf(int path, int branchCount, int routeIndex);
+
+    // Last-fired ornament id (-1 = none), and its display name (flash strings).
+    int lastOrnament() const { return _lastOrnament; }
+    static const char *ornamentName(int id);
+
 #ifndef PLATFORM_STM32
     // Test seam: run one section's traversal (capture-free, no Engine deref) so
     // unit tests can read the runMode-ordered trunk index sequence.

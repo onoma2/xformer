@@ -500,10 +500,7 @@ void FractalTrackEngine::segmentCell(int seg, int pos, float &semitonesRelRoot, 
     }
 }
 
-// KD-12 Path navigation order. Returns the segment-index play order into route[]:
-// trunk first, then outward branches (bit 0) ascending, then held branches
-// (bit 1) descending. Every segment appears exactly once.
-static int routeOf(int path, int n, int routeIndex) {
+int FractalTrackEngine::routeOf(int path, int n, int routeIndex) {
     // outward (bit=0) ascending, then held (bit=1) descending; index 0 = trunk.
     if (routeIndex == 0) return 0;
     int seen = 0;
@@ -514,6 +511,18 @@ static int routeOf(int path, int n, int routeIndex) {
         if ((path >> (b - 1)) & 1) { if (++seen == routeIndex) return b; }
     }
     return 0;
+}
+
+const char *FractalTrackEngine::ornamentName(int id) {
+    static const char *kNames[] = {
+        "Anticipation", "Suspension", "Syncopation", "Octave-Up", "Fifth-Up",
+        "Half-Turn Toward", "Half-Turn Away",
+        "Run Toward", "Run Away", "Turn", "Arp Toward", "Arp Away",
+        "Mordent Up", "Mordent Down",
+        "Trill",
+    };
+    if (id < 0 || id >= int(sizeof(kNames) / sizeof(kNames[0]))) return "-";
+    return kNames[id];
 }
 
 void FractalTrackEngine::replaySection(uint32_t tick, uint32_t divisor) {

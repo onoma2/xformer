@@ -96,8 +96,8 @@ void FractalSequenceEditPage::drawTrunk(Canvas &canvas) {
     WindowPainter::drawHeader(canvas, _model, _engine, "FRACTAL");
     WindowPainter::drawActiveFunction(canvas, "LOOP");
 
-    int activeFn = _bracket == Bracket::Record ? 0 : (_bracket == Bracket::Loop ? 1 : 2);
-    const char *footer[] = { "REC", "LOOP", "ORN", "DIV", "NEXT" };
+    int activeFn = _editRecordSkip ? 3 : (_bracket == Bracket::Record ? 0 : (_bracket == Bracket::Loop ? 1 : 2));
+    const char *footer[] = { "REC", "LOOP", "ORN", "SKIP", "NEXT" };
     WindowPainter::drawFooter(canvas, footer, pageKeyState(), activeFn);
 
     const int N = std::max(1, track.bufferLength());
@@ -172,6 +172,11 @@ void FractalSequenceEditPage::drawTrunk(Canvas &canvas) {
     str.reset();
     str("loop %d-%d", loopFirst, loopLast);
     canvas.drawText(90, 51, str);
+
+    str.reset();
+    str("skip %d", seq.recordSkip());
+    canvas.setColor(_editRecordSkip ? Color::Bright : Color::Medium);
+    canvas.drawText(2, 51, str);
 }
 
 void FractalSequenceEditPage::drawBranch(Canvas &canvas) {
@@ -196,7 +201,7 @@ void FractalSequenceEditPage::drawBranch(Canvas &canvas) {
     canvas.setColor(Color::Bright);
     str.reset();
     str("T");
-    for (int j = 1; j <= N; ++j) str(">B%d", j);
+    for (int r = 1; r <= N; ++r) str(">B%d", FractalTrackEngine::routeOf(seq.path(), N, r));
     canvas.drawText(40, 17, str);
     str.reset();
     str("N=%d", N);
@@ -226,9 +231,10 @@ void FractalSequenceEditPage::drawBranch(Canvas &canvas) {
         int x = k * pw;
         bool en = (pool >> k) & 1;
         bool sel = (_branchFocus == BranchFocus::Pool) && (k == _poolIndex);
-        canvas.setColor(sel ? Color::Bright : (en ? Color::Bright : Color::Low));
+        canvas.setColor(en ? Color::Bright : Color::Low);
         canvas.drawRect(x + 1, py, 6, 6);
         if (en) canvas.fillRect(x + 2, py + 1, 4, 4);
+        if (sel) { canvas.setColor(Color::Bright); canvas.drawRect(x - 1, py - 2, 10, 10); }
         canvas.setColor(en ? Color::MediumBright : Color::Low);
         canvas.drawText(x + 10, py + 5, kPoolNames[k]);
     }
@@ -236,6 +242,7 @@ void FractalSequenceEditPage::drawBranch(Canvas &canvas) {
 
 void FractalSequenceEditPage::drawOrnament(Canvas &canvas) {
     auto &seq = _project.selectedTrack().fractalTrack().sequence(_project.selectedPatternIndex());
+    const auto &eng = _engine.selectedTrackEngine().as<FractalTrackEngine>();
 
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "FRACTAL");
@@ -286,11 +293,11 @@ void FractalSequenceEditPage::drawOrnament(Canvas &canvas) {
     canvas.setColor(Color::MediumBright);
     canvas.drawText(Width - 2 - canvas.textWidth(str), 39, str);
 
-    // Last-fired ornament (placeholder until ornament engine lands).
+    // Last-fired ornament.
     canvas.setColor(Color::Medium);
     canvas.drawText(2, 50, "Last");
-    canvas.setColor(Color::Medium);
-    canvas.drawText(40, 50, "-");
+    canvas.setColor(Color::MediumBright);
+    canvas.drawText(40, 50, FractalTrackEngine::ornamentName(eng.lastOrnament()));
 }
 
 void FractalSequenceEditPage::drawSource(Canvas &canvas) {
@@ -391,6 +398,11 @@ void FractalSequenceEditPage::encoder(EncoderEvent &event) {
 }
 
 void FractalSequenceEditPage::encoderTrunk(EncoderEvent &event) {
+    if (_editRecordSkip) {
+        auto &seq = _project.selectedTrack().fractalTrack().sequence(_project.selectedPatternIndex());
+        seq.editRecordSkip(event.value(), globalKeyState()[Key::Shift]);
+        return;
+    }
     editBracket(event.value(), globalKeyState()[Key::Shift]);
 }
 
@@ -446,6 +458,13 @@ void FractalSequenceEditPage::keyPress(KeyPressEvent &event) {
     if (!isActiveForSelectedTrack()) { event.consume(); return; }
 
     const auto &key = event.key();
+    if (key.shiftModifier() && key.isFunction() && key.function() == 0) {
+        auto &track = _project.selectedTrack().fractalTrack();
+        track.setLock(!track.lock());
+        showMessage(track.lock() ? "LOCKED" : "UNLOCKED");
+        event.consume();
+        return;
+    }
     if (key.isFunction() && key.function() == 4) {
         nextPage();
         event.consume();
@@ -465,9 +484,10 @@ void FractalSequenceEditPage::keyPressTrunk(KeyPressEvent &event) {
     const auto &key = event.key();
     if (key.isFunction()) {
         switch (key.function()) {
-        case 0: _bracket = Bracket::Record; break;
-        case 1: _bracket = Bracket::Loop; break;
-        case 2: _bracket = Bracket::Ornament; break;
+        case 0: _bracket = Bracket::Record; _editRecordSkip = false; break;
+        case 1: _bracket = Bracket::Loop; _editRecordSkip = false; break;
+        case 2: _bracket = Bracket::Ornament; _editRecordSkip = false; break;
+        case 3: _editRecordSkip = true; break;
         default: break;
         }
         event.consume();
