@@ -72,11 +72,7 @@ else if (m == TeletypeMini) engine.trackEngine(t).as<TT2MiniTrackEngine>().trigg
 
 > **Locking — RESOLVED, no deferral (corrects the earlier worry).** `ScopedHost` does **NOT** take `Engine::lock()` — it only swaps the active-host pointer (`tt2SetActiveHost`, `TT2TrackEngine.h:196-199`). `Engine::lock()` is held only by the UI-thread entry points (`runLiveCommand`/`triggerScript`, `TT2TrackEngine.cpp:126,140`), never on the op-execution path (which already runs inside `Engine::update()`). So a cross-track trigger fired from inside an op touches no lock → no deadlock → **inline trigger is feasible, no deferral.** (`Engine::lock()` is a non-reentrant busy-spin at `Engine.cpp:326`, but it is simply not in play here.) The real requirement is the **active-host swap** above, which a bare `runScript` would miss.
 >
-> **Recursion guard — this is the actual `W.SCRIPT` BLOCKER.** The existing exec-depth guard (`TT2_EXEC_DEPTH = 8`, `model/TeletypeRuntime.h:16`; `exec.depth`/`exec.frames[8]`, `:188-189`) is **per-runtime**. A cross-track `W.SCRIPT` runs the *target's* `runScript` against the *target's* runtime, starting at **depth 0** there — so A-triggers-B-triggers-A recurses on the C++ call stack while *neither* runtime's depth-8 guard ever trips → stack overflow / hard fault on the STM32's fixed stack. The per-track guard does NOT cover this. `W.SCRIPT` therefore needs ONE of:
-> - a **global/engine-level** cross-track trigger depth counter, checked before any cross-track `runScript`, bail + `TT2EvalError` past a small depth; or
-> - **defer** — queue `(track, script)` to fire on the target's next `update()` (sidesteps inline recursion entirely; cleaner, slight latency).
->
-> Resolve this before building `W.SCRIPT`. `WPN` (data read/write) has no such risk and ships first regardless.
+> **Recursion — already bounded by the existing guard; add one global cap for stack safety.** `W.SCRIPT` goes through the same `runScript`, which increments the *target's* per-runtime `exec.depth` (`TT2_EXEC_DEPTH = 8`, `model/TeletypeRuntime.h:16`). Re-entering a track accumulates its own depth (the prior invocation is still on the C++ stack), so each track still caps at 8 → A↔B ping-pong is **bounded, not infinite**. The only residual is the *aggregate* C++ stack depth across a cycle of N distinct tracks (≈ N×8), which can exceed what the single-track depth-8 budget assumed. **Decision: reuse the per-runtime guard AND add a small global cross-track-nesting counter** (engine-level, e.g. ≤4 cross-track hops) checked in `hostTriggerTrackScript`, bailing with `TT2EvalError` past it — caps aggregate stack depth regardless of track count, inline, no deferral needed. `WPN` (data read/write) has no recursion at all.
 
 ## The two op functions (`engine/TeletypeNativeOps.cpp`, templated)
 
@@ -137,7 +133,7 @@ Negligible. Per config: +2–3 op-table pointer slots (`E_OP_*` entries) in CCMR
 
 1. **Shared cross-track helper** (`src/apps/sequencer/engine/TT2HostCrossTrack.h`): `tt2CrossPatternCell(model, t, bank, idx) -> int16_t*` + a script-target resolver. Unit-test the pattern helper directly (host-constructible — it takes `Model&`).
 2. **`WPN` first** (low-risk, data only): enum + token rules + regen (ragel + python) + vtable + `opWpn` + 2 host methods (get/set) forwarding to the helper + parser-contract test + functional test. Ship.
-3. **Decide `W.SCRIPT`'s recursion strategy** (the real gate — NOT the lock, which isn't in play): global engine-level depth guard, or defer-to-`update()`. Add the public `triggerScriptFromHost` (target-`ScopedHost` swap) on each engine.
+3. **`W.SCRIPT` plumbing**: public `triggerScriptFromHost` (target-`ScopedHost` swap) on each engine + the small global cross-track-nesting cap in `hostTriggerTrackScript`. (The per-runtime depth-8 guard already bounds it; the lock is not in play.)
 4. **`W.SCRIPT`**: enum + token rules + regen + vtable + `opWScript` + `hostTriggerTrackScript` (1 host method) per the chosen recursion strategy + tests.
 
 ## Deferred (propose only)
