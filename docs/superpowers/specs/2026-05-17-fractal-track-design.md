@@ -604,6 +604,22 @@ else:
 
 **Cost:** enum entries + `writeRouting()` cases — no per-track RAM beyond the existing routing infrastructure; the routed fields are the uint8 model params already counted (branchCount / path / ornamentRate / ornamentIntensity) plus `recordTrigger`.
 
+### KD-19: UI — Setup List + Three-Page Hero Ring
+
+**Decision:** Two surfaces, both standard Performer idioms (renders in `ui-preview/fractal-hero/`).
+
+**1. Setup list (TrackPage list view, Phase 2).** The `FractalTrackListModel` in TrackPage's existing list routing — no new page type. MVP-core params (Divisor, Clock Mult, Reset Measure, Run Mode, Root, Source A, BufferLength, Record Arm, Clear Buffer, Record Mode, Lock, Loop/Rec/Orn First/Last, Order, Rotate, SlideTime, Octave, Transpose); later in-scope phases add Source B + gate/cv logic, branch count/path/pool, ornament rate/intensity, capture cadence/fidelity, track-delay, scale. The six window edges (recordFirst/Last, loopFirst/Last, ornFirst/Last) are encoder params here, exactly as Curve/Note expose `FirstStep`/`LastStep` (`CurveSequenceListModel::FirstStep/LastStep`).
+
+**2. Hero ring (the fractal's SequencePage-equivalent), F5 = NEXT, three stops:**
+
+- **Trunk (headline) — the loop as an adaptive "tape"** (Stochastic-loop idiom). Each cell is a bar: **height = captured pitch (rel-root)**, **width = gate length** (tie = wide / spans the cell, trig = thin, the gap after a bar = gate-off / rest). `step_w = avail/N` so it scales 16 → 64 → 128 cells (denser, no paging). Overlaid: the three **brackets** (record extent / loop window / ornament zone), the **playhead**, and the ornament-zone band. Footer `REC · LOOP · ORN · DIV · NEXT`.
+- **Branches** — the `Trunk→B1…→BN` chain as labeled blocks with each limb's assigned transform, the **Path route** readout (`T>B1>B3>B2`), the 8-toggle **transform pool**, reseed. Scales to T + B1…B7. Footer `CNT · PATH · POOL · SEED · NEXT`.
+- **Ornament** — Rate + Intensity bars (Intensity shows the 40% / 75% tier ticks), inherited Scale + Root, the zone, and last-fired ornament. Footer `RATE · INT · SCALE · ZONE · NEXT`.
+
+**Window editing (Trunk page).** F1=REC / F2=LOOP / F3=ORN selects the active window; the **encoder moves its FIRST edge, SHIFT+encoder its LAST edge** (Performer's "other edge" convention). The selected bracket highlights and tracks live; values **clamp to the nesting invariant** `recordFirst ≤ loopFirst ≤ ornFirst ≤ ornLast ≤ loopLast ≤ recordLast` — an inner edge can't cross an outer (clamps), an outer edge pushes the inners. Same three brackets shown *are* the editable handles — no held-step mode.
+
+**Branch playback on the Trunk page.** Branches are non-destructive, so the stored material is never redrawn; the contour **re-skins to the segment currently sounding** — raw in the trunk segment, *transformed* in B*k* — morphing at each segment boundary (you see Reverse flip it, Interval-Expand stretch the pitch range, Transpose shift it, Gate-thin drop bars, Rotate slide it). A label shows the current limb + its transform + route position (`B2 · Exp×2 · 3 of 4`). The **loop/ornament brackets stay fixed** (defined on trunk within-positions). The playhead sweeps the segment (loopLen cells) and jumps to the next limb per Path; the page is one segment-wide window, not a `loopLen × (1+N)` scroll.
+
 ## Phased Implementation Plan
 
 > **Sequencing authority = the 1-pager phase order.** **Phase 1** model (all in-scope fields declared/serialized) → **Phase 2** the *minimal MVP looper* (one parent source, Replace/Latch capture, forward playback via loop window + Order, lock, minimal list UI) → **Phase 3** hardware verification → *stop, hand off*. After that there are **no phase numbers** — the in-scope extras are named post-hardware sections, built in the 1-pager ledger order: **Branches (count/path/pool) → Ornamentation + zone → Two-Source Mix → Track-Delay → Two-Axis Capture (Event/Feel) → Visual UI**. (Loop Controls are **not** here — they're Phase 2.) **Deferred and not phased:** mutation/evolution, CV-scan, capture variants (Punch/Once/Quantize), bar-quantize/beat-offset, density/tilt.
@@ -723,15 +739,12 @@ After Phase 2 builds and hardware-validates the minimal MVP looper, **stop and h
 
 ### Visual UI Pages (post-hardware)
 
-**Goal:** Visual pages for Fractal Track in the Performer UI.
-
-**Pages (following existing patterns):**
-- `FractalTrackListModel` — track setup: input tracks, divisor, root, loop window, scale (inherited, ornament-only).
-- `FractalBufferPage` — visual display of the captured trunk (CV/Gate), loop window, lock state.
-  - **Compass loop bar:** 128px horizontal bar representing `loopFirst..loopLast`. Start/end markers as bright vertical ticks. Current playhead position as a tall tick. Lock indicator and record arm indicator in the same view. Loop window markers at loopFirst/loopLast; record extent shown as secondary brackets. Ornament zone shown within the window.
-- `FractalBranchPage` — branch count, path, pool, order.
-- `FractalOrnamentPage` — ornament rate, intensity, zone (ornFirst/ornLast).
-- `FractalCapturePage` — two-axis capture (cadence × fidelity), two-source mix (source A/B + gate/cv logic), record arm.
+**Goal:** the hero-ring pages defined in **KD-19** (F5 = NEXT). Detail there; the page set:
+- `FractalTrackListModel` — the setup list (KD-19 §1).
+- `FractalTrunkPage` — the adaptive **tape** (height = pitch, width = gate length), the three brackets (rec/loop/orn) with the F1/F2/F3 + encoder/SHIFT edit gesture, playhead, and the branch-segment morph (KD-19 §2 / Trunk).
+- `FractalBranchPage` — chain + Path route + transform pool + reseed (KD-19 / Branches).
+- `FractalOrnamentPage` — rate/intensity (tier ticks), scale/root, zone, last-fired (KD-19 / Ornament).
+- Capture cadence/fidelity + two-source live on the setup list (or a 4th page if it grows).
 
 **Integration points:**
 - `TrackPage.cpp` — route to FractalTrackListModel.

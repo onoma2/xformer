@@ -54,6 +54,10 @@ recordFirst ≤ loopFirst ≤ ornFirst ≤ ornLast ≤ loopLast ≤ recordLast �
 - **Loop window** — what playback reads (per-pattern lens over the same trunk)
 - **Ornament zone** — where ornaments are eligible to fire (mutation/evolution deferred; this was the mutation zone)
 
+## UI (KD-19)
+
+Setup **list** (TrackPage) + a 3-stop **hero ring** (F5=NEXT): **Trunk** (adaptive tape — bar height = pitch, width = gate length; the three brackets rec/loop/orn + playhead; contour re-skins to the playing branch limb) · **Branches** (chain + Path route + pool) · **Ornament** (rate/intensity + scale + zone). Window edges: F1/F2/F3 select rec/loop/orn, encoder = first, SHIFT+encoder = last, clamped to the nesting invariant.
+
 ## RAM
 
 Tracks are a **discriminated union** (`Container` sized to the largest member), so adding FractalTrack/Engine costs **zero net RAM** as long as each stays under the union max — the ×8 slots already exist and are already counted in the current SRAM/CCMRAM figures.
