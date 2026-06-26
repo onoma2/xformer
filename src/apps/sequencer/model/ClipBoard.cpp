@@ -108,6 +108,9 @@ void ClipBoard::copyPattern(int patternIndex) {
         case Track::TrackMode::PhaseFlux:
             pattern.sequences[trackIndex].data.phaseFlux = track.phaseFluxTrack().sequence(patternIndex);
             break;
+        case Track::TrackMode::Fractal:
+            pattern.sequences[trackIndex].data.fractal = track.fractalTrack().sequence(patternIndex);
+            break;
         default:
             break;
         }
@@ -290,6 +293,9 @@ void ClipBoard::pastePattern(int patternIndex) const {
                     break;
                 case Track::TrackMode::PhaseFlux:
                     track.phaseFluxTrack().sequence(patternIndex) = pattern.sequences[trackIndex].data.phaseFlux;
+                    break;
+                case Track::TrackMode::Fractal:
+                    track.fractalTrack().sequence(patternIndex) = pattern.sequences[trackIndex].data.fractal;
                     break;
                 default:
                     break;
