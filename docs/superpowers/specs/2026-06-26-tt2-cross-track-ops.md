@@ -11,7 +11,7 @@ Both work in every direction (full↔full, full↔Mini, Mini↔Mini) because the
 
 ## How the existing cross-track bridge works (the pattern to mirror)
 
-TT2 ops reach other tracks through the **`TT2Host` virtual interface** (`engine/TT2Host.h:13`), implemented **separately** by `TT2TrackEngine` and `TT2MiniTrackEngine` (no shared base — each overrides the full vtable). An op gets the active engine via `tt2ActiveHost()` and calls a `host*` method with a 1-based track arg.
+TT2 ops reach other tracks through the **`TT2Host` virtual interface** (`engine/TT2Host.h:13`), implemented **separately** by `TT2TrackEngine` and `TT2MiniTrackEngine` (no shared base — each overrides the full vtable). An op gets the active engine via `tt2ActiveHost()` and calls a `host*` method. **Op syntax is 1-based; the op subtracts 1 so `TT2Host` track args are zero-based** — `opWng` calls `hostNoteGateSet(uint8_t(t-1), …)` (`TeletypeNativeOps.cpp:2028`), and the host resolves it as a zero-based model index (`TT2TrackEngine.cpp:219`). The new ops follow the same convention (track `t-1` zero-based; script stays 1-based, normalised inside `triggerScriptFromHost`).
 
 - **`opWng`** (`engine/TeletypeNativeOps.cpp:2021`) is the template: pop `track`, `step` (and `v` when `isSet`), null-guard the host, branch get/set, `t-1` for the 1-based→0-based track. `hostNoteGateGet` (`TT2TrackEngine.cpp:219`) reaches the model via `tt2NoteSequence(model, track)`.
 - **`tt2NoteSequence`** (`TT2TrackEngine.cpp:19`) selects the target's **currently-selected w-pattern**: `playState().trackState(track).pattern()` → `noteTrack().sequence(patternIndex)`. The new pattern op mirrors this selection (active program, not a fixed one).
@@ -72,11 +72,12 @@ TT2EvalError triggerScriptFromHost(int16_t oneBased) {
 `hostTriggerTrackScript` checks the global cross-track cap, then branches + downcasts (the `as<>()` pattern is already used, e.g. `TT2TrackEngine.cpp:243`) and returns the error:
 ```cpp
 if (t >= CONFIG_TRACK_COUNT) return TT2EvalError::None;   // GUARD FIRST — t is uint8_t(arg-1), can be 255; trackEngine()/track() do NOT range-check
-if (crossDepth >= TT2_CROSS_DEPTH) return TT2EvalError::ExecDepthOverflow;   // global cap (see Recursion)
 auto m = model.project().track(t).trackMode();
-if (m == TeletypeV2)        return engine.trackEngine(t).as<TT2TrackEngine>().triggerScriptFromHost(n);
-if (m == TeletypeMini)      return engine.trackEngine(t).as<TT2MiniTrackEngine>().triggerScriptFromHost(n);
-return TT2EvalError::None;   // non-TT2 target: silent no-op
+if (m != TeletypeV2 && m != TeletypeMini) return TT2EvalError::None;   // non-TT2 target: silent no-op (BEFORE the cap)
+if (_tt2CrossDepth >= TT2_CROSS_DEPTH) return TT2EvalError::ExecDepthOverflow;   // cap only gates real TT2 dispatch
+TT2CrossGuard g(_tt2CrossDepth);   // RAII: ++ now, -- on every return
+if (m == TeletypeV2)   return engine.trackEngine(t).as<TT2TrackEngine>().triggerScriptFromHost(n);
+return engine.trackEngine(t).as<TT2MiniTrackEngine>().triggerScriptFromHost(n);   // m == TeletypeMini
 ```
 (`n` stays 1-based into `triggerScriptFromHost`, which does the `-1` + range check itself — single source of truth for the range.)
 
