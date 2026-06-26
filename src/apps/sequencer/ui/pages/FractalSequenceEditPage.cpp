@@ -391,7 +391,7 @@ void FractalSequenceEditPage::encoder(EncoderEvent &event) {
 }
 
 void FractalSequenceEditPage::encoderTrunk(EncoderEvent &event) {
-    editBracket(event.value(), event.pressed());
+    editBracket(event.value(), globalKeyState()[Key::Shift]);
 }
 
 void FractalSequenceEditPage::encoderBranch(EncoderEvent &event) {
