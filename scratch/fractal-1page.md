@@ -25,7 +25,7 @@ It is not a stochastic generator, not a note sequencer, and not a high-fidelity 
 
 | Owner | What it owns |
 |-------|-------------|
-| **FractalSequence** (×17 patterns) | Timing (divisor, clockMultiplier, resetMeasure, runMode), loop lenses (loopFirst, loopLast, rotate, orderMode, loopMode-Loop), record extent (recordFirst, recordLast), **ornament zone (ornFirst, ornLast)**, recordMode (Replace/Latch). *(All six window edges live here so the nesting invariant holds per pattern.)* *Deferred-reserved: punchMode, recordQuantize, clockSource, loopBars, beatOffset, loopPhase.* |
+| **FractalSequence** (×17 patterns) | Timing (divisor, clockMultiplier, resetMeasure, runMode), loop lenses (loopFirst, loopLast, rotate, orderMode, loopMode-Loop, **sleep**), record extent (recordFirst, recordLast), **ornament zone (ornFirst, ornLast)**, recordMode (Replace/Latch). *(All six window edges live here so the nesting invariant holds per pattern.)* *Deferred-reserved: punchMode, recordQuantize, clockSource, loopBars, beatOffset, loopPhase.* |
 | **FractalTrack** (×1, track-wide) | 17 sequences, sourceA, sourceB, gateLogic, cvLogic, bufferLength, lock, recordTrigger (Routable), octave, transpose, slideTime, cvUpdateMode, trackDelay, **scale group (scale+scaleRotate, inherit) — ornament-only, trunk stays raw**, branchCount, path, branchSeed, branchPool, ornamentRate, ornamentIntensity, captureCadence, captureFidelity (**branchCount · path · ornamentRate · ornamentIntensity all Routable** — the four live performance controls). *Deferred-reserved: routedScan/clockSource, density, tilt, mutation params.* |
 | **FractalTrackEngine** (×1, volatile) | Trunk buffer + Feel onset array, parent resolution, observe-over-section gate/CV measurement, capture/read/loop-boundary rule execution, branch state, track-delay queue, RNG (branch-seed). *Deferred: evolution history.* |
 
@@ -42,7 +42,7 @@ tick → divisor math → shouldAdvanceSection?
 ```
 
 Default capture rule: **Replace** — continuously overwrite trunk cells from source while unlocked.
-Lock write-protects the trunk. Branch transforms and ornamentation continue while locked.
+Lock write-protects the trunk **and freezes the ornament to the last-fired one** — the per-cell roll stops re-picking and the last-played ornament repeats deterministically (catch a good flourish and hold it). Branches are deterministic, so they continue unchanged.
 
 ## Window Hierarchy
 
@@ -90,11 +90,11 @@ Engine gate is **912 B** (TeletypeTrackEngine, PROJECT.md:299; the TT2 `static_a
 After Phase 3 there are **no phase numbers** — the post-hardware in-scope work is named (order below).
 
 Post-MVP, in scope (the playable identity — each lands in reserved fields/hooks):
-branches (concatenated, chained, generative, bit-word Path) → ornaments (rate/intensity, scale-aware) + ornament zone → two-source mixing → track-delay → **two-axis capture (Section/Event cadence × Quantized/Feel fidelity — KD-14b)** → visual page.
+branches (concatenated, chained, generative, bit-word Path) → ornaments (rate/intensity, scale-aware) + ornament zone → two-source mixing → track-delay → **two-axis capture (Section/Event cadence × Quantized/Feel fidelity — KD-14b)** → sleep (Stochastic rest — KD-20) → visual page.
 Live performance controls (Routable): branch count · path · ornament rate · ornament intensity.
 
 Deferred (later phase, nice-to-have):
-mutation/evolution (entire subsystem — KD-3/6/10) · CV-scan · capture variants (Blend/Once/PunchIn) · bar-quantized loop · beat-offset · snapshot · sleep · density/tilt.
+mutation/evolution (entire subsystem — KD-3/6/10) · CV-scan · capture variants (Blend/Once/PunchIn) · bar-quantized loop · beat-offset · snapshot · density/tilt.
 
 ## Key Design Constraints
 
