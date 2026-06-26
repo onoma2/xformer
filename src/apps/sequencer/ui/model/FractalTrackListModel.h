@@ -60,6 +60,7 @@ private:
         Octave,
         Transpose,
         SlideTime,
+        Delay,
         CvUpdateMode,
         Scale,
         RootNote,
@@ -75,6 +76,7 @@ private:
         RecordFirst,
         RecordLast,
         RecordMode,
+        RecordSkip,
         Record,
         Last
     };
@@ -86,6 +88,7 @@ private:
         case Octave:            return "Octave";
         case Transpose:         return "Transpose";
         case SlideTime:         return "Slide Time";
+        case Delay:             return "Delay";
         case CvUpdateMode:      return "CV Update Mode";
         case Scale:             return "Scale";
         case RootNote:          return "Root Note";
@@ -100,6 +103,7 @@ private:
         case RecordFirst:       return "Record First";
         case RecordLast:        return "Record Last";
         case RecordMode:        return "Record Mode";
+        case RecordSkip:        return "R.Skip";
         case Record:            return "Record";
         case Last:              break;
         }
@@ -130,6 +134,9 @@ private:
             break;
         case SlideTime:
             str("%d%%", _track->slideTime());
+            break;
+        case Delay:
+            str("%d", _track->trackDelay());
             break;
         case CvUpdateMode:
             str(FractalTrack::cvUpdateModeName(_track->cvUpdateMode()));
@@ -185,6 +192,9 @@ private:
         case RecordMode:
             str(sequence.recordMode() == 1 ? "Latch" : "Replace");
             break;
+        case RecordSkip:
+            str("%d", sequence.recordSkip());
+            break;
         case Record:
             str(sequence.recordTrigger() ? "On" : "Off");
             break;
@@ -209,6 +219,9 @@ private:
             break;
         case SlideTime:
             _track->setSlideTime(ModelUtils::adjustedByStep(_track->slideTime(), value, 5, !shift));
+            break;
+        case Delay:
+            _track->setTrackDelay(_track->trackDelay() + value);
             break;
         case CvUpdateMode:
             _track->setCvUpdateMode(ModelUtils::adjustedEnum(_track->cvUpdateMode(), value));
@@ -251,6 +264,9 @@ private:
             break;
         case RecordMode:
             sequence.setRecordMode(clamp(sequence.recordMode() + value, 0, 1));
+            break;
+        case RecordSkip:
+            sequence.setRecordSkip(sequence.recordSkip() + value);
             break;
         case Record:
             sequence.setRecordTrigger(value > 0 ? 1 : 0);
