@@ -607,6 +607,9 @@ void Engine::updateTrackSetups() {
             case Track::TrackMode::Stochastic:
                 trackEngine = trackContainer.create<StochasticTrackEngine>(*this, _model, track);
                 break;
+            case Track::TrackMode::Fractal:
+                trackEngine = trackContainer.create<FractalTrackEngine>(*this, _model, track);
+                break;
             case Track::TrackMode::PhaseFlux:
                 trackEngine = trackContainer.create<PhaseFluxTrackEngine>(*this, _model, track);
                 break;

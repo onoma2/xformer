@@ -34,6 +34,9 @@ void Track::clearPattern(int patternIndex) {
     case TrackMode::Stochastic:
         _track.stochastic->sequence(patternIndex).clear();
         break;
+    case TrackMode::Fractal:
+        _track.fractal->sequence(patternIndex).clear();
+        break;
     case TrackMode::PhaseFlux:
         _track.phaseFlux->sequence(patternIndex).clear();
         break;
@@ -68,6 +71,9 @@ void Track::copyPattern(int src, int dst) {
         break;
     case TrackMode::Stochastic:
         _track.stochastic->sequence(dst) = _track.stochastic->sequence(src);
+        break;
+    case TrackMode::Fractal:
+        _track.fractal->sequence(dst) = _track.fractal->sequence(src);
         break;
     case TrackMode::PhaseFlux:
         _track.phaseFlux->sequence(dst) = _track.phaseFlux->sequence(src);
@@ -111,6 +117,9 @@ void Track::gateOutputName(int index, StringBuilder &str) const {
     case TrackMode::Stochastic:
         str("Gate");
         break;
+    case TrackMode::Fractal:
+        str("Gate");
+        break;
     case TrackMode::PhaseFlux:
         str("Gate");
         break;
@@ -144,6 +153,9 @@ void Track::cvOutputName(int index, StringBuilder &str) const {
         _track.indexed->cvOutputName(index, str);
         break;
     case TrackMode::Stochastic:
+        str("CV");
+        break;
+    case TrackMode::Fractal:
         str("CV");
         break;
     case TrackMode::PhaseFlux:
@@ -189,6 +201,9 @@ void Track::write(VersionedSerializedWriter &writer) const {
         break;
     case TrackMode::Stochastic:
         _track.stochastic->write(writer);
+        break;
+    case TrackMode::Fractal:
+        _track.fractal->write(writer);
         break;
     case TrackMode::PhaseFlux:
         _track.phaseFlux->write(writer);
@@ -238,6 +253,9 @@ void Track::read(VersionedSerializedReader &reader) {
         break;
     case TrackMode::Stochastic:
         _track.stochastic->read(reader);
+        break;
+    case TrackMode::Fractal:
+        _track.fractal->read(reader);
         break;
     case TrackMode::PhaseFlux:
         _track.phaseFlux->read(reader);

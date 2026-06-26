@@ -3,6 +3,7 @@
 #include "Config.h"
 #include "CurveTrack.h"
 #include "DiscreteMapTrack.h"
+#include "FractalTrack.h"
 #include "IndexedTrack.h"
 #include "MidiCvTrack.h"
 #include "ModelUtils.h"
@@ -48,6 +49,7 @@ public:
     DiscreteMap,
     Indexed,
     Stochastic,
+    Fractal,
     PhaseFlux,
     TeletypeV2,
     TeletypeMini,
@@ -71,6 +73,8 @@ public:
       return "Indexed";
     case TrackMode::Stochastic:
       return "Stochastic";
+    case TrackMode::Fractal:
+      return "Fractal";
     case TrackMode::PhaseFlux:
       return "PhaseFlux";
     case TrackMode::TeletypeV2:
@@ -93,6 +97,7 @@ public:
     case TrackMode::DiscreteMap: return 'D';
     case TrackMode::Indexed:     return 'I';
     case TrackMode::Stochastic:  return 'S';
+    case TrackMode::Fractal:     return 'F';
     case TrackMode::PhaseFlux:   return 'P';
     case TrackMode::TeletypeV2:  return '2';
     case TrackMode::TeletypeMini: return 'm';
@@ -123,6 +128,8 @@ public:
       return 8;
     case TrackMode::TeletypeMini:
       return 9;
+    case TrackMode::Fractal:
+      return 10;
     case TrackMode::Last:
       break;
     }
@@ -246,6 +253,17 @@ public:
     return _container.as<StochasticTrack>();
   }
 
+  // fractalTrack
+
+  const FractalTrack &fractalTrack() const {
+    SANITIZE_TRACK_MODE(_trackMode, TrackMode::Fractal);
+    return _container.as<FractalTrack>();
+  }
+  FractalTrack &fractalTrack() {
+    SANITIZE_TRACK_MODE(_trackMode, TrackMode::Fractal);
+    return _container.as<FractalTrack>();
+  }
+
   // phaseFluxTrack
 
   const PhaseFluxTrack &phaseFluxTrack() const {
@@ -329,6 +347,9 @@ private:
     case TrackMode::Stochastic:
       _container.as<StochasticTrack>().setTrackIndex(trackIndex);
       break;
+    case TrackMode::Fractal:
+      _container.as<FractalTrack>().setTrackIndex(trackIndex);
+      break;
     case TrackMode::PhaseFlux:
       _container.as<PhaseFluxTrack>().setTrackIndex(trackIndex);
       break;
@@ -380,6 +401,10 @@ private:
       _track.stochastic = _container.create<StochasticTrack>();
       _track.stochastic->setTrackIndex(_trackIndex); // Set track index here
       break;
+    case TrackMode::Fractal:
+      _track.fractal = _container.create<FractalTrack>();
+      _track.fractal->setTrackIndex(_trackIndex);
+      break;
     case TrackMode::PhaseFlux:
       _track.phaseFlux = _container.create<PhaseFluxTrack>();
       _track.phaseFlux->setTrackIndex(_trackIndex);
@@ -403,7 +428,7 @@ private:
   Routable<int8_t> _cvOutputRotate;
   Routable<int8_t> _gateOutputRotate;
 
-  Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack, StochasticTrack, PhaseFluxTrack, TT2Track, TT2MiniTrack> _container;
+  Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack, StochasticTrack, FractalTrack, PhaseFluxTrack, TT2Track, TT2MiniTrack> _container;
   union {
     NoteTrack *note;
     CurveTrack *curve;
@@ -412,6 +437,7 @@ private:
     DiscreteMapTrack *discreteMap;
     IndexedTrack *indexed;
     StochasticTrack *stochastic;
+    FractalTrack *fractal;
     PhaseFluxTrack *phaseFlux;
     TT2Track *tt2;
     TT2MiniTrack *miniTt2;

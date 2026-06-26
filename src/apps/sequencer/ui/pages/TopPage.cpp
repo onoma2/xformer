@@ -233,6 +233,10 @@ void TopPage::setTrackView(TrackView view) {
         // Page+S2 (Track) — Stochastic's analog of the generic track list-model.
         setMainPage(pages.stochasticConfig);
         break;
+    case Track::TrackMode::Fractal:
+        // Skeleton — reuse the generic track config page until Fractal pages land.
+        setMainPage(pages.track);
+        break;
     case Track::TrackMode::DiscreteMap:
         setMainPage(pages.track);
         break;
@@ -323,6 +327,9 @@ void TopPage::setSequenceView(SequenceView view) {
         // Page+S1 (Sequence) — Stochastic's performance list-model.
         setMainPage(pages.stochasticPerformance);
         break;
+    case Track::TrackMode::Fractal:
+        setMainPage(pages.track);
+        break;
     case Track::TrackMode::PhaseFlux:
         setMainPage(pages.phaseFluxSequence);
         break;
@@ -360,6 +367,9 @@ void TopPage::setSequenceEditPage() {
     case Track::TrackMode::Stochastic:
         // Page+S0 (SequenceEdit) — main hero edit pages (was stochasticPerformance).
         setMainPage(pages.stochasticSequenceEdit);
+        break;
+    case Track::TrackMode::Fractal:
+        setMainPage(pages.track);
         break;
     case Track::TrackMode::PhaseFlux:
         setMainPage(pages.phaseFluxEdit);

@@ -31,6 +31,7 @@ set(sources
     engine/StochasticTrackEngine.cpp
     engine/StochasticGenerator.cpp
     engine/StochasticCache.cpp
+    engine/FractalTrackEngine.cpp
     engine/PhaseFluxTrackEngine.cpp
     engine/TuesdayTrackEngine.cpp
     engine/RoutingEngine.cpp
@@ -65,6 +66,7 @@ set(sources
     model/NoteSequence.cpp
     model/NoteTrack.cpp
     model/StochasticTrack.cpp
+    model/FractalTrack.cpp
     model/PhaseFluxSequence.cpp
     model/PhaseFluxTrack.cpp
     model/PhaseFluxMath.cpp
