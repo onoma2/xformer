@@ -243,7 +243,8 @@ On trunk-phase loop boundary:
 - Inline `uint16_t` trunk (KD-2): max 128 cells × 2 B = **256 B** (CCMRAM)
 - Feel onset array (KD-14b): max 128 × 1 B = **128 B** (CCMRAM)
 - Track-delay ring (KD-15): max 16 × ~4 B = **64 B** (CCMRAM)
-- **Active target: ~800 B** — under the 912 B gate (~110 B headroom).
+- Ornament sub-section schedule (KD-13): worst ornament ~12–16 events ≈ **50–80 B**
+- **Active target: ~800 B** — under the 912 B gate. Headroom is thin (~30–60 B), NOT 110 — the ornament schedule and Feel onset array both land in it. If both plus track-delay are live at once, re-measure on ARM (the `sizeof` probe below) and cut before the gate, never raise it.
 
 **Deferred mutation build (NOT in the active number):** MutationHistory (16 × ~16 B ≈ 256 B) + SelectionPressure/EvolutionDepth would push the engine to ~990 B — **over** the 912 gate. So mutation **cannot co-exist with Feel** (KD-3/6 deferred); building it later requires re-probing and dropping Feel or shrinking the trunk.
 
@@ -356,7 +357,7 @@ Each segment is one loop-window length; total played length = loopLen × (1 + br
 
 **Scale source — inherited, ornament-only.** FractalTrack inherits the **project Scale + `scaleRotate`** (a setup field, standard `-1`=inherit, like every other track — `selectedScale(projectScale, projectRotate)`). The scale is applied **only to ornaments**: the flourish notes (runs, arps, half-turns, mordents, octave/fifth, trills) move by **scale degrees** off it. The **trunk stays raw** — captured CV is never quantised (the looper mirrors the parent's literal output). A raw cell that lands off-scale references its **nearest scale degree** for the ornament steps; the main note still plays raw, only the ornament notes snap to the scale around it. "Toward/Away" walks scale degrees toward/away the next cell's nearest degree.
 
-**RAM impact:** Negligible. Evaluated in tick path, no per-step storage. ~2 B track-wide (ornamentRate, ornamentIntensity) + the **ornament zone `ornFirst`/`ornLast` per-sequence** (2 B × 17 ≈ 34 B in FractalSequence — so the zone nests inside each pattern's loop window) + the inherited scale group.
+**RAM impact:** Model params are cheap — ~2 B track-wide (ornamentRate, ornamentIntensity) + the **ornament zone `ornFirst`/`ornLast` per-sequence** (2 B × 17 ≈ 34 B in FractalSequence) + the inherited scale group. **Engine cost is NOT zero, though:** a flourish fires several notes *inside* one section (Trill ≈ 8), so the engine needs a small **sub-section event schedule** — a fixed buffer sized to the worst ornament (~12–16 entries ≈ **50–80 B** in the engine, computed at section start, drained by a tick cursor; events are generated in time order so no sorted queue is needed). This buffer must be counted in the KD-9 active-engine budget — an earlier draft wrongly called ornaments "no per-step storage," which led to a 40% over-gate implementation.
 
 ### KD-14: Recording Features — Replace vs Latch (in scope) + Punch-In / Once / Quantize (deferred)
 
@@ -642,7 +643,7 @@ else:
 **Goal:** `FractalTrack` and `FractalSequence` in the Track container, serializable.
 
 **Files:**
-- NEW `model/FractalSequence.h` — a **per-pattern performance preset** over the shared trunk: divisor, clockMultiplier, resetMeasure, runMode, loopFirst, loopLast, rotate, orderMode, loopMode (Loop), sleep, recordFirst, recordLast, **ornFirst, ornLast**, recordMode, captureCadence, captureFidelity, **recordTrigger** (Routable), **branchCount, path** (Routable), branchSeed, branchPool, **ornamentRate** (Routable), ornamentIntensity/pool (~45 B). *(The loop window **is** loopFirst/loopLast — no separate firstStep/lastStep. The whole expressive layer — windows, branches, ornaments, capture config — is per-sequence so each pattern is a self-contained preset; the four bespoke Routables (branchCount · path · ornamentRate · recordTrigger) route per-sequence. Scale is track-wide. Deferred: clockSource, punchMode, recordQuantize, loopBars, beatOffset, loopPhase.)*
+- NEW `model/FractalSequence.h` — a **per-pattern performance preset** over the shared trunk: divisor, clockMultiplier, resetMeasure, runMode, loopFirst, loopLast, rotate, orderMode, loopMode (Loop), sleep, recordFirst, recordLast, **ornFirst, ornLast**, recordMode, captureCadence, captureFidelity, **recordTrigger** (Routable), **branchCount, path** (Routable), branchSeed, branchPool, **ornamentRate, ornamentIntensity** (Routable) (~45 B). *(The loop window **is** loopFirst/loopLast — no separate firstStep/lastStep. The whole expressive layer — windows, branches, ornaments, capture config — is per-sequence so each pattern is a self-contained preset; the bespoke Routables (branchCount · path · ornamentRate · ornamentIntensity · recordTrigger) route per-sequence. Scale is track-wide. Deferred: clockSource, punchMode, recordQuantize, loopBars, beatOffset, loopPhase.)*
 - NEW `model/FractalTrack.h` — the **track-wide identity**: sourceA, sourceB, gateLogic, cvLogic (two-source mix), bufferLength, lock, octave, transpose, slideTime, cvUpdateMode, scale group (inherit), trackDelay. *(Branches, ornaments, and capture config are per-sequence — see FractalSequence. Deferred — reserved: routedScan/clockSource (CV-scan), density, tilt, mutation params, Blend/Once/PunchIn.)*
 - EDIT `model/Track.h` — add `Fractal` to TrackMode enum, Container, union, accessors, initContainer.
 - EDIT `model/Routing.h` — add the `FractalFirst..FractalLast` target block (KD-18).
@@ -836,7 +837,7 @@ The **Gate** column groups each ported feature by build gate (Phase 2 vs Post-HW
 | **Post-HW** | 2-input gate/CV mixing | Vinx LogicTrackEngine | Low — adapt existing gate/note logic to output-reading |
 | **Phase 2** | Loop freeze/rotate (bool flag) | Fractal-specific | Trivial — lock flag + existing rotation |
 | **Post-HW** | Branch transforms + Path LUT | Bloom v2 (KD-12) | Low — playback-time math on trunk, zero buffer storage |
-| **Post-HW** | Ornamentation per-step + zone | Bloom v2 (KD-13) | Low — tick-path eval, ~4 B model params |
+| **Post-HW** | Ornamentation per-step + zone | Bloom v2 (KD-13) | Low model (~4 B), but ~50–80 B engine schedule for sub-section flourishes (KD-9) |
 | **Deferred** | Per-loop mutation bias via SelectionPressure + EvolutionDepth | Evolution system (KD-6) | Low — history 16 x 16 B inline, bias function per mode |
 | **Deferred** | Complexity -> mutation weights | Proteus Sec3.1 | Low — 3-tier weight table |
 | **Deferred** | Patience boredom ramp | Proteus Sec3.2 | Low — linear ramp formula |
@@ -873,7 +874,7 @@ The following Compass-derived features are noted for future consideration, not i
 7. **UI before hardware:** the minimal list UI (Phase 2) must come before hardware verification (Phase 3). Lesson from Stochastic: no manual testing without at least a list model.
 8. **Buffer persistence:** **Deferred to post-MVP.** MVP uses volatile engine buffer (not serialized). Options for persistence (per-pattern, per-track, external import) will be decided after the volatile engine proves the concept. Affects project file format, flash wear, and RAM budget.
 9. **Branches:** **Resolved:** Branches (KD-12) are an in-scope post-hardware phase. Trunk+math transforms at playback time with zero buffer storage.
-10. **Ornamentation:** **Resolved:** Ornamentation + zone (KD-13) is an in-scope post-hardware phase. Per-cell flourishes evaluated in tick path, ~4 B model params.
+10. **Ornamentation:** **Resolved:** Ornamentation + zone (KD-13) is an in-scope post-hardware phase. Per-cell flourishes evaluated in tick path, ~4 B model params **plus a ~50–80 B engine event schedule** (multi-note flourishes need sub-section scheduling — counted in KD-9, not free).
 11. **Evolution system vs Persistent RNG:** **Resolved:** KD-6 replaces old "persistent RNG only" with MutationHistory + SelectionPressure + EvolutionDepth. Persistent RNG is preserved for underlying rolls but step selection is biased by history.
 
 ## Resolved Decisions (Audit Rounds 4-5)
