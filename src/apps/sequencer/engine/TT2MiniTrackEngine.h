@@ -17,12 +17,15 @@
 // TT2TrackEngine.h. Mini mirrors that engine retemplated on TT2ConfigMini.
 #include "TT2TrackEngine.h"
 
+inline int tt2SceneIndex(int pattern, int sceneCount) { return pattern % sceneCount; }
+
 class TT2MiniTrackEngine final : public TrackEngine, public TT2Host {
 public:
     TT2MiniTrackEngine(Engine &engine, const Model &model, Track &track) :
         TrackEngine(engine, model, track),
         _miniTrack(track.tt2MiniTrack())
     {
+        changePattern();
         reset();
     }
 
@@ -39,6 +42,11 @@ public:
     virtual void restart() override {
         _firstTick = true;
         _metroAccumMs = 0;
+    }
+
+    virtual void changePattern() override {
+        _activeScene = tt2SceneIndex(pattern(), TT2ConfigMini::SceneCount);
+        // seamless: runtime carries, no reset, no re-boot
     }
 
     virtual TickResult tick(uint32_t tick) override {
@@ -160,7 +168,7 @@ private:
     float metroTempo() const;
 
     TT2MiniTrack &_miniTrack;
-    int _activeScene = 0;
+    int _activeScene = -1;
     TT2OutputState _output;
     uint32_t _tickCount = 0;
     float _msAccum = 0.f;
