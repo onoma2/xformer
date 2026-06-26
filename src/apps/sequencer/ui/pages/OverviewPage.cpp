@@ -8,6 +8,12 @@
 #include "engine/IndexedTrackEngine.h"
 #include "model/DiscreteMapTrack.h"
 #include "engine/DiscreteMapTrackEngine.h"
+#include "model/FractalTrack.h"
+#include "engine/FractalTrackEngine.h"
+#include "model/PhaseFluxTrack.h"
+#include "engine/PhaseFluxTrackEngine.h"
+#include "model/StochasticTrack.h"
+#include "engine/StochasticTrackEngine.h"
 
 #include "ui/painters/WindowPainter.h"
 
@@ -275,6 +281,125 @@ static void drawDiscreteMapTrack(Canvas &canvas, int trackIndex, const DiscreteM
     }
 }
 
+static void drawFractalTrack(Canvas &canvas, int trackIndex, const FractalTrackEngine &trackEngine, const FractalSequence &sequence) {
+    // Compressed trunk loop tape: loop-window cells as pitch-height bars + a
+    // playhead at readPos. Mirrors FractalSequenceEditPage::drawTrunk.
+    canvas.setBlendMode(BlendMode::Set);
+
+    const int y = trackIndex * 8;
+    const int barX = 64;
+    const int barW = 126;
+    const int barH = 7;
+
+    const int loopFirst = sequence.loopFirst();
+    const int loopLast = std::max(loopFirst, sequence.loopLast());
+    const int n = loopLast - loopFirst + 1;
+    if (n <= 0) return;
+
+    const int stepW = std::max(1, barW / n);
+    const int cur = trackEngine.readPos();
+
+    for (int i = 0; i < n; ++i) {
+        int cell = loopFirst + i;
+        int x = barX + i * stepW;
+        bool isCur = cell == cur;
+
+        if (!trackEngine.cellValid(cell)) {
+            canvas.setColor(isCur ? Color::Medium : Color::Low);
+            canvas.point(x, y + barH - 1);
+            continue;
+        }
+
+        float semis; int gateLen; bool valid;
+        FractalTrackEngine::decodeCell(trackEngine.trunk()[cell], semis, gateLen, valid);
+        if (!valid || gateLen == 0) {
+            canvas.setColor(isCur ? Color::Medium : Color::Low);
+            canvas.point(x, y + barH - 1);
+            continue;
+        }
+
+        float pitch = std::max(0.05f, std::min(1.f, (semis + 60.f) / 120.f));
+        int h = std::max(1, int((barH - 1) * pitch));
+        int w = std::max(1, stepW * gateLen / 15);
+
+        canvas.setColor(isCur ? Color::Bright : Color::MediumBright);
+        canvas.fillRect(x, y + barH - h, w, h);
+    }
+}
+
+static void drawPhaseFluxTrack(Canvas &canvas, int trackIndex, const PhaseFluxTrackEngine &trackEngine, const PhaseFluxSequence &sequence) {
+    // Stage blocks across the strip, active stage highlighted, skipped marked,
+    // bounded to the [firstStage, lastStage] window. Mirrors PhaseFluxEditPage::drawGrid.
+    canvas.setBlendMode(BlendMode::Set);
+
+    const int y = trackIndex * 8;
+    const int barX = 64;
+    const int barW = 126;
+    const int barH = 7;
+    const int n = PhaseFluxTrackEngine::kStageCount;
+
+    const int first = sequence.firstStage();
+    const int last = sequence.lastStage();
+    const int activeCell = trackEngine.activeCell();
+    const int cellW = std::max(2, barW / n);
+
+    for (int i = 0; i < n; ++i) {
+        int x = barX + i * cellW;
+        const auto &stage = sequence.stage(i);
+        bool inWindow = i >= first && i <= last;
+        bool isActive = i == activeCell;
+
+        if (isActive) {
+            canvas.setColor(Color::Bright);
+            canvas.fillRect(x, y, cellW - 1, barH);
+        } else if (stage.skip()) {
+            canvas.setColor(Color::Low);
+            canvas.line(x, y, x + cellW - 2, y + barH - 1);
+        } else {
+            canvas.setColor(inWindow ? Color::MediumBright : Color::Low);
+            canvas.drawRect(x, y, cellW - 1, barH);
+        }
+    }
+}
+
+static void drawStochasticTrack(Canvas &canvas, int trackIndex, const StochasticTrackEngine &trackEngine, const StochasticSequence &sequence) {
+    // Loop window as cells with the audible step highlighted. Mirrors drawNoteTrack's
+    // row, bounded to the Stochastic [first, last] window. Audible-step math from
+    // StochasticSequenceEditPage (currentStep is the NEXT step; step back one).
+    canvas.setBlendMode(BlendMode::Set);
+
+    const int y = trackIndex * 8;
+    const int barX = 64;
+    const int barW = 126;
+
+    const int size = std::max(1, sequence.size());
+    const int first = sequence.first();
+    const int last = sequence.last();
+    const int cellW = std::max(2, barW / size);
+
+    int winFirst = std::max(0, std::min(first, size - 1));
+    int winLast = std::max(winFirst, std::min(last, size - 1));
+    int winSize = std::max(1, winLast - winFirst + 1);
+    int relNext = ((trackEngine.currentStep() - winFirst) % winSize + winSize) % winSize;
+    int audible = winFirst + (relNext - 1 + winSize) % winSize;
+
+    bool haveContent = sequence.rhythmValid() || sequence.melodyValid();
+
+    for (int i = 0; i < size; ++i) {
+        int x = barX + i * cellW;
+        bool inWindow = i >= first && i <= last;
+        bool isActive = haveContent && i == audible;
+
+        if (isActive) {
+            canvas.setColor(Color::Bright);
+            canvas.fillRect(x, y + 1, cellW - 1, 6);
+        } else {
+            canvas.setColor(inWindow ? Color::Medium : Color::Low);
+            canvas.fillRect(x, y + 1, cellW - 1, 6);
+        }
+    }
+}
+
 OverviewPage::OverviewPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context)
 {}
@@ -340,16 +465,13 @@ void OverviewPage::draw(Canvas &canvas) {
             drawIndexedTrack(canvas, trackIndex, trackEngine.as<IndexedTrackEngine>(), track.indexedTrack().sequence(trackState.pattern()));
             break;
         case Track::TrackMode::Stochastic:
-            canvas.setColor(Color::Medium);
-            canvas.drawText(36, y, "Stochastic");
+            drawStochasticTrack(canvas, trackIndex, trackEngine.as<StochasticTrackEngine>(), track.stochasticTrack().sequence(trackState.pattern()));
             break;
         case Track::TrackMode::Fractal:
-            canvas.setColor(Color::Medium);
-            canvas.drawText(36, y, "Fractal");
+            drawFractalTrack(canvas, trackIndex, trackEngine.as<FractalTrackEngine>(), track.fractalTrack().sequence(trackState.pattern()));
             break;
         case Track::TrackMode::PhaseFlux:
-            canvas.setColor(Color::Medium);
-            canvas.drawText(36, y, "PhaseFlux");
+            drawPhaseFluxTrack(canvas, trackIndex, trackEngine.as<PhaseFluxTrackEngine>(), track.phaseFluxTrack().sequence(trackState.pattern()));
             break;
         case Track::TrackMode::Last:
             break;
