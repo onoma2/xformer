@@ -18,6 +18,13 @@
 
 #include <algorithm>
 
+static const ContextMenuModel::Item contextMenuItems[] = {
+    { "INIT" },
+    { "CLEAR BUF" },
+    { "COPY" },
+    { "PASTE" },
+};
+
 // 8-slot transform pool (matches branchPool bitmask order, KD-12).
 static const char *kPoolNames[8] = { "Tr", "Rv", "In", "RI", "Ro", "Co", "Ex", "Gt" };
 
@@ -458,6 +465,11 @@ void FractalSequenceEditPage::keyPress(KeyPressEvent &event) {
     if (!isActiveForSelectedTrack()) { event.consume(); return; }
 
     const auto &key = event.key();
+    if (key.isContextMenu()) {
+        contextShow();
+        event.consume();
+        return;
+    }
     if (key.shiftModifier() && key.isFunction() && key.function() == 0) {
         auto &track = _project.selectedTrack().fractalTrack();
         track.setLock(!track.lock());
@@ -553,6 +565,56 @@ void FractalSequenceEditPage::keyPressSource(KeyPressEvent &event) {
         }
         event.consume();
         return;
+    }
+}
+
+//----------
+// Context menu
+//----------
+
+void FractalSequenceEditPage::contextShow(bool doubleClick) {
+    if (!isActiveForSelectedTrack()) return;
+    showContextMenu(ContextMenu(
+        contextMenuItems,
+        int(ContextAction::Last),
+        [&] (int index) { contextAction(index); },
+        [&] (int index) { return contextActionEnabled(index); },
+        doubleClick
+    ));
+}
+
+void FractalSequenceEditPage::contextAction(int index) {
+    if (!isActiveForSelectedTrack()) return;
+    auto &seq = _project.selectedTrack().fractalTrack().sequence(_project.selectedPatternIndex());
+    switch (ContextAction(index)) {
+    case ContextAction::Init:
+        seq.clear();
+        showMessage("INIT");
+        break;
+    case ContextAction::ClearBuffer:
+        _engine.selectedTrackEngine().as<FractalTrackEngine>().clearTrunk();
+        showMessage("BUFFER CLEARED");
+        break;
+    case ContextAction::Copy:
+        _model.clipBoard().copyFractalSequence(seq);
+        showMessage("COPIED");
+        break;
+    case ContextAction::Paste:
+        _model.clipBoard().pasteFractalSequence(seq);
+        showMessage("PASTED");
+        break;
+    case ContextAction::Last:
+        break;
+    }
+}
+
+bool FractalSequenceEditPage::contextActionEnabled(int index) const {
+    if (!isActiveForSelectedTrack()) return false;
+    switch (ContextAction(index)) {
+    case ContextAction::Paste:
+        return _model.clipBoard().canPasteFractalSequence();
+    default:
+        return true;
     }
 }
 

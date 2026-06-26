@@ -20,6 +20,8 @@ public:
     virtual void encoder(EncoderEvent &event) override;
 
 private:
+    enum class ContextAction { Init, ClearBuffer, Copy, Paste, Last };
+
     enum class Page { Trunk, Branch, Ornament, Source, Last };
 
     enum class Bracket { Record, Loop, Ornament };
@@ -29,6 +31,10 @@ private:
 
     bool isActiveForSelectedTrack() const;
     void nextPage();
+
+    void contextShow(bool doubleClick = false) override;
+    void contextAction(int index);
+    bool contextActionEnabled(int index) const;
 
     void drawTrunk(Canvas &canvas);
     void drawBranch(Canvas &canvas);

@@ -75,6 +75,11 @@ void ClipBoard::copyPhaseFluxSequence(const PhaseFluxSequence &sequence) {
     _container.as<PhaseFluxSequence>() = sequence;
 }
 
+void ClipBoard::copyFractalSequence(const FractalSequence &sequence) {
+    _type = Type::FractalSequence;
+    _container.as<FractalSequence>() = sequence;
+}
+
 void ClipBoard::copyPattern(int patternIndex) {
     _type = Type::Pattern;
     auto &pattern = _container.as<Pattern>();
@@ -250,6 +255,13 @@ void ClipBoard::pastePhaseFluxSequence(PhaseFluxSequence &sequence) const {
     }
 }
 
+void ClipBoard::pasteFractalSequence(FractalSequence &sequence) const {
+    if (canPasteFractalSequence()) {
+        Model::WriteLock lock;
+        sequence = _container.as<FractalSequence>();
+    }
+}
+
 void ClipBoard::pastePattern(int patternIndex) const {
     if (canPastePattern()) {
         Model::WriteLock lock;
@@ -335,6 +347,10 @@ bool ClipBoard::canPasteStochasticSequence() const {
 
 bool ClipBoard::canPastePhaseFluxSequence() const {
     return _type == Type::PhaseFluxSequence;
+}
+
+bool ClipBoard::canPasteFractalSequence() const {
+    return _type == Type::FractalSequence;
 }
 
 bool ClipBoard::canPastePattern() const {

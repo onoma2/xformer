@@ -50,6 +50,10 @@ public:
     // Trunk accessor for the UI tape page (later phase).
     const uint16_t *trunk() const { return _trunk; }
 
+    // Erase the recorded loop: zero the trunk, reset read/record cursors, and
+    // clear the sub-section schedule + delay ring so playback restarts clean.
+    void clearTrunk();
+
     // Cursors for the UI hero pages.
     int readPos() const { return _readPos; }
     int recordPos() const { return _recordPos; }

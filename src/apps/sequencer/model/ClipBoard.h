@@ -9,6 +9,7 @@
 #include "DiscreteMapSequence.h"
 #include "IndexedSequence.h"
 #include "PhaseFluxSequence.h"
+#include "FractalSequence.h"
 #include "Project.h"
 #include "UserScale.h"
 
@@ -35,6 +36,7 @@ public:
     void copyTuesdaySequence(const TuesdaySequence &sequence);
     void copyStochasticSequence(const StochasticSequence &sequence);
     void copyPhaseFluxSequence(const PhaseFluxSequence &sequence);
+    void copyFractalSequence(const FractalSequence &sequence);
     void copyPattern(int patternIndex);
     void copyUserScale(const UserScale &userScale);
 
@@ -49,6 +51,7 @@ public:
     void pasteTuesdaySequence(TuesdaySequence &sequence) const;
     void pasteStochasticSequence(StochasticSequence &sequence) const;
     void pastePhaseFluxSequence(PhaseFluxSequence &sequence) const;
+    void pasteFractalSequence(FractalSequence &sequence) const;
     void pastePattern(int patternIndex) const;
     void pasteUserScale(UserScale &userScale) const;
 
@@ -63,6 +66,7 @@ public:
     bool canPasteTuesdaySequence() const;
     bool canPasteStochasticSequence() const;
     bool canPastePhaseFluxSequence() const;
+    bool canPasteFractalSequence() const;
     bool canPastePattern() const;
     bool canPasteUserScale() const;
 
@@ -80,6 +84,7 @@ private:
         TuesdaySequence,
         StochasticSequence,
         PhaseFluxSequence,
+        FractalSequence,
         Pattern,
         UserScale,
     };
@@ -110,6 +115,7 @@ private:
                 IndexedSequence indexed;
                 StochasticSequence stochastic;
                 PhaseFluxSequence phaseFlux;
+                FractalSequence fractal;
             } data;
         } sequences[CONFIG_TRACK_COUNT];
     };

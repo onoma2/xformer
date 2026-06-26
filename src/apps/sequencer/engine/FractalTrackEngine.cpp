@@ -233,6 +233,21 @@ void FractalTrackEngine::reset() {
     for (auto &cell : _trunk) cell = 0;
 }
 
+void FractalTrackEngine::clearTrunk() {
+    for (auto &cell : _trunk) cell = 0;
+    _recordPos = sequence().recordFirst();
+    _recordSkipRemaining = 0;
+    _wasArmed = false;
+    _readPos = sequence().loopFirst();
+    _globalPos = 0;
+    _orderState.reset();
+    _gate = false;
+    _activity = false;
+    clearSchedule();
+    clearDelayRing();
+    _lastOrnament = -1;
+}
+
 void FractalTrackEngine::restart() {
     _relativeTick = 0;
     _recordPos = sequence().recordFirst();
