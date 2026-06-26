@@ -184,6 +184,42 @@ FractalTrackEngine::FractalTrackEngine(Engine &engine, const Model &model, Track
         _fractalTrack.setGateLogic(sg);
         _fractalTrack.setCvLogic(sc);
     }
+
+    // KD-15 track-delay: delay 0 schedules the section's note immediately; delay 3
+    // holds it for 3 sections, then surfaces it. Drives replaySection on a ramp
+    // trunk with ornaments disabled (ornFirst > ornLast) so the plain note fires.
+    {
+        FractalSequence &seq = sequence();
+        int sf = seq.loopFirst(), sl = seq.loopLast(), sr = seq.rotate();
+        int sbc = seq.branchCount(), sof = seq.ornFirst(), sol = seq.ornLast();
+        int std0 = _fractalTrack.trackDelay();
+        seq.setLoopFirst(0); seq.setLoopLast(7); seq.setRotate(0);
+        seq.setBranchCount(0); seq.setOrnFirst(1); seq.setOrnLast(0);
+        for (int i = 0; i < 8; ++i) _trunk[i] = encodeCell(float(i + 1), 8, true);
+        const uint32_t div = 12;
+
+        // delay 0: each section schedules immediately (gate edges this call).
+        _fractalTrack.setTrackDelay(0);
+        _globalPos = 0; clearSchedule(); clearDelayRing();
+        replaySection(0, div);
+        assert(_gateCount > 0 && _delayCount == 0);
+        float cv0 = _cvEvents[0].cv;
+
+        // delay 3: first 3 sections defer (ring fills, nothing scheduled); the
+        // 4th surfaces section 0's note with the same playback CV.
+        _fractalTrack.setTrackDelay(3);
+        _globalPos = 0; clearSchedule(); clearDelayRing();
+        replaySection(0, div);   assert(_gateCount == 0 && _delayCount == 1);
+        replaySection(0, div);   assert(_gateCount == 0 && _delayCount == 2);
+        replaySection(0, div);   assert(_gateCount == 0 && _delayCount == 3);
+        replaySection(0, div);
+        assert(_gateCount > 0 && std::abs(_cvEvents[0].cv - cv0) < 1e-4f);
+
+        seq.setLoopFirst(sf); seq.setLoopLast(sl); seq.setRotate(sr);
+        seq.setBranchCount(sbc); seq.setOrnFirst(sof); seq.setOrnLast(sol);
+        _fractalTrack.setTrackDelay(std0);
+    }
+    reset();
 #endif
 }
 
@@ -200,6 +236,7 @@ void FractalTrackEngine::reset() {
     _cv = 0.f;
     _activity = false;
     clearSchedule();
+    clearDelayRing();
     _lastOrnament = -1;
     for (auto &cell : _trunk) cell = 0;
 }
@@ -211,12 +248,14 @@ void FractalTrackEngine::restart() {
     _wasArmed = false;
     _readPos = sequence().loopFirst();
     _globalPos = 0;
+    clearDelayRing();
 }
 
 void FractalTrackEngine::stop() {
     _gate = false;
     _activity = false;
     clearSchedule();
+    clearDelayRing();
 }
 
 uint32_t FractalTrackEngine::effectiveDivisor() const {
@@ -507,7 +546,15 @@ void FractalTrackEngine::replaySection(uint32_t tick, uint32_t divisor) {
     bool ornEligible = valid && gateLen > 0
         && readIdx >= seq.ornFirst() && readIdx <= seq.ornLast();
 
-    scheduleSection(tick, divisor, semitonesRelRoot, nextSemi, valid ? gateLen : 0, ornEligible);
+    int delay = _fractalTrack.trackDelay();
+    if (delay <= 0) {
+        // Immediate path (byte-identical to no-delay playback); ring stays empty.
+        scheduleSection(tick, divisor, semitonesRelRoot, nextSemi, valid ? gateLen : 0, ornEligible);
+    } else {
+        // Surface notes due this section first, then defer this section's note.
+        drainDelayRing(tick, divisor);
+        pushDelay(semitonesRelRoot, valid ? gateLen : 0, ornEligible, delay);
+    }
 
     _globalPos = uint16_t((gp + 1) % total);
 }
@@ -662,6 +709,38 @@ void FractalTrackEngine::scheduleSection(uint32_t tick, uint32_t divisor, float 
         pushNote(mainSemi, tick, fullDur);
         break;
     }
+}
+
+// KD-15: defer a resolved main note by `sections`. Stores the note only — raw
+// rel-root semitone (×256 fixed-point) + gateLen + ornEligible bit; ornaments are
+// re-rolled when the entry surfaces. Cap is the max delay, so never overflows.
+void FractalTrackEngine::pushDelay(float mainSemi, int gateLen, bool ornEligible, int sections) {
+    if (_delayCount >= kDelayRingSize) return;
+    DelayEntry &e = _delayRing[_delayCount++];
+    int q = clamp(int(std::lround(mainSemi * 256.f)), -32768, 32767);
+    e.cv = int16_t(q);
+    e.gatePacked = uint8_t((gateLen & 0xf) | (ornEligible ? 0x80 : 0));
+    e.sectionsLeft = uint8_t(clamp(sections, 0, 255));
+}
+
+// Decrement every live entry; entries reaching 0 schedule their note now (with a
+// fresh ornament roll). nextSemi has no cross-delay lookahead, so it equals the
+// main note (ornament direction defaults). Compacts the ring in place.
+void FractalTrackEngine::drainDelayRing(uint32_t tick, uint32_t divisor) {
+    uint8_t w = 0;
+    for (uint8_t r = 0; r < _delayCount; ++r) {
+        DelayEntry &e = _delayRing[r];
+        if (e.sectionsLeft > 0) e.sectionsLeft--;
+        if (e.sectionsLeft == 0) {
+            float semi = float(e.cv) * (1.f / 256.f);
+            int gateLen = e.gatePacked & 0xf;
+            bool ornEligible = (e.gatePacked & 0x80) != 0;
+            scheduleSection(tick, divisor, semi, semi, gateLen, ornEligible);
+        } else {
+            _delayRing[w++] = e;
+        }
+    }
+    _delayCount = w;
 }
 
 void FractalTrackEngine::update(float dt) {

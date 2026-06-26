@@ -13,8 +13,8 @@
 // two parents combine via gateLogic × cvLogic (KD-4). Branches (KD-12) concatenate
 // chained transforms of the trunk after it. Ornaments (KD-13) inject scale-snapped
 // flourish notes inside a section via a sub-section gate/CV event queue.
-// Track-delay and capture variants are deferred —
-// see docs/superpowers/specs/2026-05-17-fractal-track-design.md.
+// Track-delay (KD-15) shifts the resolved output trackDelay sections later via a
+// fixed ring — see docs/superpowers/specs/2026-05-17-fractal-track-design.md.
 class FractalTrackEngine final : public TrackEngine {
 public:
     FractalTrackEngine(Engine &engine, const Model &model, Track &track);
@@ -78,6 +78,22 @@ private:
     int rollOrnament(int rate, int intensity);
     void scheduleSection(uint32_t tick, uint32_t divisor, float mainSemi,
                          float nextSemi, int gateLen, bool ornEligible);
+
+    // KD-15 track-delay output ring. Pushing a section's resolved main note here
+    // shifts its audible output trackDelay() sections later (canon/echo). Note
+    // only — ornaments are re-rolled when the entry surfaces, not stored. Cap 16
+    // = max delay, so one entry per pending section can never overflow.
+    struct DelayEntry {
+        int16_t cv;          // raw rel-root semitones ×256 fixed-point
+        uint8_t gatePacked;  // bits 0..3 gateLen; bit 7 ornEligible; onset nibble 0
+        uint8_t sectionsLeft;
+    };
+    static constexpr int kDelayRingSize = 16;
+    DelayEntry _delayRing[kDelayRingSize];
+    uint8_t _delayCount = 0;
+    void clearDelayRing() { _delayCount = 0; }
+    void pushDelay(float mainSemi, int gateLen, bool ornEligible, int sections);
+    void drainDelayRing(uint32_t tick, uint32_t divisor);
 
     // KD-12 branches — one chained transform per branch, derived from branchSeed
     // + the branchPool mask. Recomputed when seed/pool/loop-window changes.
