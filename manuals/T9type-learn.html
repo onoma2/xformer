@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T9type Track — learn manual</title>
+<style>
+  :root{
+    --blue:#2563eb; --amber:#ca8a04; --green:#16a34a; --red:#dc2626; --purp:#7c3aed;
+    --ink:#1a1a1a; --mut:#5b5b5b; --line:#e5e5e5; --card:#ffffff; --bg:#fafafa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; line-height:1.5;}
+  .wrap{max-width:880px; margin:0 auto; padding:32px 24px 90px}
+  h1{font-size:1.75rem; line-height:1.2; margin:0 0 6px}
+  h2{font-size:1.32rem; line-height:1.25; margin:46px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--blue)}
+  h2.geo{border-color:var(--green)}
+  h2.adv{border-color:var(--purp)}
+  h3{font-size:1.06rem; margin:24px 0 6px}
+  .lede{color:var(--mut); font-size:1.05rem; margin:0 0 8px}
+  p{margin:10px 0}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#f0f0f3; padding:1px 5px; border-radius:4px; font-size:.9em}
+  pre{background:#1a1a1a; color:#f0f0f0; padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:.86rem; line-height:1.45; margin:12px 0}
+  pre code{background:none; padding:0; color:inherit; font-size:1em}
+  .kbd{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#1a1a1a; color:#fff; padding:2px 7px; border-radius:5px; font-size:.82em; white-space:nowrap}
+  .tag{display:inline-block; font-size:.7rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:99px; vertical-align:middle}
+  .t-blue{background:#e8effe; color:var(--blue)} .t-amber{background:#fbf1d9; color:var(--amber)}
+  .t-green{background:#e3f5ea; color:var(--green)} .t-purp{background:#efe7fd; color:var(--purp)}
+  .t-red{background:#fdeeee; color:var(--red)}
+
+  .note{border-left:4px solid var(--blue); background:#f3f7ff; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .warn{border-left:4px solid var(--amber); background:#fdf8ec; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .gotcha{border-left:4px solid var(--red); background:#fdeeee; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:.93rem}
+  th,td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top}
+  thead th{background:#e8effe; color:var(--blue)}
+  tbody tr:nth-child(even){background:#fafafa}
+  td code{white-space:nowrap}
+
+  figure{margin:18px 0; text-align:center}
+  figcaption{color:var(--mut); font-size:.85rem; margin-top:6px}
+  .shot{display:block; width:100%; max-width:520px; margin:14px auto 2px; image-rendering:pixelated;
+    border:1px solid #333; border-radius:4px; background:#000}
+  .cap{text-align:center; color:var(--mut); font-size:.84rem; margin:0 0 6px}
+
+  .steps{counter-reset:step; list-style:none; padding:0; margin:14px 0}
+  .steps>li{counter-increment:step; position:relative; padding:12px 12px 12px 56px; margin:10px 0;
+    background:var(--card); border:1px solid var(--line); border-radius:8px}
+  .steps>li::before{content:counter(step); position:absolute; left:12px; top:12px; width:30px; height:30px;
+    border-radius:50%; background:var(--blue); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:.95rem}
+
+  .toc{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:16px 0; columns:2; font-size:.93rem}
+  @media(max-width:620px){.toc{columns:1}}
+  .toc a{color:var(--blue); text-decoration:none} .toc a:hover{text-decoration:underline}
+  .footer{margin-top:48px; padding-top:14px; border-top:1px solid var(--line); color:var(--mut); font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>T9type Track</h1>
+<p class="lede">The complete T9type Track manual for XFORMER &mdash; teletype scripting on a sequencer track,
+from the two track types and how patterns/scenes work, through the full keyboard map and I/O grid, to the
+Performer-only op families and a step-by-step tutorial.</p>
+
+<div class="toc">
+  <a href="#overview">1 · Overview &amp; track types</a><br>
+  <a href="#patterns">2 · w-patterns vs tt-patterns</a><br>
+  <a href="#scenes">3 · Scenes (TT2-Mini)</a><br>
+  <a href="#keys">4 · Keyboard shortcuts</a><br>
+  <a href="#io">5 · I/O setup</a><br>
+  <a href="#ops">6 · Performer-added ops</a><br>
+  <a href="#tutorial">7 · Tutorial</a>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="overview">1 · Overview &amp; track types</h2>
+<p>The T9type Track puts a full teletype on a sequencer track. It gives you:</p>
+<ul>
+  <li>USB keyboard support (see <a href="#keys">Keyboard shortcuts</a>).</li>
+  <li>CV outputs freely mapped to XFORMER's CV outputs.</li>
+  <li>Gate outputs (TR) freely mapped to XFORMER's gate outputs.</li>
+  <li>Trigger inputs (<code>TI-TR</code>) to fire scripts.</li>
+  <li>CV inputs (<code>TI-IN</code> and <code>TI-PARAM</code>) from XFORMER's CV inputs.</li>
+  <li>Integration with the project clock system.</li>
+  <li>Pattern and variable storage.</li>
+  <li>Performer-only CV modulation ops: per-CV envelopes (<code>E.*</code>), per-CV LFOs (<code>LFO.*</code>), and the <code>G.*</code> modulator.</li>
+</ul>
+<p>What you actually get depends on which of the <b>two track types</b> you load. They share the same parser,
+the same op set, and the same I/O grid; they differ in how much program lives on the track and how the
+pattern selector is used.</p>
+
+<h3>TT2 (full) <span class="tag t-blue">TT2</span> &mdash; <code>TrackMode::TeletypeV2</code></h3>
+<p>The classic full teletype on a track. One large program:</p>
+<ul>
+  <li><b>10 scripts</b>: 8 trigger scripts + Metro (<code>M</code>) + Init (<code>I</code>).</li>
+  <li><b>8 trigger inputs</b>, <b>8 CV outputs</b> + <b>8 gate outputs</b>.</li>
+  <li><b>2 CV-input mappings</b> (IN, PARAM) plus the X/Y/Z/T scratch inputs (see <a href="#io">I/O setup</a>).</li>
+  <li><b>4 tt-pattern banks</b> of 64 steps each (the <code>P</code>/<code>PN</code> data).</li>
+  <li><b>Live command eval</b> (type and run from LIVE view) and <b>SD scene save/load</b>.</li>
+</ul>
+<p>Use full TT2 when you want one big patch with the whole teletype surface available.</p>
+
+<h3>TT2-Mini <span class="tag t-amber">MINI</span> &mdash; <code>TrackMode::TeletypeMini</code></h3>
+<p>A compact variant that stores <b>4 scenes</b> in the track and switches between them with the w-pattern
+selector (see <a href="#scenes">Scenes</a>). Each scene is a small, complete program:</p>
+<ul>
+  <li><b>3 scripts</b>: Script 1 + Script 2 + Metro. <b>No dedicated Init slot</b> &mdash; <b>Script 1 doubles as the boot/init script</b>: it runs once at track start <i>and</i> is also the TI-TR1 trigger script.</li>
+  <li><b>2 trigger inputs</b>.</li>
+  <li><b>8-deep delay queue</b> (<code>DEL</code>).</li>
+  <li><b>4 scenes</b>, each with its own 3 scripts, its own <b>4 tt-patterns × 64 steps</b>, and its own I/O config.</li>
+</ul>
+<p>Live command eval and SD scene save/load are <b>not</b> available on Mini (v1). Use Mini when you want
+several small, switchable scenes on one track.</p>
+
+<h3>When to use which</h3>
+<table>
+  <thead><tr><th>&nbsp;</th><th><span class="tag t-blue">TT2</span> full</th><th><span class="tag t-amber">MINI</span></th></tr></thead>
+  <tbody>
+    <tr><td><b>Scripts</b></td><td>8 + Metro + Init</td><td>Script 1 (boot+TI-TR1) + Script 2 + Metro</td></tr>
+    <tr><td><b>Trigger inputs</b></td><td>8</td><td>2</td></tr>
+    <tr><td><b>CV / gate outputs</b></td><td>8 / 8</td><td>mapped per I/O grid</td></tr>
+    <tr><td><b>Scenes on the track</b></td><td>1</td><td>4 (w-pattern selects)</td></tr>
+    <tr><td><b>tt-patterns</b></td><td>4 × 64</td><td>4 × 64 per scene</td></tr>
+    <tr><td><b>Live eval / SD scenes</b></td><td>yes</td><td>no (v1)</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="patterns">2 · w-patterns vs tt-patterns</h2>
+<div class="note"><b>Two different things are casually called "patterns." Keep them apart.</b>
+<ul style="margin:8px 0 0">
+  <li><b>tt-patterns</b> &mdash; the teletype <code>P</code>/<code>PN</code> data: <b>4 banks × 64 steps</b>, read
+    and written by scripts (<code>P.NEXT</code>, <code>P.PUSH</code>, <code>PN b i v</code>, <code>P.L</code>,
+    <code>P.I</code>, …). Per-program musical data. The Pattern View / TRACKER editor and the pattern ops all
+    operate on tt-patterns.</li>
+  <li><b>w-patterns</b> &mdash; XFORMER's <b>16+1 pattern snapshots</b> (the per-track pattern selector / song
+    construct, the same selector every track type uses).</li>
+</ul></div>
+
+<p>How the <b>w-pattern</b> selector is used differs by track type:</p>
+<ul>
+  <li><b>TT2-Mini</b>: the w-pattern selects the <b>active scene</b> &mdash; <code>scene = w-pattern % 4</code>.</li>
+  <li><b>Full TT2</b>: there is one scene, so the w-pattern is simply the track's single program slot.</li>
+</ul>
+
+<table>
+  <thead><tr><th>w-pattern</th><th>0 · 4 · 8 · 12</th><th>1 · 5 · 9 · 13</th><th>2 · 6 · 10 · 14</th><th>3 · 7 · 11 · 15</th></tr></thead>
+  <tbody><tr><td><b>Scene (Mini)</b></td><td>Scene 0</td><td>Scene 1</td><td>Scene 2</td><td>Scene 3</td></tr></tbody>
+</table>
+
+<div class="note">The <code>WP</code> opcode (<a href="#ops">Performer-added ops</a>) reads the <b>w-pattern</b>
+index of any track. It is <b>not</b> a tt-pattern op.</div>
+
+<!-- ============================================================ -->
+<h2 id="scenes">3 · Scenes (TT2-Mini)</h2>
+<p>A <b>scene</b> is a complete program: its own <b>3 scripts</b> (Script 1 + Script 2 + Metro), its own
+<b>4 tt-patterns × 64 steps</b>, and its own <b>I/O config</b>. A TT2-Mini track holds <b>4 scenes</b>. All
+four scenes share <b>one runtime</b>.</p>
+
+<figure>
+  <img class="shot" src="../ui-preview/tt2-script/tt2-script-mini-scene.png" alt="TT2-Mini Script View with the S1/4 scene chip">
+  <figcaption>Script View &mdash; the active scene shows as the <code>S1/4</code> … <code>S4/4</code> chip
+    (1-based) top-right; editing scripts edits the active scene's program.</figcaption>
+</figure>
+
+<h3>Seamless switching</h3>
+<p>Changing the w-pattern retargets the active scene with <b>no reset</b>. The shared runtime &mdash;
+<b>variables, the delay queue, and the metro tempo + phase</b> &mdash; <b>carries across</b> the switch.
+Scripts simply start running from the new scene's program.</p>
+<div class="note"><b>Nothing reboots on a scene change.</b> Script 1 (boot) does not re-run when you switch scenes.</div>
+
+<h3>Put per-scene config in the Metro script</h3>
+<div class="gotcha"><b>Per-scene config goes in the Metro script.</b> Because the runtime carries across and boot
+does not re-run, a scene cannot rely on Script 1 to apply its own tempo or setup &mdash; Script 1 runs only
+<b>once</b> at track start. The Metro script runs <b>every tick on the active scene</b>, so per-scene
+differences belong there. A scene that wants its own tempo sets <code>M &lt;ms&gt;</code> in its Metro script;
+it takes effect on the next tick after you switch.</div>
+
+<h3>Transport stop</h3>
+<p>A transport stop (<code>reset</code>) is a <b>partial</b> reset: it clears outputs, the delay queue, and the
+metro accumulator, and re-runs the boot script &mdash; but it does <b>not</b> wipe variables. (Full TT2 behaves
+the same way.)</p>
+
+<!-- ============================================================ -->
+<h2 id="keys">4 · Keyboard shortcuts</h2>
+
+<h3>Script View &mdash; function keys</h3>
+<table>
+  <thead><tr><th>Key</th><th>Action</th></tr></thead>
+  <tbody>
+    <tr><td><span class="kbd">F1</span></td><td>Select S0</td></tr>
+    <tr><td><span class="kbd">F2</span></td><td>Select S1</td></tr>
+    <tr><td><span class="kbd">F3</span></td><td>Select S2</td></tr>
+    <tr><td><span class="kbd">F4</span></td><td>Toggle S3 / Metro</td></tr>
+    <tr><td><span class="kbd">F5</span></td><td>Toggle Pattern View → Live View → Script View</td></tr>
+    <tr><td><span class="kbd">Shift</span>+<span class="kbd">F1</span>–<span class="kbd">F4</span></td><td>Fire script S0–S3 (TI-TR1..4)</td></tr>
+  </tbody>
+</table>
+
+<h3>Script View &mdash; step keys (default mode)</h3>
+<p>Each step key cycles through characters: digit → two letters.</p>
+<table>
+  <thead><tr><th>Step</th><th>Cycle</th><th>Step</th><th>Cycle</th></tr></thead>
+  <tbody>
+    <tr><td><b>1</b></td><td><code>1 → A → B</code></td><td><b>9</b></td><td><code>9 → Q → R</code></td></tr>
+    <tr><td><b>2</b></td><td><code>2 → C → D</code></td><td><b>10</b></td><td><code>0 → S → T</code></td></tr>
+    <tr><td><b>3</b></td><td><code>3 → E → F</code></td><td><b>11</b></td><td><code>. → U → V</code></td></tr>
+    <tr><td><b>4</b></td><td><code>4 → G → H</code></td><td><b>12</b></td><td><code>: → W → X</code></td></tr>
+    <tr><td><b>5</b></td><td><code>5 → I → J</code></td><td><b>13</b></td><td><code>; → Y → Z</code></td></tr>
+    <tr><td><b>6</b></td><td><code>6 → K → L</code></td><td><b>14</b></td><td>Backspace</td></tr>
+    <tr><td><b>7</b></td><td><code>7 → M → N</code></td><td><b>15</b></td><td>Insert space</td></tr>
+    <tr><td><b>8</b></td><td><code>8 → O → P</code></td><td><b>16</b></td><td>Commit line and advance</td></tr>
+  </tbody>
+</table>
+
+<h3>Script View &mdash; Shift + step (symbols &amp; commands)</h3>
+<table>
+  <thead><tr><th>Shift + Step</th><th>Cycle</th><th>Shift + Step</th><th>Cycle</th></tr></thead>
+  <tbody>
+    <tr><td><b>1</b></td><td><code>+ → -</code></td><td><b>9</b></td><td><code>CV → CV.SLEW</code></td></tr>
+    <tr><td><b>2</b></td><td><code>* → /</code></td><td><b>10</b></td><td><code>TR. → TR.TIME</code></td></tr>
+    <tr><td><b>3</b></td><td><code>= → !</code></td><td><b>11</b></td><td><code>PARAM → SCL</code></td></tr>
+    <tr><td><b>4</b></td><td><code>&lt; → &gt;</code></td><td><b>12</b></td><td><code>P.NEXT → P.HERE</code></td></tr>
+    <tr><td><b>5</b></td><td><code>% → ^</code></td><td><b>13</b></td><td><code>ELIF → OTHER</code></td></tr>
+    <tr><td><b>6</b></td><td><code>&amp; → |</code></td><td><b>14</b></td><td><code>RRAND → RND.P</code></td></tr>
+    <tr><td><b>7</b></td><td><code>$ → @</code></td><td><b>15</b></td><td><code>DRUNK → WRAP</code></td></tr>
+    <tr><td><b>8</b></td><td><code>? → ;</code></td><td><b>16</b></td><td><code>M.ACT → M.RESET</code></td></tr>
+  </tbody>
+</table>
+
+<h3>Script View &mdash; Page + step (clipboard &amp; edit)</h3>
+<table>
+  <thead><tr><th>Key</th><th>Action</th></tr></thead>
+  <tbody>
+    <tr><td><span class="kbd">Page</span>+<b>9</b></td><td>Copy current line</td></tr>
+    <tr><td><span class="kbd">Page</span>+<b>10</b></td><td>Paste line</td></tr>
+    <tr><td><span class="kbd">Page</span>+<b>11</b></td><td>Duplicate line</td></tr>
+    <tr><td><span class="kbd">Page</span>+<b>12</b></td><td>Comment / uncomment line</td></tr>
+    <tr><td><span class="kbd">Page</span>+<b>13</b></td><td>Delete line</td></tr>
+  </tbody>
+</table>
+
+<h3>Script View &mdash; navigation &amp; encoder</h3>
+<table>
+  <thead><tr><th>Control</th><th>Action</th></tr></thead>
+  <tbody>
+    <tr><td><span class="kbd">&larr;</span></td><td>Backspace (delete character to the left)</td></tr>
+    <tr><td><span class="kbd">Shift</span>+<span class="kbd">&larr;</span></td><td>Move cursor left</td></tr>
+    <tr><td><span class="kbd">&rarr;</span></td><td>Insert space</td></tr>
+    <tr><td><span class="kbd">Shift</span>+<span class="kbd">&rarr;</span></td><td>Move cursor right</td></tr>
+    <tr><td><b>Encoder press</b></td><td>Load selected line into edit buffer</td></tr>
+    <tr><td><span class="kbd">Shift</span>+<b>encoder press</b></td><td>Commit line (save changes)</td></tr>
+    <tr><td><b>Encoder turn</b></td><td>Move cursor left/right (normal) or select line (with Shift)</td></tr>
+    <tr><td><span class="kbd">Page</span>+<span class="kbd">&larr;</span>/<span class="kbd">&rarr;</span></td><td>History prev/next (live/edit)</td></tr>
+  </tbody>
+</table>
+
+<h3>USB keyboard (Script View)</h3>
+<p>Connect a USB keyboard via the USB Host port. Letters are auto-uppercased for the teletype parser.</p>
+<table>
+  <thead><tr><th>Key</th><th>Action</th></tr></thead>
+  <tbody>
+    <tr><td><span class="kbd">Enter</span></td><td>Commit line and advance</td></tr>
+    <tr><td><span class="kbd">Shift</span>+<span class="kbd">Enter</span></td><td>Commit line, insert blank line</td></tr>
+    <tr><td><span class="kbd">Backspace</span></td><td>Delete character before cursor</td></tr>
+    <tr><td><span class="kbd">Delete</span></td><td>Delete character after cursor</td></tr>
+    <tr><td><span class="kbd">&larr;</span> / <span class="kbd">&rarr;</span></td><td>Move cursor left/right</td></tr>
+    <tr><td><span class="kbd">&uarr;</span> / <span class="kbd">&darr;</span></td><td>Recall history (previous/next)</td></tr>
+    <tr><td><span class="kbd">Esc</span></td><td>Clear edit buffer</td></tr>
+    <tr><td><span class="kbd">Tab</span></td><td>Insert space</td></tr>
+    <tr><td><span class="kbd">Home</span> / <span class="kbd">End</span></td><td>Cursor to start/end of line</td></tr>
+    <tr><td><span class="kbd">Ctrl</span>+<span class="kbd">Home</span>/<span class="kbd">End</span></td><td>Cursor to start/end</td></tr>
+    <tr><td><span class="kbd">Ctrl</span>+<span class="kbd">C</span></td><td>Copy current line</td></tr>
+    <tr><td><span class="kbd">Ctrl</span>+<span class="kbd">V</span></td><td>Paste clipboard</td></tr>
+    <tr><td><span class="kbd">Ctrl</span>+<span class="kbd">X</span></td><td>Cut current line</td></tr>
+    <tr><td><span class="kbd">[</span> / <span class="kbd">]</span></td><td>Previous/next script</td></tr>
+    <tr><td><span class="kbd">F1</span>–<span class="kbd">F4</span></td><td>Run script S0–S3</td></tr>
+    <tr><td><span class="kbd">F5</span></td><td>Run metro script</td></tr>
+    <tr><td><span class="kbd">Alt</span>+<span class="kbd">F1</span>–<span class="kbd">F4</span></td><td>Jump to edit script S0–S3</td></tr>
+    <tr><td><span class="kbd">Alt</span>+<span class="kbd">F5</span></td><td>Jump to edit metro script</td></tr>
+    <tr><td><span class="kbd">Alt</span>+<span class="kbd">/</span></td><td>Toggle line comment</td></tr>
+  </tbody>
+</table>
+
+<h3>Pattern View &mdash; keys &amp; encoder</h3>
+<table>
+  <thead><tr><th>Control</th><th>Action</th></tr></thead>
+  <tbody>
+    <tr><td><span class="kbd">F1</span>–<span class="kbd">F4</span></td><td>Select pattern 0–3</td></tr>
+    <tr><td><span class="kbd">F5</span></td><td>Toggle back to Script View</td></tr>
+    <tr><td><b>Steps 1–9</b></td><td>Insert digits 1–9</td></tr>
+    <tr><td><b>Step 10</b></td><td>Insert digit 0</td></tr>
+    <tr><td><b>Step 14</b></td><td>Backspace digit</td></tr>
+    <tr><td><b>Step 16</b></td><td>Commit edited value</td></tr>
+    <tr><td><span class="kbd">Page</span>+<b>4</b></td><td>Set pattern length to current row</td></tr>
+    <tr><td><span class="kbd">Page</span>+<b>5</b></td><td>Set pattern start to current row</td></tr>
+    <tr><td><span class="kbd">Page</span>+<b>6</b></td><td>Set pattern end to current row</td></tr>
+    <tr><td><span class="kbd">&larr;</span></td><td>Backspace digit; <span class="kbd">Shift</span>+<span class="kbd">&larr;</span> deletes row</td></tr>
+    <tr><td><span class="kbd">&rarr;</span></td><td>Insert row; <span class="kbd">Shift</span>+<span class="kbd">&rarr;</span> toggles turtle display</td></tr>
+    <tr><td><b>Encoder turn</b></td><td>Move up/down through pattern rows</td></tr>
+    <tr><td><b>Encoder press</b></td><td>Negate current value</td></tr>
+    <tr><td><span class="kbd">Shift</span>+<b>encoder press</b></td><td>Commit edited value</td></tr>
+  </tbody>
+</table>
+
+<h3>USB keyboard (Pattern View)</h3>
+<table>
+  <thead><tr><th>Key</th><th>Action</th></tr></thead>
+  <tbody>
+    <tr><td><span class="kbd">&uarr;</span> / <span class="kbd">&darr;</span></td><td>Move up/down through rows</td></tr>
+    <tr><td><span class="kbd">Alt</span>+<span class="kbd">&uarr;</span>/<span class="kbd">&darr;</span></td><td>Page up/down (8 rows)</td></tr>
+    <tr><td><span class="kbd">&larr;</span> / <span class="kbd">&rarr;</span></td><td>Previous/next pattern column</td></tr>
+    <tr><td><span class="kbd">Alt</span>+<span class="kbd">&larr;</span>/<span class="kbd">&rarr;</span></td><td>Jump to first/last pattern column</td></tr>
+    <tr><td><span class="kbd">Enter</span></td><td>Commit edit, advance to next row</td></tr>
+    <tr><td><span class="kbd">Shift</span>+<span class="kbd">Enter</span></td><td>Insert/duplicate row</td></tr>
+    <tr><td><span class="kbd">Backspace</span></td><td>Backspace digit</td></tr>
+    <tr><td><span class="kbd">Delete</span></td><td>Delete row</td></tr>
+    <tr><td><span class="kbd">Space</span></td><td>Toggle 0/1</td></tr>
+    <tr><td><span class="kbd">Esc</span></td><td>Cancel edit</td></tr>
+    <tr><td><span class="kbd">Ctrl</span>+<span class="kbd">Home</span>/<span class="kbd">End</span></td><td>Jump to first/last row</td></tr>
+    <tr><td><span class="kbd">Ctrl</span>+<span class="kbd">C</span>/<span class="kbd">V</span>/<span class="kbd">X</span></td><td>Copy / paste / cut cell value</td></tr>
+    <tr><td><span class="kbd">[</span> / <span class="kbd">]</span></td><td>Decrement/increment value by 1</td></tr>
+    <tr><td><span class="kbd">-</span> / <span class="kbd">_</span></td><td>Negate value</td></tr>
+    <tr><td><b>Digits 0–9</b></td><td>Numeric entry (enters edit mode)</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="io">5 · I/O setup</h2>
+<p>If your T9type track is new, set up its I/O first so scripts can see the correct inputs/outputs.</p>
+
+<ol class="steps">
+  <li><b>Select the track.</b> Press the Track button for the slot where teletype is loaded.</li>
+  <li><b>Open the Track page (I/O list).</b> Press <span class="kbd">Page</span>+<span class="kbd">Track</span> to open the track list model.</li>
+  <li><b>Map inputs.</b> <code>TI-TR1..TI-TR4</code> assign trigger sources; <code>TI-IN</code> picks the CV source for <code>IN</code>;
+    <code>TI-PARAM</code> for <code>PARAM</code>; <code>TI-X / TI-Y / TI-Z / TI-T</code> optional CV sources for the X/Y/Z/T variables.
+    CV inputs here are direct hardware inputs (no routing needed).</li>
+  <li><b>Map outputs.</b> <code>TO-TRA..TO-TRD</code> map trigger outputs A–D to gate outputs; <code>TO-CV1..TO-CV4</code>
+    map CV outputs 1–4 to CV outputs. <span class="kbd">F5</span> (SYNC OUTS) fills TO-CV/TO-TR from the Layout-owned
+    outputs (does not overwrite unmatched slots). A <code>!</code> means the slot points at an output not owned by this track in Layout.</li>
+  <li><b>(Optional) ranges/offsets.</b> <code>CV1 RNG/OFF .. CV4 RNG/OFF</code> set per-output voltage range and offset.</li>
+  <li><b>Trigger input presets.</b> <span class="kbd">F1</span> (TI PRESET) cycles TI-TR presets: CV1-4, G1-4, G5-8, L-G1-4, L-G5-8, None.</li>
+</ol>
+
+<div class="note"><b>Defaults on a new track:</b> only <b>IN → CvIn1</b> and <b>PARAM → CvIn2</b> are mapped.
+<b>X/Y/Z/T default to None</b> &mdash; they are plain scratch variables until you assign a CV-input source to them.
+To read CV into X/Y/Z/T, set their source explicitly in the I/O grid.</div>
+
+<figure>
+  <img class="shot" src="../ui-preview/tt2-io/tt2-io-in-mini.png" alt="TT2-Mini I/O inputs page with 2 trigger rows">
+  <figcaption>TT2-Mini input page &mdash; 2 trigger rows (TI-TR1/2) plus IN, PARAM, and X/Y/Z/T sources.</figcaption>
+</figure>
+
+<h3>Layout prompt for T9type tracks</h3>
+<p>Committing a track mode change to teletype from the Layout page prompts <code>ASSIGN OUTS i-i+3?</code>.
+Answering <b>Yes</b> assigns both gate and CV outputs in that range to the track (no wrap beyond output 8).</p>
+<p>Track LED note: in teletype mode, TR activity captures the track LEDs regardless of CV/gate output mapping.
+TR1 uses the assigned track LED; TR2–TR4 use the next track LEDs (no wrap).</p>
+
+<h3>Script View I/O grid</h3>
+<p>Script View shows a real-time I/O grid in the top-right corner. Five sections:</p>
+<figure>
+  <img class="shot" src="../ui-preview/tt2-io/tt2-io-grid.png" alt="Script View I/O grid">
+  <figcaption>Script View I/O grid &mdash; BUS meters, TI / TO rows, CV bar graph, and IN/PARAM values.</figcaption>
+</figure>
+<table>
+  <thead><tr><th>Block</th><th>Shows</th></tr></thead>
+  <tbody>
+    <tr><td><b>BUS</b> (left)</td><td>Four CV bus meters A–D (BUS 1-2 top row, BUS 3-4 bottom).</td></tr>
+    <tr><td><b>TI</b> (top row)</td><td><code>TI-TR1</code>..<code>TI-TR4</code> state. Dim = unassigned (None); medium = assigned but inactive; bright = assigned and high.</td></tr>
+    <tr><td><b>TO</b> (middle row)</td><td><code>TO-TRA</code>..<code>TO-TRD</code>. Solid block = owned by this track (bright when active); outline = owned by a different track (Layout mismatch); dim = target gate assigned elsewhere.</td></tr>
+    <tr><td><b>CV</b> (bottom, double height)</td><td><code>TO-CV1</code>..<code>TO-CV4</code> as a bipolar bar from center (0V). Up = positive, down = negative. Bright = owned by this track, dim = mismatch; hidden bar if assigned to another track.</td></tr>
+    <tr><td><b>IN / PARAM</b> (right)</td><td>IN value top, PARAM value bottom. Brighter when assigned, dim when unassigned.</td></tr>
+  </tbody>
+</table>
+
+<h3>Teletype panic</h3>
+<p><span class="kbd">Page</span>+<span class="kbd">Track 6</span> → <code>TT PANIC</code> instantly silences <b>all</b> teletype
+tracks: disables metro (<code>M.ACT 0</code>), clears pending <code>DEL</code> commands, clears TR pulses and forces gates low,
+zeroes all teletype CV outputs, stops <code>E.*</code>/<code>LFO.*</code>/<code>G.*</code> modulation, and clears Geode routing/phase.</p>
+
+<h3>Default scripts on a new track</h3>
+<p>When a track has no scripts, it seeds two defaults:</p>
+<pre><code>S0       M.ACT 1               # enables metro
+M        CV 1 N 48 ; TR.P 1    # C3 on CV1 + trigger pulse</code></pre>
+<div class="note"><b>Boot runs transport-independent.</b> The Init/boot script runs once on the first engine
+refresh, not when you press play. A metro period set in Init/boot (full TT2) &mdash; or in Script 1 (Mini, where
+Script 1 is the boot script) &mdash; is already in effect before transport starts.</div>
+
+<!-- ============================================================ -->
+<h2 id="ops" class="adv">6 · Performer-added ops <span class="tag t-purp">beyond stock teletype</span></h2>
+<p>These op families are XFORMER additions and do not exist in stock teletype. For full per-op detail see
+<code>docs/new-teleops.md</code>. (Stock-teletype ops live in the upstream <code>teletype/tl-manual.md</code>.)</p>
+
+<h3>CV modulation &mdash; LFO (<code>LFO.*</code>)</h3>
+<p>Per-CV low-frequency oscillator with waveform, amplitude, fold, and offset control.</p>
+<pre><code>LFO.R 1 2000   # 2s cycle
+LFO.W 1 15     # triangle → saw
+LFO.A 1 80     # amplitude
+LFO.F 1 0      # no fold
+LFO.O 1 8192   # offset/bias
+LFO.S 1 1      # start</code></pre>
+<p>Defaults: <code>LFO.R</code>=1000 ms, <code>LFO.W</code>=0, <code>LFO.A</code>=100, <code>LFO.F</code>=0, <code>LFO.O</code>=8192, <code>LFO.S</code>=0.</p>
+
+<h3>CV modulation &mdash; Envelope (<code>E.*</code>)</h3>
+<p>Per-CV attack/decay envelope with target/offset.</p>
+<pre><code>E.O 1 0        # offset/baseline
+E 1 12000      # target (raw 0-16383)
+E.A 1 10       # attack ms
+E.D 1 80       # decay ms
+E.T 1          # trigger envelope
+
+E.R 1 1        # pulse TR1 at end of rise
+E.C 1 2        # pulse TR2 at end of cycle
+E.L 1 4        # loop 4 cycles (0 = infinite)</code></pre>
+<p>Defaults: <code>E</code>=16383, <code>E.A</code>=50 ms, <code>E.D</code>=300 ms, <code>E.O</code>=0, <code>E.L</code>=1.</p>
+
+<h3>CV modulation &mdash; Geode (<code>G.*</code>)</h3>
+<p>Polymetric rhythm generator with per-voice timing control.</p>
+<pre><code>G.R 1 0        # mix to CV1
+G.V 1 7 8      # voice 1: 7-div, 8 repeats (immediate trigger)</code></pre>
+<table>
+  <thead><tr><th>Parameter</th><th>Behavior</th></tr></thead>
+  <tbody>
+    <tr><td><code>G.TIME</code></td><td>0 fast (~166.7 ms / 6 Hz), 16383 slow (~60 s)</td></tr>
+    <tr><td><code>G.TONE</code></td><td>8192 no spread; &lt;8192 undertones; &gt;8192 overtones</td></tr>
+    <tr><td><code>G.RAMP</code></td><td>0 percussive, 8192 triangle, 16383 reverse</td></tr>
+    <tr><td><code>G.CURV</code></td><td>low step/log, 8192 linear, high smooth</td></tr>
+    <tr><td><code>G.RUN</code></td><td>8192 neutral; positive emphasizes; negative reverses/slows</td></tr>
+    <tr><td><code>G.MODE</code></td><td>0 Transient, 1 Sustain, 2 Cycle</td></tr>
+    <tr><td><code>G.V v divs reps</code></td><td>immediate trigger; <code>divs</code> events per bar; <code>reps</code> extra hits (0 single, -1 infinite)</td></tr>
+  </tbody>
+</table>
+<p>Defaults: <code>G.TIME</code>=8192, <code>G.TONE</code>=8192, <code>G.RAMP</code>=8192, <code>G.CURV</code>=8192,
+<code>G.RUN</code>=8192, <code>G.MODE</code>=0, <code>G.O</code>=0, <code>G.BAR</code>=4, tune ratios 1/1..6/1.
+Aliases: <code>G.T/G.I/G.RA/G.C/G.N/G.M/G.B/G.L</code>. Compound: <code>G.S t i n</code> sets TIME/TONE/RUN (no trigger).
+When transport is stopped, Geode free-runs using the last known bar duration (defaults to 120 BPM if none).</p>
+
+<h3>BUS routing</h3>
+<p>BUS is a shared CV bus (4 slots) that lets teletype modulate other tracks without using hardware CV outputs.
+Set <code>BUS 1 X</code> in a script, then in the Routing page create a route with source <b>BUS 1</b> and target
+<b>Transpose</b> (or any track target). BUS is global &mdash; multiple teletype tracks can read/write the same slot
+directly without routing.</p>
+
+<h3>BAR &mdash; tempo-locked modulation</h3>
+<p>Read-only opcode returning position within the current musical bar (0-16383), auto-adjusting to the project
+time signature. Zero overhead (reads the already-computed measure fraction), updates at 192 PPQN.</p>
+<pre><code>CV 1 V BAR                # 0→10V ramp over each bar
+CV 1 V BAR 4              # ramp spanning 4 bars
+CV 2 V SUB BAR 8192       # bipolar -5V..+5V (centered)
+IF GT BAR 8192: TR.P A    # pulse only in 2nd half of bar</code></pre>
+
+<h3>Transport &amp; tempo &mdash; WR / W.ACT / WBPM</h3>
+<pre><code>IF WR: TR.P A     # WR = 1 when playing, 0 when stopped
+W.ACT 1           # start    (0 = stop, 2 = pause)
+X WBPM            # read current BPM
+WBPM.S 120        # set tempo (1-1000 BPM, direct value)</code></pre>
+
+<h3>Timing helpers &mdash; WMS / WTU</h3>
+<p>Return tempo-derived durations in milliseconds; <code>n</code>/<code>m</code> clamp to 1-128.</p>
+<pre><code>X WMS       # 1/16 note in ms
+X WMS 16    # one bar in 4/4
+X WTU 3     # beat / 3 (triplet)
+X WTU 7 2   # 2 * (beat / 7)</code></pre>
+
+<h3>Note-step access &mdash; WNG / WNN</h3>
+<p>Per-step gate and note access for Note tracks (track 1..8, step 1..64). Operate on the playing pattern;
+non-Note tracks return 0 / do nothing.</p>
+<pre><code>WNG t s      # get gate (0/1); WNG t s v sets it
+WNN t s      # get note 0..127; WNN t s v sets it
+WNG.H t      # gate at current gate step
+WNN.H t      # note at current note step</code></pre>
+
+<h3>Route &amp; pattern readback &mdash; RT / WP</h3>
+<pre><code>CV 1 V RT 1            # mirror Route 1 source (pre-shaper, 0-16383)
+CV 1 N SCALE WP 1 1 16 60 75   # map track 1's w-pattern 1-16 to notes
+IF EQ WP 1 5: TR.PULSE 1       # trigger when track 1 on pattern 5
+WP.SET 1 2            # force track 1 to pattern 2 (1-based)</code></pre>
+<p><code>WP i</code> returns the 1-16 pattern index of track <code>i</code> (1-8); invalid tracks return 0.
+Read-only getter; settable only via <code>WP.SET</code>.</p>
+
+<h3>tt-pattern ops &mdash; math / analysis / randomize</h3>
+<p>Process the active pattern range <code>P.START</code>..<code>P.END</code>; <code>PN.*</code> variants target a specific pattern.</p>
+<pre><code>P.PA 100        # shift all steps +100  (P.PS/P.PM/P.PD/P.PMOD = sub/mul/div/mod)
+P.SCALE 0 16383 48 72   # remap values to MIDI range
+X P.SUM         # density (P.AVG/P.MINV/P.MAXV)
+I P.FND 0       # find first zero
+RND.P 0 4095    # randomize working pattern (RND.PN 2 ... targets pattern 2)</code></pre>
+
+<h3>Trigger divider &amp; width &mdash; TR.D / TR.W</h3>
+<pre><code>TR.D 1 2     # every other pulse on TR1
+TR.W 1 50    # 50% width based on post-div interval
+TR.W 1 0     # disable width mode (back to TR.TIME)</code></pre>
+
+<h3>Signal generation</h3>
+<table>
+  <thead><tr><th>Op</th><th>Purpose</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td><code>PERLIN</code></td><td>smooth Perlin noise, 0-16383</td><td><code>CV 1 V PERLIN</code></td></tr>
+    <tr><td><code>NORMAL</code></td><td>Gaussian (Box-Muller), clamped ±3σ</td><td><code>CV 1 V NORMAL</code></td></tr>
+    <tr><td><code>PINK</code></td><td>1/f pink noise (Voss-McCartney)</td><td><code>CV 1 V PINK</code></td></tr>
+    <tr><td><code>WALK step start</code></td><td>bounded random walk as a CV source</td><td><code>CV 1 V WALK 100 8192</code></td></tr>
+    <tr><td><code>LFO.V n</code></td><td>read LFO n's output into a variable</td><td><code>X LFO.V 1</code></td></tr>
+  </tbody>
+</table>
+
+<h3>Algorithmic generators (<code>P.*</code>)</h3>
+<p>Fill the active tt-pattern from an algorithm.</p>
+<table>
+  <thead><tr><th>Op</th><th>Purpose</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td><code>P.LSYS axiom</code></td><td>L-system string rewriting</td><td><code>P.LSYS A</code></td></tr>
+    <tr><td><code>P.THUE n</code></td><td>Thue-Morse aperiodic sequence</td><td><code>P.THUE 16</code></td></tr>
+    <tr><td><code>P.CA1D rule n</code></td><td>1D Wolfram cellular automaton</td><td><code>P.CA1D 30 16</code></td></tr>
+    <tr><td><code>P.CA2D B/S w h</code></td><td>2D Life-like automaton (rows=voices)</td><td><code>P.CA2D B3/S23 8 8</code></td></tr>
+    <tr><td><code>P.MARKOV ...</code></td><td>first-order Markov chain</td><td><code>P.MARKOV (0 60 0.7)(1 64 0.3)</code></td></tr>
+    <tr><td><code>P.LORENZ s r b</code></td><td>Lorenz attractor → values</td><td><code>P.LORENZ 10 28 2.667</code></td></tr>
+    <tr><td><code>P.DBRU win</code></td><td>De Bruijn sequence (every N-gram once)</td><td><code>P.DBRU 2</code></td></tr>
+    <tr><td><code>P.REAC feed kill</code></td><td>reaction-diffusion (Gray-Scott) rhythm</td><td><code>P.REAC 0.037 0.06</code></td></tr>
+    <tr><td><code>P.FIB n len</code></td><td>golden-angle event spacing</td><td><code>P.FIB 8 16</code></td></tr>
+    <tr><td><code>FIB n</code></td><td>nth Fibonacci number as a value</td><td><code>CV 1 V FIB 10</code></td></tr>
+    <tr><td><code>BIN val len</code></td><td>integer's bits as a gate pattern</td><td><code>BIN 13 16</code></td></tr>
+  </tbody>
+</table>
+
+<h3>Rhythm logic</h3>
+<table>
+  <thead><tr><th>Op</th><th>Purpose</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td><code>CANE.TR.AND/OR/XOR p1 p2</code></td><td>bitwise combine two trigger patterns</td><td><code>CANE.TR.AND P1 P2</code></td></tr>
+    <tr><td><code>CANE.TR.NOT p1</code></td><td>invert a trigger pattern</td><td><code>CANE.TR.NOT P1</code></td></tr>
+    <tr><td><code>P.BRES hits steps</code></td><td>Bresenham-line rhythm (Euclidean alt.)</td><td><code>P.BRES 3 8</code></td></tr>
+    <tr><td><code>P.GHOST prob bias</code></td><td>rhythm-aware probability fill</td><td><code>P.GHOST 0.3 offbeat</code></td></tr>
+    <tr><td><code>P.THIN bias prob</code></td><td>rhythm-aware note removal</td><td><code>P.THIN sixteenths 0.2</code></td></tr>
+    <tr><td><code>LCM a b</code> / <code>GCD a b</code></td><td>polyrhythm math helpers</td><td><code>LCM 3 4</code> → 12</td></tr>
+  </tbody>
+</table>
+
+<h3>Pattern transforms (<code>P.*</code>)</h3>
+<p>Operate on the active tt-pattern range.</p>
+<table>
+  <thead><tr><th>Op</th><th>Purpose</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td><code>P.PAL</code></td><td>palindrome: alternate forward/reverse</td><td><code>P.PAL</code></td></tr>
+    <tr><td><code>P.WTH a b XFORM</code></td><td>apply a transform to only steps a..b</td><td><code>P.WTH 2 6 REV</code></td></tr>
+    <tr><td><code>P.STR len</code></td><td>stretch/resample to a target length</td><td><code>P.STR 16</code></td></tr>
+    <tr><td><code>P.URN n</code></td><td>pick n distinct values (no replacement)</td><td><code>P.URN 4</code></td></tr>
+    <tr><td><code>P.INV center</code></td><td>mirror values around a center point</td><td><code>P.INV 8192</code></td></tr>
+    <tr><td><code>P.WALK maxstep start</code></td><td>fill via random walk</td><td><code>P.WALK 4096 0</code></td></tr>
+    <tr><td><code>P.SAWALK lo hi</code></td><td>self-avoiding walk fill (no repeats)</td><td><code>P.SAWALK 0 127</code></td></tr>
+    <tr><td><code>P.COMP mask...</code></td><td>keep values where mask is 1</td><td><code>P.COMP 1 0 1 0</code></td></tr>
+    <tr><td><code>P.UNDUP</code></td><td>remove consecutive duplicates</td><td><code>P.UNDUP</code></td></tr>
+    <tr><td><code>P.ACCUM</code></td><td>cumulative sum (running total)</td><td><code>P.ACCUM</code></td></tr>
+    <tr><td><code>P.STUTT n</code></td><td>ratchet: repeat each value n times</td><td><code>P.STUTT 3</code></td></tr>
+    <tr><td><code>P.OFF amt delay</code></td><td>delayed transformed copy combined in</td><td><code>P.OFF 7 0.5</code></td></tr>
+    <tr><td><code>P.SINE / P.COS / P.SQR len periods lo hi</code></td><td>wave-fill a pattern</td><td><code>P.SINE 16 1 0 16383</code></td></tr>
+  </tbody>
+</table>
+
+<h3>Timing / phase</h3>
+<table>
+  <thead><tr><th>Op</th><th>Purpose</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td><code>FLIP ratio</code></td><td>true for first ratio% of each chunk</td><td><code>IF FLIP 50: TR.P 1</code></td></tr>
+    <tr><td><code>ODDS n beats</code></td><td>time-windowed probability (clock-normalized)</td><td><code>ODDS 0.5 1: TR.P 1</code></td></tr>
+    <tr><td><code>INTOX mode amt</code></td><td>named timing jitter: BEER/HASH/COFFEE/LSD/DETOX</td><td><code>INTOX BEER 5</code></td></tr>
+    <tr><td><code>FUTURE bars:reps CMD</code></td><td>schedule a command N bars out, M times</td><td><code>FUTURE 4:2 SCRIPT 1</code></td></tr>
+  </tbody>
+</table>
+
+<h3>CV mapping</h3>
+<p>SuperCollider-style mapping curves.</p>
+<table>
+  <thead><tr><th>Op</th><th>Purpose</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td><code>LINLIN / LINEXP / EXPLIN / EXPEXP / LINCURVE</code></td><td>linear/exponential value remap</td><td><code>CV 1 N SCALE 0 127 LINLIN 10 100</code></td></tr>
+    <tr><td><code>SMOOTHSTEP x</code></td><td>cubic smooth interpolation, [0,1]→[0,1]</td><td><code>CV 1 V SMOOTHSTEP 0.5</code></td></tr>
+  </tbody>
+</table>
+
+<h3>Control flow</h3>
+<table>
+  <thead><tr><th>Op</th><th>Purpose</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td><code>CHOOSE a b c ...</code></td><td>pick one of N args with equal probability</td><td><code>CHOOSE 60 64 67 72</code></td></tr>
+    <tr><td><code>WCHOOSE v w v w ...</code></td><td>weighted pick from (value, weight) pairs</td><td><code>WCHOOSE 60 50 64 30 67 20</code></td></tr>
+    <tr><td><code>SUPERIMPOSE out XFORM</code></td><td>sum original + transformed onto one output</td><td><code>SUPERIMPOSE 2 REV</code></td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="tutorial" class="geo">7 · Tutorial</h2>
+<p>Intended for intermediate teletype users. Assumes basic teletype syntax, familiarity with the XFORMER
+interface, and CV/gate concepts.</p>
+
+<ol class="steps">
+  <li><b>First script &mdash; toggle a gate.</b> Toggles gate output A each time the trigger input fires.
+    <pre><code>TR.TOG A</code></pre></li>
+  <li><b>Add CV output.</b> Toggle gate A and set CV 1 to 5 V.
+    <pre><code>TR.TOG A
+CV 1 V 5</code></pre></li>
+  <li><b>Use variables.</b> Increment X, drive CV 1 from it, toggle gate A.
+    <pre><code>X ADD X 1
+CV 1 V X
+TR.TOG A</code></pre></li>
+  <li><b>Basic pattern usage.</b> CV 1 to the next note in the pattern on each trigger.
+    <pre><code>CV 1 N P.NEXT</code></pre></li>
+  <li><b>Load pattern values (LIVE mode).</b> A 4-step pattern of semitone offsets.
+    <pre><code>P.PUSH 0
+P.PUSH 12
+P.PUSH 7
+P.PUSH 5
+P.L 4</code></pre></li>
+  <li><b>Multiple patterns.</b> Build pattern 1, then read it from a script.
+    <pre><code>P.N 1
+P.PUSH 0
+P.PUSH 2
+P.PUSH 4
+P.PUSH 5
+P.L 4
+
+CV 1 N PN.NEXT 1   # in your script: next value from pattern 1</code></pre></li>
+  <li><b>EVERY for clock division.</b>
+    <pre><code>EVERY 2: TR.P A
+EVERY 4: TR.P B
+CV 1 V RAND 5</code></pre></li>
+  <li><b>Conditional logic with IF.</b>
+    <pre><code>IF GT X 5: CV 1 V 5
+IF LTE X 5: CV 1 V 0
+X ADD X 1
+TR.TOG A</code></pre></li>
+  <li><b>Loops with L.</b>
+    <pre><code>L 1 4: TR.P I       # pulse gates 1-4 in sequence
+CV 1 N RAND 24      # random note in 2-octave range</code></pre></li>
+  <li><b>Clock-based timing.</b> In Clock mode <code>M</code>/<code>M!</code>/<code>M.A</code> are derived from
+    tempo/div/mult and read-only (edits show "Clock Mode").
+    <pre><code>M.ACT 1             # enable metro
+M 500               # 500 ms (120 BPM) [MS timebase only]
+M.A 500             # set all teletype metros
+M.ACT.A 1           # enable metros on all teletype tracks
+M.RESET.A           # reset all teletype metro timers</code></pre></li>
+  <li><b>Metro script.</b> Runs at the metronome interval.
+    <pre><code>CV 2 V DRUNK
+DRUNK.WRAP 1</code></pre></li>
+  <li><b>CV inputs &amp; scaling.</b>
+    <pre><code>CV 1 V IN
+CV 2 V PARAM
+X SCALE 0 16383 0 10 IN   # scale IN to 0-10V
+CV 1 V X</code></pre></li>
+  <li><b>Pattern manipulation &amp; ranges.</b>
+    <pre><code>P.I ADD P.I 2       # skip 2 steps
+CV 1 N P.HERE       # current pattern value
+P.START 2
+P.END 6
+P.WRAP 1            # wrap within the range</code></pre></li>
+  <li><b>Randomness.</b>
+    <pre><code>PROB 50: TR.P A     # 50% chance to pulse A
+CV 1 V RRAND 2 8    # random voltage 2-8V
+CV 1 V DRUNK
+DRUNK.MIN 0
+DRUNK.MAX 16383</code></pre></li>
+  <li><b>MIDI (Performer-specific).</b>
+    <pre><code>MI.NV               # latest MIDI note as voltage
+MI.CCV              # latest MIDI CC as voltage
+CV 1 V MI.LNV</code></pre></li>
+  <li><b>Delays &amp; stacks.</b>
+    <pre><code>TR.P A
+DEL 100: TR.P B     # B 100ms after A
+DEL 200: TR.P C
+
+S: CV 1 V 5         # stack commands
+S: TR.P A
+S.ALL               # execute the stack</code></pre></li>
+  <li><b>Scripts as functions ($F).</b>
+    <pre><code># Script 1 returns the square of X:
+* X X
+# Caller:
+A $F 1              # A = X squared
+
+# $F1 / $F2 pass 1 or 2 parameters via I1/I2:
+FR + I1 I2          # Script 1
+A $F2 1 3 4         # A = 7</code></pre></li>
+  <li><b>Queue smoothing.</b>
+    <pre><code>Q CV 1              # push current CV 1
+Q.N 4               # queue length 4
+CV 2 V Q.AVG        # CV 2 = average of queue</code></pre></li>
+  <li><b>Complete pattern sequencer.</b>
+    <pre><code># Script 1 (triggered by input):
+CV 1 N P.NEXT
+TR.P A
+X ADD X 1
+MOD X 8
+EQ X 0
+PROB 75: SCRIPT 2
+
+# Script 2 (called conditionally):
+CV 2 V RAND 10
+TR.P B</code></pre></li>
+</ol>
+
+<div class="gotcha"><b>Troubleshooting.</b> Scripts not running → check trigger input mapping. CV not working
+→ verify CV output mapping. Pattern not advancing → use <code>P.NEXT</code> or increment <code>P.I</code> manually.
+Keep scripts efficient, use clock timing for synced sequences, and split purposes across the four tt-pattern banks.</div>
+
+<div class="footer">
+  T9type Track manual for XFORMER. TT2 (full) and TT2-Mini share one parser and op set; Mini swaps live eval /
+  SD scenes for four switchable in-track scenes. Performer-added ops are documented per op in <code>docs/new-teleops.md</code>;
+  stock teletype ops live in <code>teletype/tl-manual.md</code>.
+</div>
+
+</div>
+</body>
+</html>
