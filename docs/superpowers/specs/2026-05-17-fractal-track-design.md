@@ -220,8 +220,9 @@ On trunk-phase loop boundary:
 
 **Budget strategy:**
 - No per-step probability grid (unlike StochasticSequence's 512 B per pattern).
-- FractalSequence (~28 B): divisor, clockMultiplier, resetMeasure, runMode, loopFirst/loopLast/rotate/orderMode/loopMode, recordFirst/recordLast, recordMode.
-- Track-level FractalTrack (~58 B): sourceA/B, gate/cv logic, bufferLength, recordTrigger (Routable), lock, octave, transpose, slideTime, cvUpdateMode, trackDelay, scale group, branchCount, path, branchSeed, branchPool, ornamentRate/Intensity, captureCadence/Fidelity (+ the four Routables). *(ornFirst/ornLast are per-sequence — counted in FractalSequence.)*
+- FractalSequence (~45 B): timing + loop lenses + sleep + all six window edges + recordMode + captureCadence/Fidelity + recordTrigger + branchCount/path/branchSeed/branchPool + ornamentRate/Intensity-pool (the per-pattern preset, incl. the four per-sequence Routables).
+- Track-level FractalTrack (~30 B): sourceA/B, gate/cv logic, bufferLength, lock, octave, transpose, slideTime, cvUpdateMode, trackDelay, scale group.
+- 17 × ~45 B ≈ 765 B + ~30 B track-level ≈ **~795 B model** — far under the 9544 B model gate (the per-sequence ×17 routables fit easily; the model rail, unlike the engine, has ample room).
 - 17 sequences × ~28 B ≈ 476 B + ~60 B track-level + ~overhead ≈ **~560 B total**.
 - Well under the 9544 B gate. No container inflation risk. *(All deferred fields — density/tilt, mutation params, punchMode/recordQuantize, loopBars/beatOffset/loopPhase, clockSource — are excluded from this estimate; they are reserved, not allocated.)*
 
@@ -320,7 +321,7 @@ Each segment is one loop-window length; total played length = loopLen × (1 + br
 - **Order** = how a single segment is read internally (Forward / Reverse / Pendulum / Random / Converge / Diverge / Page-Jump).
 - **Path** = the across-segments **branch order** — which branch plays when (Trunk + outward-ascending + held-descending).
 
-**Routable.** Both **Branch count** and **Path** are Routable destinations (CV / internal-mod, depth scaled to range — §6), matching Bloom's dedicated Branch / Path CV inputs. These plus Ornament rate + intensity (KD-13) are the four live performance controls.
+**Routable.** **Branch count** and **Path** are Routable destinations (CV / internal-mod, depth scaled to range — §6), matching Bloom's dedicated Branch / Path CV inputs. With **Ornament rate** (KD-13) and **recordTrigger** (KD-7) these are the bespoke live performance controls — **all per-sequence** (each pattern routes its own value, like Divisor/Scale; KD-18).
 
 **RAM impact:** Zero buffers. Model params: branchCount (uint8_t, 0-7), path (uint8_t bit-word), orderMode (uint8_t, 0-6), branchSeed (uint16_t — the generative transform assignment), branchPool (uint8_t bitmask — enabled transform palette). Branches evaluated at playback from the single trunk buffer.
 
@@ -594,7 +595,7 @@ else:
 
 **Decision:** Routing reaches the fractal two ways — a small **bespoke target block** for its own controls, plus the **generic per-track targets** it inherits by handling them in `writeRouting()`.
 
-**Bespoke block.** Add `FractalFirst..FractalLast` to `Routing::Target` (`model/Routing.h`), mirroring `TuesdayFirst..TuesdayLast`:
+**Bespoke block** — **per-sequence** targets (they route the *active pattern's* value, like the sequence-level Divisor/Scale targets). Add `FractalFirst..FractalLast` to `Routing::Target` (`model/Routing.h`), mirroring `TuesdayFirst..TuesdayLast`:
 - `BranchCount`, `Path`, `OrnamentRate`, `OrnamentIntensity` — the four live performance controls (KD-12 / KD-13).
 - `RecordArm` — the fractal-local record trigger (KD-7), distinct from the global `Record`/`RecordToggle`.
 - *(Deferred-reserved: `Scan` — the CV-scan read position, KD-17.)*
@@ -640,8 +641,8 @@ else:
 **Goal:** `FractalTrack` and `FractalSequence` in the Track container, serializable.
 
 **Files:**
-- NEW `model/FractalSequence.h` — minimal sequence: divisor, clockMultiplier, resetMeasure, runMode, loopFirst, loopLast, rotate, orderMode, loopMode (Loop), sleep, recordFirst, recordLast, **ornFirst, ornLast**, recordMode (~27 B). *(The loop window **is** loopFirst/loopLast — no separate firstStep/lastStep. **All six window edges (rec/loop/orn first/last) are per-sequence** so the nesting invariant holds per pattern. Scale is track-wide on FractalTrack, not per-sequence. Deferred: clockSource, punchMode, recordQuantize, loopBars, beatOffset, loopPhase.)*
-- NEW `model/FractalTrack.h` — 17 sequences + track params (**in scope**): sourceA, sourceB, gateLogic, cvLogic (two-source mix), bufferLength, recordTrigger (Routable), lock, octave, transpose, slideTime, cvUpdateMode, scale group (inherit), branchCount, path, branchSeed, branchPool, ornamentRate, ornamentIntensity, captureCadence, captureFidelity, trackDelay. **Routable:** recordTrigger, branchCount, path, ornamentRate, ornamentIntensity. *(Deferred — reserved, not built: routedScan/clockSource (CV-scan), density, tilt, complexity, patience, mutationProb, octaveShiftProb, mutateFirst, mutateLast, evolutionDepth, pressureMode, and the Blend/Once/PunchIn capture variants.)*
+- NEW `model/FractalSequence.h` — a **per-pattern performance preset** over the shared trunk: divisor, clockMultiplier, resetMeasure, runMode, loopFirst, loopLast, rotate, orderMode, loopMode (Loop), sleep, recordFirst, recordLast, **ornFirst, ornLast**, recordMode, captureCadence, captureFidelity, **recordTrigger** (Routable), **branchCount, path** (Routable), branchSeed, branchPool, **ornamentRate** (Routable), ornamentIntensity/pool (~45 B). *(The loop window **is** loopFirst/loopLast — no separate firstStep/lastStep. The whole expressive layer — windows, branches, ornaments, capture config — is per-sequence so each pattern is a self-contained preset; the four bespoke Routables (branchCount · path · ornamentRate · recordTrigger) route per-sequence. Scale is track-wide. Deferred: clockSource, punchMode, recordQuantize, loopBars, beatOffset, loopPhase.)*
+- NEW `model/FractalTrack.h` — the **track-wide identity**: sourceA, sourceB, gateLogic, cvLogic (two-source mix), bufferLength, lock, octave, transpose, slideTime, cvUpdateMode, scale group (inherit), trackDelay. *(Branches, ornaments, and capture config are per-sequence — see FractalSequence. Deferred — reserved: routedScan/clockSource (CV-scan), density, tilt, mutation params, Blend/Once/PunchIn.)*
 - EDIT `model/Track.h` — add `Fractal` to TrackMode enum, Container, union, accessors, initContainer.
 - EDIT `model/Routing.h` — add the `FractalFirst..FractalLast` target block (KD-18).
 - EDIT `engine/Engine.h` — add `FractalTrackEngine` to TrackEngineContainer typedef.
