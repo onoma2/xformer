@@ -228,10 +228,6 @@ if(${PLATFORM} STREQUAL "sim")
     target_link_libraries(sequencer sequencer_shared)
     target_link_options(sequencer PRIVATE "${SEQUENCER_MAP_FLAG}")
     platform_postprocess_executable(sequencer)
-
-    add_executable(project_setup_fractal projecttools/ProjectSetupFractal.cpp)
-    target_link_libraries(project_setup_fractal core sequencer_shared)
-    platform_postprocess_executable(project_setup_fractal)
     add_custom_command(TARGET sequencer COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/../../platform/sim/assets ${CMAKE_BINARY_DIR}/assets)
 
     if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Emscripten")
