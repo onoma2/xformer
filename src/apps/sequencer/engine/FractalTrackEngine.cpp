@@ -507,6 +507,45 @@ void FractalTrackEngine::advanceRecordPos() {
     else _recordPos++;
 }
 
+// orderMode → SequenceState runMode for the four standard traversals. Converge/
+// Diverge/Page advance the logical step linearly (Forward) and remap it in
+// orderMapWithin, so they resolve to Forward here.
+static Types::RunMode orderRunMode(FractalSequence::OrderMode mode) {
+    switch (mode) {
+    case FractalSequence::OrderMode::Reverse:  return Types::RunMode::Backward;
+    case FractalSequence::OrderMode::Pendulum: return Types::RunMode::Pendulum;
+    case FractalSequence::OrderMode::Random:   return Types::RunMode::Random;
+    default:                                   return Types::RunMode::Forward;
+    }
+}
+
+// Map a linear logical step (0..len-1) to a within-loop read position for the
+// Converge/Diverge/Page orders. Ported from the sim's mapLogicalToRead
+// (.scratch/fractal-sim.html, order codes 4/5/6). Standard orders pass through.
+static int orderMapWithin(FractalSequence::OrderMode mode, int step, int len) {
+    if (len <= 0) return 0;
+    int s = ((step % len) + len) % len;
+    switch (mode) {
+    case FractalSequence::OrderMode::Converge: {   // 0,last,1,last-1,...
+        int half = s / 2;
+        return (s % 2 == 0) ? half : (len - 1 - half);
+    }
+    case FractalSequence::OrderMode::Diverge: {     // centre outward
+        int c = (len - 1) / 2;
+        int k = (s + 1) / 2;
+        return (s % 2 == 0) ? clamp(c - k, 0, len - 1) : clamp(c + k, 0, len - 1);
+    }
+    case FractalSequence::OrderMode::Page: {        // 4-cell pages
+        int pages = (len + 3) / 4;
+        int page = s % pages;
+        int within = s / pages;
+        return clamp(page * 4 + within, 0, len - 1);
+    }
+    default:
+        return s;
+    }
+}
+
 int FractalTrackEngine::loopLen() const {
     const auto &seq = sequence();
     int first = seq.loopFirst();
@@ -672,17 +711,20 @@ void FractalTrackEngine::replaySection(uint32_t tick, uint32_t divisor) {
     int gp = _globalPos % total;
 
     // KD-12: global walk position → segment via Path route. The within-loop read
-    // order comes from the runMode-aware SequenceState (Forward stays byte-identical
-    // to the old gp%len walk), not a hand-rolled forward+rotate.
+    // order comes from orderMode: the four standard orders drive SequenceState
+    // (Forward stays byte-identical to the old gp%len walk); Converge/Diverge/Page
+    // advance the logical step linearly and remap it via orderMapWithin.
     int routeIndex = clamp(gp / len, 0, n);
     int segment = routeOf(seq.path(), n, routeIndex);
 
-    _orderState.advanceFree(seq.runMode(), 0, len - 1, _rng);
-    int within = _orderState.step();
+    FractalSequence::OrderMode order = seq.orderMode();
+    Types::RunMode runMode = orderRunMode(order);
+    _orderState.advanceFree(runMode, 0, len - 1, _rng);
+    int within = orderMapWithin(order, _orderState.step(), len);
     // Lookahead within: a copy advanced one more section gives the next read order.
     SequenceState nextState = _orderState;
-    nextState.advanceFree(seq.runMode(), 0, len - 1, _rng);
-    int nextWithin = nextState.step();
+    nextState.advanceFree(runMode, 0, len - 1, _rng);
+    int nextWithin = orderMapWithin(order, nextState.step(), len);
 
     float semitonesRelRoot; int gateLen; bool valid;
     segmentCell(segment, within, semitonesRelRoot, gateLen, valid);

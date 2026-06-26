@@ -26,7 +26,7 @@ namespace {
 alignas(Engine) unsigned char g_engineStorage[sizeof(Engine)];
 Engine &placeholderEngine() { return *reinterpret_cast<Engine *>(g_engineStorage); }
 
-FractalSequence &setupLoop(Model &model, int loopFirst, int loopLast, Types::RunMode runMode) {
+FractalSequence &setupLoop(Model &model, int loopFirst, int loopLast, FractalSequence::OrderMode orderMode) {
     model.project().setTrackMode(0, Track::TrackMode::Fractal);
     FractalTrack &track = model.project().track(0).fractalTrack();
     FractalSequence &seq = track.sequence(0);
@@ -35,7 +35,7 @@ FractalSequence &setupLoop(Model &model, int loopFirst, int loopLast, Types::Run
     seq.setRotate(0);
     seq.setBranchCount(0);
     seq.setResetMeasure(0);
-    seq.setRunMode(runMode);
+    seq.setOrderMode(orderMode);
     return seq;
 }
 
@@ -53,9 +53,9 @@ std::vector<int> readOrder(FractalTrackEngine &engine, int count) {
 
 UNIT_TEST("FractalTrackEngine") {
 
-CASE("runmode_forward_reads_ascending") {
+CASE("order_forward_reads_ascending") {
     Model model;
-    setupLoop(model, 2, 6, Types::RunMode::Forward);
+    setupLoop(model, 2, 6, FractalSequence::OrderMode::Forward);
     Track &track = model.project().track(0);
     FractalTrackEngine fractal(placeholderEngine(), model, track);
 
@@ -67,9 +67,9 @@ CASE("runmode_forward_reads_ascending") {
     }
 }
 
-CASE("runmode_reverse_reads_descending") {
+CASE("order_reverse_reads_descending") {
     Model model;
-    setupLoop(model, 2, 6, Types::RunMode::Backward);
+    setupLoop(model, 2, 6, FractalSequence::OrderMode::Reverse);
     Track &track = model.project().track(0);
     FractalTrackEngine fractal(placeholderEngine(), model, track);
 
@@ -81,11 +81,25 @@ CASE("runmode_reverse_reads_descending") {
     }
 }
 
+CASE("order_converge_interleaves_ends") {
+    Model model;
+    setupLoop(model, 0, 7, FractalSequence::OrderMode::Converge);
+    Track &track = model.project().track(0);
+    FractalTrackEngine fractal(placeholderEngine(), model, track);
+
+    // Converge reads first, last, first+1, last-1, ... (ported sim order code 4).
+    auto order = readOrder(fractal, 8);
+    std::vector<int> expected = { 0, 7, 1, 6, 2, 5, 3, 4 };
+    for (size_t i = 0; i < expected.size(); ++i) {
+        expectEqual(order[i], expected[i], "Converge must interleave loop ends inward");
+    }
+}
+
 CASE("branch_determinism_same_seed_same_segment") {
     // Swap 1/2: branch transforms now draw from a Random seeded by branchSeed.
     // Same seed → identical resolved branch segment on every rebuild.
     Model model;
-    FractalSequence &seq = setupLoop(model, 0, 7, Types::RunMode::Forward);
+    FractalSequence &seq = setupLoop(model, 0, 7, FractalSequence::OrderMode::Forward);
     seq.setBranchCount(3);
     seq.setBranchPool(0xff);
     seq.setBranchSeed(1234);
@@ -112,7 +126,7 @@ CASE("branch_determinism_same_seed_same_segment") {
 CASE("branch_pool_restriction_honored") {
     // Swap 1/2: with the pool restricted to one op, every branch resolves to it.
     Model model;
-    FractalSequence &seq = setupLoop(model, 0, 7, Types::RunMode::Forward);
+    FractalSequence &seq = setupLoop(model, 0, 7, FractalSequence::OrderMode::Forward);
     seq.setBranchCount(7);
     seq.setBranchPool(1 << kOpReverse);   // Reverse only
     seq.setBranchSeed(42);
@@ -128,7 +142,7 @@ CASE("track_delay_surfaces_three_sections_later") {
     // Swap 3: the DelayEntry ring is now a RingBuffer; delay=3 still holds a note
     // for three sections, then surfaces it with the same playback CV.
     Model model;
-    FractalSequence &seq = setupLoop(model, 0, 7, Types::RunMode::Forward);
+    FractalSequence &seq = setupLoop(model, 0, 7, FractalSequence::OrderMode::Forward);
     seq.setOrnFirst(1); seq.setOrnLast(0);   // ornaments disabled → plain note
     Track &track = model.project().track(0);
     FractalTrack &ftrack = track.fractalTrack();
@@ -171,7 +185,7 @@ CASE("scale_snap_uses_noteFromVolts") {
     // In-scale notes and non-midpoint notes are unchanged. Affects only ornament
     // grace/turn notes (stepDegrees), never the raw trunk main note.
     Model model;
-    setupLoop(model, 0, 7, Types::RunMode::Forward);
+    setupLoop(model, 0, 7, FractalSequence::OrderMode::Forward);
     model.project().setScale(1);   // Major
     Track &track = model.project().track(0);
     FractalTrackEngine fractal(placeholderEngine(), model, track);
@@ -223,7 +237,7 @@ CASE("feel_onset_side_array_packs_two_per_byte") {
     // per byte. Round-trip the low and high nibble independently; Quantized cells
     // (never written) read 0.
     Model model;
-    setupLoop(model, 0, 7, Types::RunMode::Forward);
+    setupLoop(model, 0, 7, FractalSequence::OrderMode::Forward);
     Track &track = model.project().track(0);
     FractalTrackEngine fractal(placeholderEngine(), model, track);
 
@@ -241,7 +255,7 @@ CASE("feel_onset_delays_replay_gate") {
     // KD-14b replay: in Feel, the sounding cell's gate is delayed by its onset
     // phase (onset/16 of the section). Quantized (onset 0) fires at tick 0.
     Model model;
-    FractalSequence &seq = setupLoop(model, 0, 7, Types::RunMode::Forward);
+    FractalSequence &seq = setupLoop(model, 0, 7, FractalSequence::OrderMode::Forward);
     seq.setOrnFirst(1); seq.setOrnLast(0);   // ornaments off → plain note
     Track &track = model.project().track(0);
     FractalTrackEngine fractal(placeholderEngine(), model, track);

@@ -146,12 +146,6 @@ public:
         }
     }
 
-    // runMode
-    Types::RunMode runMode() const { return _runMode; }
-    void setRunMode(Types::RunMode runMode) { _runMode = ModelUtils::clampedEnum(runMode); }
-    void editRunMode(int value, bool shift) { setRunMode(ModelUtils::adjustedEnum(runMode(), value)); }
-    void printRunMode(StringBuilder &str) const { str(Types::runModeName(runMode())); }
-
     // loopFirst / loopLast
     int loopFirst() const { return _loopFirst; }
     void setLoopFirst(int v) { _loopFirst = clamp(v, 0, CONFIG_FRACTAL_MAX_CELLS - 1); }
@@ -276,7 +270,6 @@ public:
         writer.write(_divisor);
         writer.write(_resetMeasure);
         writer.write(_clockMultiplier);
-        writer.write(static_cast<uint8_t>(_runMode));
         writer.write(_loopFirst);
         writer.write(_loopLast);
         writer.write(_rotate);
@@ -314,9 +307,6 @@ public:
         reader.read(_resetMeasure);
         _resetMeasure = clamp(int(_resetMeasure), 0, 128);
         reader.read(_clockMultiplier);
-        uint8_t runMode;
-        reader.read(runMode);
-        _runMode = runMode < uint8_t(Types::RunMode::Last) ? static_cast<Types::RunMode>(runMode) : Types::RunMode::Forward;
         reader.read(_loopFirst);
         reader.read(_loopLast);
         reader.read(_rotate);
@@ -358,7 +348,6 @@ private:
         _divisor = 12;
         _resetMeasure = 0;
         _clockMultiplier = 100;
-        _runMode = Types::RunMode::Forward;
         _loopFirst = 0;
         _loopLast = CONFIG_FRACTAL_DEFAULT_CELLS - 1;
         _rotate = 0;
@@ -391,7 +380,6 @@ private:
     uint8_t _divisor = 12;
     uint8_t _resetMeasure = 0;
     uint8_t _clockMultiplier = 100;
-    Types::RunMode _runMode = Types::RunMode::Forward;
 
     uint8_t _loopFirst = 0;
     uint8_t _loopLast = 0;

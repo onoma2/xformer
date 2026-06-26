@@ -84,7 +84,7 @@ public:
 
 #ifndef PLATFORM_STM32
     // Test seam: run one section's traversal (capture-free, no Engine deref) so
-    // unit tests can read the runMode-ordered trunk index sequence.
+    // unit tests can read the orderMode-ordered trunk index sequence.
     void replaySectionForTest(uint32_t tick, uint32_t divisor) { replaySection(tick, divisor); }
 
     // Test seams for the Random/RingBuffer/Scale-snap refactor characterization.
@@ -222,8 +222,9 @@ private:
     uint8_t _readPos = 0;     // trunk read index of the sounding cell (UI highlight)
     uint16_t _globalPos = 0;  // KD-12 walk over the concatenated length 0..total-1
 
-    // Within-loop read order, runMode-aware. Advanced once per section; its step()
-    // is the loop-relative position fed to segmentCell/trunkReadIndex.
+    // Within-loop read order, orderMode-aware. Advanced once per section; its step()
+    // is remapped by orderMapWithin into the loop-relative position fed to
+    // segmentCell/trunkReadIndex.
     SequenceState _orderState;
 
     // Outputs.

@@ -54,7 +54,6 @@ CASE("all_fields_round_trip") {
     seq.setDivisor(24);
     seq.setClockMultiplier(133);
     seq.setResetMeasure(8);
-    seq.setRunMode(Types::RunMode::Pendulum);
     seq.setLoopFirst(2);
     seq.setLoopLast(9);
     seq.setRotate(-13);
@@ -92,7 +91,6 @@ CASE("all_fields_round_trip") {
     expectEqual(r.divisor(), 24, "divisor persists");
     expectEqual(r.clockMultiplier(), 133, "clockMultiplier persists");
     expectEqual(r.resetMeasure(), 8, "resetMeasure persists");
-    expectTrue(r.runMode() == Types::RunMode::Pendulum, "runMode persists");
     expectEqual(r.loopFirst(), 2, "loopFirst persists");
     expectEqual(r.loopLast(), 9, "loopLast persists");
     expectEqual(r.rotate(), -13, "rotate persists");

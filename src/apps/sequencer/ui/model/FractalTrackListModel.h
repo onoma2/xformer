@@ -47,7 +47,6 @@ public:
         case Octave:        return Routing::Target::Octave;
         case Transpose:     return Routing::Target::Transpose;
         case Divisor:       return Routing::Target::Divisor;
-        case RunMode:       return Routing::Target::RunMode;
         default:            return Routing::Target::None;
         }
     }
@@ -71,7 +70,7 @@ private:
         Divisor,
         ClockMultiplier,
         ResetMeasure,
-        RunMode,
+        Order,
         LoopFirst,
         LoopLast,
         RecordFirst,
@@ -99,7 +98,7 @@ private:
         case Divisor:           return "Divisor";
         case ClockMultiplier:   return "Clock Mult";
         case ResetMeasure:      return "Reset Measure";
-        case RunMode:           return "Run Mode";
+        case Order:             return "Order";
         case LoopFirst:         return "Loop First";
         case LoopLast:          return "Loop Last";
         case RecordFirst:       return "Record First";
@@ -171,8 +170,8 @@ private:
         case ResetMeasure:
             sequence.printResetMeasure(str);
             break;
-        case RunMode:
-            sequence.printRunMode(str);
+        case Order:
+            sequence.printOrderMode(str);
             break;
         case LoopFirst:
             sequence.printLoopFirst(str);
@@ -247,8 +246,8 @@ private:
         case ResetMeasure:
             sequence.editResetMeasure(value, shift);
             break;
-        case RunMode:
-            sequence.editRunMode(value, shift);
+        case Order:
+            sequence.editOrderMode(value, shift);
             break;
         case LoopFirst:
             sequence.editLoopFirst(value, shift);
