@@ -20,6 +20,26 @@ static constexpr float kSemitonesPerOctave = 12.f;
 static constexpr float kCvRangeSemitones = 60.f;
 static constexpr float kCvCodeScale = 1024.f;
 
+// KD-12 branch transform op codes (canonical assignment + pool-bit order).
+enum BranchOp {
+    OpTranspose = 0, OpReverse, OpInverse, OpRetInverse,
+    OpRotate, OpCompress, OpExpand, OpGateThin,
+};
+static constexpr int kNumBranchOps = 8;
+static constexpr int kTransposeIntervals[] = { 5, 7, 12 };   // P4, P5, octave
+static constexpr int kCompressFactorsX100[] = { 50, 67 };    // f < 1
+static constexpr int kExpandFactorsX100[] = { 150, 200 };    // f > 1
+
+// Deterministic 32-bit hash → float in [0,1). Ports the sim's hash01(seed,s,p):
+// the seeded transform assignment + per-op params stay stable, no RNG content.
+static float hash01(uint32_t seed, uint32_t s, uint32_t p) {
+    uint32_t h = seed * 2654435761u + s * 40503u + p * 2246822519u;
+    h ^= h >> 15; h *= 2246822519u;
+    h ^= h >> 13; h *= 3266489917u;
+    h ^= h >> 16;
+    return float(h) / 4294967296.f;
+}
+
 uint16_t FractalTrackEngine::encodeCell(float semitonesRelRoot, int gateLen, bool valid) {
     int c = int(std::lround(semitonesRelRoot * kCvCodeScale / kCvRangeSemitones));
     c = clamp(c, -1024, 1023);
@@ -60,6 +80,42 @@ FractalTrackEngine::FractalTrackEngine(Engine &engine, const Model &model, Track
     }
 #endif
     reset();
+
+#ifndef PLATFORM_STM32
+    // KD-12 branch self-check (mirrors harness b1/b3). Save the sequence fields
+    // we touch, run on a known ramp trunk, restore.
+    {
+        FractalSequence &seq = sequence();
+        int sf = seq.loopFirst(), sl = seq.loopLast(), sr = seq.rotate();
+        int sc = seq.branchCount(), ssd = seq.branchSeed(), sp = seq.branchPool();
+        seq.setLoopFirst(0); seq.setLoopLast(7); seq.setRotate(0); seq.setBranchPool(0xff);
+        for (int i = 0; i < 8; ++i) _trunk[i] = encodeCell(float(i), 8, true);
+
+        float st; int gl; bool v;
+        // b1: branchCount 0 → trunk segment equals raw trunk cells.
+        seq.setBranchCount(0); rebuildBranchTransforms();
+        for (int p = 0; p < 8; ++p) {
+            segmentCell(0, p, st, gl, v);
+            assert(std::abs(st - float(p)) < 0.06f && v && gl == 8);
+        }
+        // b3: a Reverse-transform branch reverses the previous segment.
+        seq.setBranchCount(3);
+        int seed = 1; bool found = false;
+        for (; seed < 4000 && !found; ++seed) {
+            seq.setBranchSeed(seed); rebuildBranchTransforms();
+            if (_branches[0].kind == OpReverse) found = true;
+        }
+        assert(found);
+        for (int p = 0; p < 8; ++p) {
+            segmentCell(1, p, st, gl, v);
+            assert(std::abs(st - float(7 - p)) < 0.06f);
+        }
+
+        seq.setLoopFirst(sf); seq.setLoopLast(sl); seq.setRotate(sr);
+        seq.setBranchCount(sc); seq.setBranchSeed(ssd); seq.setBranchPool(sp);
+    }
+    reset();
+#endif
 }
 
 void FractalTrackEngine::reset() {
@@ -67,6 +123,8 @@ void FractalTrackEngine::reset() {
     _relativeTick = 0;
     _recordPos = sequence().recordFirst();
     _readPos = sequence().loopFirst();
+    _globalPos = 0;
+    _branchHash = -1;
     _gate = false;
     _cv = 0.f;
     _activity = false;
@@ -79,6 +137,7 @@ void FractalTrackEngine::restart() {
     _relativeTick = 0;
     _recordPos = sequence().recordFirst();
     _readPos = sequence().loopFirst();
+    _globalPos = 0;
 }
 
 void FractalTrackEngine::stop() {
@@ -106,6 +165,7 @@ TrackEngine::TickResult FractalTrackEngine::tick(uint32_t tick) {
     if (resetDivisor > 0 && relativeTick == 0) {
         _recordPos = seq.recordFirst();
         _readPos = seq.loopFirst();
+        _globalPos = 0;
     }
 
     TickResult result = TickResult::NoUpdate;
@@ -162,25 +222,154 @@ void FractalTrackEngine::captureSection() {
     else _recordPos++;
 }
 
-void FractalTrackEngine::replaySection(uint32_t tick, uint32_t divisor) {
+int FractalTrackEngine::loopLen() const {
     const auto &seq = sequence();
-
     int first = seq.loopFirst();
     int last = seq.loopLast();
     if (last < first) last = first;
-    int windowSize = last - first + 1;
+    return last - first + 1;
+}
 
-    // Forward run with rotate() offset applied within the window.
-    int pos = _readPos;
-    if (seq.rotate() != 0 && windowSize > 0) {
-        int offset = (_readPos - first + seq.rotate()) % windowSize;
-        if (offset < 0) offset += windowSize;
-        pos = first + offset;
+// Forward+rotate lens: within-position 0..loopLen-1 → trunk read index (MVP order).
+int FractalTrackEngine::trunkReadIndex(int within) const {
+    const auto &seq = sequence();
+    int first = seq.loopFirst();
+    int len = loopLen();
+    int s = ((within % len) + len) % len;
+    if (seq.rotate() != 0) {
+        s = (s + (seq.rotate() % len) + len) % len;
     }
-    pos = clamp(pos, 0, CONFIG_FRACTAL_MAX_CELLS - 1);
+    return clamp(first + s, 0, CONFIG_FRACTAL_MAX_CELLS - 1);
+}
+
+float FractalTrackEngine::inversionCenter() const {
+    const auto &seq = sequence();
+    int idx = clamp(seq.loopFirst(), 0, CONFIG_FRACTAL_MAX_CELLS - 1);
+    if (cellValid(idx)) {
+        float st; int gl; bool v;
+        decodeCell(_trunk[idx], st, gl, v);
+        return st;
+    }
+    return 0.f;   // empty trunk → root (rel-root 0)
+}
+
+// Derive one chained transform per branch from branchSeed, drawn only from the
+// enabled branchPool (empty → all Transpose). Per-op params are seed-derived.
+void FractalTrackEngine::rebuildBranchTransforms() {
+    const auto &seq = sequence();
+    uint32_t seed = uint32_t(seq.branchSeed());
+    int pool = seq.branchPool();
+    int len = loopLen();
+
+    int eligible[kNumBranchOps]; int nEligible = 0;
+    for (int k = 0; k < kNumBranchOps; ++k) {
+        if ((pool >> k) & 1) eligible[nEligible++] = k;
+    }
+    if (nEligible == 0) { eligible[0] = OpTranspose; nEligible = 1; }
+
+    int n = clamp(seq.branchCount(), 0, 7);
+    for (int s = 1; s <= n; ++s) {
+        BranchTransform &b = _branches[s - 1];
+        b.kind = uint8_t(eligible[int(hash01(seed, s, 0) * nEligible) % nEligible]);
+        b.t = 0; b.k = 0; b.fx100 = 100; b.n = 2;
+        if (b.kind == OpTranspose) {
+            int mag = kTransposeIntervals[int(hash01(seed, s, 1) * 3) % 3];
+            b.t = int8_t((hash01(seed, s, 2) < 0.5f ? -1 : 1) * mag);
+        } else if (b.kind == OpRotate) {
+            b.k = uint8_t(len > 1 ? (1 + int(hash01(seed, s, 3) * (len - 1))) : 0);
+        } else if (b.kind == OpCompress) {
+            b.fx100 = uint16_t(kCompressFactorsX100[int(hash01(seed, s, 4) * 2) % 2]);
+        } else if (b.kind == OpExpand) {
+            b.fx100 = uint16_t(kExpandFactorsX100[int(hash01(seed, s, 4) * 2) % 2]);
+        } else if (b.kind == OpGateThin) {
+            b.n = uint8_t(2 + int(hash01(seed, s, 5) * 3));   // 2..4
+        }
+    }
+    _branchHash = int((seed * 131u + uint32_t(pool) * 17u + uint32_t(len)) & 0x7fffffff);
+    _branchCountCache = n;
+}
+
+void FractalTrackEngine::maybeRebuildBranchTransforms() {
+    const auto &seq = sequence();
+    int sig = int((uint32_t(seq.branchSeed()) * 131u
+                   + uint32_t(seq.branchPool()) * 17u + uint32_t(loopLen())) & 0x7fffffff);
+    if (sig != _branchHash || clamp(seq.branchCount(), 0, 7) != _branchCountCache) {
+        rebuildBranchTransforms();
+    }
+}
+
+// Resolve segment seg (0 = trunk) at within-position pos by applying the chained
+// transforms onto the trunk cell. Recursive — depth ≤ branchCount ≤ 7. The trunk
+// buffer is never mutated (branches transform on read).
+void FractalTrackEngine::segmentCell(int seg, int pos, float &semitonesRelRoot, int &gateLen, bool &valid) const {
+    int len = loopLen();
+    pos = ((pos % len) + len) % len;
+    if (seg == 0) {
+        decodeCell(_trunk[trunkReadIndex(pos)], semitonesRelRoot, gateLen, valid);
+        return;
+    }
+    const BranchTransform &tf = _branches[seg - 1];
+    if (tf.kind == OpReverse) {
+        segmentCell(seg - 1, len - 1 - pos, semitonesRelRoot, gateLen, valid);
+        return;
+    }
+    if (tf.kind == OpRetInverse) {
+        segmentCell(seg - 1, len - 1 - pos, semitonesRelRoot, gateLen, valid);
+        semitonesRelRoot = 2.f * inversionCenter() - semitonesRelRoot;
+        return;
+    }
+    if (tf.kind == OpRotate) {
+        segmentCell(seg - 1, pos + tf.k, semitonesRelRoot, gateLen, valid);
+        return;
+    }
+    segmentCell(seg - 1, pos, semitonesRelRoot, gateLen, valid);
+    if (tf.kind == OpTranspose) {
+        semitonesRelRoot += float(tf.t);
+    } else if (tf.kind == OpInverse) {
+        semitonesRelRoot = 2.f * inversionCenter() - semitonesRelRoot;
+    } else if (tf.kind == OpCompress || tf.kind == OpExpand) {
+        float center = inversionCenter();
+        semitonesRelRoot = center + std::round((semitonesRelRoot - center) * float(tf.fx100) * 0.01f);
+    } else if (tf.kind == OpGateThin) {
+        if ((pos + 1) % tf.n == 0) gateLen = 0;   // periodic rest, CV untouched
+    }
+}
+
+// KD-12 Path navigation order. Returns the segment-index play order into route[]:
+// trunk first, then outward branches (bit 0) ascending, then held branches
+// (bit 1) descending. Every segment appears exactly once.
+static int routeOf(int path, int n, int routeIndex) {
+    // outward (bit=0) ascending, then held (bit=1) descending; index 0 = trunk.
+    if (routeIndex == 0) return 0;
+    int seen = 0;
+    for (int b = 1; b <= n; ++b) {            // outward ascending
+        if (!((path >> (b - 1)) & 1)) { if (++seen == routeIndex) return b; }
+    }
+    for (int b = n; b >= 1; --b) {            // held descending
+        if ((path >> (b - 1)) & 1) { if (++seen == routeIndex) return b; }
+    }
+    return 0;
+}
+
+void FractalTrackEngine::replaySection(uint32_t tick, uint32_t divisor) {
+    const auto &seq = sequence();
+
+    maybeRebuildBranchTransforms();
+
+    int n = clamp(seq.branchCount(), 0, 7);
+    int len = loopLen();
+    int total = len * (1 + n);
+    int gp = _globalPos % total;
+
+    // KD-12: global walk position → (segment via Path route, within-position).
+    int routeIndex = clamp(gp / len, 0, n);
+    int within = gp % len;
+    int segment = routeOf(seq.path(), n, routeIndex);
 
     float semitonesRelRoot; int gateLen; bool valid;
-    decodeCell(_trunk[pos], semitonesRelRoot, gateLen, valid);
+    segmentCell(segment, within, semitonesRelRoot, gateLen, valid);
+
+    _readPos = uint8_t(trunkReadIndex(within));   // UI highlight = trunk index read
 
     // Octave/transpose applied at playback (octave = 1V; transpose semitones
     // → volts). Trunk stays raw — captured CV is never quantized (KD-13).
@@ -203,9 +392,7 @@ void FractalTrackEngine::replaySection(uint32_t tick, uint32_t divisor) {
         _activity = false;
     }
 
-    // Advance Forward through loopFirst..loopLast.
-    if (_readPos >= last) _readPos = first;
-    else _readPos++;
+    _globalPos = uint16_t((gp + 1) % total);
 }
 
 void FractalTrackEngine::update(float dt) {

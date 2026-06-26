@@ -6,9 +6,10 @@
 
 #include <cstdint>
 
-// MVP looper engine: capture sourceA's emitted gate+CV per section into an
-// inline trunk buffer, replay it through the loop window. Branches, ornaments,
-// sleep, two-source mix, track-delay and capture variants are deferred —
+// Looper engine: capture sourceA's emitted gate+CV per section into an inline
+// trunk buffer, replay it through the loop window. Branches (KD-12) concatenate
+// chained transforms of the trunk after it. Ornaments, sleep, two-source mix,
+// track-delay and capture variants are deferred —
 // see docs/superpowers/specs/2026-05-17-fractal-track-design.md.
 class FractalTrackEngine final : public TrackEngine {
 public:
@@ -59,6 +60,27 @@ private:
     void captureSection();
     void replaySection(uint32_t tick, uint32_t divisor);
 
+    // KD-12 branches — one chained transform per branch, derived from branchSeed
+    // + the branchPool mask. Recomputed when seed/pool/loop-window changes.
+    struct BranchTransform {
+        uint8_t kind;   // op code 0..7 (Transpose..Gate-thin)
+        int8_t t;       // Transpose semitones
+        uint8_t k;      // Rotate offset
+        uint16_t fx100; // Compress/Expand factor ×100
+        uint8_t n;      // Gate-thin period
+    };
+    BranchTransform _branches[7] = {};
+    int _branchHash = -1;          // signature of the cached assignment
+    int _branchCountCache = 0;     // branchCount the cache was built for
+
+    void rebuildBranchTransforms();
+    void maybeRebuildBranchTransforms();
+    // Resolve segment seg (0 = trunk) at within-position pos → trunk cell fields.
+    void segmentCell(int seg, int pos, float &semitonesRelRoot, int &gateLen, bool &valid) const;
+    float inversionCenter() const;
+    int trunkReadIndex(int within) const;   // Forward+rotate lens (MVP order)
+    int loopLen() const;
+
     FractalTrack &_fractalTrack;
     FractalSequence *_sequence = nullptr;
 
@@ -68,7 +90,8 @@ private:
     // Section timing.
     uint32_t _relativeTick = 0;
     uint8_t _recordPos = 0;   // capture cursor (recordFirst..recordLast)
-    uint8_t _readPos = 0;     // replay cursor (loopFirst..loopLast)
+    uint8_t _readPos = 0;     // trunk read index of the sounding cell (UI highlight)
+    uint16_t _globalPos = 0;  // KD-12 walk over the concatenated length 0..total-1
 
     // Outputs.
     bool _gate = false;
