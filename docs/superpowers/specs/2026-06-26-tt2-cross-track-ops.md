@@ -50,7 +50,10 @@ static inline int16_t* tt2CrossPatternCell(Model &model, int t, int16_t bank, in
     return nullptr;   // not a TT2-family track — safe no-op
 }
 ```
-- **Bank/idx normalisation matches `PN`'s clamp** (so WPN ≈ cross-track PN). `PN` clamps the bank `<0→0`, `>=PatternCount→PatternCount-1` (`normalisePn`, `TeletypeNativeOps.cpp:3287`) and clamps the index the same way. The `tt2PatternCell<Cfg>` helper **replicates that same small clamp inline** (it's two lines — `bank = clamp(bank,0,PatternCount-1); idx = clamp(idx,0,PatternLength-1);`). Pass signed args; do NOT `uint8_t`-cast before the clamp. (No refactor of the existing `normalisePn`/`patternGetVal` — they stay as they are; the helper just clamps the same way.)
+- **Bank/idx normalisation must match `PN` exactly** (so WPN is true cross-track PN). Two steps, mirroring `PN`:
+  - **bank** via `normalisePn` (`TeletypeNativeOps.cpp:3287`): `<0→0`, `≥PatternCount→PatternCount-1`.
+  - **idx** via `normaliseIdx(p, idx)` (`:3302`) — **negative idx counts back from the resolved pattern's `p.len`**: `if (idx < -len) idx=0; else if (idx<0) idx=len+idx;` then clamp `≥PatternLength→PatternLength-1`, `<0→0`. So `WPN t 0 -1` hits index `len-1`, NOT 0 — a plain `clamp(0,…)` is wrong.
+  Resolve the bank first, then normalise idx against `patterns[bank].len`. Pass signed args; no `uint8_t`-cast before normalising. The helper **replicates `normaliseIdx`'s exact logic** (or the implementer exposes `normalisePn`/`normaliseIdx` for reuse — their call; either way PN's behaviour stays unchanged).
 - Mini's active scene is recomputed from `playState().trackState(t).pattern() % SceneCount` — the **same formula** the Mini engine uses (`tt2SceneIndex`, `TT2MiniTrackEngine.h:20,48`). Do NOT reach the other engine's private `_activeScene`.
 - Both configs share `TT2_PATTERN_COUNT == 4` (`model/TeletypeProgram.h:20`/:34) and `PatternLength == 64`.
 
@@ -132,7 +135,7 @@ Hand-edited files: `op_enum.h`, `match_token.rl`, `TeletypeNativeOps.cpp` (+ the
 - **`TestTT2OpNames.cpp`** — iterates `0..E_OP__LENGTH` asserting every enum has a name; passes automatically once step 3 is done (catches a missing name).
 - **`WPN` functional test** — exercise `opWpn` get/set through a **fake `TT2Host`** (or `tt2CrossPatternCell` directly against a `Model` with a Mini track): a full track writing `WPN <miniTrack> 0 5 42` lands in the Mini track's active-scene `patterns[0].val[5]`; read it back; out-of-range bank/idx clamp like `PN`.
 - **`W.SCRIPT` op tests via a fake `TT2Host`** (the risky part — do NOT leave it all sim/manual): drive `opWScript` with a fake host that records `(track, script)` and returns a chosen `TT2EvalError`, asserting:
-  - valid `W.SCRIPT 2 1` → host called with `(track 1, script 0)`, `error == None`;
+  - valid `W.SCRIPT 2 1` → host called with `(track 1, script 1)` — script stays **1-based** at the host boundary; the `-1` to zero-based happens only inside `triggerScriptFromHost` — `error == None`;
   - **invalid track** `W.SCRIPT 0 1` (→ `t=255`) → host's range guard returns `None` and **never indexes the engine** (the fake asserts it wasn't dispatched);
   - **out-of-range script** (e.g. `W.SCRIPT 2 11` on a Full target) → `error == OutOfRange` (matches `SCRIPT`);
   - **cap hit** → host returns `ExecDepthOverflow` → `opWScript` writes it to `error` (proves propagation; `runScript` already returns it, `TT2Runner.h:26`).
@@ -146,7 +149,7 @@ Negligible. Per config: +2–3 op-table pointer slots (`E_OP_*` entries) in CCMR
 
 1. **Shared cross-track helper** (`src/apps/sequencer/engine/TT2HostCrossTrack.h`): `tt2CrossPatternCell(model, t, bank, idx) -> int16_t*` + a script-target resolver. Unit-test the pattern helper directly (host-constructible — it takes `Model&`).
 2. **`WPN` first** (low-risk, data only): enum + token rules + regen (ragel + python) + vtable + `opWpn` + 2 host methods (get/set) forwarding to the helper + parser-contract test + functional test. Ship.
-3. **`W.SCRIPT` plumbing**: public `triggerScriptFromHost` (target-`ScopedHost` swap) on each engine + the small global cross-track-nesting cap in `hostTriggerTrackScript`. (The per-runtime depth-8 guard already bounds it; the lock is not in play.)
+3. **`W.SCRIPT` plumbing**: public `triggerScriptFromHost` (target-`ScopedHost` swap) on each engine + the `uint8_t _tt2CrossDepth` Engine member with an RAII cap in `hostTriggerTrackScript` (NOT a static global). (The per-runtime depth-8 guard already bounds it; the lock is not in play.)
 4. **`W.SCRIPT`**: enum + token rules + regen + vtable + `opWScript` + `hostTriggerTrackScript` (1 host method) per the chosen recursion strategy + tests.
 
 ## Deferred (propose only)
