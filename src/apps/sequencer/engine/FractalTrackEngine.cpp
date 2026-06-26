@@ -164,8 +164,7 @@ void FractalTrackEngine::reset() {
     _gate = false;
     _cv = 0.f;
     _activity = false;
-    _gateQueue.clear();
-    _cvQueue.clear();
+    clearSchedule();
     _lastOrnament = -1;
     for (auto &cell : _trunk) cell = 0;
 }
@@ -180,8 +179,7 @@ void FractalTrackEngine::restart() {
 void FractalTrackEngine::stop() {
     _gate = false;
     _activity = false;
-    _gateQueue.clear();
-    _cvQueue.clear();
+    clearSchedule();
 }
 
 uint32_t FractalTrackEngine::effectiveDivisor() const {
@@ -212,16 +210,16 @@ TrackEngine::TickResult FractalTrackEngine::tick(uint32_t tick) {
         advanceSection(tick, divisor);
     }
 
-    // Drain the sub-section CV/gate event queues at this tick. Each section
-    // schedules a main note plus any ornament flourish notes here.
-    while (!_cvQueue.empty() && tick >= _cvQueue.front().tick) {
-        _cv = _cvQueue.front().cv;
-        _cvQueue.pop();
+    // Drain the sub-section CV/gate schedule at this tick. Each section fills a
+    // main note plus any ornament flourish notes here, generated in time order.
+    while (_cvHead < _cvCount && tick >= _cvEvents[_cvHead].tick) {
+        _cv = _cvEvents[_cvHead].cv;
+        ++_cvHead;
         result |= TickResult::CvUpdate;
     }
-    while (!_gateQueue.empty() && tick >= _gateQueue.front().tick) {
-        _gate = _gateQueue.front().gate;
-        _gateQueue.pop();
+    while (_gateHead < _gateCount && tick >= _gateEvents[_gateHead].tick) {
+        _gate = _gateEvents[_gateHead].gate;
+        ++_gateHead;
         _activity = _gate;
         result |= TickResult::GateUpdate;
     }
@@ -492,16 +490,18 @@ int FractalTrackEngine::rollOrnament(int rate, int intensity) {
 // queues. Notes are emitted in time order so the queue stays a clean envelope.
 void FractalTrackEngine::scheduleSection(uint32_t tick, uint32_t divisor, float mainSemi,
                                          float nextSemi, int gateLen, bool ornEligible) {
+    clearSchedule();
+
     auto pushNote = [&](float semi, uint32_t at, uint32_t dur) {
-        _cvQueue.push({ at, fractalPlaybackCv(semi, _fractalTrack) });
-        _gateQueue.push({ at, true });
-        _gateQueue.push({ at + std::max<uint32_t>(1u, dur), false });
+        pushCv(at, fractalPlaybackCv(semi, _fractalTrack));
+        pushGate(at, true);
+        pushGate(at + std::max<uint32_t>(1u, dur), false);
     };
 
     if (gateLen <= 0) {
         // Rest: hold CV, gate stays low. Still set CV so glides/scope track it.
-        _cvQueue.push({ tick, fractalPlaybackCv(mainSemi, _fractalTrack) });
-        _gateQueue.push({ tick, false });
+        pushCv(tick, fractalPlaybackCv(mainSemi, _fractalTrack));
+        pushGate(tick, false);
         return;
     }
 

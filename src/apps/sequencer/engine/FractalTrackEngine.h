@@ -1,7 +1,6 @@
 #pragma once
 
 #include "TrackEngine.h"
-#include "SortedQueue.h"
 #include "model/FractalSequence.h"
 #include "model/FractalTrack.h"
 
@@ -112,15 +111,26 @@ private:
     float _cv = 0.f;
     bool _activity = false;
 
-    // Sub-section gate/CV event queue (KD-13). Mirrors NoteTrackEngine's
-    // _gateQueue/_cvQueue: events carry absolute-tick timestamps, drained in
-    // tick(). One main note per section plus injected ornament flourish notes.
+    // Sub-section schedule (KD-13). The flourish for a section is generated in
+    // time order when the section starts, so a plain fixed array drained by a
+    // head cursor replaces the sorted queues. Worst case is Trill: 8 notes →
+    // 16 gate edges + 8 CV updates. Cleared and refilled per section.
     struct GateEvent { uint32_t tick; bool gate; };
-    struct GateCompare { bool operator()(const GateEvent &a, const GateEvent &b) { return a.tick < b.tick; } };
     struct CvEvent { uint32_t tick; float cv; };
-    struct CvCompare { bool operator()(const CvEvent &a, const CvEvent &b) { return a.tick < b.tick; } };
-    SortedQueue<GateEvent, 24, GateCompare> _gateQueue;
-    SortedQueue<CvEvent, 24, CvCompare> _cvQueue;
+    static constexpr int kMaxGateEvents = 18;
+    static constexpr int kMaxCvEvents = 10;
+    GateEvent _gateEvents[kMaxGateEvents];
+    CvEvent _cvEvents[kMaxCvEvents];
+    uint8_t _gateCount = 0, _gateHead = 0;
+    uint8_t _cvCount = 0, _cvHead = 0;
+
+    void clearSchedule() { _gateCount = _gateHead = _cvCount = _cvHead = 0; }
+    void pushGate(uint32_t tick, bool gate) {
+        if (_gateCount < kMaxGateEvents) _gateEvents[_gateCount++] = { tick, gate };
+    }
+    void pushCv(uint32_t tick, float cv) {
+        if (_cvCount < kMaxCvEvents) _cvEvents[_cvCount++] = { tick, cv };
+    }
 
     // KD-13 ornament state. PRNG is live/probabilistic (free-running). Lock
     // freezes _lastOrnament: Rate still gates whether a flourish fires, Lock
@@ -129,4 +139,4 @@ private:
     int _lastOrnament = -1;
 };
 
-static_assert(sizeof(FractalTrackEngine) <= 1280, "FractalTrackEngine too large");
+static_assert(sizeof(FractalTrackEngine) <= 912, "FractalTrackEngine too large");
