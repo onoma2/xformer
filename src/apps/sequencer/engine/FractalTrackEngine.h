@@ -1,6 +1,7 @@
 #pragma once
 
 #include "TrackEngine.h"
+#include "SequenceState.h"
 #include "model/FractalSequence.h"
 #include "model/FractalTrack.h"
 
@@ -51,6 +52,12 @@ public:
     // Cursors for the UI hero pages.
     int readPos() const { return _readPos; }
     int recordPos() const { return _recordPos; }
+
+#ifndef PLATFORM_STM32
+    // Test seam: run one section's traversal (capture-free, no Engine deref) so
+    // unit tests can read the runMode-ordered trunk index sequence.
+    void replaySectionForTest(uint32_t tick, uint32_t divisor) { replaySection(tick, divisor); }
+#endif
 
 private:
     FractalSequence &sequence()             { return *_sequence; }
@@ -129,6 +136,10 @@ private:
     bool _wasArmed = false;   // arm rising-edge detect → fresh run starts on a write
     uint8_t _readPos = 0;     // trunk read index of the sounding cell (UI highlight)
     uint16_t _globalPos = 0;  // KD-12 walk over the concatenated length 0..total-1
+
+    // Within-loop read order, runMode-aware. Advanced once per section; its step()
+    // is the loop-relative position fed to segmentCell/trunkReadIndex.
+    SequenceState _orderState;
 
     // Outputs.
     bool _gate = false;

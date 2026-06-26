@@ -200,7 +200,7 @@ FractalTrackEngine::FractalTrackEngine(Engine &engine, const Model &model, Track
 
         // delay 0: each section schedules immediately (gate edges this call).
         _fractalTrack.setTrackDelay(0);
-        _globalPos = 0; clearSchedule(); clearDelayRing();
+        _globalPos = 0; _orderState.reset(); clearSchedule(); clearDelayRing();
         replaySection(0, div);
         assert(_gateCount > 0 && _delayCount == 0);
         float cv0 = _cvEvents[0].cv;
@@ -208,7 +208,7 @@ FractalTrackEngine::FractalTrackEngine(Engine &engine, const Model &model, Track
         // delay 3: first 3 sections defer (ring fills, nothing scheduled); the
         // 4th surfaces section 0's note with the same playback CV.
         _fractalTrack.setTrackDelay(3);
-        _globalPos = 0; clearSchedule(); clearDelayRing();
+        _globalPos = 0; _orderState.reset(); clearSchedule(); clearDelayRing();
         replaySection(0, div);   assert(_gateCount == 0 && _delayCount == 1);
         replaySection(0, div);   assert(_gateCount == 0 && _delayCount == 2);
         replaySection(0, div);   assert(_gateCount == 0 && _delayCount == 3);
@@ -231,6 +231,7 @@ void FractalTrackEngine::reset() {
     _wasArmed = false;
     _readPos = sequence().loopFirst();
     _globalPos = 0;
+    _orderState.reset();
     _branchHash = -1;
     _gate = false;
     _cv = 0.f;
@@ -248,6 +249,7 @@ void FractalTrackEngine::restart() {
     _wasArmed = false;
     _readPos = sequence().loopFirst();
     _globalPos = 0;
+    _orderState.reset();
     clearDelayRing();
 }
 
@@ -278,6 +280,7 @@ TrackEngine::TickResult FractalTrackEngine::tick(uint32_t tick) {
         _recordPos = seq.recordFirst();
         _readPos = seq.loopFirst();
         _globalPos = 0;
+        _orderState.reset();
     }
 
     TickResult result = TickResult::NoUpdate;
@@ -526,10 +529,18 @@ void FractalTrackEngine::replaySection(uint32_t tick, uint32_t divisor) {
     int total = len * (1 + n);
     int gp = _globalPos % total;
 
-    // KD-12: global walk position → (segment via Path route, within-position).
+    // KD-12: global walk position → segment via Path route. The within-loop read
+    // order comes from the runMode-aware SequenceState (Forward stays byte-identical
+    // to the old gp%len walk), not a hand-rolled forward+rotate.
     int routeIndex = clamp(gp / len, 0, n);
-    int within = gp % len;
     int segment = routeOf(seq.path(), n, routeIndex);
+
+    _orderState.advanceFree(seq.runMode(), 0, len - 1, _rng);
+    int within = _orderState.step();
+    // Lookahead within: a copy advanced one more section gives the next read order.
+    SequenceState nextState = _orderState;
+    nextState.advanceFree(seq.runMode(), 0, len - 1, _rng);
+    int nextWithin = nextState.step();
 
     float semitonesRelRoot; int gateLen; bool valid;
     segmentCell(segment, within, semitonesRelRoot, gateLen, valid);
@@ -538,7 +549,7 @@ void FractalTrackEngine::replaySection(uint32_t tick, uint32_t divisor) {
 
     // Lookahead for direction-aware ornaments: the next sounding cell's raw note.
     float nextSemi; int nextGateLen; bool nextValid;
-    segmentCell(segment, within + 1, nextSemi, nextGateLen, nextValid);
+    segmentCell(segment, nextWithin, nextSemi, nextGateLen, nextValid);
 
     // Ornament eligibility (KD-13): sounding cell gated and trunk read index
     // inside the ornament zone. Rests and out-of-zone cells never ornament.
