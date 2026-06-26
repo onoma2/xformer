@@ -97,7 +97,7 @@ void FractalSequenceEditPage::drawTrunk(Canvas &canvas) {
     WindowPainter::drawActiveFunction(canvas, "LOOP");
 
     int activeFn = _editRecordSkip ? 3 : (_bracket == Bracket::Record ? 0 : (_bracket == Bracket::Loop ? 1 : 2));
-    const char *footer[] = { "REC", "LOOP", "ORN", "SKIP", "NEXT" };
+    const char *footer[] = { "REC", "LOOP", "ORN", "R.Skip", "NEXT" };
     WindowPainter::drawFooter(canvas, footer, pageKeyState(), activeFn);
 
     const int N = std::max(1, track.bufferLength());
@@ -174,7 +174,7 @@ void FractalSequenceEditPage::drawTrunk(Canvas &canvas) {
     canvas.drawText(90, 51, str);
 
     str.reset();
-    str("skip %d", seq.recordSkip());
+    str("R.Skip %d", seq.recordSkip());
     canvas.setColor(_editRecordSkip ? Color::Bright : Color::Medium);
     canvas.drawText(2, 51, str);
 }
