@@ -31,10 +31,10 @@ static const ContextMenuModel::Item contextMenuItems[] = {
 static const char *kPoolNames[8] = { "Tr", "Rv", "In", "RI", "Ro", "Co", "Ex", "Gt" };
 
 static const FractalSequenceListModel::Item quickEditItems[8] = {
-    FractalSequenceListModel::Item::LoopFirst,
-    FractalSequenceListModel::Item::LoopLast,
     FractalSequenceListModel::Item::RecordFirst,
     FractalSequenceListModel::Item::RecordLast,
+    FractalSequenceListModel::Item::LoopFirst,
+    FractalSequenceListModel::Item::LoopLast,
     FractalSequenceListModel::Item::OrnFirst,
     FractalSequenceListModel::Item::OrnLast,
     FractalSequenceListModel::Item::OrnamentRate,
