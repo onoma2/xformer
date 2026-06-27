@@ -22,6 +22,10 @@ public:
         RecordMode,
         CaptureCadence,
         CaptureFidelity,
+        Divisor,
+        ClockMultiplier,
+        ResetMeasure,
+        RecordTrigger,
         Last
     };
 
@@ -74,6 +78,8 @@ public:
             return Routing::Target::FractalOrnamentRate;
         case OrnamentIntensity:
             return Routing::Target::FractalOrnamentIntensity;
+        case RecordTrigger:
+            return Routing::Target::FractalRecordArm;
         default:
             return Routing::Target::None;
         }
@@ -99,6 +105,10 @@ private:
         case RecordMode:        return "Rec Mode";
         case CaptureCadence:    return "Capture";
         case CaptureFidelity:   return "Fidelity";
+        case Divisor:           return "Divisor";
+        case ClockMultiplier:   return "Clock Mult";
+        case ResetMeasure:      return "Reset Measure";
+        case RecordTrigger:     return "Record";
         case Last:              break;
         }
         return nullptr;
@@ -123,6 +133,10 @@ private:
         case RecordMode:        _sequence->printRecordMode(str); break;
         case CaptureCadence:    _sequence->printCaptureCadence(str); break;
         case CaptureFidelity:   _sequence->printCaptureFidelity(str); break;
+        case Divisor:           _sequence->printDivisor(str); break;
+        case ClockMultiplier:   _sequence->printClockMultiplier(str); break;
+        case ResetMeasure:      _sequence->printResetMeasure(str); break;
+        case RecordTrigger:     _sequence->printRecordTrigger(str); break;
         case Last:              break;
         }
     }
@@ -142,6 +156,10 @@ private:
         case RecordMode:        _sequence->editRecordMode(value, shift); break;
         case CaptureCadence:    _sequence->editCaptureCadence(value, shift); break;
         case CaptureFidelity:   _sequence->editCaptureFidelity(value, shift); break;
+        case Divisor:           _sequence->editDivisor(value, shift); break;
+        case ClockMultiplier:   _sequence->editClockMultiplier(value, shift); break;
+        case ResetMeasure:      _sequence->editResetMeasure(value, shift); break;
+        case RecordTrigger:     _sequence->editRecordTrigger(value, shift); break;
         case Last:              break;
         }
     }
@@ -168,6 +186,12 @@ private:
             return int(FractalSequence::CaptureCadence::Last);
         case CaptureFidelity:
             return int(FractalSequence::CaptureFidelity::Last);
+        case RecordTrigger:
+            return 2;
+        case Divisor:
+        case ClockMultiplier:
+        case ResetMeasure:
+            return -1;   // not a flat index range; edited via the encoder
         case Last:
             break;
         }
@@ -189,6 +213,10 @@ private:
         case RecordMode:        return int(_sequence->recordMode());
         case CaptureCadence:    return int(_sequence->captureCadence());
         case CaptureFidelity:   return int(_sequence->captureFidelity());
+        case RecordTrigger:     return _sequence->recordTrigger();
+        case Divisor:
+        case ClockMultiplier:
+        case ResetMeasure:      return -1;
         case Last:              break;
         }
         return -1;
@@ -209,6 +237,10 @@ private:
         case RecordMode:        return _sequence->setRecordMode(FractalSequence::RecordMode(index));
         case CaptureCadence:    return _sequence->setCaptureCadence(FractalSequence::CaptureCadence(index));
         case CaptureFidelity:   return _sequence->setCaptureFidelity(FractalSequence::CaptureFidelity(index));
+        case RecordTrigger:     return _sequence->setRecordTrigger(index);
+        case Divisor:
+        case ClockMultiplier:
+        case ResetMeasure:      break;
         case Last:              break;
         }
     }

@@ -134,7 +134,7 @@ void TrackPage::setTrack(Track &track) {
         newListModel = &_stochasticTrackListModel;
         break;
     case Track::TrackMode::Fractal:
-        _fractalTrackListModel.setTrack(track.fractalTrack(), _project, &_engine);
+        _fractalTrackListModel.setTrack(track.fractalTrack());
         newListModel = &_fractalTrackListModel;
         break;
     case Track::TrackMode::PhaseFlux:

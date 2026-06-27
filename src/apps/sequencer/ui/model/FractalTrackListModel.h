@@ -1,20 +1,18 @@
 #pragma once
 
-#include "Config.h"
 #include "RoutableListModel.h"
 #include "model/FractalTrack.h"
-#include "model/Project.h"
 #include "model/Scale.h"
 #include "model/ModelUtils.h"
 
+// Track-scope params only. Per-sequence params (loop/record/orn edges, order,
+// rate, intensity, divisor, …) live in FractalSequenceListModel.
 class FractalTrackListModel : public RoutableListModel {
 public:
     FractalTrackListModel() {}
 
-    void setTrack(FractalTrack &track, Project &project, Engine *engine = nullptr) {
+    void setTrack(FractalTrack &track) {
         _track = &track;
-        _project = &project;
-        _engine = engine;
     }
 
     virtual int rows() const override {
@@ -26,34 +24,29 @@ public:
     }
 
     virtual void cell(int row, int column, StringBuilder &str) const override {
-        auto &sequence = _track->sequence(_project->selectedPatternIndex());
         if (column == 0) {
             formatName(Item(row), str);
         } else if (column == 1) {
-            formatValue(Item(row), sequence, str);
+            formatValue(Item(row), str);
         }
     }
 
     virtual void edit(int row, int column, int value, bool shift) override {
         if (column == 1) {
-            auto &sequence = _track->sequence(_project->selectedPatternIndex());
-            editValue(Item(row), sequence, value, shift);
+            editValue(Item(row), value, shift);
         }
     }
 
     virtual Routing::Target routingTarget(int row) const override {
-        switch (Item(row)) {
-        case SlideTime:     return Routing::Target::SlideTime;
-        case Octave:        return Routing::Target::Octave;
-        case Transpose:     return Routing::Target::Transpose;
-        case Divisor:       return Routing::Target::Divisor;
-        default:            return Routing::Target::None;
-        }
+        // No track-scope Fractal param is in the RouteResolve table (KD-18 routes
+        // branchCount/path/ornamentRate/ornamentIntensity/recordTrigger, all
+        // per-sequence). So no inline route indicator here.
+        (void)row;
+        return Routing::Target::None;
     }
 
 private:
     enum Item {
-        // track-wide
         SourceA,
         BufferLength,
         Octave,
@@ -67,18 +60,6 @@ private:
         ScaleRotate,
         Lock,
         RecordMuted,
-        // per-sequence (active pattern)
-        Divisor,
-        ClockMultiplier,
-        ResetMeasure,
-        Order,
-        LoopFirst,
-        LoopLast,
-        RecordFirst,
-        RecordLast,
-        RecordMode,
-        RecordSkip,
-        Record,
         Last
     };
 
@@ -97,17 +78,6 @@ private:
         case ScaleRotate:       return "Scale Rotate";
         case Lock:              return "Lock";
         case RecordMuted:       return "Rec Muted";
-        case Divisor:           return "Divisor";
-        case ClockMultiplier:   return "Clock Mult";
-        case ResetMeasure:      return "Reset Measure";
-        case Order:             return "Order";
-        case LoopFirst:         return "Loop First";
-        case LoopLast:          return "Loop Last";
-        case RecordFirst:       return "Record First";
-        case RecordLast:        return "Record Last";
-        case RecordMode:        return "Record Mode";
-        case RecordSkip:        return "R.Skip";
-        case Record:            return "Record";
         case Last:              break;
         }
         return nullptr;
@@ -117,7 +87,7 @@ private:
         str(itemName(item));
     }
 
-    void formatValue(Item item, const FractalSequence &sequence, StringBuilder &str) const {
+    void formatValue(Item item, StringBuilder &str) const {
         switch (item) {
         case SourceA:
             _track->printSourceA(str);
@@ -166,45 +136,12 @@ private:
         case RecordMuted:
             _track->printRecordMuted(str);
             break;
-        case Divisor:
-            sequence.printDivisor(str);
-            break;
-        case ClockMultiplier:
-            sequence.printClockMultiplier(str);
-            break;
-        case ResetMeasure:
-            sequence.printResetMeasure(str);
-            break;
-        case Order:
-            sequence.printOrderMode(str);
-            break;
-        case LoopFirst:
-            sequence.printLoopFirst(str);
-            break;
-        case LoopLast:
-            sequence.printLoopLast(str);
-            break;
-        case RecordFirst:
-            sequence.printRecordFirst(str);
-            break;
-        case RecordLast:
-            sequence.printRecordLast(str);
-            break;
-        case RecordMode:
-            sequence.printRecordMode(str);
-            break;
-        case RecordSkip:
-            sequence.printRecordSkip(str);
-            break;
-        case Record:
-            sequence.printRecordTrigger(str);
-            break;
         case Last:
             break;
         }
     }
 
-    void editValue(Item item, FractalSequence &sequence, int value, bool shift) {
+    void editValue(Item item, int value, bool shift) {
         switch (item) {
         case SourceA:
             _track->editSourceA(value, shift);
@@ -245,45 +182,10 @@ private:
         case RecordMuted:
             _track->editRecordMuted(value, shift);
             break;
-        case Divisor:
-            sequence.editDivisor(value, shift);
-            break;
-        case ClockMultiplier:
-            sequence.editClockMultiplier(value, shift);
-            break;
-        case ResetMeasure:
-            sequence.editResetMeasure(value, shift);
-            break;
-        case Order:
-            sequence.editOrderMode(value, shift);
-            break;
-        case LoopFirst:
-            sequence.editLoopFirst(value, shift);
-            break;
-        case LoopLast:
-            sequence.editLoopLast(value, shift);
-            break;
-        case RecordFirst:
-            sequence.editRecordFirst(value, shift);
-            break;
-        case RecordLast:
-            sequence.editRecordLast(value, shift);
-            break;
-        case RecordMode:
-            sequence.editRecordMode(value, shift);
-            break;
-        case RecordSkip:
-            sequence.editRecordSkip(value, shift);
-            break;
-        case Record:
-            sequence.editRecordTrigger(value, shift);
-            break;
         case Last:
             break;
         }
     }
 
     FractalTrack *_track = nullptr;
-    Project *_project = nullptr;
-    Engine *_engine = nullptr;
 };
