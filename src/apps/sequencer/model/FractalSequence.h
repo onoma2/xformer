@@ -363,8 +363,8 @@ private:
         _ornFirst = 0;
         _ornLast = DefaultCells - 1;
         _recordMode = RecordMode::Replace;
-        _captureCadence = CaptureCadence::Section;
-        _captureFidelity = CaptureFidelity::Quantized;
+        _captureCadence = CaptureCadence::Event;
+        _captureFidelity = CaptureFidelity::Feel;
         _recordTrigger = 0;
         _branchCount = 0;
         _path = 0;
