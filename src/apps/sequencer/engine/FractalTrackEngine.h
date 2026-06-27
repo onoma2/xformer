@@ -120,6 +120,9 @@ private:
     // phase → onset, S&H the CV at the first edge (Feel) / boundary (Quantized).
     // Event cadence commits on the parent's hysteretic note-change here instead.
     bool resolveParentMix(bool &gate, float &cv) const;
+    // Single routing-channel reads for source slots (raw volts / channel-as-gate).
+    float readChannelVolts(Routing::Source src) const;
+    bool channelAsGate(Routing::Source src) const;
     void observeParent(uint32_t divisor);
     void resetObservation();
     void commitCell(float semitonesRelRoot, int gateLen, int onsetNibble, bool valid);
@@ -136,6 +139,8 @@ private:
     // generator emits a mono note list scheduled onto the gate/CV queues.
     int nearestDegree(float semitonesRelRoot) const;
     float stepDegrees(float semitonesRelRoot, int steps) const;
+    // Opt-in playback quantize for the literal main note (raw when quantize < 0).
+    float quantizeMainSemi(float semitonesRelRoot) const;
     int eligibleOrnaments(int ids[], int intensity) const;
     int rollOrnament(int rate, int intensity);
     void scheduleSection(uint32_t tick, uint32_t divisor, float mainSemi,

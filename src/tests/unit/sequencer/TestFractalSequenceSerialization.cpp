@@ -172,4 +172,50 @@ CASE("track_record_muted_round_trip") {
     expectTrue(r.recordMuted(), "recordMuted persists");
 }
 
+CASE("track_quantize_round_trip") {
+    FractalTrack track;
+    track.clear();
+    expectEqual(track.quantize(), -1, "quantize defaults to raw (-1)");
+
+    track.setQuantize(5);
+
+    uint8_t buf[8192];
+    std::memset(buf, 0, sizeof(buf));
+    writeTrack(track, buf, sizeof(buf));
+
+    FractalTrack r;
+    r.clear();
+    readTrack(r, buf, sizeof(buf));
+
+    expectEqual(r.quantize(), 5, "quantize persists");
+}
+
+CASE("track_channel_source_round_trip") {
+    // Extended source slots store track indices (current) and single channels
+    // (above the track range). A channel value must round-trip and classify.
+    FractalTrack track;
+    track.clear();
+
+    int chanA = FractalTrack::sourceMax();   // last channel (Mod8)
+    track.setSourceA(chanA);
+    track.setSourceB(3);                      // still a parent track
+
+    uint8_t buf[8192];
+    std::memset(buf, 0, sizeof(buf));
+    writeTrack(track, buf, sizeof(buf));
+
+    FractalTrack r;
+    r.clear();
+    readTrack(r, buf, sizeof(buf));
+
+    expectEqual(r.sourceA(), chanA, "channel source A persists");
+    expectEqual(r.sourceB(), 3, "track source B persists");
+    expectTrue(FractalTrack::sourceKind(r.sourceA()) == FractalTrack::SourceKind::Channel,
+               "source A classifies as channel");
+    expectTrue(FractalTrack::sourceKind(r.sourceB()) == FractalTrack::SourceKind::Track,
+               "source B classifies as track");
+    expectTrue(FractalTrack::sourceChannelOf(r.sourceA()) == Routing::Source::Mod8,
+               "last channel maps to Mod8");
+}
+
 } // UNIT_TEST("FractalSequenceSerialization")

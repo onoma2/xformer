@@ -68,20 +68,55 @@ public:
         return nullptr;
     }
 
+    // Source slot classification. A slot value is None (-1), a parent Track
+    // (0..CONFIG_TRACK_COUNT-1), or a routing Channel (above the track range,
+    // indexing into the ordered kSourceChannels list).
+    enum class SourceKind { None, Track, Channel };
+
+    // Ordered single-channel list a source slot can select after the tracks:
+    // CvIn1-4, CvOut1-8, BusCv1-4, GateOut1-8, Mod1-8 (the full exposed set).
+    static constexpr int sourceChannelCount() { return 4 + 8 + 4 + 8 + 8; }
+    static Routing::Source sourceChannel(int listIndex) {
+        static const Routing::Source kSourceChannels[] = {
+            Routing::Source::CvIn1, Routing::Source::CvIn2, Routing::Source::CvIn3, Routing::Source::CvIn4,
+            Routing::Source::CvOut1, Routing::Source::CvOut2, Routing::Source::CvOut3, Routing::Source::CvOut4,
+            Routing::Source::CvOut5, Routing::Source::CvOut6, Routing::Source::CvOut7, Routing::Source::CvOut8,
+            Routing::Source::BusCv1, Routing::Source::BusCv2, Routing::Source::BusCv3, Routing::Source::BusCv4,
+            Routing::Source::GateOut1, Routing::Source::GateOut2, Routing::Source::GateOut3, Routing::Source::GateOut4,
+            Routing::Source::GateOut5, Routing::Source::GateOut6, Routing::Source::GateOut7, Routing::Source::GateOut8,
+            Routing::Source::Mod1, Routing::Source::Mod2, Routing::Source::Mod3, Routing::Source::Mod4,
+            Routing::Source::Mod5, Routing::Source::Mod6, Routing::Source::Mod7, Routing::Source::Mod8,
+        };
+        return kSourceChannels[clamp(listIndex, 0, sourceChannelCount() - 1)];
+    }
+    static SourceKind sourceKind(int v) {
+        if (v < 0) return SourceKind::None;
+        if (v < CONFIG_TRACK_COUNT) return SourceKind::Track;
+        return SourceKind::Channel;
+    }
+    // Channel slot → Routing::Source (caller checks sourceKind == Channel first).
+    static Routing::Source sourceChannelOf(int v) { return sourceChannel(v - CONFIG_TRACK_COUNT); }
+    static int sourceMax() { return CONFIG_TRACK_COUNT - 1 + sourceChannelCount(); }
+
     //----------------------------------------
     // Properties
     //----------------------------------------
 
-    // sourceA / sourceB (parent track indices; -1 = none)
+    // sourceA / sourceB: -1 = None, 0..CONFIG_TRACK_COUNT-1 = parent track,
+    // above that = a single routing channel (sourceChannelOf).
     int sourceA() const { return _sourceA; }
-    void setSourceA(int v) { _sourceA = clamp(v, -1, CONFIG_TRACK_COUNT - 1); }
+    void setSourceA(int v) { _sourceA = clamp(v, -1, sourceMax()); }
     void editSourceA(int value, bool shift) { setSourceA(sourceA() + value); }
     void printSourceA(StringBuilder &str) const { printSource(str, sourceA()); }
 
     int sourceB() const { return _sourceB; }
-    void setSourceB(int v) { _sourceB = clamp(v, -1, CONFIG_TRACK_COUNT - 1); }
+    void setSourceB(int v) { _sourceB = clamp(v, -1, sourceMax()); }
     void editSourceB(int value, bool shift) { setSourceB(sourceB() + value); }
     void printSourceB(StringBuilder &str) const { printSource(str, sourceB()); }
+
+    // Any slot selects a source (gates capture). With channels, slot B alone may
+    // hold a source, so this can't reduce to sourceA() >= 0.
+    bool hasSource() const { return _sourceA >= 0 || _sourceB >= 0; }
 
     // gateLogic / cvLogic
     GateLogic gateLogic() const { return _gateLogic; }
@@ -115,6 +150,16 @@ public:
     // slideTime
     int slideTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slideTime, 0, 100); }
     void setSlideTime(int slideTime) { _slideTime = clamp(slideTime, 0, 100); }
+
+    // quantize: -1 = raw (no quantize), >=0 = scale index to snap the played
+    // main note to. Trunk storage stays raw; quantize only shapes playback.
+    int quantize() const { return _quantize; }
+    void setQuantize(int v) { _quantize = clamp(v, -1, Scale::Count - 1); }
+    void editQuantize(int value, bool shift) { setQuantize(quantize() + value); }
+    void printQuantize(StringBuilder &str) const {
+        if (_quantize < 0) str("Raw");
+        else str("%s", Scale::name(_quantize));
+    }
 
     // cvUpdateMode
     CvUpdateMode cvUpdateMode() const { return _cvUpdateMode; }
@@ -171,6 +216,7 @@ public:
         _transpose = 0;
         _slideTime = 0;
         _cvUpdateMode = CvUpdateMode::Gate;
+        _quantize = -1;
         _trackDelay = 0;
         _scaleGroup.raw = 0;
         setScale(-1);
@@ -195,6 +241,7 @@ public:
         writer.write(_transpose);
         writer.write(_slideTime);
         writer.write(static_cast<uint8_t>(_cvUpdateMode));
+        writer.write(_quantize);
         writer.write(_trackDelay);
         writer.write(_scaleGroup.raw);
         writer.write(static_cast<uint8_t>(_playMode));
@@ -222,6 +269,7 @@ public:
         uint8_t cvUpdateMode;
         reader.read(cvUpdateMode);
         _cvUpdateMode = cvUpdateMode < uint8_t(CvUpdateMode::Last) ? static_cast<CvUpdateMode>(cvUpdateMode) : CvUpdateMode::Gate;
+        reader.read(_quantize);
         reader.read(_trackDelay);
         reader.read(_scaleGroup.raw);
         uint8_t playMode;
@@ -236,10 +284,10 @@ public:
 
 private:
     static void printSource(StringBuilder &str, int source) {
-        if (source < 0) {
-            str("None");
-        } else {
-            str("Track %d", source + 1);
+        switch (sourceKind(source)) {
+        case SourceKind::None:    str("None"); break;
+        case SourceKind::Track:   str("Track %d", source + 1); break;
+        case SourceKind::Channel: Routing::printSource(sourceChannelOf(source), str); break;
         }
     }
 
@@ -262,6 +310,7 @@ private:
     int8_t _transpose;
     uint8_t _slideTime;
     CvUpdateMode _cvUpdateMode;
+    int8_t _quantize;
     uint8_t _trackDelay;
     union {
         uint16_t raw;

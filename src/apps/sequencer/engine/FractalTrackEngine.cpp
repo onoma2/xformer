@@ -1,5 +1,6 @@
 #include "FractalTrackEngine.h"
 #include "Engine.h"
+#include "TT2OutputShaping.h"
 
 #include "model/FractalSequence.h"
 #include "model/FractalTrack.h"
@@ -330,7 +331,7 @@ TrackEngine::TickResult FractalTrackEngine::tick(uint32_t tick) {
     {
         const auto &seq2 = sequence();
         bool armed = seq2.recordTrigger() != 0;
-        if (armed && !_fractalTrack.lock() && _fractalTrack.sourceA() >= 0) {
+        if (armed && !_fractalTrack.lock() && _fractalTrack.hasSource()) {
             observeParent(divisor);
         }
     }
@@ -360,10 +361,9 @@ void FractalTrackEngine::advanceSection(uint32_t tick, uint32_t divisor) {
     // commits per parent note-change inside observeParent). Then reset the window
     // for the section now beginning. Lock/disarm suspend capture entirely.
     bool armed = seq.recordTrigger() != 0;
-    int srcA = _fractalTrack.sourceA();
     if (armed && !_wasArmed) { _recordSkipRemaining = 0; resetObservation(); }
     _wasArmed = armed;
-    bool capturing = armed && !_fractalTrack.lock() && srcA >= 0;
+    bool capturing = armed && !_fractalTrack.lock() && _fractalTrack.hasSource();
     bool sectionCadence = seq.captureCadence() == FractalSequence::CaptureCadence::Section;
     if (capturing && sectionCadence) {
         captureSection();
@@ -422,23 +422,99 @@ float FractalTrackEngine::combineCv(float aCv, float bCv, bool aGate, bool bGate
     }
 }
 
-// KD-4 mix resolve. Reads the parents' emitted gate+CV (volts) and combines them.
+// Raw volts of a single routing channel — same source locations as
+// RoutingEngine::resolveSourceValue, but unnormalized (1V/oct for the Fractal).
+// Mod 0..127 → ±5V via Engine's modulator-offset mapping (applyModulatorOffset).
+float FractalTrackEngine::readChannelVolts(Routing::Source src) const {
+    using S = Routing::Source;
+    if (src >= S::CvIn1 && src <= S::CvIn4) {
+        return _engine.cvInput().channel(int(src) - int(S::CvIn1));
+    }
+    if (src >= S::CvOut1 && src <= S::CvOut8) {
+        return _engine.cvOutput().channel(int(src) - int(S::CvOut1));
+    }
+    if (src >= S::BusCv1 && src <= S::BusCv4) {
+        return _engine.busCv(int(src) - int(S::BusCv1));
+    }
+    if (src >= S::GateOut1 && src <= S::GateOut8) {
+        return (_engine.gateOutput() & (1 << (int(src) - int(S::GateOut1)))) ? 5.f : 0.f;
+    }
+    if (src >= S::Mod1 && src <= S::Mod8) {
+        int v = _engine.modulatorEngine().currentValue(int(src) - int(S::Mod1));
+        return (v - 64) / 12.8f;   // 0..127 → ±5V
+    }
+    return 0.f;
+}
+
+// Channel-as-gate: a GateOut bit is on when the raw read is non-zero; any other
+// channel (a CV) gates when its value is non-zero.
+bool FractalTrackEngine::channelAsGate(Routing::Source src) const {
+    return readChannelVolts(src) != 0.f;
+}
+
+// KD-4 mix resolve. Both-track-or-None slots take the logic-mix path (byte-
+// identical to before). If either slot is a single routing channel, the tailored
+// path applies: final CV from slot A, final gate from slot B, no logic mix.
 // recordMuted (KD-21 ghost) taps the pre-mute gate. Returns false if no source.
 bool FractalTrackEngine::resolveParentMix(bool &gate, float &cv) const {
     int srcA = _fractalTrack.sourceA();
-    if (srcA < 0) { gate = false; cv = 0.f; return false; }
-    bool recordMuted = _fractalTrack.recordMuted();
-    const TrackEngine &parentA = _engine.trackEngine(srcA);
-    bool aGate = recordMuted ? parentA.recordGate() : parentA.gateOutput(0);
-    float aCv = parentA.cvOutput(0);
-
     int srcB = _fractalTrack.sourceB();
-    if (srcB < 0) { gate = aGate; cv = aCv; return true; }
-    const TrackEngine &parentB = _engine.trackEngine(srcB);
-    bool bGate = recordMuted ? parentB.recordGate() : parentB.gateOutput(0);
-    float bCv = parentB.cvOutput(0);
-    gate = combineGate(aGate, bGate);
-    cv = combineCv(aCv, bCv, aGate, bGate);
+    using SK = FractalTrack::SourceKind;
+    bool channelInvolved =
+        FractalTrack::sourceKind(srcA) == SK::Channel ||
+        FractalTrack::sourceKind(srcB) == SK::Channel;
+    bool recordMuted = _fractalTrack.recordMuted();
+
+    if (!channelInvolved) {
+        if (srcA < 0) { gate = false; cv = 0.f; return false; }
+        const TrackEngine &parentA = _engine.trackEngine(srcA);
+        bool aGate = recordMuted ? parentA.recordGate() : parentA.gateOutput(0);
+        float aCv = parentA.cvOutput(0);
+
+        if (srcB < 0) { gate = aGate; cv = aCv; return true; }
+        const TrackEngine &parentB = _engine.trackEngine(srcB);
+        bool bGate = recordMuted ? parentB.recordGate() : parentB.gateOutput(0);
+        float bCv = parentB.cvOutput(0);
+        gate = combineGate(aGate, bGate);
+        cv = combineCv(aCv, bCv, aGate, bGate);
+        return true;
+    }
+
+    if (srcA < 0 && srcB < 0) { gate = false; cv = 0.f; return false; }
+
+    // Slot A → CV (+ its own gate, used as the fallback when B is None).
+    float aCv = 0.f; bool aGate = false;
+    switch (FractalTrack::sourceKind(srcA)) {
+    case SK::Channel: {
+        Routing::Source ch = FractalTrack::sourceChannelOf(srcA);
+        aCv = readChannelVolts(ch);
+        aGate = channelAsGate(ch);
+        break;
+    }
+    case SK::Track: {
+        const TrackEngine &parentA = _engine.trackEngine(srcA);
+        aCv = parentA.cvOutput(0);
+        aGate = recordMuted ? parentA.recordGate() : parentA.gateOutput(0);
+        break;
+    }
+    case SK::None: break;
+    }
+
+    // Slot B → gate. None → fall back to slot A's gate so a lone CV-in-A gates.
+    switch (FractalTrack::sourceKind(srcB)) {
+    case SK::Channel:
+        gate = channelAsGate(FractalTrack::sourceChannelOf(srcB));
+        break;
+    case SK::Track: {
+        const TrackEngine &parentB = _engine.trackEngine(srcB);
+        gate = recordMuted ? parentB.recordGate() : parentB.gateOutput(0);
+        break;
+    }
+    case SK::None:
+        gate = aGate;
+        break;
+    }
+    cv = aCv;
     return true;
 }
 
@@ -782,6 +858,18 @@ void FractalTrackEngine::replaySection(uint32_t tick, uint32_t divisor) {
     _globalPos = uint16_t((gp + 1) % total);
 }
 
+// Opt-in playback quantize: snap rel-root semitones to the track's quantize scale
+// via Tt2OutputShaping::shapeCv's quantize block (Bipolar5V range, no offset, so
+// only the quantize+clamp engages). quantize < 0 → raw pass-through, untouched.
+float FractalTrackEngine::quantizeMainSemi(float semitonesRelRoot) const {
+    int q = _fractalTrack.quantize();
+    if (q < 0) return semitonesRelRoot;
+    float volts = semitonesRelRoot * (1.f / kSemitonesPerOctave);
+    volts = Tt2OutputShaping::shapeCv(volts, Types::VoltageRange::Bipolar5V, 0,
+                                      q, -1, _model.project().rootNote());
+    return volts * kSemitonesPerOctave;
+}
+
 // rel-root semitones → playback volts. octave = 1V; transpose semitones → volts.
 // Trunk stays raw — captured CV is never quantized (KD-13). Ornament notes are
 // already scale-snapped before reaching here; the main note is literal.
@@ -837,6 +925,12 @@ int FractalTrackEngine::rollOrnament(int rate, int intensity) {
 void FractalTrackEngine::scheduleSection(uint32_t tick, uint32_t divisor, float mainSemi,
                                          float nextSemi, int gateLen, bool ornEligible) {
     clearSchedule();
+
+    // Post-record quantize (opt-in): snap the played main note to the track's
+    // quantize scale. Off (-1) → skipped, byte-identical. Trunk stays raw; the
+    // derived ornament flourish notes already snap to their own scale.
+    mainSemi = quantizeMainSemi(mainSemi);
+    nextSemi = quantizeMainSemi(nextSemi);
 
     // gap = retrigger silence held before the next note: ornament notes pass 1 so
     // the gate drops for a tick and re-articulates; the plain/main note passes 0 to

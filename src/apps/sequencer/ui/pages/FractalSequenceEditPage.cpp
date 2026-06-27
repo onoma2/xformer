@@ -61,10 +61,27 @@ static void drawBar(Canvas &canvas, int x, int y, int w, int h, int pct, bool hi
     canvas.fillRect(x + 1, y + 1, fw, h - 2);
 }
 
-// Compact track ref: "<mode-letter> T<n>" or "-" for none.
+// Compact source-slot ref: "-" for none, "<mode-letter> T<n>" for a parent track,
+// or a compact channel name (CvIn2 / CvOut3 / Bus1 / Gate4 / Mod5) for a channel.
 static void printSourceRef(StringBuilder &str, const Project &project, int index) {
-    if (index < 0) { str("-"); return; }
-    str("%c T%d", Track::trackModeLetter(project.track(index).trackMode()), index + 1);
+    using S = Routing::Source;
+    switch (FractalTrack::sourceKind(index)) {
+    case FractalTrack::SourceKind::None:
+        str("-");
+        return;
+    case FractalTrack::SourceKind::Track:
+        str("%c T%d", Track::trackModeLetter(project.track(index).trackMode()), index + 1);
+        return;
+    case FractalTrack::SourceKind::Channel: {
+        S ch = FractalTrack::sourceChannelOf(index);
+        if (ch >= S::CvIn1 && ch <= S::CvIn4) str("CvIn%d", int(ch) - int(S::CvIn1) + 1);
+        else if (ch >= S::CvOut1 && ch <= S::CvOut8) str("CvOut%d", int(ch) - int(S::CvOut1) + 1);
+        else if (ch >= S::BusCv1 && ch <= S::BusCv4) str("Bus%d", int(ch) - int(S::BusCv1) + 1);
+        else if (ch >= S::GateOut1 && ch <= S::GateOut8) str("Gate%d", int(ch) - int(S::GateOut1) + 1);
+        else str("Mod%d", int(ch) - int(S::Mod1) + 1);
+        return;
+    }
+    }
 }
 
 // Single-select row of cells (mirrors the mockup _seg_row).
@@ -317,7 +334,8 @@ void FractalSequenceEditPage::drawOrnament(Canvas &canvas) {
     canvas.drawText(2, 39, "Scale");
     canvas.setColor((_ornamentFocus == OrnamentFocus::Scale || _ornamentFocus == OrnamentFocus::Root) ? Color::Bright : Color::MediumBright);
     str.reset();
-    Types::printNote(str, seq.rootNote());
+    if (seq.rootNote() >= 0) Types::printNote(str, seq.rootNote());
+    else str("Inherit");
     if (seq.scale() < 0) str(" Default");
     else str(" %s", Scale::name(seq.scale()));
     canvas.drawText(40, 39, str);
@@ -347,15 +365,19 @@ void FractalSequenceEditPage::drawSource(Canvas &canvas) {
     canvas.setFont(Font::Tiny);
     FixedStringBuilder<24> str;
 
-    // Source A / Source B refs
+    // Source A / Source B refs. A single-channel slot suffixes its label with the
+    // slot's tailored role (A → CV, B → Gate); a track/none slot keeps plain A/B.
+    using SK = FractalTrack::SourceKind;
     canvas.setColor(Color::Medium);
-    canvas.drawText(2, 16, "A");
+    const char *labelA = FractalTrack::sourceKind(track.sourceA()) == SK::Channel ? "A-CV" : "A";
+    canvas.drawText(2, 16, labelA);
     canvas.setColor(_sourceFocus == SourceFocus::SourceA ? Color::Bright : Color::MediumBright);
     str.reset(); printSourceRef(str, _project, track.sourceA());
-    canvas.drawText(14, 16, str);
+    canvas.drawText(28, 16, str);
 
     canvas.setColor(Color::Medium);
-    canvas.drawText(200, 16, "B");
+    const char *labelB = FractalTrack::sourceKind(track.sourceB()) == SK::Channel ? "B-Gt" : "B";
+    canvas.drawText(196, 16, labelB);
     canvas.setColor(_sourceFocus == SourceFocus::SourceB ? Color::Bright : Color::MediumBright);
     str.reset(); printSourceRef(str, _project, track.sourceB());
     canvas.drawText(Width - 2 - canvas.textWidth(str), 16, str);

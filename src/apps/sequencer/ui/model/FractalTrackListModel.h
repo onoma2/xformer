@@ -61,6 +61,7 @@ private:
         SlideTime,
         Delay,
         CvUpdateMode,
+        Quantize,
         Scale,
         RootNote,
         ScaleRotate,
@@ -90,6 +91,7 @@ private:
         case SlideTime:         return "Slide Time";
         case Delay:             return "Delay";
         case CvUpdateMode:      return "CV Update Mode";
+        case Quantize:          return "Quantize";
         case Scale:             return "Scale";
         case RootNote:          return "Root Note";
         case ScaleRotate:       return "Scale Rotate";
@@ -137,6 +139,9 @@ private:
             break;
         case CvUpdateMode:
             str(FractalTrack::cvUpdateModeName(_track->cvUpdateMode()));
+            break;
+        case Quantize:
+            _track->printQuantize(str);
             break;
         case Scale:
             str(_track->scale() < 0 ? "Default" : Scale::name(_track->scale()));
@@ -221,6 +226,9 @@ private:
             break;
         case CvUpdateMode:
             _track->setCvUpdateMode(ModelUtils::adjustedEnum(_track->cvUpdateMode(), value));
+            break;
+        case Quantize:
+            _track->editQuantize(value, shift);
             break;
         case Scale:
             _track->setScale(_track->scale() + value);
