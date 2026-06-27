@@ -279,11 +279,7 @@ void FractalSequenceEditPage::drawBranch(Canvas &canvas) {
         int x = j * bw;
         bool isTrunk = j == 0;
         bool isPlaying = j == playing;
-        if (isPlaying) {                              // sounding block: filled bar
-            canvas.setColor(Color::Medium);
-            canvas.fillRect(x + 1, y, bw - 2, 10);
-        }
-        canvas.setColor(isTrunk ? Color::Bright : Color::Medium);
+        canvas.setColor(isPlaying ? Color::Bright : Color::Medium);   // bright border = playhead
         canvas.drawRect(x + 1, y, bw - 2, 10);
         str.reset();
         if (isTrunk) {
@@ -293,7 +289,7 @@ void FractalSequenceEditPage::drawBranch(Canvas &canvas) {
             branchBlockLabel(str, kind, param);
             if (canvas.textWidth(str) > bw - 3) { str.reset(); str("%s", kPoolNames[kind]); }
         }
-        canvas.setColor(isPlaying ? Color::Bright : (isTrunk ? Color::Bright : Color::MediumBright));
+        canvas.setColor(isPlaying ? Color::Bright : Color::MediumBright);
         canvas.drawText(x + 1 + (bw - 2 - canvas.textWidth(str)) / 2, y + 6, str);
     }
 
