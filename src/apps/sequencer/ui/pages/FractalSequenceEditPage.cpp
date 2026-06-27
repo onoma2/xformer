@@ -318,8 +318,10 @@ void FractalSequenceEditPage::drawOrnament(Canvas &canvas) {
     WindowPainter::drawHeader(canvas, _model, _engine, "FRACTAL");
     WindowPainter::drawActiveFunction(canvas, "ORN");
 
-    int activeFn = int(_ornamentFocus);
-    const char *footer[] = { "RATE", "INT", "SCALE", "ZONE", "NEXT" };
+    // LOCK footer highlights while the track is locked (persistent state); else
+    // the active F-slot follows the encoder focus.
+    int activeFn = _project.selectedTrack().fractalTrack().lock() ? 3 : int(_ornamentFocus);
+    const char *footer[] = { "RATE", "INT", "SCALE", "LOCK", "NEXT" };
     WindowPainter::drawFooter(canvas, footer, pageKeyState(), activeFn);
 
     canvas.setFont(Font::Tiny);
@@ -613,6 +615,13 @@ void FractalSequenceEditPage::keyPressOrnament(KeyPressEvent &event) {
         case 0: _ornamentFocus = OrnamentFocus::Rate; break;
         case 1: _ornamentFocus = OrnamentFocus::Intensity; break;
         case 2: _ornamentFocus = OrnamentFocus::Scale; break;
+        case 3: {
+            // LOCK: toggle on press (freezes the ornament roll to the last-fired).
+            auto &track = _project.selectedTrack().fractalTrack();
+            track.setLock(!track.lock());
+            showMessage(track.lock() ? "LOCKED" : "UNLOCKED");
+            break;
+        }
         default: break;
         }
         event.consume();
