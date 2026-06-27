@@ -432,3 +432,7 @@ Each is independently scoped — lands inside an existing function or reserved f
 ## Blocks
 
 Nothing directly blocked.
+
+## Shipped — 2026-06-27
+
+Full track on `feat/fractal-track`. RAM concern resolved: `FractalTrackEngine` is **888 B ≤ the 912 union gate** (net-zero under the discriminated-union Container). Every in-scope KD wired — **presented == built**; commit list in the STATUS.md fractal block. Engine capture path + `recordGate()` overrides are **build-verified only** (headless `Engine` test seam still absent — the one open infra task). LoopMode Once deferred per spec; DiscreteMap/PhaseFlux decay-timer `activity()` noted in memory `project_fix_indexed_mute` for a future ghost-source refinement.
