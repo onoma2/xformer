@@ -2,6 +2,8 @@
 
 #include "ui/painters/WindowPainter.h"
 #include "ui/painters/SequencePainter.h"
+#include "ui/LedPainter.h"
+#include "ui/MatrixMap.h"
 #include "Pages.h"
 
 #include "model/FractalTrack.h"
@@ -27,6 +29,17 @@ static const ContextMenuModel::Item contextMenuItems[] = {
 
 // 8-slot transform pool (matches branchPool bitmask order, KD-12).
 static const char *kPoolNames[8] = { "Tr", "Rv", "In", "RI", "Ro", "Co", "Ex", "Gt" };
+
+static const FractalSequenceListModel::Item quickEditItems[8] = {
+    FractalSequenceListModel::Item::LoopFirst,
+    FractalSequenceListModel::Item::LoopLast,
+    FractalSequenceListModel::Item::RecordFirst,
+    FractalSequenceListModel::Item::RecordLast,
+    FractalSequenceListModel::Item::OrnFirst,
+    FractalSequenceListModel::Item::OrnLast,
+    FractalSequenceListModel::Item::OrnamentRate,
+    FractalSequenceListModel::Item::OrnamentIntensity,
+};
 
 // Branch-block label: pool abbrev + resolved param (KD-12). Paramless ops
 // (Reverse/Inverse/RetInverse/GateThin) yield abbrev only. fx100 → compact
@@ -510,6 +523,11 @@ void FractalSequenceEditPage::keyPress(KeyPressEvent &event) {
     if (!isActiveForSelectedTrack()) { event.consume(); return; }
 
     const auto &key = event.key();
+    if (key.isQuickEdit()) {
+        quickEdit(key.quickEdit());
+        event.consume();
+        return;
+    }
     if (key.pageModifier()) return;   // Page held → let global nav switch away (exit)
     if (key.isContextMenu()) {
         contextShow();
@@ -663,4 +681,24 @@ bool FractalSequenceEditPage::contextActionEnabled(int index) const {
     }
 }
 
-void FractalSequenceEditPage::updateLeds(Leds &leds) {}
+void FractalSequenceEditPage::quickEdit(int index) {
+    if (!isActiveForSelectedTrack()) return;
+    _quickEditModel.setSequence(&_project.selectedTrack().fractalTrack().sequence(_project.selectedPatternIndex()));
+    int row = _quickEditModel.rowForItem(quickEditItems[index]);
+    if (row < 0) return;
+    _manager.pages().quickEdit.show(_quickEditModel, row);
+}
+
+void FractalSequenceEditPage::updateLeds(Leds &leds) {
+    if (!isActiveForSelectedTrack()) return;
+
+    // show quick edit keys
+    if (globalKeyState()[Key::Page] && !globalKeyState()[Key::Shift]) {
+        for (int i = 0; i < 8; ++i) {
+            int index = MatrixMap::fromStep(i + 8);
+            leds.unmask(index);
+            leds.set(index, false, true);
+            leds.mask(index);
+        }
+    }
+}

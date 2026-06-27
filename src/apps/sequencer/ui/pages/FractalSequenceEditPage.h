@@ -2,6 +2,8 @@
 
 #include "BasePage.h"
 
+#include "ui/model/FractalSequenceListModel.h"
+
 // Fractal hero-page ring (KD-19): one page object cycling Trunk -> Branch ->
 // Ornament -> Source via F5=NEXT. Trunk is the captured loop "tape" with the
 // live bracket editor (record/loop/ornament); Branch edits the transform
@@ -52,6 +54,10 @@ private:
     void keyPressSource(KeyPressEvent &event);
 
     void editBracket(int value, bool shift);
+
+    void quickEdit(int index);
+
+    FractalSequenceListModel _quickEditModel;
 
     Page _currentPage = Page::Trunk;
 
