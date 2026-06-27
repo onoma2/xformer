@@ -261,11 +261,13 @@ private:
     }
 
     // KD-13 ornament state. PRNG is live/probabilistic (free-running). Lock
-    // freezes _lastOrnament: Rate still gates whether a flourish fires, Lock
-    // fixes which one. -1 = none rolled yet.
+    // freezes _lastOrnament (which flourish) AND _lastDir (its realized shape —
+    // the toward/away direction + lookahead), so the locked flourish is identical
+    // every firing instead of re-adapting to each cell. -1 = none rolled yet.
     Random _rng;
     Random _branchRng;        // seeded from branchSeed per rebuild — deterministic
     int _lastOrnament = -1;
+    int8_t _lastDir = 1;
 };
 
 static_assert(sizeof(FractalTrackEngine) <= 912, "FractalTrackEngine too large");

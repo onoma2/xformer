@@ -138,8 +138,20 @@ FractalTrackEngine::FractalTrackEngine(Engine &engine, const Model &model, Track
         bool wasLocked = _fractalTrack.lock();
         _fractalTrack.setLock(true);
         for (int i = 0; i < 50; ++i) assert(rollOrnament(100, 100) == OrnTrill);
+
+        // Lock freezes the realized flourish, not just the id: a dir-dependent
+        // ornament with _lastDir=+1 ascends regardless of the (opposite) lookahead,
+        // and the flourish is identical for nextSemi below vs above the main note.
+        _lastOrnament = OrnRunToward; _lastDir = 1;
+        scheduleSection(0, 96, 0.f, -60.f, 8, true);   // nextSemi far below
+        float belowMain = cvEventForTest(0), belowFlourish = cvEventForTest(1);
+        scheduleSection(0, 96, 0.f, 60.f, 8, true);    // nextSemi far above
+        float aboveFlourish = cvEventForTest(1);
+        assert(belowFlourish > belowMain);                          // frozen dir +1 (ascends)
+        assert(std::abs(belowFlourish - aboveFlourish) < 1e-4f);    // identical, ignores lookahead
+
         _fractalTrack.setLock(wasLocked);
-        _lastOrnament = -1;
+        _lastOrnament = -1; _lastDir = 1;
     }
     reset();
 
@@ -942,7 +954,20 @@ void FractalTrackEngine::scheduleSection(uint32_t tick, uint32_t divisor, float 
         return;
     }
 
-    int dir = (nextSemi >= mainSemi) ? 1 : -1;   // toward the next cell
+    // Direction toward the next cell — frozen under lock so the locked flourish
+    // keeps the same shape (KD-13 lock = freeze the realized flourish, ignore
+    // per-cell lookahead). Anticipation likewise uses a frozen-direction grace
+    // instead of the live next-cell pitch while locked.
+    int dir;
+    float antNote;
+    if (_fractalTrack.lock()) {
+        dir = _lastDir;
+        antNote = stepDegrees(mainSemi, dir);
+    } else {
+        dir = (nextSemi >= mainSemi) ? 1 : -1;
+        _lastDir = int8_t(dir);
+        antNote = nextSemi;
+    }
 
     // Grace: main held, then a one-eighth grace note at the tail.
     auto grace = [&](float semi) {
@@ -952,7 +977,7 @@ void FractalTrackEngine::scheduleSection(uint32_t tick, uint32_t divisor, float 
 
     switch (name) {
     case OrnAnticipation:
-        pushNote(nextSemi, tick, e);
+        pushNote(antNote, tick, e);
         pushNote(mainSemi, tick + e, fullDur - e);
         break;
     case OrnSuspension:                          // no prior-cell handle in the looper
