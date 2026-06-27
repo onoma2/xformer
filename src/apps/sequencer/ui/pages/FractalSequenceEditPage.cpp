@@ -233,6 +233,11 @@ void FractalSequenceEditPage::drawTrunk(Canvas &canvas) {
     str("R.Skip %d", seq.recordSkip());
     canvas.setColor(_editRecordSkip ? Color::Bright : Color::Medium);
     canvas.drawText(2, 51, str);
+
+    str.reset();
+    str("rec %d-%d", recFirst, recLast);
+    canvas.setColor(_bracket == Bracket::Record ? Color::Bright : Color::Medium);
+    canvas.drawText(Width - 2 - canvas.textWidth(str), 51, str);
 }
 
 void FractalSequenceEditPage::drawBranch(Canvas &canvas) {
