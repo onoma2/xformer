@@ -143,6 +143,26 @@ FractalTrackEngine::FractalTrackEngine(Engine &engine, const Model &model, Track
     }
     reset();
 
+    // KD-13 retrigger gap: consecutive ornament notes leave the gate low for a tick
+    // between them (each note-off precedes the next note-on) so they re-articulate
+    // instead of fusing into one held gate.
+    {
+        int sr = _sequence->ornamentRate(), si = _sequence->ornamentIntensity();
+        _sequence->setOrnamentRate(100); _sequence->setOrnamentIntensity(100);
+        bool sawMulti = false;
+        for (int t = 0; t < 200 && !sawMulti; ++t) {
+            scheduleSection(0, 96, 0.f, 12.f, 8, true);
+            if (_gateCount >= 4) {            // ≥2 notes scheduled
+                sawMulti = true;
+                for (int i = 1; i + 1 < _gateCount; i += 2)   // off[i] < on[i+1]
+                    assert(_gateEvents[i].tick < _gateEvents[i + 1].tick);
+            }
+        }
+        assert(sawMulti);
+        _sequence->setOrnamentRate(sr); _sequence->setOrnamentIntensity(si);
+    }
+    reset();
+
     // KD-20 Pack: over 2N sections, recordSkip=1 writes half as many cells as
     // recordSkip=0. Replays captureSection's skip/write/reset counter rule.
     {
@@ -818,10 +838,13 @@ void FractalTrackEngine::scheduleSection(uint32_t tick, uint32_t divisor, float 
                                          float nextSemi, int gateLen, bool ornEligible) {
     clearSchedule();
 
-    auto pushNote = [&](float semi, uint32_t at, uint32_t dur) {
+    // gap = retrigger silence held before the next note: ornament notes pass 1 so
+    // the gate drops for a tick and re-articulates; the plain/main note passes 0 to
+    // stay byte-identical to un-ornamented playback.
+    auto pushNote = [&](float semi, uint32_t at, uint32_t dur, uint32_t gap = 1u) {
         pushCv(at, fractalPlaybackCv(semi, _fractalTrack));
         pushGate(at, true);
-        pushGate(at + std::max<uint32_t>(1u, dur), false);
+        pushGate(at + (dur > gap ? dur - gap : 1u), false);
     };
 
     if (gateLen <= 0) {
@@ -837,7 +860,7 @@ void FractalTrackEngine::scheduleSection(uint32_t tick, uint32_t divisor, float 
 
     int name = ornEligible ? rollOrnament(_sequence->ornamentRate(), _sequence->ornamentIntensity()) : -1;
     if (name < 0) {
-        pushNote(mainSemi, tick, fullDur);
+        pushNote(mainSemi, tick, fullDur, 0u);   // plain note: no retrigger gap (byte-identical)
         return;
     }
 
@@ -901,7 +924,7 @@ void FractalTrackEngine::scheduleSection(uint32_t tick, uint32_t divisor, float 
         break;
     }
     default:
-        pushNote(mainSemi, tick, fullDur);
+        pushNote(mainSemi, tick, fullDur, 0u);
         break;
     }
 }
