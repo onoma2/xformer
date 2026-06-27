@@ -175,9 +175,9 @@ CASE("track_record_muted_round_trip") {
 CASE("track_quantize_round_trip") {
     FractalTrack track;
     track.clear();
-    expectEqual(track.quantize(), -1, "quantize defaults to raw (-1)");
+    expectTrue(!track.quantize(), "quantize defaults to raw (false)");
 
-    track.setQuantize(5);
+    track.setQuantize(true);
 
     uint8_t buf[8192];
     std::memset(buf, 0, sizeof(buf));
@@ -187,7 +187,7 @@ CASE("track_quantize_round_trip") {
     r.clear();
     readTrack(r, buf, sizeof(buf));
 
-    expectEqual(r.quantize(), 5, "quantize persists");
+    expectTrue(r.quantize(), "quantize persists");
 }
 
 CASE("track_channel_source_round_trip") {

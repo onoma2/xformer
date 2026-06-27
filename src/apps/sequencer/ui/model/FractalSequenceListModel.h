@@ -5,27 +5,31 @@
 #include "RoutableListModel.h"
 
 #include "model/FractalSequence.h"
+#include "model/Scale.h"
 
 class FractalSequenceListModel : public RoutableListModel {
 public:
     enum Item {
         LoopFirst,
         LoopLast,
-        RecordFirst,
-        RecordLast,
-        OrnFirst,
-        OrnLast,
         OrderMode,
-        OrnamentRate,
-        OrnamentIntensity,
-        RecordSkip,
-        RecordMode,
-        CaptureCadence,
-        CaptureFidelity,
         Divisor,
         ClockMultiplier,
         ResetMeasure,
+        RecordFirst,
+        RecordLast,
+        RecordMode,
+        RecordSkip,
         RecordTrigger,
+        OrnFirst,
+        OrnLast,
+        OrnamentRate,
+        OrnamentIntensity,
+        CaptureCadence,
+        CaptureFidelity,
+        Scale,
+        RootNote,
+        ScaleRotate,
         Last
     };
 
@@ -80,6 +84,10 @@ public:
             return Routing::Target::FractalOrnamentIntensity;
         case RecordTrigger:
             return Routing::Target::FractalRecordArm;
+        case Scale:
+            return Routing::Target::Scale;
+        case RootNote:
+            return Routing::Target::RootNote;
         default:
             return Routing::Target::None;
         }
@@ -94,21 +102,24 @@ private:
         switch (item) {
         case LoopFirst:         return "Loop First";
         case LoopLast:          return "Loop Last";
-        case RecordFirst:       return "Rec First";
-        case RecordLast:        return "Rec Last";
-        case OrnFirst:          return "Orn First";
-        case OrnLast:           return "Orn Last";
         case OrderMode:         return "Order Mode";
-        case OrnamentRate:      return "Orn Rate";
-        case OrnamentIntensity: return "Orn Intens";
-        case RecordSkip:        return "Rec Skip";
-        case RecordMode:        return "Rec Mode";
-        case CaptureCadence:    return "Capture";
-        case CaptureFidelity:   return "Fidelity";
         case Divisor:           return "Divisor";
         case ClockMultiplier:   return "Clock Mult";
         case ResetMeasure:      return "Reset Measure";
+        case RecordFirst:       return "Rec First";
+        case RecordLast:        return "Rec Last";
+        case RecordMode:        return "Rec Mode";
+        case RecordSkip:        return "Rec Skip";
         case RecordTrigger:     return "Record";
+        case OrnFirst:          return "Orn First";
+        case OrnLast:           return "Orn Last";
+        case OrnamentRate:      return "Orn Rate";
+        case OrnamentIntensity: return "Orn Intens";
+        case CaptureCadence:    return "Capture";
+        case CaptureFidelity:   return "Fidelity";
+        case Scale:             return "Scale";
+        case RootNote:          return "Root Note";
+        case ScaleRotate:       return "Scale Rotate";
         case Last:              break;
         }
         return nullptr;
@@ -122,21 +133,38 @@ private:
         switch (item) {
         case LoopFirst:         _sequence->printLoopFirst(str); break;
         case LoopLast:          _sequence->printLoopLast(str); break;
-        case RecordFirst:       _sequence->printRecordFirst(str); break;
-        case RecordLast:        _sequence->printRecordLast(str); break;
-        case OrnFirst:          str("%d", _sequence->ornFirst() + 1); break;
-        case OrnLast:           str("%d", _sequence->ornLast() + 1); break;
         case OrderMode:         _sequence->printOrderMode(str); break;
-        case OrnamentRate:      str("%d%%", _sequence->ornamentRate()); break;
-        case OrnamentIntensity: str("%d%%", _sequence->ornamentIntensity()); break;
-        case RecordSkip:        _sequence->printRecordSkip(str); break;
-        case RecordMode:        _sequence->printRecordMode(str); break;
-        case CaptureCadence:    _sequence->printCaptureCadence(str); break;
-        case CaptureFidelity:   _sequence->printCaptureFidelity(str); break;
         case Divisor:           _sequence->printDivisor(str); break;
         case ClockMultiplier:   _sequence->printClockMultiplier(str); break;
         case ResetMeasure:      _sequence->printResetMeasure(str); break;
+        case RecordFirst:       _sequence->printRecordFirst(str); break;
+        case RecordLast:        _sequence->printRecordLast(str); break;
+        case RecordMode:        _sequence->printRecordMode(str); break;
+        case RecordSkip:        _sequence->printRecordSkip(str); break;
         case RecordTrigger:     _sequence->printRecordTrigger(str); break;
+        case OrnFirst:          str("%d", _sequence->ornFirst() + 1); break;
+        case OrnLast:           str("%d", _sequence->ornLast() + 1); break;
+        case OrnamentRate:      str("%d%%", _sequence->ornamentRate()); break;
+        case OrnamentIntensity: str("%d%%", _sequence->ornamentIntensity()); break;
+        case CaptureCadence:    _sequence->printCaptureCadence(str); break;
+        case CaptureFidelity:   _sequence->printCaptureFidelity(str); break;
+        case Scale:
+            _sequence->printRouted(str, Routing::Target::Scale);
+            str(_sequence->scale() < 0 ? "Default" : Scale::name(_sequence->scale()));
+            break;
+        case RootNote:
+            _sequence->printRouted(str, Routing::Target::RootNote);
+            if (_sequence->rootNote() < 0) {
+                str("Default");
+            } else {
+                Types::printNote(str, _sequence->rootNote());
+            }
+            break;
+        case ScaleRotate: {
+            int r = _sequence->scaleRotate();
+            if (r < 0) str("Default"); else str("%d", r);
+            break;
+        }
         case Last:              break;
         }
     }
@@ -145,21 +173,24 @@ private:
         switch (item) {
         case LoopFirst:         _sequence->editLoopFirst(value, shift); break;
         case LoopLast:          _sequence->editLoopLast(value, shift); break;
-        case RecordFirst:       _sequence->editRecordFirst(value, shift); break;
-        case RecordLast:        _sequence->editRecordLast(value, shift); break;
-        case OrnFirst:          _sequence->setOrnFirst(_sequence->ornFirst() + value); break;
-        case OrnLast:           _sequence->setOrnLast(_sequence->ornLast() + value); break;
         case OrderMode:         _sequence->editOrderMode(value, shift); break;
-        case OrnamentRate:      _sequence->setOrnamentRate(_sequence->ornamentRate() + value * (shift ? 10 : 1)); break;
-        case OrnamentIntensity: _sequence->setOrnamentIntensity(_sequence->ornamentIntensity() + value * (shift ? 10 : 1)); break;
-        case RecordSkip:        _sequence->editRecordSkip(value, shift); break;
-        case RecordMode:        _sequence->editRecordMode(value, shift); break;
-        case CaptureCadence:    _sequence->editCaptureCadence(value, shift); break;
-        case CaptureFidelity:   _sequence->editCaptureFidelity(value, shift); break;
         case Divisor:           _sequence->editDivisor(value, shift); break;
         case ClockMultiplier:   _sequence->editClockMultiplier(value, shift); break;
         case ResetMeasure:      _sequence->editResetMeasure(value, shift); break;
+        case RecordFirst:       _sequence->editRecordFirst(value, shift); break;
+        case RecordLast:        _sequence->editRecordLast(value, shift); break;
+        case RecordMode:        _sequence->editRecordMode(value, shift); break;
+        case RecordSkip:        _sequence->editRecordSkip(value, shift); break;
         case RecordTrigger:     _sequence->editRecordTrigger(value, shift); break;
+        case OrnFirst:          _sequence->setOrnFirst(_sequence->ornFirst() + value); break;
+        case OrnLast:           _sequence->setOrnLast(_sequence->ornLast() + value); break;
+        case OrnamentRate:      _sequence->setOrnamentRate(_sequence->ornamentRate() + value * (shift ? 10 : 1)); break;
+        case OrnamentIntensity: _sequence->setOrnamentIntensity(_sequence->ornamentIntensity() + value * (shift ? 10 : 1)); break;
+        case CaptureCadence:    _sequence->editCaptureCadence(value, shift); break;
+        case CaptureFidelity:   _sequence->editCaptureFidelity(value, shift); break;
+        case Scale:             _sequence->setScale(_sequence->rawScale() + value); break;
+        case RootNote:          _sequence->setRootNote(_sequence->rawRootNote() + value); break;
+        case ScaleRotate:       _sequence->setScaleRotate(_sequence->scaleRotate() + value); break;
         case Last:              break;
         }
     }
@@ -188,9 +219,14 @@ private:
             return int(FractalSequence::CaptureFidelity::Last);
         case RecordTrigger:
             return 2;
+        case Scale:
+            return Scale::Count + 1;
+        case RootNote:
+            return 12 + 1;
         case Divisor:
         case ClockMultiplier:
         case ResetMeasure:
+        case ScaleRotate:
             return -1;   // not a flat index range; edited via the encoder
         case Last:
             break;
@@ -214,9 +250,12 @@ private:
         case CaptureCadence:    return int(_sequence->captureCadence());
         case CaptureFidelity:   return int(_sequence->captureFidelity());
         case RecordTrigger:     return _sequence->recordTrigger();
+        case Scale:             return _sequence->scale() + 1;
+        case RootNote:          return _sequence->rootNote() + 1;
         case Divisor:
         case ClockMultiplier:
-        case ResetMeasure:      return -1;
+        case ResetMeasure:
+        case ScaleRotate:       return -1;
         case Last:              break;
         }
         return -1;
@@ -238,9 +277,12 @@ private:
         case CaptureCadence:    return _sequence->setCaptureCadence(FractalSequence::CaptureCadence(index));
         case CaptureFidelity:   return _sequence->setCaptureFidelity(FractalSequence::CaptureFidelity(index));
         case RecordTrigger:     return _sequence->setRecordTrigger(index);
+        case Scale:             return _sequence->setScale(index - 1);
+        case RootNote:          return _sequence->setRootNote(index - 1);
         case Divisor:
         case ClockMultiplier:
-        case ResetMeasure:      break;
+        case ResetMeasure:
+        case ScaleRotate:       break;
         case Last:              break;
         }
     }

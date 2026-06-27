@@ -151,15 +151,12 @@ public:
     int slideTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slideTime, 0, 100); }
     void setSlideTime(int slideTime) { _slideTime = clamp(slideTime, 0, 100); }
 
-    // quantize: -1 = raw (no quantize), >=0 = scale index to snap the played
-    // main note to. Trunk storage stays raw; quantize only shapes playback.
-    int quantize() const { return _quantize; }
-    void setQuantize(int v) { _quantize = clamp(v, -1, Scale::Count - 1); }
-    void editQuantize(int value, bool shift) { setQuantize(quantize() + value); }
-    void printQuantize(StringBuilder &str) const {
-        if (_quantize < 0) str("Raw");
-        else str("%s", Scale::name(_quantize));
-    }
+    // quantize: false = raw (no quantize), true = snap the played main note to
+    // the sequence scale. Trunk storage stays raw; quantize only shapes playback.
+    bool quantize() const { return _quantize; }
+    void setQuantize(bool v) { _quantize = v; }
+    void editQuantize(int value, bool shift) { setQuantize(value > 0); }
+    void printQuantize(StringBuilder &str) const { str(_quantize ? "On" : "Raw"); }
 
     // cvUpdateMode
     CvUpdateMode cvUpdateMode() const { return _cvUpdateMode; }
@@ -168,18 +165,6 @@ public:
     // trackDelay (0..16 sections)
     int trackDelay() const { return _trackDelay; }
     void setTrackDelay(int v) { _trackDelay = clamp(v, 0, 16); }
-
-    // scale group (track-wide)
-    int rawScale() const { return int(_scaleGroup.scale) - 1; }
-    int scale() const { return rawScale(); }
-    void setScale(int scale) { _scaleGroup.scale = clamp(scale, -1, Scale::Count - 1) + 1; }
-
-    int rawRootNote() const { return int(_scaleGroup.rootNote) - 1; }
-    int rootNote() const { return rawRootNote(); }
-    void setRootNote(int rootNote) { _scaleGroup.rootNote = clamp(rootNote, -1, 11) + 1; }
-
-    int scaleRotate() const { return int(_scaleGroup.scaleRotate) - 1; }
-    void setScaleRotate(int v) { _scaleGroup.scaleRotate = clamp(v, -1, 31) + 1; }
 
     // playMode
     Types::PlayMode playMode() const { return _playMode; }
@@ -216,12 +201,8 @@ public:
         _transpose = 0;
         _slideTime = 0;
         _cvUpdateMode = CvUpdateMode::Gate;
-        _quantize = -1;
+        _quantize = false;
         _trackDelay = 0;
-        _scaleGroup.raw = 0;
-        setScale(-1);
-        setRootNote(-1);
-        setScaleRotate(-1);
         _playMode = Types::PlayMode::Aligned;
         _recordMuted = false;
 
@@ -243,7 +224,6 @@ public:
         writer.write(static_cast<uint8_t>(_cvUpdateMode));
         writer.write(_quantize);
         writer.write(_trackDelay);
-        writer.write(_scaleGroup.raw);
         writer.write(static_cast<uint8_t>(_playMode));
         writer.write(_recordMuted);
 
@@ -271,7 +251,6 @@ public:
         _cvUpdateMode = cvUpdateMode < uint8_t(CvUpdateMode::Last) ? static_cast<CvUpdateMode>(cvUpdateMode) : CvUpdateMode::Gate;
         reader.read(_quantize);
         reader.read(_trackDelay);
-        reader.read(_scaleGroup.raw);
         uint8_t playMode;
         reader.read(playMode);
         _playMode = playMode < uint8_t(Types::PlayMode::Last) ? static_cast<Types::PlayMode>(playMode) : Types::PlayMode::Aligned;
@@ -310,14 +289,8 @@ private:
     int8_t _transpose;
     uint8_t _slideTime;
     CvUpdateMode _cvUpdateMode;
-    int8_t _quantize;
+    bool _quantize;
     uint8_t _trackDelay;
-    union {
-        uint16_t raw;
-        BitField<uint16_t, 0, 5> scale;
-        BitField<uint16_t, 5, 4> rootNote;
-        BitField<uint16_t, 9, 6> scaleRotate;
-    } _scaleGroup = { 0 };
     Types::PlayMode _playMode;
     bool _recordMuted;
 

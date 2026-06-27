@@ -1,6 +1,5 @@
 #include "FractalTrackEngine.h"
 #include "Engine.h"
-#include "TT2OutputShaping.h"
 
 #include "model/FractalSequence.h"
 #include "model/FractalTrack.h"
@@ -845,16 +844,14 @@ void FractalTrackEngine::replaySection(uint32_t tick, uint32_t divisor) {
     _globalPos = uint16_t((gp + 1) % total);
 }
 
-// Opt-in playback quantize: snap rel-root semitones to the track's quantize scale
-// via Tt2OutputShaping::shapeCv's quantize block (Bipolar5V range, no offset, so
-// only the quantize+clamp engages). quantize < 0 → raw pass-through, untouched.
+// Opt-in playback quantize: snap rel-root semitones to the sequence scale (the
+// same RotatedScaleView the ornaments use) via the shared noteFromVolts /
+// noteToVolts round-trip. quantize off → raw pass-through, untouched.
 float FractalTrackEngine::quantizeMainSemi(float semitonesRelRoot) const {
-    int q = _fractalTrack.quantize();
-    if (q < 0) return semitonesRelRoot;
+    if (!_fractalTrack.quantize()) return semitonesRelRoot;
+    const auto scale = sequence().selectedScale(_model.project().scale(), _model.project().scaleRotate());
     float volts = semitonesRelRoot * (1.f / kSemitonesPerOctave);
-    volts = Tt2OutputShaping::shapeCv(volts, Types::VoltageRange::Bipolar5V, 0,
-                                      q, -1, _model.project().rootNote());
-    return volts * kSemitonesPerOctave;
+    return scale.noteToVolts(scale.noteFromVolts(volts)) * kSemitonesPerOctave;
 }
 
 // rel-root semitones → playback volts. octave = 1V; transpose semitones → volts.
