@@ -222,11 +222,11 @@ void FractalSequenceEditPage::drawTrunk(Canvas &canvas) {
     canvas.drawText(2, 16, str);
 
     str.reset();
-    str("orn %d-%d", ornFirst, ornLast);
+    str("orn %d-%d", ornFirst + 1, ornLast + 1);
     canvas.drawText(Width - 2 - canvas.textWidth(str), 16, str);
 
     str.reset();
-    str("loop %d-%d", loopFirst, loopLast);
+    str("loop %d-%d", loopFirst + 1, loopLast + 1);
     canvas.drawText(90, 51, str);
 
     str.reset();
@@ -235,7 +235,7 @@ void FractalSequenceEditPage::drawTrunk(Canvas &canvas) {
     canvas.drawText(2, 51, str);
 
     str.reset();
-    str("rec %d-%d", recFirst, recLast);
+    str("rec %d-%d", recFirst + 1, recLast + 1);
     canvas.setColor(_bracket == Bracket::Record ? Color::Bright : Color::Medium);
     canvas.drawText(Width - 2 - canvas.textWidth(str), 51, str);
 }
@@ -356,7 +356,7 @@ void FractalSequenceEditPage::drawOrnament(Canvas &canvas) {
     else str("%s", Scale::name(seq.scale()));
     canvas.drawText(40, 39, str);
 
-    str.reset(); str("zone %d-%d", seq.ornFirst(), seq.ornLast());
+    str.reset(); str("zone %d-%d", seq.ornFirst() + 1, seq.ornLast() + 1);
     canvas.setColor(Color::MediumBright);
     canvas.drawText(Width - 2 - canvas.textWidth(str), 39, str);
 
