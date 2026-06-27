@@ -510,6 +510,7 @@ void FractalSequenceEditPage::keyPress(KeyPressEvent &event) {
     if (!isActiveForSelectedTrack()) { event.consume(); return; }
 
     const auto &key = event.key();
+    if (key.pageModifier()) return;   // Page held → let global nav switch away (exit)
     if (key.isContextMenu()) {
         contextShow();
         event.consume();
