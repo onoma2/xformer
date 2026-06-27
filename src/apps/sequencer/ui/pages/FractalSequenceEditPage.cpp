@@ -517,8 +517,8 @@ void FractalSequenceEditPage::encoderSource(EncoderEvent &event) {
     int v = event.value();
 
     switch (_sourceFocus) {
-    case SourceFocus::SourceA: track.setSourceA(track.sourceA() + v); break;
-    case SourceFocus::SourceB: track.setSourceB(track.sourceB() + v); break;
+    case SourceFocus::SourceA: track.editSourceA(v, false); break;
+    case SourceFocus::SourceB: track.editSourceB(v, false); break;
     case SourceFocus::Gate:    track.setGateLogic(ModelUtils::adjustedEnum(track.gateLogic(), v)); break;
     case SourceFocus::Cv:      track.setCvLogic(ModelUtils::adjustedEnum(track.cvLogic(), v)); break;
     }

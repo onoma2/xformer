@@ -105,14 +105,27 @@ public:
     // sourceA / sourceB: -1 = None, 0..CONFIG_TRACK_COUNT-1 = parent track,
     // above that = a single routing channel (sourceChannelOf).
     int sourceA() const { return _sourceA; }
-    void setSourceA(int v) { _sourceA = clamp(v, -1, sourceMax()); }
-    void editSourceA(int value, bool shift) { setSourceA(sourceA() + value); }
+    void setSourceA(int v) { _sourceA = sanitizeSource(clamp(v, -1, sourceMax())); }
+    void editSourceA(int value, bool shift) { _sourceA = stepSource(_sourceA, value); }
     void printSourceA(StringBuilder &str) const { printSource(str, sourceA()); }
 
     int sourceB() const { return _sourceB; }
-    void setSourceB(int v) { _sourceB = clamp(v, -1, sourceMax()); }
-    void editSourceB(int value, bool shift) { setSourceB(sourceB() + value); }
+    void setSourceB(int v) { _sourceB = sanitizeSource(clamp(v, -1, sourceMax())); }
+    void editSourceB(int value, bool shift) { _sourceB = stepSource(_sourceB, value); }
     void printSourceB(StringBuilder &str) const { printSource(str, sourceB()); }
+
+    // A Track-kind source equal to this track's own index is a self-reference
+    // (output feedback) — never allowed. Direct set snaps it to None; the encoder
+    // walk skips over it in the travel direction.
+    int sanitizeSource(int v) const {
+        return (v == _trackIndex && sourceKind(v) == SourceKind::Track) ? -1 : v;
+    }
+    int stepSource(int cur, int delta) const {
+        int v = clamp(cur + delta, -1, sourceMax());
+        if (v == _trackIndex && sourceKind(v) == SourceKind::Track)
+            v = clamp(v + (delta >= 0 ? 1 : -1), -1, sourceMax());
+        return v;
+    }
 
     // Any slot selects a source (gates capture). With channels, slot B alone may
     // hold a source, so this can't reduce to sourceA() >= 0.

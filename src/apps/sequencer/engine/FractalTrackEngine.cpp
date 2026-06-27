@@ -473,11 +473,14 @@ bool FractalTrackEngine::resolveParentMix(bool &gate, float &cv) const {
     using SK = FractalTrack::SourceKind;
     bool recordMuted = _fractalTrack.recordMuted();
 
+    int self = sequence().trackIndex();
+
     // Resolve one slot to a (gate, cv) pair, uniform across kinds: a track gives
     // both natively; a channel derives gate (value≠0 / GateOut bit) + cv (volts).
     auto resolveSlot = [&](int src, bool &g, float &c) {
         switch (FractalTrack::sourceKind(src)) {
         case SK::Track: {
+            if (src == self) { g = false; c = 0.f; break; }   // self-reference → idle (feedback guard)
             const TrackEngine &p = _engine.trackEngine(src);
             g = recordMuted ? p.recordGate() : p.gateOutput(0);
             c = p.cvOutput(0);
