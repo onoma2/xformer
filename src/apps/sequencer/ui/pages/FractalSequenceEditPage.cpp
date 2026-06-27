@@ -318,7 +318,7 @@ void FractalSequenceEditPage::drawOrnament(Canvas &canvas) {
 
     // Intensity (tier label: off / 2-step / 4-step / 8-step trill)
     canvas.setColor(Color::Medium);
-    canvas.drawText(2, 28, "Int");
+    canvas.drawText(2, 28, "Intens");
     drawBar(canvas, 40, 24, 96, 6, intensity, _ornamentFocus == OrnamentFocus::Intensity);
     // tier ticks at 40% and 75%
     canvas.setColor(Color::MediumLow);
@@ -334,10 +334,14 @@ void FractalSequenceEditPage::drawOrnament(Canvas &canvas) {
     canvas.drawText(2, 39, "Scale");
     canvas.setColor((_ornamentFocus == OrnamentFocus::Scale || _ornamentFocus == OrnamentFocus::Root) ? Color::Bright : Color::MediumBright);
     str.reset();
-    if (seq.rootNote() >= 0) Types::printNote(str, seq.rootNote());
-    else str("Inherit");
-    if (seq.scale() < 0) str(" Default");
-    else str(" %s", Scale::name(seq.scale()));
+    if (seq.scale() < 0) {
+        str("Default");
+    } else if (seq.rootNote() >= 0) {
+        Types::printNote(str, seq.rootNote());
+        str(" %s", Scale::name(seq.scale()));
+    } else {
+        str("%s", Scale::name(seq.scale()));
+    }
     canvas.drawText(40, 39, str);
 
     str.reset(); str("zone %d-%d", seq.ornFirst(), seq.ornLast());
