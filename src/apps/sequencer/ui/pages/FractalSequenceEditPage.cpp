@@ -217,8 +217,8 @@ void FractalSequenceEditPage::drawTrunk(Canvas &canvas) {
 
     FixedStringBuilder<16> str;
     canvas.setFont(Font::Tiny);
-    canvas.setColor(Color::Medium);
-    str("%dc", N);
+    str("rec %d-%d", recFirst + 1, recLast + 1);
+    canvas.setColor(_bracket == Bracket::Record ? Color::Bright : Color::Medium);
     canvas.drawText(2, 16, str);
 
     str.reset();
@@ -235,8 +235,8 @@ void FractalSequenceEditPage::drawTrunk(Canvas &canvas) {
     canvas.drawText(2, 51, str);
 
     str.reset();
-    str("rec %d-%d", recFirst + 1, recLast + 1);
-    canvas.setColor(_bracket == Bracket::Record ? Color::Bright : Color::Medium);
+    str("%dc", N);
+    canvas.setColor(Color::Medium);
     canvas.drawText(Width - 2 - canvas.textWidth(str), 51, str);
 }
 
