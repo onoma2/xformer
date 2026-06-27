@@ -473,6 +473,14 @@ void OverviewPage::draw(Canvas &canvas) {
         case Track::TrackMode::PhaseFlux:
             drawPhaseFluxTrack(canvas, trackIndex, trackEngine.as<PhaseFluxTrackEngine>(), track.phaseFluxTrack().sequence(trackState.pattern()));
             break;
+        case Track::TrackMode::TeletypeV2:
+            canvas.setColor(Color::Medium);
+            canvas.drawText(64, y, "T9type");
+            break;
+        case Track::TrackMode::TeletypeMini:
+            canvas.setColor(Color::Medium);
+            canvas.drawText(64, y, "T9type-mini");
+            break;
         case Track::TrackMode::Last:
             break;
         }
