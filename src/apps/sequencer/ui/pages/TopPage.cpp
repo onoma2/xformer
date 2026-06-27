@@ -327,8 +327,8 @@ void TopPage::setSequenceView(SequenceView view) {
         setMainPage(pages.stochasticPerformance);
         break;
     case Track::TrackMode::Fractal:
-        // Hero ring entry (Trunk); F5=NEXT cycles to Branch/Ornament/Source.
-        setMainPage(pages.fractalSequenceEdit);
+        // Page+S1 (Sequence) — flat per-sequence param list (NoteTrack model).
+        setMainPage(pages.fractalSequenceList);
         break;
     case Track::TrackMode::PhaseFlux:
         setMainPage(pages.phaseFluxSequence);

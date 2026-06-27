@@ -163,6 +163,7 @@ set(sources
     ui/pages/PhaseFluxEditPage.cpp
     ui/pages/PhaseFluxSequencePage.cpp
     ui/pages/FractalSequenceEditPage.cpp
+    ui/pages/FractalSequenceListPage.cpp
     ui/pages/TempoPage.cpp
     ui/pages/TextInputPage.cpp
     ui/pages/TopPage.cpp
