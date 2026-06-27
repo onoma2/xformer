@@ -460,61 +460,47 @@ bool FractalTrackEngine::resolveParentMix(bool &gate, float &cv) const {
     int srcA = _fractalTrack.sourceA();
     int srcB = _fractalTrack.sourceB();
     using SK = FractalTrack::SourceKind;
-    bool channelInvolved =
-        FractalTrack::sourceKind(srcA) == SK::Channel ||
-        FractalTrack::sourceKind(srcB) == SK::Channel;
     bool recordMuted = _fractalTrack.recordMuted();
 
-    if (!channelInvolved) {
-        if (srcA < 0) { gate = false; cv = 0.f; return false; }
-        const TrackEngine &parentA = _engine.trackEngine(srcA);
-        bool aGate = recordMuted ? parentA.recordGate() : parentA.gateOutput(0);
-        float aCv = parentA.cvOutput(0);
+    // Resolve one slot to a (gate, cv) pair, uniform across kinds: a track gives
+    // both natively; a channel derives gate (value≠0 / GateOut bit) + cv (volts).
+    auto resolveSlot = [&](int src, bool &g, float &c) {
+        switch (FractalTrack::sourceKind(src)) {
+        case SK::Track: {
+            const TrackEngine &p = _engine.trackEngine(src);
+            g = recordMuted ? p.recordGate() : p.gateOutput(0);
+            c = p.cvOutput(0);
+            break;
+        }
+        case SK::Channel: {
+            Routing::Source ch = FractalTrack::sourceChannelOf(src);
+            g = channelAsGate(ch);
+            c = readChannelVolts(ch);
+            break;
+        }
+        case SK::None:
+            g = false; c = 0.f;
+            break;
+        }
+    };
 
-        if (srcB < 0) { gate = aGate; cv = aCv; return true; }
-        const TrackEngine &parentB = _engine.trackEngine(srcB);
-        bool bGate = recordMuted ? parentB.recordGate() : parentB.gateOutput(0);
-        float bCv = parentB.cvOutput(0);
+    bool aSet = FractalTrack::sourceKind(srcA) != SK::None;
+    bool bSet = FractalTrack::sourceKind(srcB) != SK::None;
+    if (!aSet && !bSet) { gate = false; cv = 0.f; return false; }
+
+    bool aGate, bGate; float aCv, bCv;
+    resolveSlot(srcA, aGate, aCv);
+    resolveSlot(srcB, bGate, bCv);
+
+    // One slot empty → the other alone; both set → gate/cv logic mix (works for
+    // tracks and channels alike — cvLogic=A/gateLogic=B reproduces the old
+    // "A=CV, B=Gate" tailoring as an explicit setting).
+    if (!bSet)      { gate = aGate; cv = aCv; }
+    else if (!aSet) { gate = bGate; cv = bCv; }
+    else {
         gate = combineGate(aGate, bGate);
         cv = combineCv(aCv, bCv, aGate, bGate);
-        return true;
     }
-
-    if (srcA < 0 && srcB < 0) { gate = false; cv = 0.f; return false; }
-
-    // Slot A → CV (+ its own gate, used as the fallback when B is None).
-    float aCv = 0.f; bool aGate = false;
-    switch (FractalTrack::sourceKind(srcA)) {
-    case SK::Channel: {
-        Routing::Source ch = FractalTrack::sourceChannelOf(srcA);
-        aCv = readChannelVolts(ch);
-        aGate = channelAsGate(ch);
-        break;
-    }
-    case SK::Track: {
-        const TrackEngine &parentA = _engine.trackEngine(srcA);
-        aCv = parentA.cvOutput(0);
-        aGate = recordMuted ? parentA.recordGate() : parentA.gateOutput(0);
-        break;
-    }
-    case SK::None: break;
-    }
-
-    // Slot B → gate. None → fall back to slot A's gate so a lone CV-in-A gates.
-    switch (FractalTrack::sourceKind(srcB)) {
-    case SK::Channel:
-        gate = channelAsGate(FractalTrack::sourceChannelOf(srcB));
-        break;
-    case SK::Track: {
-        const TrackEngine &parentB = _engine.trackEngine(srcB);
-        gate = recordMuted ? parentB.recordGate() : parentB.gateOutput(0);
-        break;
-    }
-    case SK::None:
-        gate = aGate;
-        break;
-    }
-    cv = aCv;
     return true;
 }
 
