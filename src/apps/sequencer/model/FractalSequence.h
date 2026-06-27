@@ -16,6 +16,10 @@
 
 class FractalSequence {
 public:
+    // Cell count a fresh sequence/buffer initializes to (a musical default, not a
+    // RAM bound — the buffer's max lives in Config as CONFIG_FRACTAL_MAX_CELLS).
+    static constexpr int DefaultCells = 16;
+
     //----------------------------------------
     // Types
     //----------------------------------------
@@ -349,15 +353,15 @@ private:
         _resetMeasure = 0;
         _clockMultiplier = 100;
         _loopFirst = 0;
-        _loopLast = CONFIG_FRACTAL_DEFAULT_CELLS - 1;
+        _loopLast = DefaultCells - 1;
         _rotate = 0;
         _orderMode = OrderMode::Forward;
         _loopMode = LoopMode::Loop;
         _recordSkip = 0;
         _recordFirst = 0;
-        _recordLast = CONFIG_FRACTAL_DEFAULT_CELLS - 1;
+        _recordLast = DefaultCells - 1;
         _ornFirst = 0;
-        _ornLast = CONFIG_FRACTAL_DEFAULT_CELLS - 1;
+        _ornLast = DefaultCells - 1;
         _recordMode = RecordMode::Replace;
         _captureCadence = CaptureCadence::Section;
         _captureFidelity = CaptureFidelity::Quantized;

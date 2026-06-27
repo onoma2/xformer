@@ -210,7 +210,7 @@ public:
         _sourceB = -1;
         _gateLogic = GateLogic::A;
         _cvLogic = CvLogic::A;
-        _bufferLength = CONFIG_FRACTAL_DEFAULT_CELLS;
+        _bufferLength = FractalSequence::DefaultCells;
         _lock = false;
         _octave = 0;
         _transpose = 0;
