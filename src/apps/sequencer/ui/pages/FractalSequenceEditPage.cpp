@@ -28,7 +28,7 @@ static const ContextMenuModel::Item contextMenuItems[] = {
 };
 
 // 8-slot transform pool (matches branchPool bitmask order, KD-12).
-static const char *kPoolNames[8] = { "Tr", "Rv", "In", "RI", "Ro", "Co", "Ex", "Gt" };
+static const char *kPoolNames[8] = { "Tra", "Rev", "Inv", "RtI", "Rot", "Cmp", "Exp", "Thn" };
 
 static const FractalSequenceListModel::Item quickEditItems[8] = {
     FractalSequenceListModel::Item::RecordFirst,
@@ -274,9 +274,15 @@ void FractalSequenceEditPage::drawBranch(Canvas &canvas) {
     const int cols = N + 1;
     const int bw = Width / cols;
     const int y = 26;
+    const int playing = eng.currentSegment();
     for (int j = 0; j < cols; ++j) {
         int x = j * bw;
         bool isTrunk = j == 0;
+        bool isPlaying = j == playing;
+        if (isPlaying) {                              // sounding block: filled bar
+            canvas.setColor(Color::Medium);
+            canvas.fillRect(x + 1, y, bw - 2, 10);
+        }
         canvas.setColor(isTrunk ? Color::Bright : Color::Medium);
         canvas.drawRect(x + 1, y, bw - 2, 10);
         str.reset();
@@ -287,7 +293,7 @@ void FractalSequenceEditPage::drawBranch(Canvas &canvas) {
             branchBlockLabel(str, kind, param);
             if (canvas.textWidth(str) > bw - 3) { str.reset(); str("%s", kPoolNames[kind]); }
         }
-        canvas.setColor(isTrunk ? Color::Bright : Color::MediumBright);
+        canvas.setColor(isPlaying ? Color::Bright : (isTrunk ? Color::Bright : Color::MediumBright));
         canvas.drawText(x + 1 + (bw - 2 - canvas.textWidth(str)) / 2, y + 6, str);
     }
 
@@ -582,16 +588,7 @@ void FractalSequenceEditPage::keyPressBranch(KeyPressEvent &event) {
         switch (key.function()) {
         case 0: _branchFocus = BranchFocus::Count; break;
         case 1: _branchFocus = BranchFocus::Path; break;
-        case 2: {
-            auto &seq = _project.selectedTrack().fractalTrack().sequence(_project.selectedPatternIndex());
-            if (_branchFocus == BranchFocus::Pool) {
-                // toggle the selected pool bit on a second press
-                seq.setBranchPool(seq.branchPool() ^ (1 << _poolIndex));
-            } else {
-                _branchFocus = BranchFocus::Pool;
-            }
-            break;
-        }
+        case 2: _branchFocus = BranchFocus::Pool; break;   // select layer; encoder click toggles the bit
         case 3: {
             // SEED: reseed to a fresh random value.
             auto &seq = _project.selectedTrack().fractalTrack().sequence(_project.selectedPatternIndex());
@@ -602,6 +599,12 @@ void FractalSequenceEditPage::keyPressBranch(KeyPressEvent &event) {
         }
         default: break;
         }
+        event.consume();
+        return;
+    }
+    if (key.isEncoder() && _branchFocus == BranchFocus::Pool) {
+        auto &seq = _project.selectedTrack().fractalTrack().sequence(_project.selectedPatternIndex());
+        seq.setBranchPool(seq.branchPool() ^ (1 << _poolIndex));
         event.consume();
         return;
     }

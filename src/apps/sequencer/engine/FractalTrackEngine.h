@@ -60,6 +60,7 @@ public:
     // Cursors for the UI hero pages.
     int readPos() const { return _readPos; }
     int recordPos() const { return _recordPos; }
+    int currentSegment() const { return _currentSegment; }   // 0=trunk, 1..N=branch
 
     // KD-12 Path navigation order: trunk first, then outward branches (path bit 0)
     // ascending, then held branches (bit 1) descending. routeIndex 0 = trunk.
@@ -225,6 +226,7 @@ private:
     bool _eventHasRef = false;     // reference armed (first note seen)
     int16_t _eventInhibit = 0;     // inhibit-window ticks remaining
     uint8_t _readPos = 0;     // trunk read index of the sounding cell (UI highlight)
+    uint8_t _currentSegment = 0;  // sounding segment (0=trunk, 1..N=branch) for UI highlight
     uint16_t _globalPos = 0;  // KD-12 walk over the concatenated length 0..total-1
 
     // Within-loop read order, orderMode-aware. Advanced once per section; its step()

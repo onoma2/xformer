@@ -826,6 +826,7 @@ void FractalTrackEngine::replaySection(uint32_t tick, uint32_t divisor) {
     segmentCell(segment, within, semitonesRelRoot, gateLen, valid);
 
     _readPos = uint8_t(trunkReadIndex(within));   // UI highlight = trunk index read
+    _currentSegment = uint8_t(segment);           // UI highlight = sounding branch block
 
     // Lookahead for direction-aware ornaments: the next sounding cell's raw note.
     float nextSemi; int nextGateLen; bool nextValid;
