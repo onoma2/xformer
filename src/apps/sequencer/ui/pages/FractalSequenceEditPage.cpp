@@ -332,7 +332,7 @@ void FractalSequenceEditPage::drawOrnament(Canvas &canvas) {
     // Scale + Root
     canvas.setColor(Color::Medium);
     canvas.drawText(2, 39, "Scale");
-    canvas.setColor((_ornamentFocus == OrnamentFocus::Scale || _ornamentFocus == OrnamentFocus::Root) ? Color::Bright : Color::MediumBright);
+    canvas.setColor(_ornamentFocus == OrnamentFocus::Scale ? Color::Bright : Color::MediumBright);
     str.reset();
     if (seq.scale() < 0) str("Default");
     else str("%s", Scale::name(seq.scale()));
@@ -487,7 +487,6 @@ void FractalSequenceEditPage::encoderOrnament(EncoderEvent &event) {
     case OrnamentFocus::Rate:      seq.setOrnamentRate(seq.ornamentRate() + v); break;
     case OrnamentFocus::Intensity: seq.setOrnamentIntensity(seq.ornamentIntensity() + v); break;
     case OrnamentFocus::Scale:     seq.setScale(seq.scale() + v); break;
-    case OrnamentFocus::Root:      seq.setRootNote(seq.rootNote() + v); break;
     }
 }
 
@@ -590,8 +589,7 @@ void FractalSequenceEditPage::keyPressOrnament(KeyPressEvent &event) {
         switch (key.function()) {
         case 0: _ornamentFocus = OrnamentFocus::Rate; break;
         case 1: _ornamentFocus = OrnamentFocus::Intensity; break;
-        // F3 cycles Scale <-> Root (zone is edited on the Trunk page).
-        case 2: _ornamentFocus = _ornamentFocus == OrnamentFocus::Scale ? OrnamentFocus::Root : OrnamentFocus::Scale; break;
+        case 2: _ornamentFocus = OrnamentFocus::Scale; break;
         default: break;
         }
         event.consume();

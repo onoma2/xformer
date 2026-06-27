@@ -26,7 +26,7 @@ private:
 
     enum class Bracket { Record, Loop, Ornament };
     enum class BranchFocus { Count, Path, Pool, Seed };
-    enum class OrnamentFocus { Rate, Intensity, Scale, Root };
+    enum class OrnamentFocus { Rate, Intensity, Scale };
     enum class SourceFocus { SourceA, SourceB, Gate, Cv };
 
     bool isActiveForSelectedTrack() const;
