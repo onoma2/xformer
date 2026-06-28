@@ -3,9 +3,9 @@
 **Goal:** Two new cross-track Teletype ops so any TT2-family track (full **or** Mini) can reach into another TT2-family track's data — the parity-with-`WNG`/`WNN` the NoteTrack ops already have, but for TT2 targets:
 
 - **`WPN <track> <bank> <idx> [<v>]`** — get/set cell `idx` of pattern `bank` on track `track` (the target's *active* program — for a Mini target, its active scene). The cross-track form of same-track `PN bank idx [v]`, with **identical bank/idx normalisation** (see below) so it's a true `PN` parity op.
-- **`W.SCRIPT <track> <n>`** — trigger script `n` on track `track`. Range matches native `SCRIPT` = `1..Cfg::ScriptCount` (**Full 1–10** = 8 trigger + Metro 9 + Init 10; **Mini 1–3** = 2 trigger + Metro), out-of-range sets `OutOfRange` like `SCRIPT`.
+- **`WS <track> <n>`** — trigger script `n` on track `track`. Range matches native `SCRIPT` = `1..Cfg::ScriptCount` (**Full 1–10** = 8 trigger + Metro 9 + Init 10; **Mini 1–3** = 2 trigger + Metro), out-of-range sets `OutOfRange` like `SCRIPT`.
 
-Both work in every direction (full↔full, full↔Mini, Mini↔Mini) because the op functions are `template<Cfg>` and instantiate for both configs automatically. (Op names are proposals — they follow the `W*` "reach another track" family; adjust if you prefer `W.PN`/`W.SCR`.)
+Both work in every direction (full↔full, full↔Mini, Mini↔Mini) because the op functions are `template<Cfg>` and instantiate for both configs automatically. (Names follow the `W*` "reach another track" family: `WPN` ≈ cross-track `PN`, `WS` ≈ cross-track `SCRIPT`.)
 
 > **Path convention for this spec:** `engine/…` and `model/…` citations are under `src/apps/sequencer/` (e.g. `engine/TT2Host.h` = `src/apps/sequencer/engine/TT2Host.h`). `teletype/…` citations are repo-root-relative.
 
@@ -83,7 +83,7 @@ return engine.trackEngine(t).as<TT2MiniTrackEngine>().triggerScriptFromHost(n); 
 
 > **Locking — RESOLVED, no deferral (corrects the earlier worry).** `ScopedHost` does **NOT** take `Engine::lock()` — it only swaps the active-host pointer (`tt2SetActiveHost`, `TT2TrackEngine.h:196-199`). `Engine::lock()` is held only by the UI-thread entry points (`runLiveCommand`/`triggerScript`, `TT2TrackEngine.cpp:126,140`), never on the op-execution path (which already runs inside `Engine::update()`). So a cross-track trigger fired from inside an op touches no lock → no deadlock → **inline trigger is feasible, no deferral.** (`Engine::lock()` is a non-reentrant busy-spin at `Engine.cpp:326`, but it is simply not in play here.) The real requirement is the **active-host swap** above, which a bare `runScript` would miss.
 >
-> **Recursion — already bounded by the existing guard; add one global cap for stack safety.** `W.SCRIPT` goes through the same `runScript`, which increments the *target's* per-runtime `exec.depth` (`TT2_EXEC_DEPTH = 8`, `model/TeletypeRuntime.h:16`). Re-entering a track accumulates its own depth (the prior invocation is still on the C++ stack), so each track still caps at 8 → A↔B ping-pong is **bounded, not infinite**. The only residual is the *aggregate* C++ stack depth across a cycle of N distinct tracks (≈ N×8), which can exceed what the single-track depth-8 budget assumed. **Decision: reuse the per-runtime guard AND add one `uint8_t _tt2CrossDepth` member on `Engine`** (NOT a static global — a global leaks state across tests/instances). Cap `TT2_CROSS_DEPTH` ≈ 4. In `hostTriggerTrackScript`, guard it with **RAII** so it increments before the target call and restores on *every* return path; past the cap return `ExecDepthOverflow` (the op propagates it via its `error` param). Caps aggregate stack depth regardless of track count — inline, no deferral. `WPN` (data read/write) has no recursion at all.
+> **Recursion — already bounded by the existing guard; add one global cap for stack safety.** `WS` goes through the same `runScript`, which increments the *target's* per-runtime `exec.depth` (`TT2_EXEC_DEPTH = 8`, `model/TeletypeRuntime.h:16`). Re-entering a track accumulates its own depth (the prior invocation is still on the C++ stack), so each track still caps at 8 → A↔B ping-pong is **bounded, not infinite**. The only residual is the *aggregate* C++ stack depth across a cycle of N distinct tracks (≈ N×8), which can exceed what the single-track depth-8 budget assumed. **Decision: reuse the per-runtime guard AND add one `uint8_t _tt2CrossDepth` member on `Engine`** (NOT a static global — a global leaks state across tests/instances). Cap `TT2_CROSS_DEPTH` ≈ 4. In `hostTriggerTrackScript`, guard it with **RAII** so it increments before the target call and restores on *every* return path; past the cap return `ExecDepthOverflow` (the op propagates it via its `error` param). Caps aggregate stack depth regardless of track count — inline, no deferral. `WPN` (data read/write) has no recursion at all.
 
 ## The two op functions (`engine/TeletypeNativeOps.cpp`, templated)
 
@@ -105,7 +105,7 @@ static void opWpn(TT2RuntimeT<Cfg>&, TT2OutputState&, const TeletypeProgramT<Cfg
     }
 }
 template<typename Cfg>
-static void opWScript(TT2RuntimeT<Cfg>&, TT2OutputState&, const TeletypeProgramT<Cfg>*,
+static void opWs(TT2RuntimeT<Cfg>&, TT2OutputState&, const TeletypeProgramT<Cfg>*,
                       int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t t=0,n=0;
     if (!popStack(stack,stackSize,t,error)) return;
@@ -120,38 +120,38 @@ static void opWScript(TT2RuntimeT<Cfg>&, TT2OutputState&, const TeletypeProgramT
 
 `teletype/src/match_token.rl` (op text → enum) is the **source of truth**. The lexer (`match_token.c`) and the name table (`TT2OpNames.cpp`) are **generated** from it — never edit them by hand: `match_token.c` is **gitignored** (`teletype/.gitignore:48`) and gets clobbered on the next worktree bootstrap. The flow, mirroring how `WNG` exists:
 
-1. **Enum** (hand-edited, tracked) — add `E_OP_WPN` and `E_OP_W_SCRIPT` to `tele_op_idx_t` in `teletype/src/ops/op_enum.h`, before the `E_OP__LENGTH` sentinel (`:441`; `W*` block at `:179-186`). **No `_SET` variant** — `opWpn` is a single fused get/set op like `opWng` (there is no `E_OP_WNG_SET`; `isSet` is set positionally at dispatch, `TT2Evaluator.h:127`).
-2. **Token rules** (hand-edited, tracked) — add spellings to `teletype/src/match_token.rl` (`W*` at `:206-213`): `"WPN" => { MATCH_OP(E_OP_WPN); };`, `"W.SCRIPT" => { MATCH_OP(E_OP_W_SCRIPT); };`. No ordering hazard — `match_token.rl` is a Ragel *scanner* (longest-match is native, so `WPN` beats `WP` regardless of order; grep confirms no collision with existing tokens).
+1. **Enum** (hand-edited, tracked) — add `E_OP_WPN` and `E_OP_WS` to `tele_op_idx_t` in `teletype/src/ops/op_enum.h`, before the `E_OP__LENGTH` sentinel (`:441`; `W*` block at `:179-186`). **No `_SET` variant** — `opWpn` is a single fused get/set op like `opWng` (there is no `E_OP_WNG_SET`; `isSet` is set positionally at dispatch, `TT2Evaluator.h:127`).
+2. **Token rules** (hand-edited, tracked) — add spellings to `teletype/src/match_token.rl` (`W*` at `:206-213`): `"WPN" => { MATCH_OP(E_OP_WPN); };`, `"WS" => { MATCH_OP(E_OP_WS); };`. No ordering hazard — `match_token.rl` is a Ragel *scanner* (longest-match is native, so `WPN` beats `WP` regardless of order; grep confirms no collision with existing tokens).
 3. **Regenerate via the tooling (the canonical path — the only correct way):**
    - `( cd teletype/src && ragel -C -G2 match_token.rl -o match_token.c )` — regenerates the lexer (gitignored, per `PROJECT.md:407-410`; `ragel` is on PATH). **Never hand-edit `match_token.c`.**
    - `python3 teletype/utils/tt2_op_names.py` — regenerates `src/apps/sequencer/engine/TT2OpNames.cpp` (enum→name) from the `.rl`. Run **after** the `.rl` edit. **Never hand-add the `case`.**
    - *(optional)* `python3 teletype/utils/docs.py` / `cheatsheet.py` to include the op in generated docs.
-4. **Op vtable** (hand-edited, tracked) — register the op functions in `src/apps/sequencer/engine/TeletypeNativeOps.cpp` (the `table[E_OP_*] = op…<Cfg>;` block, `:4474-4481`): `table[E_OP_WPN] = opWpn<Cfg>; table[E_OP_W_SCRIPT] = opWScript<Cfg>;`. **Silent-no-op trap** — enum + name resolve but a null slot makes the op do nothing.
+4. **Op vtable** (hand-edited, tracked) — register the op functions in `src/apps/sequencer/engine/TeletypeNativeOps.cpp` (the `table[E_OP_*] = op…<Cfg>;` block, `:4474-4481`): `table[E_OP_WPN] = opWpn<Cfg>; table[E_OP_WS] = opWs<Cfg>;`. **Silent-no-op trap** — enum + name resolve but a null slot makes the op do nothing.
 
 Hand-edited files: `op_enum.h`, `match_token.rl`, `TeletypeNativeOps.cpp` (+ the op fns + host methods). Generated (by the tools, never by hand): `match_token.c`, `TT2OpNames.cpp`.
 
 ## Tests
 
-- **`TestTeletypeV2ParserContract.cpp`** — add `expectToken("WPN", E_OP_WPN, "...")` and `expectToken("W.SCRIPT", E_OP_W_SCRIPT, ...)` round-trips (catches a broken tokenizer entry, trap #1).
+- **`TestTeletypeV2ParserContract.cpp`** — add `expectToken("WPN", E_OP_WPN, "...")` and `expectToken("WS", E_OP_WS, ...)` round-trips (catches a broken tokenizer entry, trap #1).
 - **`TestTT2OpNames.cpp`** — iterates `0..E_OP__LENGTH` asserting every enum has a name; passes automatically once step 3 is done (catches a missing name).
 - **`WPN` functional test** — exercise `opWpn` get/set through a **fake `TT2Host`** (or `tt2CrossPatternCell` directly against a `Model` with a Mini track): a full track writing `WPN <miniTrack> 0 5 42` lands in the Mini track's active-scene `patterns[0].val[5]`; read it back; out-of-range bank/idx clamp like `PN`.
-- **`W.SCRIPT` op tests via a fake `TT2Host`** (the risky part — do NOT leave it all sim/manual): drive `opWScript` with a fake host that records `(track, script)` and returns a chosen `TT2EvalError`, asserting:
-  - valid `W.SCRIPT 2 1` → host called with `(track 1, script 1)` — script stays **1-based** at the host boundary; the `-1` to zero-based happens only inside `triggerScriptFromHost` — `error == None`;
-  - **invalid track** `W.SCRIPT 0 1` (→ `t=255`) → host's range guard returns `None` and **never indexes the engine** (the fake asserts it wasn't dispatched);
-  - **out-of-range script** (e.g. `W.SCRIPT 2 11` on a Full target) → `error == OutOfRange` (matches `SCRIPT`);
-  - **cap hit** → host returns `ExecDepthOverflow` → `opWScript` writes it to `error` (proves propagation; `runScript` already returns it, `TT2Runner.h:26`).
+- **`WS` op tests via a fake `TT2Host`** (the risky part — do NOT leave it all sim/manual): drive `opWs` with a fake host that records `(track, script)` and returns a chosen `TT2EvalError`, asserting:
+  - valid `WS 2 1` → host called with `(track 1, script 1)` — script stays **1-based** at the host boundary; the `-1` to zero-based happens only inside `triggerScriptFromHost` — `error == None`;
+  - **invalid track** `WS 0 1` (→ `t=255`) → host's range guard returns `None` and **never indexes the engine** (the fake asserts it wasn't dispatched);
+  - **out-of-range script** (e.g. `WS 2 11` on a Full target) → `error == OutOfRange` (matches `SCRIPT`);
+  - **cap hit** → host returns `ExecDepthOverflow` → `opWs` writes it to `error` (proves propagation; `runScript` already returns it, `TT2Runner.h:26`).
   The actual inline cross-track run + the RAII `_tt2CrossDepth` guard are engine-level → sim/manual.
 
 ## Budget
 
-Negligible. Per config: +2–3 op-table pointer slots (`E_OP_*` entries) in CCMRAM × 2 configs (~a few dozen bytes), + the op-function bodies in `.text` (small, ×2 instantiations). The only state added is **one `uint8_t _tt2CrossDepth` on `Engine`** (for `W.SCRIPT`); the host methods add no per-track state.
+Negligible. Per config: +2–3 op-table pointer slots (`E_OP_*` entries) in CCMRAM × 2 configs (~a few dozen bytes), + the op-function bodies in `.text` (small, ×2 instantiations). The only state added is **one `uint8_t _tt2CrossDepth` on `Engine`** (for `WS`); the host methods add no per-track state.
 
 ## Work order
 
 1. **Shared cross-track helper** (`src/apps/sequencer/engine/TT2HostCrossTrack.h`): `tt2CrossPatternCell(model, t, bank, idx) -> int16_t*` + a script-target resolver. Unit-test the pattern helper directly (host-constructible — it takes `Model&`).
 2. **`WPN` first** (low-risk, data only): enum + token rules + regen (ragel + python) + vtable + `opWpn` + 2 host methods (get/set) forwarding to the helper + parser-contract test + functional test. Ship.
-3. **`W.SCRIPT` plumbing**: public `triggerScriptFromHost` (target-`ScopedHost` swap) on each engine + the `uint8_t _tt2CrossDepth` Engine member with an RAII cap in `hostTriggerTrackScript` (NOT a static global). (The per-runtime depth-8 guard already bounds it; the lock is not in play.)
-4. **`W.SCRIPT`**: enum + token rules + regen + vtable + `opWScript` + `hostTriggerTrackScript` (1 host method) per the chosen recursion strategy + tests.
+3. **`WS` plumbing**: public `triggerScriptFromHost` (target-`ScopedHost` swap) on each engine + the `uint8_t _tt2CrossDepth` Engine member with an RAII cap in `hostTriggerTrackScript` (NOT a static global). (The per-runtime depth-8 guard already bounds it; the lock is not in play.)
+4. **`WS`**: enum + token rules + regen + vtable + `opWs` + `hostTriggerTrackScript` (1 host method) per the chosen recursion strategy + tests.
 
 ## Deferred (propose only)
 - Cross-track variable peek/poke (`W.A`-style) — same bridge, another host method pair.

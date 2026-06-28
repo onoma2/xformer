@@ -13,7 +13,7 @@ This plan touches `engine/TT2Host.h` and the **4 fake-host test files** — `Tes
 Two cross-track Teletype ops so any TT2-family track (full or Mini) reaches another TT2 track's data, mirroring the `WNG`/`WNN` Note-track cross-track ops:
 
 - **`WPN <track> <bank> <idx> [v]`** — get/set cell `idx` of pattern `bank` on `track`'s active program (Mini → its active scene). True cross-track `PN`: identical `normalisePn` (bank) + `normaliseIdx` (idx, negative-counts-back-from-`p.len`) normalisation.
-- **`W.SCRIPT <track> <n>`** — trigger script `n` (1-based, `1..Cfg::ScriptCount`) on `track`, run with that track installed as the active host so its own ops resolve against it; out-of-range → `OutOfRange`, recursion past the cross-track cap → `ExecDepthOverflow`, both propagated to the op's `error`.
+- **`WS <track> <n>`** — trigger script `n` (1-based, `1..Cfg::ScriptCount`) on `track`, run with that track installed as the active host so its own ops resolve against it; out-of-range → `OutOfRange`, recursion past the cross-track cap → `ExecDepthOverflow`, both propagated to the op's `error`.
 
 Op syntax is 1-based; ops subtract 1 so host track args are zero-based (script stays 1-based across the host boundary, `-1` happens inside `triggerScriptFromHost`).
 
@@ -358,7 +358,7 @@ git commit -m "feat(tt2): WPN cross-track pattern-cell op (true cross-track PN)"
 
 ---
 
-## Task 3 — `W.SCRIPT` plumbing (`triggerScriptFromHost` + cross-depth cap + `hostTriggerTrackScript`)
+## Task 3 — `WS` plumbing (`triggerScriptFromHost` + cross-depth cap + `hostTriggerTrackScript`)
 
 Engine-level: target-host swap, recursion cap, host dispatch. No op yet (Task 4 wires the op + tests).
 
@@ -440,13 +440,13 @@ TT2EvalError TT2TrackEngine::hostTriggerTrackScript(uint8_t t, int16_t n) {
 ```
 make -C build TestTeletypeV2Modulator && ctest --test-dir build -R TestTeletypeV2Modulator -V
 ```
-Expected: compiles + passes (the existing CASEs and the WPN CASE; no new W.SCRIPT op yet, so nothing exercises the new engine path — Task 4 adds that).
+Expected: compiles + passes (the existing CASEs and the WPN CASE; no new WS op yet, so nothing exercises the new engine path — Task 4 adds that).
 
-### Commit — combined with Task 4 (one `W.SCRIPT` commit). Do not commit here.
+### Commit — combined with Task 4 (one `WS` commit). Do not commit here.
 
 ---
 
-## Task 4 — `W.SCRIPT` op + enum + token + regen + vtable + fake-host tests
+## Task 4 — `WS` op + enum + token + regen + vtable + fake-host tests
 
 **Files:**
 - `teletype/src/ops/op_enum.h`
@@ -461,16 +461,16 @@ Expected: compiles + passes (the existing CASEs and the WPN CASE; no new W.SCRIP
 
 Add to `TestTeletypeV2ParserContract.cpp`:
 ```cpp
-    CASE("W.SCRIPT op token") {
-        auto r = tryParse("W.SCRIPT");
-        expectEqual(int(r.error), int(E_OK), "W.SCRIPT parses");
-        expectToken(r.cmd, 0, OP, E_OP_W_SCRIPT, "W.SCRIPT op");
+    CASE("WS op token") {
+        auto r = tryParse("WS");
+        expectEqual(int(r.error), int(E_OK), "WS parses");
+        expectToken(r.cmd, 0, OP, E_OP_WS, "WS op");
     }
 ```
 
-Add to `TestTeletypeV2Modulator.cpp` (drives `opWScript` through a fake host that records the call and returns a chosen error):
+Add to `TestTeletypeV2Modulator.cpp` (drives `opWs` through a fake host that records the call and returns a chosen error):
 ```cpp
-CASE("W.SCRIPT propagates host error; track stays 1-based at boundary") {
+CASE("WS propagates host error; track stays 1-based at boundary") {
     struct ScriptHost : ModStubHost {
         int calls = 0; int16_t lastTrack = -1, lastScript = -1;
         TT2EvalError ret = TT2EvalError::None;
@@ -483,26 +483,26 @@ CASE("W.SCRIPT propagates host error; track stays 1-based at boundary") {
     TT2OutputState out = {}; init(out);
 
     // valid: host called (track 1 zero-based, script 1 still 1-based), no error
-    auto res = evalText("W.SCRIPT 2 1", rt, out);
+    auto res = evalText("WS 2 1", rt, out);
     expectEqual(int(host.lastTrack), 1, "track 2 → host track 1");
     expectEqual(int(host.lastScript), 1, "script stays 1-based at boundary");
     expectEqual(int(res.error), int(TT2EvalError::None), "no error");
 
-    // invalid track W.SCRIPT 0 1 → t = uint8_t(0-1) = 255; host guards, returns None
+    // invalid track WS 0 1 → t = uint8_t(0-1) = 255; host guards, returns None
     host.calls = 0; host.lastTrack = -1;
-    evalText("W.SCRIPT 0 1", rt, out);
+    evalText("WS 0 1", rt, out);
     // op still dispatches to host (the guard lives in hostTriggerTrackScript);
     // host receives 255 and its real impl returns None without indexing the engine.
     expectEqual(int(host.lastTrack), 255, "0 → 255 reaches host guard");
 
     // out-of-range script → host returns OutOfRange → op writes it to error
     host.ret = TT2EvalError::OutOfRange;
-    auto r2 = evalText("W.SCRIPT 2 11", rt, out);
+    auto r2 = evalText("WS 2 11", rt, out);
     expectEqual(int(r2.error), int(TT2EvalError::OutOfRange), "OutOfRange propagated");
 
     // cap hit → host returns ExecDepthOverflow → op propagates
     host.ret = TT2EvalError::ExecDepthOverflow;
-    auto r3 = evalText("W.SCRIPT 2 1", rt, out);
+    auto r3 = evalText("WS 2 1", rt, out);
     expectEqual(int(r3.error), int(TT2EvalError::ExecDepthOverflow), "ExecDepthOverflow propagated");
 }
 ```
@@ -512,18 +512,18 @@ CASE("W.SCRIPT propagates host error; track stays 1-based at boundary") {
 ```
 make -C build TestTeletypeV2ParserContract
 ```
-Expected: **compile failure** — `'E_OP_W_SCRIPT' was not declared in this scope`.
+Expected: **compile failure** — `'E_OP_WS' was not declared in this scope`.
 
 ### GREEN — enum, token, op, regen, vtable
 
 1. `teletype/src/ops/op_enum.h` — after `E_OP_WPN`:
 ```c
-    E_OP_W_SCRIPT,
+    E_OP_WS,
 ```
 
 2. `teletype/src/match_token.rl` — in the `W*` block:
 ```c
-        "W.SCRIPT"    => { MATCH_OP(E_OP_W_SCRIPT); };
+        "WS"    => { MATCH_OP(E_OP_WS); };
 ```
 
 3. Regenerate:
@@ -532,10 +532,10 @@ Expected: **compile failure** — `'E_OP_W_SCRIPT' was not declared in this scop
 python3 teletype/utils/tt2_op_names.py
 ```
 
-4. `src/apps/sequencer/engine/TeletypeNativeOps.cpp` — `opWScript` next to `opWpn`:
+4. `src/apps/sequencer/engine/TeletypeNativeOps.cpp` — `opWs` next to `opWpn`:
 ```cpp
 template<typename Cfg>
-static void opWScript(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
+static void opWs(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                       int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t t = 0, n = 0;
     if (!popStack(stack, stackSize, t, error)) return;
@@ -545,7 +545,7 @@ static void opWScript(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgra
 ```
 Register in the op-table block:
 ```cpp
-            table[E_OP_W_SCRIPT]           = opWScript<Cfg>;
+            table[E_OP_WS]           = opWs<Cfg>;
 ```
 
 ### Run-to-pass
@@ -556,7 +556,7 @@ make -C build TestTT2OpNames && ctest --test-dir build -R TestTT2OpNames -V
 ```
 Expected: all pass.
 
-### Commit (stage only these files — one `W.SCRIPT` commit covering Task 3 + 4)
+### Commit (stage only these files — one `WS` commit covering Task 3 + 4)
 ```
 git add src/apps/sequencer/engine/TT2Host.h \
         src/apps/sequencer/engine/TT2TrackEngine.h \
@@ -574,7 +574,7 @@ git add src/apps/sequencer/engine/TT2Host.h \
         src/tests/unit/sequencer/TestTeletypeV2Geode.cpp \
         src/tests/unit/sequencer/TestTeletypeV2EnvelopeOps.cpp \
         src/tests/unit/sequencer/TestTeletypeV2LfoOps.cpp
-git commit -m "feat(tt2): W.SCRIPT cross-track script trigger with host-swap + cross-depth cap"
+git commit -m "feat(tt2): WS cross-track script trigger with host-swap + cross-depth cap"
 ```
 
 ---
@@ -591,7 +591,7 @@ No new code. Verify all three build targets compile clean, the full TT2 suite is
 ```
 make -C build -j && ctest --test-dir build -R 'TT2|TeletypeV2|TeletypeMini' -V
 ```
-Expected: all green, including the new `TestTT2HostCrossTrack`, the WPN/W.SCRIPT parser-contract cases, and the fake-host op tests.
+Expected: all green, including the new `TestTT2HostCrossTrack`, the WPN/WS parser-contract cases, and the fake-host op tests.
 
 2. Sim build (the user's default sim tree):
 ```
