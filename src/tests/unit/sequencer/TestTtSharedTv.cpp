@@ -42,6 +42,9 @@ struct TvStubHost : TT2Host {
     void hostSetBusCv(uint8_t, int16_t) override {}
     int16_t hostTvGet(uint8_t slot) override { return slot < 16 ? tv[slot] : 0; }
     void hostTvSet(uint8_t slot, int16_t v) override { if (slot < 16) tv[slot] = v; }
+    int16_t hostTrackPatternVal(uint8_t, int16_t, int16_t) override { return 0; }
+    void hostSetTrackPatternVal(uint8_t, int16_t, int16_t, int16_t) override {}
+    TT2EvalError hostTriggerTrackScript(uint8_t, int16_t) override { return TT2EvalError::None; }
 
     Modulator &hostModulator(uint8_t) override { return mod; }
     int16_t hostModulatorOutput(uint8_t) override { return 0; }
