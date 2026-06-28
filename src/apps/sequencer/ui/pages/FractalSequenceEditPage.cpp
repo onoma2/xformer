@@ -612,7 +612,7 @@ void FractalSequenceEditPage::keyPressTrunk(KeyPressEvent &event) {
         case 4: editEdge(Bracket::Ornament, false, d8); break; // Orn First
         case 5: editEdge(Bracket::Ornament, true, d8); break;  // Orn Last
         case 6: seq.editRecordSkip(d1, false); break;          // R.Skip
-        case 7: seq.editDivisor(d1, false); break;             // Divisor
+        case 7: seq.editDivisor(-d1, false); break;            // Divisor: up = faster (lower divisor)
         }
         event.consume();
         return;
