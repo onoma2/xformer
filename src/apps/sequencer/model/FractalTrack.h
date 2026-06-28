@@ -140,7 +140,19 @@ public:
 
     // bufferLength
     int bufferLength() const { return _bufferLength; }
-    void setBufferLength(int v) { _bufferLength = clamp(v, 1, CONFIG_FRACTAL_MAX_CELLS); }
+    void setBufferLength(int v) {
+        _bufferLength = clamp(v, 1, CONFIG_FRACTAL_MAX_CELLS);
+        // Pull every pattern's loop/record/orn edges in to fit a shrunk buffer.
+        int maxCell = _bufferLength - 1;
+        for (auto &seq : _sequences) {
+            seq.setLoopFirst(clamp(seq.loopFirst(), 0, maxCell));
+            seq.setLoopLast(clamp(seq.loopLast(), 0, maxCell));
+            seq.setRecordFirst(clamp(seq.recordFirst(), 0, maxCell));
+            seq.setRecordLast(clamp(seq.recordLast(), 0, maxCell));
+            seq.setOrnFirst(clamp(seq.ornFirst(), 0, maxCell));
+            seq.setOrnLast(clamp(seq.ornLast(), 0, maxCell));
+        }
+    }
 
     // lock
     bool lock() const { return _lock; }
