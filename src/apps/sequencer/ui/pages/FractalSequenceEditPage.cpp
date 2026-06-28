@@ -275,10 +275,12 @@ void FractalSequenceEditPage::drawBranch(Canvas &canvas) {
     const int bw = Width / cols;
     const int y = 26;
     const int playing = eng.currentSegment();
+    const int queued = eng.queuedSegment();
     for (int j = 0; j < cols; ++j) {
         int x = j * bw;
         bool isTrunk = j == 0;
         bool isPlaying = j == playing;
+        bool isQueued = queued >= 0 && j == queued;
         canvas.setColor(isPlaying ? Color::Bright : Color::Medium);   // bright border = playhead
         canvas.drawRect(x + 1, y, bw - 2, 10);
         str.reset();
@@ -291,6 +293,12 @@ void FractalSequenceEditPage::drawBranch(Canvas &canvas) {
         }
         canvas.setColor(isPlaying ? Color::Bright : Color::MediumBright);
         canvas.drawText(x + 1 + (bw - 2 - canvas.textWidth(str)) / 2, y + 6, str);
+        // queued jump target: "Q" tag above the block, distinct from the
+        // bright-border playhead.
+        if (isQueued) {
+            canvas.setColor(Color::MediumBright);
+            canvas.drawText(x + 2, y - 1, "Q");
+        }
     }
 
     // transform pool toggles
@@ -369,6 +377,15 @@ void FractalSequenceEditPage::drawOrnament(Canvas &canvas) {
     canvas.drawText(2, 50, "Last");
     canvas.setColor(Color::MediumBright);
     canvas.drawText(40, 50, FractalTrackEngine::ornamentName(eng.lastOrnament()));
+
+    // Pending punch-in ornament, bright + right-aligned on the Last row so it
+    // reads distinct from the last-fired readout.
+    if (eng.queuedOrnament() >= 0) {
+        str.reset();
+        str("Q %s", FractalTrackEngine::ornamentName(eng.queuedOrnament()));
+        canvas.setColor(Color::Bright);
+        canvas.drawText(Width - 2 - canvas.textWidth(str), 50, str);
+    }
 }
 
 void FractalSequenceEditPage::drawSource(Canvas &canvas) {
@@ -669,8 +686,12 @@ void FractalSequenceEditPage::keyPressSource(KeyPressEvent &event) {
         if (s < int(FractalTrack::GateLogic::Last)) {
             // Top row S1..S6: select gate-logic mode.
             track.setGateLogic(FractalTrack::GateLogic(s));
+        } else if (s == 15) {
+            // S16: roll both logics at random.
+            _engine.selectedTrackEngine().as<FractalTrackEngine>().randomizeLogic();
+            showMessage("Random Logic");
         } else if (s >= 8 && (s - 8) < int(FractalTrack::CvLogic::Last)) {
-            // Bottom row S9..: select cv-logic mode.
+            // Bottom row S9..S15: select cv-logic mode.
             track.setCvLogic(FractalTrack::CvLogic(s - 8));
         }
         event.consume();
@@ -747,5 +768,55 @@ void FractalSequenceEditPage::updateLeds(Leds &leds) {
             leds.set(index, false, true);
             leds.mask(index);
         }
+        return;
+    }
+
+    // Page not held: paint the per-page step grid (mirrors Stochastic's idiom).
+    auto &track = _project.selectedTrack().fractalTrack();
+    auto &seq = track.sequence(_project.selectedPatternIndex());
+    const auto &eng = _engine.selectedTrackEngine().as<FractalTrackEngine>();
+    auto paint = [&](int i, bool red, bool green) {
+        int idx = MatrixMap::fromStep(i);
+        leds.unmask(idx); leds.set(idx, red, green); leds.mask(idx);
+    };
+
+    switch (_currentPage) {
+    case Page::Branch: {
+        const int N = seq.branchCount();
+        const int playing = eng.currentSegment();
+        const int queued = eng.queuedSegment();
+        // Top row S1..S(N+1): segments green; playing amber; queued red.
+        for (int i = 0; i <= N && i < 8; ++i) {
+            bool q = queued >= 0 && i == queued;
+            bool p = i == playing;
+            paint(i, /*red*/ q || p, /*green*/ !q);
+        }
+        // Bottom row S9..S16: transform-pool bits, green when set.
+        const int pool = seq.branchPool();
+        for (int k = 0; k < 8; ++k) paint(8 + k, false, (pool >> k) & 1);
+        break;
+    }
+    case Page::Ornament: {
+        const int queued = eng.queuedOrnament();
+        const int last = eng.lastOrnament();
+        // S1..S15: ornaments green; queued amber; last-fired red.
+        for (int i = 0; i < 15; ++i) {
+            if (i == queued) paint(i, true, true);
+            else if (i == last) paint(i, true, false);
+            else paint(i, false, true);
+        }
+        break;
+    }
+    case Page::Source: {
+        const int gsel = int(track.gateLogic());
+        for (int i = 0; i < int(FractalTrack::GateLogic::Last); ++i) paint(i, false, i == gsel);
+        const int csel = int(track.cvLogic());
+        for (int i = 0; i < int(FractalTrack::CvLogic::Last); ++i) paint(8 + i, false, i == csel);
+        paint(15, true, true);   // randomize = amber
+        break;
+    }
+    case Page::Trunk:
+    case Page::Last:
+        break;
     }
 }

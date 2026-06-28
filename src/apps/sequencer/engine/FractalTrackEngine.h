@@ -75,6 +75,12 @@ public:
     void queueSegment(int seg) { _queuedSegment = int8_t(clamp(seg, 0, 7)); }
     void queueOrnament(int id) { _queuedOrnament = int8_t(clamp(id, 0, 14)); }
     bool hasQueuedOrnament() const { return _queuedOrnament >= 0; }
+    int queuedSegment() const { return _queuedSegment; }
+    int queuedOrnament() const { return _queuedOrnament; }
+
+    // Roll both source-mix logics to a fresh random valid enum via the engine's
+    // free-running _rng (Source-page S16 action).
+    void randomizeLogic();
 
     // Branch transform readout for the UI Branch page. seg 1..branchCount.
     // branchKind → op code 0..7; branchParam → kind-relevant resolved value:

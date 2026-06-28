@@ -294,6 +294,11 @@ void FractalTrackEngine::clearTrunk() {
     _eventInhibit = 0;
 }
 
+void FractalTrackEngine::randomizeLogic() {
+    _fractalTrack.setGateLogic(FractalTrack::GateLogic(_rng.nextRange(uint32_t(FractalTrack::GateLogic::Last))));
+    _fractalTrack.setCvLogic(FractalTrack::CvLogic(_rng.nextRange(uint32_t(FractalTrack::CvLogic::Last))));
+}
+
 void FractalTrackEngine::restart() {
     _relativeTick = 0;
     _recordPos = sequence().recordFirst();
