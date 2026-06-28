@@ -90,6 +90,46 @@ void seedTeletypeMiniDemo(TT2MiniTrack &mt) {
         loadScriptText(p, TT2ConfigMini::MetroScript, metro[s]); // metro: per-scene tempo/pitch on CV2/TR4
     }
 }
+
+// Cross-track demo: Full track 0 conducts Mini track 1. The Full metro cycles the
+// Mini's scene (WP = switch w-pattern → scene) and fires its accent (WS = trigger
+// script); each Mini scene has its own tempo/pitch, so the cycle is audible. The
+// two new cross-track ops, end to end. Mini metro is booted once (X==0) so the
+// per-tick WS accent doesn't reset its tempo.
+void seedTeletypeCrossTrackDemo(TeletypeProgram &full, TT2MiniTrack &mini) {
+    loadScriptText(full, 0, "WP 2 MOD ADD WP 2 1 4\n");   // S1: manual next-scene on Mini
+    loadScriptText(full, 1, "WS 2 2\n");                  // S2: manual fire Mini accent
+    loadScriptText(full, TT2_METRO_SCRIPT,
+        "IF EQ X 0 : WS 2 1\n"   // boot Mini metro once
+        "X ADD X 1\n"
+        "WP 2 MOD X 4\n"         // cycle Mini scene 0..3
+        "WS 2 2\n"               // fire Mini accent (Mini script 1)
+        "CV 1 N MOD X 7\n"       // own note on CV1
+        "TR.P 1\n");             // own gate on TR1
+    loadScriptText(full, TT2_INIT_SCRIPT,
+        "X 0\n"
+        "M 1500\n"               // 1.5s conductor tick
+        "M.ACT 1\n");
+
+    static const char *sceneMetro[TT2ConfigMini::SceneCount] = {
+        "M 500\nCV 2 N 0\nTR.P 4\n",     // scene 0: medium, root
+        "M 250\nCV 2 N 7\nTR.P 4\n",     // scene 1: faster, fifth
+        "M 1000\nCV 2 N 12\nTR.P 4\n",   // scene 2: slow, octave
+        "M 125\nCV 2 N 3\nTR.P 4\n",     // scene 3: fastest, minor third
+    };
+    static const char *sceneAccent[TT2ConfigMini::SceneCount] = {
+        "CV 2 N 4\nTR.P 4\n",            // per-scene accent fired by Full's WS 2 2
+        "CV 2 N 11\nTR.P 4\n",
+        "CV 2 N 16\nTR.P 4\n",
+        "CV 2 N 7\nTR.P 4\n",
+    };
+    for (int s = 0; s < TT2ConfigMini::SceneCount; ++s) {
+        auto &p = mini.program(s);
+        loadScriptText(p, 0, "M 500\nM.ACT 1\n");                       // boot (WS 2 1, once)
+        loadScriptText(p, 1, sceneAccent[s]);                          // accent (WS 2 2, per tick)
+        loadScriptText(p, TT2ConfigMini::MetroScript, sceneMetro[s]);  // per-scene tempo/pitch
+    }
+}
 } // namespace
 #endif
 
@@ -177,6 +217,10 @@ void Project::clear() {
     // Set back to 0 when the timing experiment is done. Non-destructive — loading
     // a saved project still overwrites clear().
 #define STRESS_TIMING_DEMO 0
+    // TT_CROSSTRACK_DEMO: when 1, the sim boots a TT2 cross-track patch (Full
+    // track 0 conducts Mini track 1 — WP scene-switch + WS script-trigger)
+    // instead of the fractal project. Set to 0 for the fractal default.
+#define TT_CROSSTRACK_DEMO 1
 #if STRESS_TIMING_DEMO
     // 8 active tracks across the heaviest engines at fast tempo. RAM-safe: only
     // ONE Stochastic track (two have hardfaulted on boot — see PROJECT.md).
@@ -211,6 +255,13 @@ void Project::clear() {
         noteSequence(t, 0).setGates({ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 });
     }
 #elif PLATFORM_SIM
+#if TT_CROSSTRACK_DEMO
+    track(0).setTrackMode(Track::TrackMode::TeletypeV2);
+    track(1).setTrackMode(Track::TrackMode::TeletypeMini);
+    seedTeletypeCrossTrackDemo(track(0).tt2Track().program(), track(1).tt2MiniTrack());
+    setTempo(120.f);
+    setScale(2); // 2 corresponds to H.Minor scale
+#else
     // Fractal test project: track 8 mirrors parents on tracks 6 & 7.
     // Teletype tracks stay present but UNSEEDED — empty scripts emit no gate/CV,
     // so teletype doesn't interfere with the fractal capture (re-seed via the
@@ -256,6 +307,7 @@ void Project::clear() {
 
     setTempo(80.f);
     setScale(2); // 2 corresponds to H.Minor scale
+#endif // TT_CROSSTRACK_DEMO
 #endif
 
     _observable.notify(ProjectCleared);
