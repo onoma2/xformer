@@ -177,6 +177,7 @@ const char *tt2OpName(int v) {
     case E_OP_PARAM_CAL_MAX: return "PARAM.CAL.MAX";
     case E_OP_PARAM_CAL_RESET: return "PARAM.CAL.RESET";
     case E_OP_BUS: return "BUS";
+    case E_OP_TV: return "TV";
     case E_OP_WBPM_S: return "WBPM.S";
     case E_OP_WBPM: return "WBPM";
     case E_OP_WMS: return "WMS";

@@ -520,4 +520,10 @@ UNIT_TEST("TeletypeV2ParserContract") {
         expectEqual(int(r.error), int(E_OK), "RAND.SD parses");
         expectToken(r.cmd, 0, OP, E_OP_SYM_RAND_SD, "RAND.SD op");
     }
+
+    CASE("tv_token_smoke") {
+        auto r = tryParse("TV 0");
+        expectEqual(int(r.error), int(E_OK), "TV parses");
+        expectToken(r.cmd, 0, OP, E_OP_TV, "TV op");
+    }
 }

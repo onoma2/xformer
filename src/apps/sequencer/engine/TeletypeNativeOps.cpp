@@ -2081,6 +2081,20 @@ static void opBus(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<C
     }
 }
 
+template<typename Cfg>
+static void opTv(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
+                 int16_t *stack, uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
+    int16_t i = 0;
+    if (!popStack(stack, stackSize, i, error)) return;
+    TT2Host *h = tt2ActiveHost();
+    if (isSetPosition && stackSize >= 1) {
+        int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+        if (h) h->hostTvSet(uint8_t(i), v);
+    } else {
+        pushStack(stack, stackSize, h ? h->hostTvGet(uint8_t(i)) : 0, error);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Geode ops (G.*) — drive the live GeodeConfig/GeodeEngine via the active host.
 // Run = M2 output (G.RUN), voices land in M3-M8. G.O/G.BAR/G.R have no live
@@ -4481,6 +4495,7 @@ namespace {
             table[E_OP_WNN_H]              = opWnnH<Cfg>;
             table[E_OP_RT]                 = opRt<Cfg>;
             table[E_OP_BUS]                = opBus<Cfg>;
+            table[E_OP_TV]                 = opTv<Cfg>;
             // Geode (G.*) — canonical + short aliases share one handler.
             table[E_OP_G_TIME] = opGTime<Cfg>;  table[E_OP_G_T]  = opGTime<Cfg>;
             table[E_OP_G_TONE] = opGTone<Cfg>;  table[E_OP_G_I]  = opGTone<Cfg>;

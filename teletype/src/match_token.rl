@@ -198,6 +198,7 @@
         "PARAM.CAL.MAX"  => { MATCH_OP(E_OP_PARAM_CAL_MAX); };
         "PARAM.CAL.RESET" => { MATCH_OP(E_OP_PARAM_CAL_RESET); };
         "BUS"         => { MATCH_OP(E_OP_BUS); };
+        "TV"          => { MATCH_OP(E_OP_TV); };
         "WBPM.S"      => { MATCH_OP(E_OP_WBPM_S); };
         "WBPM"        => { MATCH_OP(E_OP_WBPM); };
         "WMS"         => { MATCH_OP(E_OP_WMS); };
