@@ -324,6 +324,9 @@ public:
 
     static void printNote(StringBuilder &str, int note) {
         static const char *names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+        // Guard the 12-element array: a -1 (inherit) root or any stray value would
+        // read names[-1] -> garbage pointer -> crash. Out of range writes nothing.
+        if (note < 0 || note >= 12) return;
         str(names[note]);
     }
 
