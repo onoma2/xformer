@@ -607,6 +607,25 @@ Notes:
 - These operate on the playing pattern for that track.
 - If the track is not a Note track, getters return 0 and setters do nothing.
 
+## WPN / WS Cross-Track TT2 Ops
+
+Reach into another TT2-family track's patterns and scripts (track index 1-based). These are to TT2 targets what `WNG`/`WNN` are to Note tracks. Works full↔full, full↔Mini, Mini↔Mini.
+
+- `WPN t b i` -> get cell `i` of pattern bank `b` on track `t`'s active program (a Mini target → its active scene)
+- `WPN t b i v` -> set that cell to `v`
+- `WS t n` -> trigger script `n` (1-based) on track `t`, run with that track installed as host
+
+`WPN` is the cross-track form of same-track `PN`: identical normalisation — bank clamps to the pattern range, and a negative `idx` counts back from the pattern's length (`WPN 2 0 -1` hits the last step). If the target is not a TT2-family track, getters return 0 and setters do nothing.
+
+`WS` range is `1..ScriptCount` (full: 1–10 incl. metro/init; Mini: 1–3). Out-of-range script reports an error; cross-track recursion is bounded by a small depth cap (returns an overflow error rather than blowing the stack).
+
+Example: a conductor track writes step 0 of track 3's pattern, then fires track 3's script 1.
+
+```
+WPN 3 0 0 60     # track 3, bank 0, step 0 := 60
+WS 3 1           # run track 3's script 1
+```
+
 ## WBPM Tempo Control
 
 WBPM reads the current project tempo in BPM. WBPM.S sets the tempo.

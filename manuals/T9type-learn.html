@@ -485,6 +485,21 @@ WNN t s      # get note 0..127; WNN t s v sets it
 WNG.H t      # gate at current gate step
 WNN.H t      # note at current note step</code></pre>
 
+<h3>Cross-track TT2 &mdash; WPN / WS</h3>
+<p>Reach into another TT2-family track's patterns and scripts (track 1-based). These are to TT2 targets what
+<code>WNG</code>/<code>WNN</code> are to Note tracks. Works full↔full, full↔Mini, Mini↔Mini.</p>
+<pre><code>WPN t b i      # get cell i of bank b on track t's active program
+WPN t b i v    # set that cell to v
+WS t n         # trigger script n (1-based) on track t, with t installed as host
+
+WPN 3 0 0 60   # track 3, bank 0, step 0 := 60
+WS 3 1         # run track 3's script 1</code></pre>
+<div class="note"><b>WPN is the cross-track form of <code>PN</code>.</b> Identical normalisation: bank clamps to the
+pattern range, and a negative <code>idx</code> counts back from the pattern's length (<code>WPN 2 0 -1</code> hits the
+last step). A Mini target resolves to its active scene. Non-TT2 targets read 0 / write nothing. <code>WS</code> range is
+<code>1..ScriptCount</code> (full: 1–10 incl. metro/init; Mini: 1–3); out-of-range reports an error, and cross-track
+recursion is bounded by a small depth cap (returns an overflow error rather than blowing the stack).</div>
+
 <h3>Route &amp; pattern readback &mdash; RT / WP</h3>
 <pre><code>CV 1 V RT 1            # mirror Route 1 source (pre-shaper, 0-16383)
 CV 1 N SCALE WP 1 1 16 60 75   # map track 1's w-pattern 1-16 to notes
