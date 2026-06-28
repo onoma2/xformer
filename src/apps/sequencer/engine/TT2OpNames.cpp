@@ -190,6 +190,7 @@ const char *tt2OpName(int v) {
     case E_OP_WNN_H: return "WNN.H";
     case E_OP_WNG: return "WNG";
     case E_OP_WNN: return "WNN";
+    case E_OP_WPN: return "WPN";
     case E_OP_WR: return "WR";
     case E_OP_RT: return "RT";
     case E_OP_PRM: return "PRM";

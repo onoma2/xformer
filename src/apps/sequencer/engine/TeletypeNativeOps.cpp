@@ -2033,6 +2033,21 @@ static void opWng(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<C
     }
 }
 template<typename Cfg>
+static void opWpn(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
+                  int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
+    int16_t t = 0, b = 0, i = 0;
+    if (!popStack(stack, stackSize, t, error)) return;
+    if (!popStack(stack, stackSize, b, error)) return;
+    if (!popStack(stack, stackSize, i, error)) return;
+    TT2Host *h = tt2ActiveHost();
+    if (isSet && stackSize >= 1) {
+        int16_t v = 0; if (!popStack(stack, stackSize, v, error)) return;
+        if (h) h->hostSetTrackPatternVal(uint8_t(t - 1), b, i, v);
+    } else {
+        pushStack(stack, stackSize, h ? h->hostTrackPatternVal(uint8_t(t - 1), b, i) : 0, error);
+    }
+}
+template<typename Cfg>
 static void opWnn(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t t = 0, s = 0;
@@ -4490,6 +4505,7 @@ namespace {
             table[E_OP_WR]                 = opWr<Cfg>;
             table[E_OP_WR_ACT]             = opWrAct<Cfg>;
             table[E_OP_WNG]                = opWng<Cfg>;
+            table[E_OP_WPN]                = opWpn<Cfg>;
             table[E_OP_WNN]                = opWnn<Cfg>;
             table[E_OP_WNG_H]              = opWngH<Cfg>;
             table[E_OP_WNN_H]              = opWnnH<Cfg>;

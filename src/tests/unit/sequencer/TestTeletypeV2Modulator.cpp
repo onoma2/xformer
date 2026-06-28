@@ -43,6 +43,8 @@ struct ModStubHost : TT2Host {
     void hostSetBusCv(uint8_t, int16_t) override {}
     int16_t hostTvGet(uint8_t) override { return 0; }
     void hostTvSet(uint8_t, int16_t) override {}
+    int16_t hostTrackPatternVal(uint8_t, int16_t, int16_t) override { return 0; }
+    void hostSetTrackPatternVal(uint8_t, int16_t, int16_t, int16_t) override {}
 
     Modulator &hostModulator(uint8_t idx) override {
         if (idx >= CONFIG_MODULATOR_COUNT) idx = 0;
@@ -146,6 +148,30 @@ CASE("slot index out of range is OutOfRange, no write") {
     expectTrue(evalText("MO.DEPTH 9 50", rt, out).error == TT2EvalError::OutOfRange,
                "slot 9 rejected");
     expectEqual(host.mods[0].depth(), before, "no write on bad slot");
+    tt2SetActiveHost(nullptr);
+}
+
+CASE("WPN forwards signed bank/idx to host set/get") {
+    struct RecHost : ModStubHost {
+        int16_t lastTrack = -1, lastBank = -1, lastIdx = -1, lastVal = -1;
+        int16_t cell = 0;
+        int16_t hostTrackPatternVal(uint8_t tr, int16_t b, int16_t i) override {
+            lastTrack = tr; lastBank = b; lastIdx = i; return cell;
+        }
+        void hostSetTrackPatternVal(uint8_t tr, int16_t b, int16_t i, int16_t v) override {
+            lastTrack = tr; lastBank = b; lastIdx = i; lastVal = v; cell = v;
+        }
+    } host;
+    tt2SetActiveHost(&host);
+    TT2Runtime rt = {}; init(rt);
+    TT2OutputState out = {}; init(out);
+    evalText("WPN 2 0 5 42", rt, out);
+    expectEqual(int(host.lastTrack), 1, "track 1-based→0-based");
+    expectEqual(int(host.lastBank), 0, "bank passed signed");
+    expectEqual(int(host.lastIdx), 5, "idx passed signed");
+    expectEqual(int(host.lastVal), 42, "value written");
+    evalText("WPN 2 0 5", rt, out);
+    expectEqual(int(host.cell), 42, "read back same cell");
     tt2SetActiveHost(nullptr);
 }
 

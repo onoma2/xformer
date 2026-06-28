@@ -4,6 +4,7 @@
 #include "CvInput.h"
 #include "NoteTrackEngine.h"
 #include "MidiUtils.h"
+#include "TT2HostCrossTrack.h"
 
 #include "model/NoteSequence.h"
 
@@ -196,6 +197,13 @@ void TT2MiniTrackEngine::hostNoteGateSet(uint8_t track, uint8_t step, int16_t v)
     NoteSequence *seq = tt2MiniNoteSequence(_engine.model(), track);
     if (!seq || step >= CONFIG_STEP_COUNT) return;
     seq->step(step).setGate(v != 0);
+}
+int16_t TT2MiniTrackEngine::hostTrackPatternVal(uint8_t track, int16_t bank, int16_t idx) {
+    int16_t *cell = tt2CrossPatternCell(_engine.model(), track, bank, idx);
+    return cell ? *cell : 0;
+}
+void TT2MiniTrackEngine::hostSetTrackPatternVal(uint8_t track, int16_t bank, int16_t idx, int16_t v) {
+    if (int16_t *cell = tt2CrossPatternCell(_engine.model(), track, bank, idx)) *cell = v;
 }
 int16_t TT2MiniTrackEngine::hostNoteNoteGet(uint8_t track, uint8_t step) {
     const NoteSequence *seq = tt2MiniNoteSequence(_engine.model(), track);

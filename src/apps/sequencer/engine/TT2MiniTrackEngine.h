@@ -135,6 +135,8 @@ public:
     int16_t hostWtu(uint8_t div, uint8_t mult) override;
     int16_t hostTrackPattern(uint8_t track) override;
     void hostSetTrackPattern(uint8_t track, uint8_t pattern) override;
+    int16_t hostTrackPatternVal(uint8_t track, int16_t bank, int16_t idx) override;
+    void hostSetTrackPatternVal(uint8_t track, int16_t bank, int16_t idx, int16_t v) override;
     int16_t hostNoteGateGet(uint8_t track, uint8_t step) override;
     void hostNoteGateSet(uint8_t track, uint8_t step, int16_t v) override;
     int16_t hostNoteNoteGet(uint8_t track, uint8_t step) override;

@@ -25,6 +25,8 @@ struct TT2Host {
     // per-track pattern
     virtual int16_t hostTrackPattern(uint8_t track) = 0;
     virtual void hostSetTrackPattern(uint8_t track, uint8_t pattern) = 0;
+    virtual int16_t hostTrackPatternVal(uint8_t track, int16_t bank, int16_t idx) = 0;
+    virtual void hostSetTrackPatternVal(uint8_t track, int16_t bank, int16_t idx, int16_t v) = 0;
 
     // cross-track note/gate (Note tracks)
     virtual int16_t hostNoteGateGet(uint8_t track, uint8_t step) = 0;
