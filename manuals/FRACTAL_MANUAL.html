@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fractal Track — manual</title>
+<style>
+  :root{
+    --blue:#2563eb; --amber:#ca8a04; --green:#16a34a; --red:#dc2626; --purp:#7c3aed;
+    --ink:#1a1a1a; --mut:#5b5b5b; --line:#e5e5e5; --card:#ffffff; --bg:#fafafa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; line-height:1.5;}
+  .wrap{max-width:880px; margin:0 auto; padding:32px 24px 90px}
+  h1{font-size:1.75rem; line-height:1.2; margin:0 0 6px}
+  h2{font-size:1.32rem; line-height:1.25; margin:46px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--blue)}
+  h2.geo{border-color:var(--green)}
+  h2.adv{border-color:var(--purp)}
+  h3{font-size:1.06rem; margin:24px 0 6px}
+  .lede{color:var(--mut); font-size:1.05rem; margin:0 0 8px}
+  p{margin:10px 0}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#f0f0f3; padding:1px 5px; border-radius:4px; font-size:.9em}
+  pre{background:#1a1a1a; color:#f0f0f0; padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:.86rem; line-height:1.45; margin:12px 0}
+  pre code{background:none; padding:0; color:inherit; font-size:1em}
+  .kbd{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#1a1a1a; color:#fff; padding:2px 7px; border-radius:5px; font-size:.82em; white-space:nowrap}
+  .tag{display:inline-block; font-size:.7rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:99px; vertical-align:middle}
+  .t-blue{background:#e8effe; color:var(--blue)} .t-amber{background:#fbf1d9; color:var(--amber)}
+  .t-green{background:#e3f5ea; color:var(--green)} .t-purp{background:#efe7fd; color:var(--purp)}
+  .t-red{background:#fdeeee; color:var(--red)}
+
+  .note{border-left:4px solid var(--blue); background:#f3f7ff; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .warn{border-left:4px solid var(--amber); background:#fdf8ec; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .gotcha{border-left:4px solid var(--red); background:#fdeeee; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:.93rem}
+  th,td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top}
+  thead th{background:#e8effe; color:var(--blue)}
+  tbody tr:nth-child(even){background:#fafafa}
+  td code{white-space:nowrap}
+
+  figure{margin:18px 0; text-align:center}
+  figcaption{color:var(--mut); font-size:.85rem; margin-top:6px}
+  .shot{display:block; width:100%; max-width:520px; margin:14px auto 2px; image-rendering:pixelated;
+    border:1px solid #333; border-radius:4px; background:#000}
+  .cap{text-align:center; color:var(--mut); font-size:.84rem; margin:0 0 6px}
+
+  .steps{counter-reset:step; list-style:none; padding:0; margin:14px 0}
+  .steps>li{counter-increment:step; position:relative; padding:12px 12px 12px 56px; margin:10px 0;
+    background:var(--card); border:1px solid var(--line); border-radius:8px}
+  .steps>li::before{content:counter(step); position:absolute; left:12px; top:12px; width:30px; height:30px;
+    border-radius:50%; background:var(--blue); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:.95rem}
+
+  .toc{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:16px 0; columns:2; font-size:.93rem}
+  @media(max-width:620px){.toc{columns:1}}
+  .toc a{color:var(--blue); text-decoration:none} .toc a:hover{text-decoration:underline}
+  .footer{margin-top:48px; padding-top:14px; border-top:1px solid var(--line); color:var(--mut); font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Fractal Track — manual</h1>
+<p class="lede">A section-sampled CV/gate looper. Capture one or two source tracks, then reshape the loop with composable branches and ornaments.</p>
+
+<div class="toc">
+  <a href="#p1">1. Overview</a><br>
+  <a href="#p2">2. Sources &amp; Capture</a><br>
+  <a href="#p3">3. The Trunk &amp; Zones</a><br>
+  <a href="#p4">4. Branches</a><br>
+  <a href="#p5">5. Ornaments</a><br>
+  <a href="#p6">6. Playback</a><br>
+  <a href="#p7">7. The Hero Pages</a><br>
+  <a href="#p8">8. Setup &amp; Routing</a>
+</div>
+
+<h2>Introduction</h2>
+<p>The Fractal track does not generate notes of its own — it <strong>watches</strong> one or two other tracks (or routing channels), summarizes what they emit over each loop section into a compact buffer (the <strong>trunk</strong>), and replays that captured loop. On top of the trunk you stack two composable layers: <strong>branches</strong> (chained transforms of the trunk that play after it) and <strong>ornaments</strong> (scale-snapped flourish notes injected inside a section). You record once, then reshape forever without re-touching the source.</p>
+<p>Everything here is grounded in the firmware as built — defaults, ranges, enum members, key bindings, and step-grid maps come from the model, engine, and UI code.</p>
+
+<h3>Prerequisites</h3>
+<ul>
+  <li>Familiarity with the xformer track/sequence/edit page model (<span class="kbd">Page+S2</span> / <span class="kbd">Page+S1</span> / <span class="kbd">Page+S0</span>).</li>
+  <li>Understanding of CV/gate concepts in modular synthesis.</li>
+  <li>At least one other track running that the Fractal track can listen to, or a routing channel worth sampling.</li>
+</ul>
+
+<h2 id="p1">Part 1 · Overview</h2>
+<p>A Fractal track has <strong>no sequence data of its own</strong> in the usual sense. Instead it:</p>
+<ol>
+  <li><strong>Listens</strong> to source A and/or source B — another track's emitted gate+CV, or a single routing channel.</li>
+  <li><strong>Observes over each section</strong>: every tick while armed it accumulates how long the source gate was high and where in the section it first fired, then commits one summarized <strong>cell</strong> into the trunk buffer.</li>
+  <li><strong>Replays</strong> the captured loop through a loop window, optionally re-ordered, transposed, and ornamented.</li>
+</ol>
+<p>The three layers stack:</p>
+<ul>
+  <li><span class="tag t-blue">Trunk</span> the literal captured loop. Pitch + proportional gate length per cell.</li>
+  <li><span class="tag t-purp">Branches</span> chained transforms concatenated <em>after</em> the trunk, so the playhead walks trunk → branch 1 → branch 2 → … building a longer phrase from one recording.</li>
+  <li><span class="tag t-amber">Ornaments</span> probabilistic flourish notes snapped to the scale and injected <em>inside</em> eligible sections.</li>
+</ul>
+<p>It is a sampler/looper, not a stochastic or algorithmic note source. Everything it plays traces back to what it captured.</p>
+<div class="note"><strong>Where state lives.</strong> Track-wide params (sources, logic mix, buffer length, octave/transpose, quantize, delay, lock, ghost) live on the <strong>track</strong>. Per-pattern params (loop/record/orn zones, order mode, divisor, branch/ornament settings, the live scale group) live on the <strong>sequence</strong>. The scale group is on the sequence, not the track.</div>
+
+<h2 id="p2">Part 2 · Sources &amp; Capture</h2>
+
+<h3>Source A and Source B</h3>
+<p>Each source slot (<code>SrcA</code>, <code>SrcB</code>) selects one of three kinds:</p>
+<ul>
+  <li><strong>None</strong> — slot empty.</li>
+  <li><strong>Track</strong> — a parent track. Gate and CV taken natively from that track's output.</li>
+  <li><strong>Channel</strong> — a single routing channel. The ordered list after the tracks: CvIn1-4, CvOut1-8, BusCv1-4, GateOut1-8, Mod1-8. A channel derives a gate (a GateOut bit, or any channel reading non-zero) and a CV (raw volts, 1V/oct; Mod 0..127 maps to ±5V).</li>
+</ul>
+<div class="gotcha"><strong>Self-reference is forbidden.</strong> A Track slot pointing at the Fractal track's own index would be output feedback. Setting it directly snaps to None; the encoder walk skips over it in the travel direction.</div>
+
+<h3>The two-source mix</h3>
+<p>With both slots set, the parents combine through two independent logic stages.</p>
+<table>
+  <thead><tr><th>Gate logic (<code>GATE</code>)</th><th>Result</th></tr></thead>
+  <tbody>
+    <tr><td>A</td><td>source A gate</td></tr>
+    <tr><td>B</td><td>source B gate</td></tr>
+    <tr><td>And</td><td>A and B</td></tr>
+    <tr><td>Or</td><td>A or B</td></tr>
+    <tr><td>Xor</td><td>A xor B</td></tr>
+    <tr><td>Nand</td><td>not (A and B)</td></tr>
+  </tbody>
+</table>
+<table>
+  <thead><tr><th>CV logic (<code>CV</code>)</th><th>Result</th></tr></thead>
+  <tbody>
+    <tr><td>A</td><td>source A CV</td></tr>
+    <tr><td>B</td><td>source B CV</td></tr>
+    <tr><td>Min</td><td>min(A, B)</td></tr>
+    <tr><td>Max</td><td>max(A, B)</td></tr>
+    <tr><td>Sum</td><td>A + B</td></tr>
+    <tr><td>Avg</td><td>(A + B) / 2</td></tr>
+    <tr><td>Gated (Gat)</td><td>whichever slot just fired, A-priority</td></tr>
+  </tbody>
+</table>
+<p>With only one slot set, that slot passes through alone (no mix). The classic "A=CV, B=Gate" tailoring is just <code>CV=A</code> + <code>GATE=B</code>.</p>
+
+<h3>Record-muted (ghost source)</h3>
+<p><code>Rec Muted</code> taps the parent's <strong>pre-mute</strong> intended gate. With it on, the Fractal track keeps capturing a source even while that source is muted — a silent rehearsal you record from without hearing the parent.</p>
+
+<h3>Capture cadence and fidelity</h3>
+<table>
+  <thead><tr><th>Param</th><th>Members</th><th>Default</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>Capture (cadence)</td><td>Section, Event</td><td><strong>Event</strong></td><td>Section commits one cell per loop-section boundary; Event commits on the parent's hysteretic note-change</td></tr>
+    <tr><td>Fidelity</td><td>Quantized, Feel</td><td><strong>Feel</strong></td><td>Quantized holds the last CV sample, discards onset; Feel S&amp;Hs CV at the first rising edge and keeps the onset phase</td></tr>
+  </tbody>
+</table>
+<p>Gate length is always proportional: gate-high ticks over total section ticks become a 4-bit gate length (0 = rest, 15 = tie). Feel additionally stores the onset nibble — <em>when</em> in the section the gate first fired — so playback reproduces the original feel.</p>
+
+<h3>Record arm, Replace vs Latch, R.Skip</h3>
+<ul>
+  <li><strong>Record</strong> (<code>recordTrigger</code>, per sequence) is the arm. Capture runs only when armed, the track is <strong>not locked</strong>, and a source is set. Routable.</li>
+  <li><strong>Rec Mode</strong> — <strong>Replace</strong> (default) overwrites every section; <strong>Latch</strong> only writes sections that gated, so silent sections keep prior content (overdub).</li>
+  <li><strong>R.Skip</strong> (<code>recordSkip</code>, 0-15) packs capture: skips that many sections between writes, and written cells pack consecutively (R.Skip 1 writes half as many cells over the same span).</li>
+</ul>
+<p>Capture writes into the <strong>record zone</strong> (<code>recF..recL</code>); the record cursor wraps within it.</p>
+
+<h2 id="p3">Part 3 · The Trunk &amp; Zones</h2>
+<p>The trunk buffer holds up to <code>bufferLength</code> cells (default 16, max 128). Three brackets carve it up and must nest:</p>
+<pre><code>recordFirst ≤ loopFirst ≤ ornFirst ≤ ornLast ≤ loopLast ≤ recordLast</code></pre>
+<ul>
+  <li><strong>Record zone</strong> (rec) — outermost. Where capture writes.</li>
+  <li><strong>Loop zone</strong> (loop) — the window that actually replays.</li>
+  <li><strong>Ornament zone</strong> (orn) — innermost. Cells inside it are eligible for ornament flourishes.</li>
+</ul>
+<p>Moving an outer edge pushes the inner edges it would cross; moving an inner edge clamps against its outer neighbour. The invariant is always enforced.</p>
+<div class="warn"><strong>Buffer Length shrinks pull edges in.</strong> Lowering <code>bufferLength</code> clamps every pattern's loop/record/orn edges down to fit the new last cell.</div>
+<h3>The tape</h3>
+<p>The Trunk page draws the buffer as a horizontal <strong>tape</strong>. Each captured cell is a filled bar: <strong>height = pitch</strong> (±5 octaves mapped into the tape), <strong>width = gate length</strong> (0..15 of the cell width). Cells inside the loop window are brighter; the sounding cell is brightest. A vertical <strong>playhead</strong> marks the read position. Above the tape, three thin lines show the rec / loop / orn zones stacked top-to-bottom, the focused bracket drawn bright.</p>
+
+<h2 id="p4">Part 4 · Branches</h2>
+<p>A branch is <strong>one chained transform</strong> of the trunk, derived deterministically from a seed. <code>branchCount</code> (0-7) branches play one after another, concatenated after the trunk, so the global walk is trunk → B1 → B2 → … Each branch reads the <em>previous</em> segment and applies its transform on read; the trunk buffer is never mutated.</p>
+<table>
+  <thead><tr><th>#</th><th>Label</th><th>Op</th><th>Param</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>Tra</td><td>Transpose</td><td>± a fixed interval: P4 (5), P5 (7), or octave (12)</td></tr>
+    <tr><td>1</td><td>Rev</td><td>Reverse</td><td>reads the segment backwards</td></tr>
+    <tr><td>2</td><td>Inv</td><td>Inverse</td><td>mirrors pitch around the loop-start cell</td></tr>
+    <tr><td>3</td><td>RtI</td><td>Retrograde Inverse</td><td>reverse + invert</td></tr>
+    <tr><td>4</td><td>Rot</td><td>Rotate</td><td>shifts read position by an offset (1..loopLen-1)</td></tr>
+    <tr><td>5</td><td>Cmp</td><td>Compress</td><td>scales intervals around centre by ×0.5 or ×0.67</td></tr>
+    <tr><td>6</td><td>Exp</td><td>Expand</td><td>scales intervals around centre by ×1.5 or ×2.0</td></tr>
+    <tr><td>7</td><td>Thn</td><td>Gate-thin</td><td>periodically rests every Nth cell (N = 2..4), CV untouched</td></tr>
+  </tbody>
+</table>
+<h3>Count, Path, Pool, Seed</h3>
+<ul>
+  <li><strong>CNT</strong> (<code>branchCount</code>, 0-7, routable) — how many branches play.</li>
+  <li><strong>PATH</strong> (<code>path</code>, 0-255 bit-word, routable) — read order. Each path bit flips a branch between <strong>outward</strong> (walked ascending after the trunk) and <strong>held</strong> (walked descending after the outward ones). The Branch page prints the resolved order as <code>T&gt;B1&gt;B2…</code></li>
+  <li><strong>POOL</strong> (<code>branchPool</code>, 8-bit mask) — which of the 8 transforms the seed may draw from. Empty pool falls back to all-Transpose.</li>
+  <li><strong>SEED</strong> (<code>branchSeed</code>) — the deterministic draw. Same seed + pool + loop length always yields the same chain. <span class="kbd">F4</span> (SEED) reseeds to a fresh random value.</li>
+</ul>
+<h3>Jumping segments live</h3>
+<p>On the Branch page the top step row queues a <strong>beat-synced jump</strong> to a segment: it applies at the next section boundary. The playing block shows a bright border; a queued target shows a <code>Q</code>.</p>
+
+<h2 id="p5">Part 5 · Ornaments</h2>
+<p>Ornaments inject short, scale-snapped flourish notes inside a section. They are <strong>probabilistic and live</strong> — rolled per eligible cell from a free-running PRNG. The trunk stays raw; ornament notes snap to the sequence scale on the way out.</p>
+<table>
+  <thead><tr><th>#</th><th>Name</th><th>Tier</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>Anticipation</td><td>2-step</td></tr>
+    <tr><td>1</td><td>Suspension</td><td>2-step</td></tr>
+    <tr><td>2</td><td>Syncopation</td><td>2-step</td></tr>
+    <tr><td>3</td><td>Octave-Up</td><td>2-step</td></tr>
+    <tr><td>4</td><td>Fifth-Up</td><td>2-step</td></tr>
+    <tr><td>5</td><td>Half-Turn Toward</td><td>2-step</td></tr>
+    <tr><td>6</td><td>Half-Turn Away</td><td>2-step</td></tr>
+    <tr><td>7</td><td>Run Toward</td><td>4-step</td></tr>
+    <tr><td>8</td><td>Run Away</td><td>4-step</td></tr>
+    <tr><td>9</td><td>Turn</td><td>4-step</td></tr>
+    <tr><td>10</td><td>Arp Toward</td><td>4-step</td></tr>
+    <tr><td>11</td><td>Arp Away</td><td>4-step</td></tr>
+    <tr><td>12</td><td>Mordent Up</td><td>4-step</td></tr>
+    <tr><td>13</td><td>Mordent Down</td><td>4-step</td></tr>
+    <tr><td>14</td><td>Trill</td><td>trill</td></tr>
+  </tbody>
+</table>
+<h3>Rate and Intensity</h3>
+<ul>
+  <li><strong>RATE</strong> (<code>ornamentRate</code>, 0-100%, routable) — probability an eligible cell fires an ornament at all. 0 = never.</li>
+  <li><strong>INT</strong> (<code>ornamentIntensity</code>, 0-100%, routable) — which tiers are in the draw pool:
+    <ul>
+      <li>0-39%: the 7 <strong>2-step</strong> ornaments only.</li>
+      <li>≥40%: add the 7 <strong>4-step</strong> ornaments.</li>
+      <li>≥75%: add <strong>Trill</strong>.</li>
+    </ul>
+  </li>
+</ul>
+<p>The Ornament page labels the slider with a tier readout (<code>off</code> / <code>2-step</code> / <code>4-step</code> / <code>8-trill</code>); the underlying eligibility uses the thresholds above.</p>
+<h3>Lock</h3>
+<p><strong>LOCK</strong> freezes the ornament roll. While locked, every firing repeats the <strong>last-fired</strong> ornament <em>and its realized shape</em> (direction + lookahead) instead of re-adapting per cell. Capture is also blocked while locked. Toggle it with <span class="kbd">F4</span> (LOCK) on the Ornament page, or <span class="kbd">Shift+F1</span> on any hero page.</p>
+<h3>Queued punch-in</h3>
+<p>The Ornament page step row queues a <strong>forced ornament</strong>: it ignores rate, zone, and lock, and fires on the next gated cell. A queued ornament reads <code>Q &lt;name&gt;</code>, the last fired reads <code>Last &lt;name&gt;</code>. Consecutive ornament notes leave a one-tick retrigger gap so each note re-articulates.</p>
+
+<h2 id="p6">Part 6 · Playback</h2>
+<h3>Order mode</h3>
+<table>
+  <thead><tr><th>Mode</th><th>Reads</th></tr></thead>
+  <tbody>
+    <tr><td>Fwd (Forward)</td><td>0, 1, 2, …</td></tr>
+    <tr><td>Rev (Reverse)</td><td>last, …, 1, 0</td></tr>
+    <tr><td>Pend (Pendulum)</td><td>forward then back</td></tr>
+    <tr><td>Rand (Random)</td><td>random within the window</td></tr>
+    <tr><td>Conv (Converge)</td><td>0, last, 1, last-1, … inward</td></tr>
+    <tr><td>Div (Diverge)</td><td>centre outward</td></tr>
+    <tr><td>Page</td><td>4-cell pages, interleaved</td></tr>
+  </tbody>
+</table>
+<p>Forward/Reverse/Pendulum/Random map to the shared sequence run-mode state; Converge/Diverge/Page advance linearly and remap the read index.</p>
+<h3>Quantize</h3>
+<p><code>Quantize</code> is a playback-only snap: <strong>Raw</strong> (default) plays the captured pitch literally; <strong>On</strong> snaps the main note to the sequence scale. Trunk storage stays raw either way. Ornament flourishes always snap to their own scale regardless.</p>
+<h3>Track delay</h3>
+<p><code>Delay</code> (<code>trackDelay</code>, 0-16 sections) shifts the resolved main note that many sections later through a fixed ring — a canon/echo against the source. Only the note is delayed; ornaments are re-rolled fresh when the delayed entry surfaces.</p>
+<div class="note">Other per-sequence timing: <strong>Divisor</strong> (default 12), <strong>Clock Mult</strong> (50-150%, default 1.00x), <strong>Reset Measure</strong> (off / N bars, default off), <strong>Rotate</strong> (-64..64), <strong>Loop Mode</strong> (Loop / Once).</div>
+
+<h2 id="p7">Part 7 · The Hero Pages</h2>
+<p><span class="kbd">Page+S0</span> opens the <strong>hero ring</strong>: one page object cycling <strong>Trunk → Branch → Ornament → Source</strong> via <span class="kbd">F5</span> (NEXT). <span class="kbd">Shift+F1</span> toggles Lock on any of them. The context menu offers <strong>INIT</strong> (clear sequence params), <strong>CLEAR BUF</strong> (erase the recorded loop), <strong>COPY</strong>, <strong>PASTE</strong>.</p>
+<p>Holding <span class="kbd">Page</span> + <span class="kbd">S9-S16</span> opens a <strong>quick-edit</strong> overlay for, in order: Rec First, Rec Last, Loop First, Loop Last, Orn First, Orn Last, Orn Rate, Orn Intensity. <span class="kbd">Page</span> + any other step exits.</p>
+
+<h3>Trunk page</h3>
+<p><span class="kbd">F1</span> REC / <span class="kbd">F2</span> LOOP / <span class="kbd">F3</span> ORN focus that bracket for the encoder; <span class="kbd">F4</span> R.Skip focuses R.Skip. The encoder nudges the focused edge by ±1 (Shift = the bracket's <em>last</em> edge). Step keypad — top row <span class="kbd">S1-8</span> adds, bottom row <span class="kbd">S9-16</span> subtracts:</p>
+<table>
+  <thead><tr><th>Col</th><th>S1-8 (top, +)</th><th>S9-16 (bottom, −)</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Rec First +8</td><td>Rec First −8</td></tr>
+    <tr><td>2</td><td>Rec Last +8</td><td>Rec Last −8</td></tr>
+    <tr><td>3</td><td>Loop First +8</td><td>Loop First −8</td></tr>
+    <tr><td>4</td><td>Loop Last +8</td><td>Loop Last −8</td></tr>
+    <tr><td>5</td><td>Orn First +8</td><td>Orn First −8</td></tr>
+    <tr><td>6</td><td>Orn Last +8</td><td>Orn Last −8</td></tr>
+    <tr><td>7</td><td>R.Skip +1</td><td>R.Skip −1</td></tr>
+    <tr><td>8</td><td>Divisor (faster)</td><td>Divisor (slower)</td></tr>
+  </tbody>
+</table>
+<p>All edge moves are nesting-clamped. On the Divisor column <strong>top = faster</strong> (lower divisor value). <strong>LEDs:</strong> top row dim green (+), bottom row dim red (−).</p>
+
+<h3>Branch page</h3>
+<p><span class="kbd">F1</span> CNT / <span class="kbd">F2</span> PATH / <span class="kbd">F4</span> SEED focus for the encoder (SEED also reseeds on press). <span class="kbd">F3</span> POOL selects the pool layer; an <strong>encoder click toggles the focused pool bit</strong>. Steps: <strong>top row</strong> <span class="kbd">S1..S(N+1)</span> queues a beat-synced jump to that segment; <strong>bottom row</strong> <span class="kbd">S9..S16</span> toggles the 8 transform-pool bits.</p>
+<p><strong>LEDs:</strong> top row — present segment dim green, playing bright amber, queued bright red. Bottom row — pool bit set = bright green.</p>
+
+<h3>Ornament page</h3>
+<p><span class="kbd">F1</span> RATE / <span class="kbd">F2</span> INT / <span class="kbd">F3</span> SCALE focus for the encoder; <span class="kbd">F4</span> LOCK toggles Lock. Steps <span class="kbd">S1-S15</span> queue a forced ornament (id 0-14), ignoring rate and zone. <strong>S16 is inert.</strong></p>
+<p><strong>LEDs:</strong> S1-S15 — slot dim green, last-fired dim red, queued bright amber.</p>
+
+<h3>Source page</h3>
+<p><span class="kbd">F1</span> SrcA / <span class="kbd">F2</span> SrcB focus the slot; <span class="kbd">F3</span> GATE / <span class="kbd">F4</span> CV focus the logic row. Steps: <strong>top row</strong> <span class="kbd">S1-S6</span> selects the gate-logic mode; <strong>bottom row</strong> <span class="kbd">S9-S15</span> selects the cv-logic mode; <span class="kbd">S16</span> <strong>randomizes both</strong> logics.</p>
+<p><strong>LEDs:</strong> selected mode bright green, other modes in the row dim green; S16 bright amber.</p>
+
+<h2 id="p8">Part 8 · Setup &amp; Routing</h2>
+<h3>Track-scope list (<span class="kbd">Page+S2</span>)</h3>
+<p>Track-wide params, hosted by the generic Track page:</p>
+<ul>
+  <li>Buffer Length (1-128, default 16)</li>
+  <li>Octave (-10..+10)</li>
+  <li>Transpose (-100..+100)</li>
+  <li>Slide Time (0-100%)</li>
+  <li>CV Update Mode (Gate / Always / Last)</li>
+  <li>Quantize (Raw / On)</li>
+  <li>Delay (0-16 sections)</li>
+  <li>Lock (yes/no)</li>
+  <li>Rec Muted (yes/no)</li>
+</ul>
+<h3>Sequence-scope list (<span class="kbd">Page+S1</span>)</h3>
+<p>Per-pattern params: Loop First, Loop Last, Order Mode, Divisor, Clock Mult, Reset Measure, Rec First, Rec Last, Rec Mode, Rec Skip, Record (arm), Orn First, Orn Last, Orn Rate, Orn Intens, Capture (cadence), Fidelity, Scale, Root Note, Scale Rotate.</p>
+<h3>What is routable</h3>
+<p>Only these Fractal params are routing targets — all per-sequence:</p>
+<ul>
+  <li><code>branchCount</code></li>
+  <li><code>path</code></li>
+  <li><code>ornamentRate</code></li>
+  <li><code>ornamentIntensity</code></li>
+  <li><code>recordTrigger</code> (record arm)</li>
+</ul>
+<p>(Scale and Root Note also route through the shared scale targets.) No track-scope Fractal param is routable.</p>
+<h3>The four live controls</h3>
+<p>The hero-page step grids give four hands-on, beat-synced performance controls without leaving the edit page:</p>
+<ol>
+  <li><strong>Branch jump</strong> — queue a playback jump to any segment (Branch top row).</li>
+  <li><strong>Pool toggles</strong> — flip transforms in/out of the branch draw (Branch bottom row).</li>
+  <li><strong>Ornament punch-in</strong> — force any ornament on the next gated cell (Ornament S1-S15).</li>
+  <li><strong>Logic randomize</strong> — roll both gate and cv logic at once (Source S16).</li>
+</ol>
+
+<div class="footer">Fractal Track — xformer firmware manual. Grounded in the model, engine, and UI source.</div>
+
+</div>
+</body>
+</html>
