@@ -73,6 +73,11 @@ static const int UserCount = UserScale::userScales.size();
 int Scale::Count = BuiltinCount + UserCount;
 
 const Scale &Scale::get(int index) {
+    // Never index out of bounds: an unresolved -1 (or any stray value) would read
+    // scales[-1] / a bad userScale slot and return a garbage Scale whose first
+    // virtual call hard-faults. Clamp to the valid range.
+    if (index < 0) index = 0;
+    if (index >= Count) index = Count - 1;
     if (index < BuiltinCount) {
         return *scales[index];
     } else {
