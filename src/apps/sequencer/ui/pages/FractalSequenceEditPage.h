@@ -54,6 +54,7 @@ private:
     void keyPressSource(KeyPressEvent &event);
 
     void editBracket(int value, bool shift);
+    void editEdge(Bracket bracket, bool last, int value);
 
     void quickEdit(int index);
 

@@ -441,6 +441,10 @@ void FractalSequenceEditPage::drawSource(Canvas &canvas) {
 //----------
 
 void FractalSequenceEditPage::editBracket(int value, bool shift) {
+    editEdge(_bracket, shift, value);
+}
+
+void FractalSequenceEditPage::editEdge(Bracket bracket, bool shift, int value) {
     auto &seq = _project.selectedTrack().fractalTrack().sequence(_project.selectedPatternIndex());
     const int N = std::max(1, _project.selectedTrack().fractalTrack().bufferLength());
     const int maxCell = N - 1;
@@ -454,7 +458,7 @@ void FractalSequenceEditPage::editBracket(int value, bool shift) {
     //   recF <= loopF <= ornF <= ornL <= loopL <= recL
     // Inner edges clamp against their outer neighbour; moving an outer edge
     // pushes the inners it would otherwise cross.
-    switch (_bracket) {
+    switch (bracket) {
     case Bracket::Record:
         if (!shift) { recF = clamp(recF + value, 0, recL); if (loopF < recF) loopF = recF; if (ornF < loopF) ornF = loopF; }
         else        { recL = clamp(recL + value, recF, maxCell); if (loopL > recL) loopL = recL; if (ornL > loopL) ornL = loopL; }
@@ -591,6 +595,28 @@ void FractalSequenceEditPage::keyPressTrunk(KeyPressEvent &event) {
         case 2: _bracket = Bracket::Ornament; _editRecordSkip = false; break;
         case 3: _editRecordSkip = true; break;
         default: break;
+        }
+        event.consume();
+        return;
+    }
+    // Tuesday-style keypad: columns = rec/loop/orn edges (±8, nesting-clamped),
+    // R.Skip (±1), Divisor (±1). Top row (S1-8) adds, bottom row (S9-16) subtracts.
+    if (key.isStep()) {
+        auto &seq = _project.selectedTrack().fractalTrack().sequence(_project.selectedPatternIndex());
+        int s = key.step();
+        int col = s % 8;
+        bool top = s < 8;
+        int d8 = top ? 8 : -8;
+        int d1 = top ? 1 : -1;
+        switch (col) {
+        case 0: editEdge(Bracket::Record, false, d8); break;   // Rec First
+        case 1: editEdge(Bracket::Record, true, d8); break;    // Rec Last
+        case 2: editEdge(Bracket::Loop, false, d8); break;     // Loop First
+        case 3: editEdge(Bracket::Loop, true, d8); break;      // Loop Last
+        case 4: editEdge(Bracket::Ornament, false, d8); break; // Orn First
+        case 5: editEdge(Bracket::Ornament, true, d8); break;  // Orn Last
+        case 6: seq.editRecordSkip(d1, false); break;          // R.Skip
+        case 7: seq.editDivisor(d1, false); break;             // Divisor
         }
         event.consume();
         return;
@@ -819,6 +845,10 @@ void FractalSequenceEditPage::updateLeds(Leds &leds) {
         break;
     }
     case Page::Trunk:
+        // Keypad: top row + (dim green), bottom row − (dim red).
+        for (int i = 0; i < 8; ++i) paint(i, Off, Lo);
+        for (int i = 8; i < 16; ++i) paint(i, Lo, Off);
+        break;
     case Page::Last:
         break;
     }
