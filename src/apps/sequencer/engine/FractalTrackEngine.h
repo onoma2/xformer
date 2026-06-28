@@ -70,6 +70,12 @@ public:
     int lastOrnament() const { return _lastOrnament; }
     static const char *ornamentName(int id);
 
+    // Hero step-grid queues. queueSegment defers a playback jump to the next
+    // section boundary; queueOrnament forces an ornament on the next gated cell.
+    void queueSegment(int seg) { _queuedSegment = int8_t(clamp(seg, 0, 7)); }
+    void queueOrnament(int id) { _queuedOrnament = int8_t(clamp(id, 0, 14)); }
+    bool hasQueuedOrnament() const { return _queuedOrnament >= 0; }
+
     // Branch transform readout for the UI Branch page. seg 1..branchCount.
     // branchKind → op code 0..7; branchParam → kind-relevant resolved value:
     // Transpose semitones, Rotate offset, Compress/Expand factor ×100, else 0.
@@ -103,6 +109,7 @@ public:
     int onsetNibbleForTest(int cell) const { return onsetNibble(cell); }
     void setOnsetNibbleForTest(int cell, int v) { setOnsetNibble(cell, v); }
     uint16_t trunkCellForTest(int cell) const { return _trunk[cell]; }
+    int rollOrnamentForTest(int rate, int intensity) { return rollOrnament(rate, intensity); }
 #endif
 
 private:
@@ -268,6 +275,12 @@ private:
     Random _branchRng;        // seeded from branchSeed per rebuild — deterministic
     int _lastOrnament = -1;
     int8_t _lastDir = 1;
+
+    // Hero step-grid live queues. _queuedSegment: pending Branch-page playback
+    // jump, applied at the next section boundary. _queuedOrnament: pending forced
+    // ornament punch-in, consumed by the next gated cell. -1 = idle.
+    int8_t _queuedSegment = -1;
+    int8_t _queuedOrnament = -1;
 };
 
 static_assert(sizeof(FractalTrackEngine) <= 912, "FractalTrackEngine too large");

@@ -606,6 +606,20 @@ void FractalSequenceEditPage::keyPressBranch(KeyPressEvent &event) {
         event.consume();
         return;
     }
+    if (key.isStep()) {
+        auto &seq = _project.selectedTrack().fractalTrack().sequence(_project.selectedPatternIndex());
+        const int s = key.step();
+        if (s < 8) {
+            // Top row S1..S(N+1): queue a beat-synced jump to that segment.
+            if (s <= seq.branchCount())
+                _engine.selectedTrackEngine().as<FractalTrackEngine>().queueSegment(s);
+        } else {
+            // Bottom row S9..S16: toggle the matching transform-pool bit.
+            seq.setBranchPool(seq.branchPool() ^ (1 << (s - 8)));
+        }
+        event.consume();
+        return;
+    }
 }
 
 void FractalSequenceEditPage::keyPressOrnament(KeyPressEvent &event) {
@@ -627,6 +641,13 @@ void FractalSequenceEditPage::keyPressOrnament(KeyPressEvent &event) {
         event.consume();
         return;
     }
+    if (key.isStep()) {
+        // S1..S15: queue ornament id 0..14 as a forced punch-in; S16 inert.
+        if (key.step() < 15)
+            _engine.selectedTrackEngine().as<FractalTrackEngine>().queueOrnament(key.step());
+        event.consume();
+        return;
+    }
 }
 
 void FractalSequenceEditPage::keyPressSource(KeyPressEvent &event) {
@@ -638,6 +659,19 @@ void FractalSequenceEditPage::keyPressSource(KeyPressEvent &event) {
         case 2: _sourceFocus = SourceFocus::Gate; break;
         case 3: _sourceFocus = SourceFocus::Cv; break;
         default: break;
+        }
+        event.consume();
+        return;
+    }
+    if (key.isStep()) {
+        auto &track = _project.selectedTrack().fractalTrack();
+        const int s = key.step();
+        if (s < int(FractalTrack::GateLogic::Last)) {
+            // Top row S1..S6: select gate-logic mode.
+            track.setGateLogic(FractalTrack::GateLogic(s));
+        } else if (s >= 8 && (s - 8) < int(FractalTrack::CvLogic::Last)) {
+            // Bottom row S9..: select cv-logic mode.
+            track.setCvLogic(FractalTrack::CvLogic(s - 8));
         }
         event.consume();
         return;

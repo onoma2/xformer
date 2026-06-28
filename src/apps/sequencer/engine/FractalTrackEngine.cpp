@@ -143,10 +143,13 @@ FractalTrackEngine::FractalTrackEngine(Engine &engine, const Model &model, Track
         // ornament with _lastDir=+1 ascends regardless of the (opposite) lookahead,
         // and the flourish is identical for nextSemi below vs above the main note.
         _lastOrnament = OrnRunToward; _lastDir = 1;
+        int savedRate = _sequence->ornamentRate();
+        _sequence->setOrnamentRate(100);   // scheduleSection rolls via the sequence rate
         scheduleSection(0, 96, 0.f, -60.f, 8, true);   // nextSemi far below
         float belowMain = cvEventForTest(0), belowFlourish = cvEventForTest(1);
         scheduleSection(0, 96, 0.f, 60.f, 8, true);    // nextSemi far above
         float aboveFlourish = cvEventForTest(1);
+        _sequence->setOrnamentRate(savedRate);
         assert(belowFlourish > belowMain);                          // frozen dir +1 (ascends)
         assert(std::abs(belowFlourish - aboveFlourish) < 1e-4f);    // identical, ignores lookahead
 
@@ -262,6 +265,8 @@ void FractalTrackEngine::reset() {
     clearSchedule();
     clearDelayRing();
     _lastOrnament = -1;
+    _queuedSegment = -1;
+    _queuedOrnament = -1;
     for (auto &cell : _trunk) cell = 0;
     for (auto &o : _onset) o = 0;
     resetObservation();
@@ -380,6 +385,21 @@ void FractalTrackEngine::advanceSection(uint32_t tick, uint32_t divisor) {
         captureSection();
     }
     resetObservation();
+
+    // Hero Branch-page jump: a queued segment is applied here, beat-synced. Find
+    // the route index whose path maps to the target segment and seek _globalPos to
+    // that segment's start so replaySection sounds it from this boundary on.
+    if (_queuedSegment >= 0) {
+        int n = clamp(seq.branchCount(), 0, 7);
+        for (int r = 0; r <= n; ++r) {
+            if (routeOf(seq.path(), n, r) == _queuedSegment) {
+                _globalPos = uint16_t(r * loopLen());
+                _orderState.reset();
+                break;
+            }
+        }
+        _queuedSegment = -1;
+    }
 
     replaySection(tick, divisor);
 }
@@ -835,8 +855,9 @@ void FractalTrackEngine::replaySection(uint32_t tick, uint32_t divisor) {
     // Ornament eligibility (KD-13): sounding cell gated and trunk read index
     // inside the ornament zone. Rests and out-of-zone cells never ornament.
     int readIdx = trunkReadIndex(within);
-    bool ornEligible = valid && gateLen > 0
-        && readIdx >= seq.ornFirst() && readIdx <= seq.ornLast();
+    bool gated = valid && gateLen > 0;
+    bool inZone = readIdx >= seq.ornFirst() && readIdx <= seq.ornLast();
+    bool ornEligible = gated && (inZone || hasQueuedOrnament());
 
     // KD-14b Feel replay: delay the cell's gate by its stored onset phase
     // (onset/16 of the section) → swing/microtiming. Quantized onset is 0 → no
@@ -907,6 +928,12 @@ int FractalTrackEngine::eligibleOrnaments(int ids[], int intensity) const {
 // an ornament id picked uniformly from the eligible tier. Lock freezes which one:
 // Rate still gates whether a flourish fires, Lock holds the last-fired ornament.
 int FractalTrackEngine::rollOrnament(int rate, int intensity) {
+    if (_queuedOrnament >= 0) {
+        int o = _queuedOrnament;   // forced punch-in: ignores rate, zone, lock
+        _queuedOrnament = -1;
+        _lastOrnament = o;
+        return o;
+    }
     if (rate <= 0) return -1;
     if (int(_rng.nextRange(100)) >= rate) return -1;
     if (_fractalTrack.lock()) {

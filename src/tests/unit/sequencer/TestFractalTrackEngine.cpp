@@ -282,4 +282,24 @@ CASE("feel_onset_delays_replay_gate") {
     expectEqual(int(firstGateOnTick()), 24, "Feel delays the gate by the onset phase");
 }
 
+CASE("queued_ornament_forces_next_roll") {
+    // Hero Ornament-page punch-in: a queued ornament fires on the next roll even
+    // with rate=0 and lock on, then clears so subsequent rolls run normally.
+    Model model;
+    setupLoop(model, 0, 7, FractalSequence::OrderMode::Forward);
+    Track &track = model.project().track(0);
+    FractalTrack &ftrack = track.fractalTrack();
+    FractalTrackEngine fractal(placeholderEngine(), model, track);
+
+    ftrack.setLock(true);
+    fractal.queueOrnament(9);
+    expectEqual(fractal.hasQueuedOrnament(), true, "queue sets the pending flag");
+    expectEqual(fractal.rollOrnamentForTest(0, 100), 9, "forced punch ignores rate=0 and lock");
+    expectEqual(fractal.hasQueuedOrnament(), false, "forced punch clears the queue");
+    expectEqual(fractal.rollOrnamentForTest(0, 100), -1, "after punch, rate=0 rolls none");
+
+    // queueSegment is reachable (capture/replay jump is build-verified).
+    fractal.queueSegment(2);
+}
+
 } // UNIT_TEST("FractalTrackEngine")
