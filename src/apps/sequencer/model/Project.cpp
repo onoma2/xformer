@@ -97,12 +97,12 @@ void seedTeletypeMiniDemo(TT2MiniTrack &mt) {
 // two new cross-track ops, end to end. Mini metro is booted once (X==0) so the
 // per-tick WS accent doesn't reset its tempo.
 void seedTeletypeCrossTrackDemo(TeletypeProgram &full, TT2MiniTrack &mini) {
-    loadScriptText(full, 0, "WP 2 MOD ADD WP 2 1 4\n");   // S1: manual next-scene on Mini
+    loadScriptText(full, 0, "WP.SET 2 MOD ADD WP 2 1 4\n");   // S1: manual next-scene on Mini
     loadScriptText(full, 1, "WS 2 2\n");                  // S2: manual fire Mini accent
     loadScriptText(full, TT2_METRO_SCRIPT,
         "IF EQ X 0 : WS 2 1\n"   // boot Mini metro once
         "X ADD X 1\n"
-        "WP 2 MOD X 4\n"         // cycle Mini scene 0..3
+        "WP.SET 2 MOD X 4\n"     // cycle Mini scene 0..3
         "WS 2 2\n"               // fire Mini accent (Mini script 1)
         "CV 1 N MOD X 7\n"       // own note on CV1
         "TR.P 1\n");             // own gate on TR1
