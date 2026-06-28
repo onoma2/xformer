@@ -46,6 +46,7 @@ struct ModStubHost : TT2Host {
     void hostTvSet(uint8_t, int16_t) override {}
     int16_t hostTrackPatternVal(uint8_t, int16_t, int16_t) override { return 0; }
     void hostSetTrackPatternVal(uint8_t, int16_t, int16_t, int16_t) override {}
+    TT2EvalError hostTriggerTrackScript(uint8_t, int16_t) override { return TT2EvalError::None; }
 
     Modulator &hostModulator(uint8_t idx) override {
         if (idx >= CONFIG_MODULATOR_COUNT) idx = 0;

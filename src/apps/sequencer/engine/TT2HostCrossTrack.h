@@ -3,6 +3,15 @@
 #include "model/Model.h"
 #include "model/TeletypeProgram.h"
 
+#include <cstdint>
+
+// Increment cross-track recursion depth for the lifetime of a WS dispatch.
+struct TT2CrossGuard {
+    uint8_t &d;
+    explicit TT2CrossGuard(uint8_t &x) : d(x) { ++d; }
+    ~TT2CrossGuard() { --d; }
+};
+
 // Cross-track PN-cell resolver shared by both TT2 engines' host overrides.
 // bank/idx SIGNED, normalised exactly like same-track PN (normalisePn on bank,
 // normaliseIdx — negative-counts-from-p.len — on idx). nullptr if not a TT2 track.

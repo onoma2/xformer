@@ -213,6 +213,7 @@
         "WNG"         => { MATCH_OP(E_OP_WNG); };
         "WNN"         => { MATCH_OP(E_OP_WNN); };
         "WPN"         => { MATCH_OP(E_OP_WPN); };
+        "WS"          => { MATCH_OP(E_OP_WS); };
         "WR"          => { MATCH_OP(E_OP_WR); };
         "RT"          => { MATCH_OP(E_OP_RT); };
         "PRM"         => { MATCH_OP(E_OP_PRM); };

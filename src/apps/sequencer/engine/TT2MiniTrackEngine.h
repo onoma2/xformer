@@ -116,6 +116,14 @@ public:
         return ::runScript(_miniTrack.program(_activeScene), _miniTrack.runtime(), _output, scriptIndex);
     }
 
+    // Cross-track entry: install self as host, run 1-based script index.
+    TT2EvalError triggerScriptFromHost(int16_t oneBased) {
+        int idx = oneBased - 1;
+        if (idx < 0 || idx >= TT2ConfigMini::ScriptCount) return TT2EvalError::OutOfRange;
+        ScopedHost host(this);
+        return runScript(uint8_t(idx)).error;
+    }
+
     void triggerScript(int scriptIndex) override;
     void toggleScriptMute(int scriptIndex) override;
     void toggleMetroActive() override;
@@ -137,6 +145,7 @@ public:
     void hostSetTrackPattern(uint8_t track, uint8_t pattern) override;
     int16_t hostTrackPatternVal(uint8_t track, int16_t bank, int16_t idx) override;
     void hostSetTrackPatternVal(uint8_t track, int16_t bank, int16_t idx, int16_t v) override;
+    TT2EvalError hostTriggerTrackScript(uint8_t track, int16_t script) override;
     int16_t hostNoteGateGet(uint8_t track, uint8_t step) override;
     void hostNoteGateSet(uint8_t track, uint8_t step, int16_t v) override;
     int16_t hostNoteNoteGet(uint8_t track, uint8_t step) override;

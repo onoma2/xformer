@@ -2048,6 +2048,14 @@ static void opWpn(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<C
     }
 }
 template<typename Cfg>
+static void opWs(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
+                 int16_t *stack, uint8_t &stackSize, bool, TT2EvalError &error) {
+    int16_t t = 0, n = 0;
+    if (!popStack(stack, stackSize, t, error)) return;
+    if (!popStack(stack, stackSize, n, error)) return;
+    if (TT2Host *h = tt2ActiveHost()) error = h->hostTriggerTrackScript(uint8_t(t - 1), n);
+}
+template<typename Cfg>
 static void opWnn(TT2RuntimeT<Cfg> &, TT2OutputState &, const TeletypeProgramT<Cfg> *,
                   int16_t *stack, uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     int16_t t = 0, s = 0;
@@ -4506,6 +4514,7 @@ namespace {
             table[E_OP_WR_ACT]             = opWrAct<Cfg>;
             table[E_OP_WNG]                = opWng<Cfg>;
             table[E_OP_WPN]                = opWpn<Cfg>;
+            table[E_OP_WS]                 = opWs<Cfg>;
             table[E_OP_WNN]                = opWnn<Cfg>;
             table[E_OP_WNG_H]              = opWngH<Cfg>;
             table[E_OP_WNN_H]              = opWnnH<Cfg>;

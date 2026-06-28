@@ -3,6 +3,8 @@
 #include "model/Modulator.h"
 #include "model/GeodeConfig.h"
 
+#include "TT2Evaluator.h"
+
 #include <cstdint>
 
 // Host accessor for native TT2 ops that need live engine / cross-track state
@@ -27,6 +29,7 @@ struct TT2Host {
     virtual void hostSetTrackPattern(uint8_t track, uint8_t pattern) = 0;
     virtual int16_t hostTrackPatternVal(uint8_t track, int16_t bank, int16_t idx) = 0;
     virtual void hostSetTrackPatternVal(uint8_t track, int16_t bank, int16_t idx, int16_t v) = 0;
+    virtual TT2EvalError hostTriggerTrackScript(uint8_t track, int16_t script) = 0;
 
     // cross-track note/gate (Note tracks)
     virtual int16_t hostNoteGateGet(uint8_t track, uint8_t step) = 0;

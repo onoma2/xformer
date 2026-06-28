@@ -45,6 +45,7 @@ struct ModStubHost : TT2Host {
     void hostTvSet(uint8_t, int16_t) override {}
     int16_t hostTrackPatternVal(uint8_t, int16_t, int16_t) override { return 0; }
     void hostSetTrackPatternVal(uint8_t, int16_t, int16_t, int16_t) override {}
+    TT2EvalError hostTriggerTrackScript(uint8_t, int16_t) override { return TT2EvalError::None; }
 
     Modulator &hostModulator(uint8_t idx) override {
         if (idx >= CONFIG_MODULATOR_COUNT) idx = 0;
@@ -172,6 +173,33 @@ CASE("WPN forwards signed bank/idx to host set/get") {
     expectEqual(int(host.lastVal), 42, "value written");
     evalText("WPN 2 0 5", rt, out);
     expectEqual(int(host.cell), 42, "read back same cell");
+    tt2SetActiveHost(nullptr);
+}
+
+CASE("WS propagates host error; track stays 1-based at boundary") {
+    struct ScriptHost : ModStubHost {
+        int calls = 0; int16_t lastTrack = -1, lastScript = -1;
+        TT2EvalError ret = TT2EvalError::None;
+        TT2EvalError hostTriggerTrackScript(uint8_t tr, int16_t n) override {
+            ++calls; lastTrack = tr; lastScript = n; return ret;
+        }
+    } host;
+    tt2SetActiveHost(&host);
+    TT2Runtime rt = {}; init(rt);
+    TT2OutputState out = {}; init(out);
+    auto res = evalText("WS 2 1", rt, out);
+    expectEqual(int(host.lastTrack), 1, "track 2 → host track 1");
+    expectEqual(int(host.lastScript), 1, "script stays 1-based at boundary");
+    expectEqual(int(res.error), int(TT2EvalError::None), "no error");
+    host.calls = 0; host.lastTrack = -1;
+    evalText("WS 0 1", rt, out);
+    expectEqual(int(host.lastTrack), 255, "0 → 255 reaches host guard");
+    host.ret = TT2EvalError::OutOfRange;
+    auto r2 = evalText("WS 2 11", rt, out);
+    expectEqual(int(r2.error), int(TT2EvalError::OutOfRange), "OutOfRange propagated");
+    host.ret = TT2EvalError::ExecDepthOverflow;
+    auto r3 = evalText("WS 2 1", rt, out);
+    expectEqual(int(r3.error), int(TT2EvalError::ExecDepthOverflow), "ExecDepthOverflow propagated");
     tt2SetActiveHost(nullptr);
 }
 

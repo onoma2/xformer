@@ -205,6 +205,17 @@ int16_t TT2MiniTrackEngine::hostTrackPatternVal(uint8_t track, int16_t bank, int
 void TT2MiniTrackEngine::hostSetTrackPatternVal(uint8_t track, int16_t bank, int16_t idx, int16_t v) {
     if (int16_t *cell = tt2CrossPatternCell(_engine.model(), track, bank, idx)) *cell = v;
 }
+TT2EvalError TT2MiniTrackEngine::hostTriggerTrackScript(uint8_t t, int16_t n) {
+    if (t >= CONFIG_TRACK_COUNT) return TT2EvalError::None;
+    auto m = _engine.model().project().track(t).trackMode();
+    if (m != Track::TrackMode::TeletypeV2 && m != Track::TrackMode::TeletypeMini)
+        return TT2EvalError::None;
+    if (_engine.tt2CrossDepth() >= Engine::TT2_CROSS_DEPTH) return TT2EvalError::ExecDepthOverflow;
+    TT2CrossGuard g(_engine.tt2CrossDepthRef());
+    if (m == Track::TrackMode::TeletypeV2)
+        return _engine.trackEngine(t).as<TT2TrackEngine>().triggerScriptFromHost(n);
+    return _engine.trackEngine(t).as<TT2MiniTrackEngine>().triggerScriptFromHost(n);
+}
 int16_t TT2MiniTrackEngine::hostNoteNoteGet(uint8_t track, uint8_t step) {
     const NoteSequence *seq = tt2MiniNoteSequence(_engine.model(), track);
     if (!seq || step >= CONFIG_STEP_COUNT) return 0;

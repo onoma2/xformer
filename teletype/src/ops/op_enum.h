@@ -186,6 +186,7 @@ typedef enum {
     E_OP_WNG_H,
     E_OP_WNN_H,
     E_OP_WPN,
+    E_OP_WS,
     E_OP_RT,
     E_OP_PRM,
     E_OP_TR,

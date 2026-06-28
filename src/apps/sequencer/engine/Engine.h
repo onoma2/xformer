@@ -202,6 +202,10 @@ public:
     const TrackEngine &selectedTrackEngine() const { return *_trackEngines[_model.project().selectedTrackIndex()]; }
           TrackEngine &selectedTrackEngine()       { return *_trackEngines[_model.project().selectedTrackIndex()]; }
 
+    static constexpr uint8_t TT2_CROSS_DEPTH = 4;
+    uint8_t tt2CrossDepth() const { return _tt2CrossDepth; }
+    uint8_t &tt2CrossDepthRef() { return _tt2CrossDepth; }
+
     const RoutingEngine &routingEngine() const { return _routingEngine; }
           RoutingEngine &routingEngine()       { return _routingEngine; }
 
@@ -287,6 +291,7 @@ private:
 
     TrackEngineContainerArray _trackEngineContainers;
     TrackEngineArray _trackEngines;
+    uint8_t _tt2CrossDepth = 0;
     UpdateReducer<os::time::ms(25)> _updateReducer; // rate-limit cap on the per-tick global recompute
 
     MidiOutputEngine _midiOutputEngine;

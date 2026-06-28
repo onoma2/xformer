@@ -532,4 +532,10 @@ UNIT_TEST("TeletypeV2ParserContract") {
         expectEqual(int(r.error), int(E_OK), "WPN parses");
         expectToken(r.cmd, 0, OP, E_OP_WPN, "WPN op");
     }
+
+    CASE("WS op token") {
+        auto r = tryParse("WS");
+        expectEqual(int(r.error), int(E_OK), "WS parses");
+        expectToken(r.cmd, 0, OP, E_OP_WS, "WS op");
+    }
 }
