@@ -445,6 +445,17 @@ Set <code>BUS 1 X</code> in a script, then in the Routing page create a route wi
 <b>Transpose</b> (or any track target). BUS is global &mdash; multiple teletype tracks can read/write the same slot
 directly without routing.</p>
 
+<h3>TV &mdash; shared variable bank</h3>
+<p>Shared integer variable bank (16 slots, <code>TV 0</code>..<code>TV 15</code>) that lets teletype tracks pass values
+to each other. <code>TV i</code> reads slot <code>i</code>; <code>TV i v</code> writes it (<code>int16</code>).</p>
+<pre><code>TV 0 ADD TV 0 1    # track A: shared counter in its metro
+CV 1 N TV 0        # track B: read the counter</code></pre>
+<div class="note"><b>Like BUS, but for ints across teletype tracks.</b> TV carries ints not CV, is teletype-only
+(invisible to Performer routing and other track types), is last-writer-wins (not summed), and is 0-based. An
+out-of-range index (<code>TV 99</code>, <code>TV -1</code>) is a silent no-op and reads 0. Slots are session-global
+and ephemeral: zeroed at power-on, held across frames, transport stop, and project load until overwritten, and never
+saved with the project.</div>
+
 <h3>BAR &mdash; tempo-locked modulation</h3>
 <p>Read-only opcode returning position within the current musical bar (0-16383), auto-adjusting to the project
 time signature. Zero overhead (reads the already-computed measure fraction), updates at 192 PPQN.</p>

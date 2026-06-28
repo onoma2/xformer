@@ -468,6 +468,16 @@ BUS 1 X
 
 Note: BUS is global. Multiple Teletype tracks can read/write the same BUS slot directly without routing.
 
+## TV Shared Variable Bank
+
+TV is a shared integer variable bank (16 slots, `TV 0`..`TV 15`) that lets Teletype tracks pass values to each other. `TV i` reads slot `i`; `TV i v` writes it (`int16`).
+
+Like BUS, but ints not CV, TT-only (invisible to Performer routing and other track types), last-writer-wins (not summed), and 0-based. An out-of-range index (`TV 99`, `TV -1`) is a silent no-op and reads 0.
+
+Slots are session-global and ephemeral: zeroed at power-on, held across frames, transport stop, and project load until overwritten, and never saved with the project.
+
+Example: track A runs `TV 0 ADD TV 0 1` in its metro (a shared counter); track B reads it with `CV 1 N TV 0`.
+
 ## BAR Tempo-Locked Modulation
 
 BAR is a read-only opcode that returns the position within the current musical bar (0-16383).
