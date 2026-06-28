@@ -137,10 +137,6 @@ enum ProjectVersion {
     // added StochasticSequence::tiltMelody (unipolar mask-melody inversion)
     Version35 = 35,
 
-    // 0.8.0 baseline: Fractal track (model + sequence), file magic, strict load.
-    // Pre-0.8 files are rejected wholesale — no migration below this version.
-    Version36 = 36,
-
     // automatically derive latest version
     Last,
     Latest = Last - 1,

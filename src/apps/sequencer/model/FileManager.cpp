@@ -349,19 +349,11 @@ fs::Error FileManager::readProject(Project &project, const char *path) {
 
     FileHeader header;
     fileReader.read(&header, sizeof(header));
-    // Reject foreign / pre-0.8 files (no magic signature, or wrong file type).
-    if (!header.valid() || header.type != FileType::Project) {
-        return fs::INVALID_DATA;
-    }
 
     VersionedSerializedReader reader(
         [&fileReader] (void *data, size_t len) { fileReader.read(data, len); },
         ProjectVersion::Latest
     );
-    // Strict: only the current project version loads — no migration of older data.
-    if (reader.dataVersion() != ProjectVersion::Latest) {
-        return fs::INVALID_DATA;
-    }
 
     bool success = project.read(reader);
 
