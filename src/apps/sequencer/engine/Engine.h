@@ -169,6 +169,10 @@ public:
         }
     }
 
+    static constexpr int TvCount = 16;
+    int16_t tvGet(int i) const { return (i >= 0 && i < TvCount) ? _tv[i] : 0; }
+    void tvSet(int i, int16_t v) { if (i >= 0 && i < TvCount) _tv[i] = v; }
+
     // gate overrides
     bool gateOutputOverride() const { return _gateOutputOverride; }
     void setGateOutputOverride(bool enabled) { _gateOutputOverride = enabled; }
@@ -367,6 +371,7 @@ private:
     std::array<float, BusCvCount> _busCv{};
     std::array<bool, BusCvCount> _busCvWritten{};
     std::array<uint8_t, BusCvCount> _busCvWriters{};
+    int16_t _tv[TvCount] = {};
     bool _busCvSafeMode = true;
     static constexpr float BusCvDecay = 0.9995f;
     std::array<float, CvRoute::LaneCount> _cvRouteOutputs{};
