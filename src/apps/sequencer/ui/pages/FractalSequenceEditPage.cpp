@@ -162,7 +162,7 @@ void FractalSequenceEditPage::drawTrunk(Canvas &canvas) {
     const int recFirst = seq.recordFirst(), recLast = seq.recordLast();
     const int cur = eng.readPos();
 
-    const int tapeTop = 22, tapeBot = 44;
+    const int tapeTop = 25, tapeBot = 44;
     const int tapeH = tapeBot - tapeTop + 1;
     const int margin = 4;
     const int stepW = std::max(1, (Width - 2 * margin) / N);
@@ -201,11 +201,11 @@ void FractalSequenceEditPage::drawTrunk(Canvas &canvas) {
     // thin-line idiom for all three; the focused bracket is bright. The decreasing
     // width + indent reads the nesting invariant at a glance.
     canvas.setColor(_bracket == Bracket::Record ? Color::Bright : Color::Medium);
-    canvas.hline(x0 + recFirst * stepW, tapeTop - 5, (recLast - recFirst + 1) * stepW);
+    canvas.hline(x0 + recFirst * stepW, tapeTop - 7, (recLast - recFirst + 1) * stepW);
     canvas.setColor(_bracket == Bracket::Loop ? Color::Bright : Color::MediumBright);
-    canvas.hline(x0 + loopFirst * stepW, tapeTop - 3, (loopLast - loopFirst + 1) * stepW);
+    canvas.hline(x0 + loopFirst * stepW, tapeTop - 5, (loopLast - loopFirst + 1) * stepW);
     canvas.setColor(_bracket == Bracket::Ornament ? Color::Bright : Color::MediumBright);
-    canvas.hline(x0 + ornFirst * stepW, tapeTop - 1, (ornLast - ornFirst + 1) * stepW);
+    canvas.hline(x0 + ornFirst * stepW, tapeTop - 3, (ornLast - ornFirst + 1) * stepW);
 
     // playhead
     canvas.setColor(Color::Bright);
