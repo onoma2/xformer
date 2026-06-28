@@ -180,6 +180,8 @@ public:
     int16_t hostRoutingSource(uint8_t index) override;
     int16_t hostBusCv(uint8_t index) override;
     void hostSetBusCv(uint8_t index, int16_t raw) override;
+    int16_t hostTvGet(uint8_t slot) override;
+    void hostTvSet(uint8_t slot, int16_t v) override;
     Modulator &hostModulator(uint8_t idx) override;
     int16_t hostModulatorOutput(uint8_t idx) override;
     void hostModulatorTrigger(uint8_t idx) override;

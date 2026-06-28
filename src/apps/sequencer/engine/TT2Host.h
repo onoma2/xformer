@@ -38,6 +38,8 @@ struct TT2Host {
     virtual int16_t hostRoutingSource(uint8_t index) = 0;  // 0..16383
     virtual int16_t hostBusCv(uint8_t index) = 0;          // raw 0..16383
     virtual void hostSetBusCv(uint8_t index, int16_t raw) = 0;
+    virtual int16_t hostTvGet(uint8_t slot) = 0;          // shared TV bank, 0-based
+    virtual void hostTvSet(uint8_t slot, int16_t v) = 0;
 
     // modulator slots (MO.*) — direct field access via the shared param dictionary
     virtual Modulator &hostModulator(uint8_t idx) = 0;     // 0-based slot

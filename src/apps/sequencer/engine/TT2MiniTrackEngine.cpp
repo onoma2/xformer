@@ -233,6 +233,13 @@ void TT2MiniTrackEngine::hostSetBusCv(uint8_t index, int16_t raw) {
     _engine.setBusCv(index, TT2TrackEngine::rawToVolts(raw), Engine::BusWriterTeletype);
 }
 
+int16_t TT2MiniTrackEngine::hostTvGet(uint8_t slot) {
+    return _engine.tvGet(slot);
+}
+void TT2MiniTrackEngine::hostTvSet(uint8_t slot, int16_t v) {
+    _engine.tvSet(slot, v);
+}
+
 // --- Modulator slots (MO.*) ---
 
 Modulator &TT2MiniTrackEngine::hostModulator(uint8_t idx) {

@@ -43,6 +43,8 @@ struct GeodeStubHost : TT2Host {
     int16_t hostRoutingSource(uint8_t) override { return 0; }
     int16_t hostBusCv(uint8_t) override { return 0; }
     void hostSetBusCv(uint8_t, int16_t) override {}
+    int16_t hostTvGet(uint8_t) override { return 0; }
+    void hostTvSet(uint8_t, int16_t) override {}
 
     Modulator &hostModulator(uint8_t) override { return mod; }
     int16_t hostModulatorOutput(uint8_t) override { return 0; }
