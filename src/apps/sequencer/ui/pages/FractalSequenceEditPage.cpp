@@ -775,9 +775,11 @@ void FractalSequenceEditPage::updateLeds(Leds &leds) {
     auto &track = _project.selectedTrack().fractalTrack();
     auto &seq = track.sequence(_project.selectedPatternIndex());
     const auto &eng = _engine.selectedTrackEngine().as<FractalTrackEngine>();
-    auto paint = [&](int i, bool red, bool green) {
+    // Per-channel PWM (setDimmed) gives off / dim / bright × red / green / amber.
+    const uint8_t Hi = 0xff, Lo = 0x30, Off = 0;
+    auto paint = [&](int i, uint8_t red, uint8_t green) {
         int idx = MatrixMap::fromStep(i);
-        leds.unmask(idx); leds.set(idx, red, green); leds.mask(idx);
+        leds.unmask(idx); leds.setDimmed(idx, red, green); leds.mask(idx);
     };
 
     switch (_currentPage) {
@@ -785,34 +787,35 @@ void FractalSequenceEditPage::updateLeds(Leds &leds) {
         const int N = seq.branchCount();
         const int playing = eng.currentSegment();
         const int queued = eng.queuedSegment();
-        // Top row S1..S(N+1): segments green; playing amber; queued red.
+        // Top row S1..S(N+1): present = dim green, playing = bright amber, queued = bright red.
         for (int i = 0; i <= N && i < 8; ++i) {
-            bool q = queued >= 0 && i == queued;
-            bool p = i == playing;
-            paint(i, /*red*/ q || p, /*green*/ !q);
+            if (queued >= 0 && i == queued) paint(i, Hi, Off);
+            else if (i == playing)          paint(i, Hi, Hi);
+            else                            paint(i, Off, Lo);
         }
-        // Bottom row S9..S16: transform-pool bits, green when set.
+        // Bottom row S9..S16: transform-pool bits — bright green when set.
         const int pool = seq.branchPool();
-        for (int k = 0; k < 8; ++k) paint(8 + k, false, (pool >> k) & 1);
+        for (int k = 0; k < 8; ++k) paint(8 + k, Off, ((pool >> k) & 1) ? Hi : Off);
         break;
     }
     case Page::Ornament: {
         const int queued = eng.queuedOrnament();
         const int last = eng.lastOrnament();
-        // S1..S15: ornaments green; queued amber; last-fired red.
+        // S1..S15: slot = dim green, last-fired = dim red, queued = bright amber.
         for (int i = 0; i < 15; ++i) {
-            if (i == queued) paint(i, true, true);
-            else if (i == last) paint(i, true, false);
-            else paint(i, false, true);
+            if (i == queued)    paint(i, Hi, Hi);
+            else if (i == last) paint(i, Lo, Off);
+            else                paint(i, Off, Lo);
         }
         break;
     }
     case Page::Source: {
+        // Selected mode = bright green, other modes in the row = dim green.
         const int gsel = int(track.gateLogic());
-        for (int i = 0; i < int(FractalTrack::GateLogic::Last); ++i) paint(i, false, i == gsel);
+        for (int i = 0; i < int(FractalTrack::GateLogic::Last); ++i) paint(i, Off, i == gsel ? Hi : Lo);
         const int csel = int(track.cvLogic());
-        for (int i = 0; i < int(FractalTrack::CvLogic::Last); ++i) paint(8 + i, false, i == csel);
-        paint(15, true, true);   // randomize = amber
+        for (int i = 0; i < int(FractalTrack::CvLogic::Last); ++i) paint(8 + i, Off, i == csel ? Hi : Lo);
+        paint(15, Hi, Hi);   // randomize = bright amber
         break;
     }
     case Page::Trunk:
