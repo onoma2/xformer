@@ -197,19 +197,15 @@ void FractalSequenceEditPage::drawTrunk(Canvas &canvas) {
         canvas.fillRect(x, tapeBot - barH, bw, barH);
     }
 
-    // ornament zone — band above the tape
-    canvas.setColor(_bracket == Bracket::Ornament ? Color::Bright : Color::MediumBright);
-    canvas.hline(x0 + ornFirst * stepW, tapeTop - 3, (ornLast - ornFirst + 1) * stepW);
-
-    // record extent — loop brackets below the tape
+    // Nested zone lines above the tape — rec ⊇ loop ⊇ orn, top to bottom. Same
+    // thin-line idiom for all three; the focused bracket is bright. The decreasing
+    // width + indent reads the nesting invariant at a glance.
     canvas.setColor(_bracket == Bracket::Record ? Color::Bright : Color::Medium);
-    SequencePainter::drawLoopStart(canvas, x0 + recFirst * stepW, tapeBot + 2, (recLast - recFirst + 1) * stepW);
-    SequencePainter::drawLoopEnd(canvas, x0 + recFirst * stepW, tapeBot + 2, (recLast - recFirst + 1) * stepW);
-
-    // loop window — loop brackets on the tape top edge
+    canvas.hline(x0 + recFirst * stepW, tapeTop - 5, (recLast - recFirst + 1) * stepW);
     canvas.setColor(_bracket == Bracket::Loop ? Color::Bright : Color::MediumBright);
-    SequencePainter::drawLoopStart(canvas, x0 + loopFirst * stepW, tapeTop - 1, (loopLast - loopFirst + 1) * stepW);
-    SequencePainter::drawLoopEnd(canvas, x0 + loopFirst * stepW, tapeTop - 1, (loopLast - loopFirst + 1) * stepW);
+    canvas.hline(x0 + loopFirst * stepW, tapeTop - 3, (loopLast - loopFirst + 1) * stepW);
+    canvas.setColor(_bracket == Bracket::Ornament ? Color::Bright : Color::MediumBright);
+    canvas.hline(x0 + ornFirst * stepW, tapeTop - 1, (ornLast - ornFirst + 1) * stepW);
 
     // playhead
     canvas.setColor(Color::Bright);
