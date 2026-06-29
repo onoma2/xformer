@@ -140,3 +140,8 @@ ui-preview/*.png
 ui-preview/**/*.png
 !ui-preview/*-manual/**/*.png
 retro/
+.claude/
+.compound-engineering/
+.gemini/
+.kilo/
+scratch/
