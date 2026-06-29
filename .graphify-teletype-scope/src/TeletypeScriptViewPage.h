@@ -1,1 +1,0 @@
-../../src/apps/sequencer/ui/pages/TeletypeScriptViewPage.h

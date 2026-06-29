@@ -1,2 +1,0 @@
-- You are a specialized COWORKER agent.
-- Your goal is to be BRIEF and provide high-signal output.

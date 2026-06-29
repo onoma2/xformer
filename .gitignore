@@ -131,3 +131,11 @@ builder_part*.py
 COWORK.md
 STATUS.md
 TASK.md
+# assistant configs
+GEMINI.md
+QWEN.md
+# ui-preview render PNGs are regenerable from the scripts (scripts stay tracked);
+# keep the manual-embedded renders so the published HTML manuals still show them
+ui-preview/*.png
+ui-preview/**/*.png
+!ui-preview/*-manual/**/*.png
