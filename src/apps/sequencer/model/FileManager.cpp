@@ -1,6 +1,7 @@
 #include "FileManager.h"
 #include "ProjectVersion.h"
 #include "TT2Track.h"
+#include "TT2MiniTrack.h"
 
 #include "engine/TT2SceneSerializer.h"
 
@@ -274,6 +275,54 @@ fs::Error FileManager::readTt2Program(TT2Track &track, const char *path) {
     }
     if (error == fs::OK) {
         track.program() = staging;  // atomic swap on clean parse
+    }
+    return error;
+}
+
+fs::Error FileManager::writeTt2MiniScene(const TT2MiniTrack &track, int scene, const char *name, int slot) {
+    return writeFile(FileType::TeletypeV2Program, slot, [&] (const char *path) {
+        return writeTt2MiniScene(track, scene, name, path);
+    });
+}
+
+fs::Error FileManager::readTt2MiniScene(TT2MiniTrack &track, int scene, int slot) {
+    return readFile(FileType::TeletypeV2Program, slot, [&] (const char *path) {
+        return readTt2MiniScene(track, scene, path);
+    });
+}
+
+fs::Error FileManager::writeTt2MiniScene(const TT2MiniTrack &track, int scene, const char *name, const char *path) {
+    fs::FileWriter fileWriter(path);
+    if (fileWriter.error() != fs::OK) {
+        return fileWriter.error();
+    }
+    const char *safeName = (name && name[0]) ? name : "TT2";
+    FixedStringBuilder<64> nameLine("NAME %s\n", safeName);
+    fileWriter.write(static_cast<const char *>(nameLine), std::strlen(nameLine));
+    tt2SerializeScene<TT2ConfigMini>(track.program(scene), tt2FileWrite, &fileWriter);
+    return fileWriter.finish();
+}
+
+fs::Error FileManager::readTt2MiniScene(TT2MiniTrack &track, int scene, const char *path) {
+    fs::FileReader fileReader(path);
+    if (fileReader.error() != fs::OK) {
+        return fileReader.error();
+    }
+    // ponytail: overlay the Mini staging onto the Full CCMRAM scratch — Mini is
+    // smaller (static_assert below), never live at the same time as a Full load.
+    static_assert(sizeof(TeletypeProgramT<TT2ConfigMini>) <= sizeof(gTeletypeLoadScratch),
+                  "Mini program must fit the Full CCMRAM scratch");
+    auto &staging = *reinterpret_cast<TeletypeProgramT<TT2ConfigMini> *>(&gTeletypeLoadScratch);
+    bool ok = tt2DeserializeScene<TT2ConfigMini>(staging, tt2FileRead, &fileReader);
+    fs::Error error = fileReader.finish();
+    if (error == fs::END_OF_FILE) {
+        error = fs::OK;
+    }
+    if (error == fs::OK && !ok) {
+        error = fs::INVALID_DATA;
+    }
+    if (error == fs::OK) {
+        track.program(scene) = staging;  // atomic swap on clean parse
     }
     return error;
 }

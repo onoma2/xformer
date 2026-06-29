@@ -316,9 +316,6 @@ void TT2IoConfigPage::contextShow(bool doubleClick) {
         [&] (int index) { contextAction(index); },
         [&] (int index) {
             SceneAction a = SceneAction(index);
-            // SD scene file uses the Full single-program format; disable for Mini
-            // before any tt2Track() deref. Copy/Paste act on the whole track.
-            if (isMini() && (a == SceneAction::Load || a == SceneAction::Save)) return false;
             return a != SceneAction::Paste || _model.clipBoard().canPasteTrack();
         },
         doubleClick
@@ -362,7 +359,12 @@ void TT2IoConfigPage::saveScene() {
 void TT2IoConfigPage::saveSceneToSlot(int slot) {
     _engine.suspend();
     _manager.pages().busy.show("SAVING TT2 SCENE ...");
-    FileManager::task([this, slot] () {
+    const bool mini = isMini();
+    const int scene = activeScene();
+    FileManager::task([this, slot, mini, scene] () {
+        if (mini) {
+            return FileManager::writeTt2MiniScene(_project.selectedTrack().tt2MiniTrack(), scene, nullptr, slot);
+        }
         return FileManager::writeTt2Program(_project.selectedTrack().tt2Track(), nullptr, slot);
     }, [this] (fs::Error result) {
         if (result == fs::OK) {
@@ -378,7 +380,12 @@ void TT2IoConfigPage::saveSceneToSlot(int slot) {
 void TT2IoConfigPage::loadSceneFromSlot(int slot) {
     _engine.suspend();
     _manager.pages().busy.show("LOADING TT2 SCENE ...");
-    FileManager::task([this, slot] () {
+    const bool mini = isMini();
+    const int scene = activeScene();
+    FileManager::task([this, slot, mini, scene] () {
+        if (mini) {
+            return FileManager::readTt2MiniScene(_project.selectedTrack().tt2MiniTrack(), scene, slot);
+        }
         return FileManager::readTt2Program(_project.selectedTrack().tt2Track(), slot);
     }, [this] (fs::Error result) {
         if (result == fs::OK) {

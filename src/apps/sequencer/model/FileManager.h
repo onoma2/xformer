@@ -13,6 +13,7 @@
 #include <cstdint>
 
 class TT2Track;
+class TT2MiniTrack;
 
 class FileManager {
 public:
@@ -33,6 +34,9 @@ public:
     static fs::Error writeTt2Program(const TT2Track &track, const char *name, int slot);
     static fs::Error readTt2Program(TT2Track &track, int slot);
 
+    static fs::Error writeTt2MiniScene(const TT2MiniTrack &track, int scene, const char *name, int slot);
+    static fs::Error readTt2MiniScene(TT2MiniTrack &track, int scene, int slot);
+
     static fs::Error writeTt2Script(const TT2Track &track, int scriptIndex, const char *name, int slot);
     static fs::Error readTt2Script(TT2Track &track, int scriptIndex, int slot);
 
@@ -44,6 +48,9 @@ public:
 
     static fs::Error writeTt2Program(const TT2Track &track, const char *name, const char *path);
     static fs::Error readTt2Program(TT2Track &track, const char *path);
+
+    static fs::Error writeTt2MiniScene(const TT2MiniTrack &track, int scene, const char *name, const char *path);
+    static fs::Error readTt2MiniScene(TT2MiniTrack &track, int scene, const char *path);
 
     static fs::Error writeTt2Script(const TT2Track &track, int scriptIndex, const char *name, const char *path);
     static fs::Error readTt2Script(TT2Track &track, int scriptIndex, const char *path);
