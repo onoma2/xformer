@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Generator System — manual</title>
+<style>
+  :root{
+    --blue:#2563eb; --amber:#ca8a04; --green:#16a34a; --red:#dc2626; --purp:#7c3aed;
+    --ink:#1a1a1a; --mut:#5b5b5b; --line:#e5e5e5; --card:#ffffff; --bg:#fafafa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; line-height:1.5;}
+  .wrap{max-width:880px; margin:0 auto; padding:32px 24px 90px}
+  h1{font-size:1.75rem; line-height:1.2; margin:0 0 6px}
+  h2{font-size:1.32rem; line-height:1.25; margin:46px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--blue)}
+  h2.geo{border-color:var(--green)}
+  h2.adv{border-color:var(--purp)}
+  h3{font-size:1.06rem; margin:24px 0 6px}
+  .lede{color:var(--mut); font-size:1.05rem; margin:0 0 8px}
+  p{margin:10px 0}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#f0f0f3; padding:1px 5px; border-radius:4px; font-size:.9em}
+  pre{background:#1a1a1a; color:#f0f0f0; padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:.86rem; line-height:1.45; margin:12px 0}
+  pre code{background:none; padding:0; color:inherit; font-size:1em}
+  .kbd{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#1a1a1a; color:#fff; padding:2px 7px; border-radius:5px; font-size:.82em; white-space:nowrap}
+  .tag{display:inline-block; font-size:.7rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:99px; vertical-align:middle}
+  .t-blue{background:#e8effe; color:var(--blue)} .t-amber{background:#fbf1d9; color:var(--amber)}
+  .t-green{background:#e3f5ea; color:var(--green)} .t-purp{background:#efe7fd; color:var(--purp)}
+  .t-red{background:#fdeeee; color:var(--red)}
+
+  .note{border-left:4px solid var(--blue); background:#f3f7ff; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .warn{border-left:4px solid var(--amber); background:#fdf8ec; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .gotcha{border-left:4px solid var(--red); background:#fdeeee; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:.93rem}
+  th,td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top}
+  thead th{background:#e8effe; color:var(--blue)}
+  tbody tr:nth-child(even){background:#fafafa}
+  td code{white-space:nowrap}
+
+  figure{margin:18px 0; text-align:center}
+  figcaption{color:var(--mut); font-size:.85rem; margin-top:6px}
+  .shot{display:block; width:100%; max-width:520px; margin:14px auto 2px; image-rendering:pixelated;
+    border:1px solid #333; border-radius:4px; background:#000}
+  .cap{text-align:center; color:var(--mut); font-size:.84rem; margin:0 0 6px}
+
+  .steps{counter-reset:step; list-style:none; padding:0; margin:14px 0}
+  .steps>li{counter-increment:step; position:relative; padding:12px 12px 12px 56px; margin:10px 0;
+    background:var(--card); border:1px solid var(--line); border-radius:8px}
+  .steps>li::before{content:counter(step); position:absolute; left:12px; top:12px; width:30px; height:30px;
+    border-radius:50%; background:var(--blue); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:.95rem}
+
+  .toc{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:16px 0; columns:2; font-size:.93rem}
+  @media(max-width:620px){.toc{columns:1}}
+  .toc a{color:var(--blue); text-decoration:none} .toc a:hover{text-decoration:underline}
+  .footer{margin-top:48px; padding-top:14px; border-top:1px solid var(--line); color:var(--mut); font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Generator System — manual</h1>
+<p class="lede">Algorithmic Random / Algo / Euclidean generators for Note &amp; Curve sequences, with a deterministic A/B preview workflow to audition before committing.</p>
+
+<p>The Generator system provides algorithmic tools for creating and modifying Note and Curve sequence data. Accessed via long-press on the <span class="kbd">GEN</span> button in Note/Curve sequence edit pages, generators produce deterministic output and support an A/B preview workflow to audition changes before committing.</p>
+
+<div class="toc">
+  <a href="#s1">1. Accessing Generators</a><br>
+  <a href="#s2">2. Generator Types</a><br>
+  <a href="#s3">3. A/B Preview Workflow</a><br>
+  <a href="#s4">4. Common Controls</a><br>
+  <a href="#s5">5. Random Generator</a><br>
+  <a href="#s6">6. Algo Generator</a><br>
+  <a href="#s7">7. Euclidean Generator</a><br>
+  <a href="#s8">8. Init Layer / Init Steps</a><br>
+  <a href="#s9">9. Layer-Specific Visualization</a><br>
+  <a href="#s10">10. Context Menu</a>
+</div>
+
+<h2 id="s1">1. Accessing Generators</h2>
+<p>From a Note or Curve sequence edit page:</p>
+<ul>
+  <li><strong>Long-press <span class="kbd">GEN</span></strong> to open the generator select page</li>
+  <li>Choose a generator type from the list</li>
+  <li>The generator opens in <strong>ORIGINAL</strong> state — no data is modified yet</li>
+</ul>
+<p>Available generator types depend on the track:</p>
+<table>
+  <thead><tr><th>Generator</th><th>Note Track</th><th>Curve Track</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Init Layer</td><td>✅</td><td>✅</td><td>Reset current layer to default values</td></tr>
+    <tr><td>Init Steps</td><td>✅</td><td>✅</td><td>Clear all step data</td></tr>
+    <tr><td>Euclidean</td><td>✅</td><td>✅</td><td>Distribute N gates evenly across M steps</td></tr>
+    <tr><td>Random</td><td>✅</td><td>✅</td><td>Randomize step values per layer</td></tr>
+    <tr><td>Algo</td><td>✅</td><td>❌</td><td>Tuesday algorithm engines on Note sequences</td></tr>
+  </tbody>
+</table>
+
+<h2 id="s2">2. Generator Types</h2>
+
+<h3>Init Layer</h3>
+<p>Resets the current edit layer to its default value across all steps (or selected steps). No A/B workflow — applies immediately.</p>
+
+<h3>Init Steps</h3>
+<p>Clears all step data (gate, note, slide, etc.) across all steps (or selected steps). No A/B workflow — applies immediately.</p>
+
+<h3>Euclidean</h3>
+<p>Generates a Euclidean rhythm pattern: distributes N gates as evenly as possible across M steps with an offset. Supports A/B preview.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead><tr><th>Param</th><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Steps</td><td><span class="kbd">F2</span>+encoder</td><td>Total number of steps in the pattern</td></tr>
+    <tr><td>Beats</td><td><span class="kbd">F3</span>+encoder</td><td>Number of gates to distribute</td></tr>
+    <tr><td>Offset</td><td><span class="kbd">F1</span>+encoder</td><td>Rotate the pattern</td></tr>
+  </tbody>
+</table>
+
+<h3>Random</h3>
+<p>Generates random values for the current edit layer. Seed-driven and deterministic — same seed always produces the same output. Supports A/B preview.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead><tr><th>Param</th><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Seed</td><td><span class="kbd">F0</span> (A/B toggle)</td><td>32-bit seed value. Displayed in footer</td></tr>
+    <tr><td>VAR</td><td><span class="kbd">F1</span>+encoder</td><td>Variation 0-100%. 100% = fully random, 0% = unchanged</td></tr>
+    <tr><td>RANGE</td><td><span class="kbd">F2</span>+encoder</td><td>Scale range for generated values</td></tr>
+    <tr><td>BIAS</td><td><span class="kbd">F3</span>+encoder</td><td>Bias offset from center</td></tr>
+  </tbody>
+</table>
+<p><strong>Visualization:</strong> Draws a profile graph showing the generated values for the current layer. The graph updates per layer type (gate blocks, note contour, length bars, slide markers, etc.).</p>
+
+<h3>Algo</h3>
+<p><strong>Note track only.</strong> Runs one of 15 Tuesday algorithmic composition engines against the sequence, producing gate, note, slide, gate offset, gate length, retrigger, and gate probability values in a single pass. Each algorithm is a self-contained compositional state machine. Supports A/B preview.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead><tr><th>Param</th><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Seed</td><td><span class="kbd">F0</span> (A/B toggle)</td><td>32-bit seed mixed into algorithm RNG</td></tr>
+    <tr><td>ALGO</td><td><span class="kbd">F1</span>+encoder</td><td>Algorithm selection 0-14</td></tr>
+    <tr><td>FLOW</td><td><span class="kbd">F2</span>+encoder</td><td>Flow parameter 0-16 (seeds main RNG, drives gesture/mode decisions)</td></tr>
+    <tr><td>ORNMT</td><td><span class="kbd">F3</span>+encoder</td><td>Ornament parameter 0-16 (seeds aux RNG, drives subdivisions)</td></tr>
+    <tr><td>POWER</td><td><span class="kbd">F4</span>+encoder</td><td>Gate density 0-16 (higher = more gates)</td></tr>
+  </tbody>
+</table>
+<p><strong>Algorithms:</strong></p>
+<table>
+  <thead><tr><th>#</th><th>Name</th><th>Character</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>TEST</td><td>Simple test patterns: octave sweeps or scale walk</td></tr>
+    <tr><td>1</td><td>TRITRANCE</td><td>3-phase polyrhythm with swing and drag</td></tr>
+    <tr><td>2</td><td>STOMPER</td><td>7-mode gestural state machine with slide transitions</td></tr>
+    <tr><td>3</td><td>MARKOV</td><td>Order-2 Markov chain, 8×8×2 probability matrix</td></tr>
+    <tr><td>4</td><td>CHIP1</td><td>Chord-arpeggio pattern with chord stabs</td></tr>
+    <tr><td>5</td><td>CHIP2</td><td>Variable-length ascending/descending arpeggio</td></tr>
+    <tr><td>6</td><td>WOBBLE</td><td>Dual-phasor oscillator with phase-selected notes</td></tr>
+    <tr><td>7</td><td>SCALEWLK</td><td>Scale direction walker with polyrhythm subdivisions</td></tr>
+    <tr><td>8</td><td>WINDOW</td><td>Dual-phase Markov-arpeggio engine, 4 voices</td></tr>
+    <tr><td>9</td><td>MINIMAL</td><td>Burst/silence state machine with density control</td></tr>
+    <tr><td>10</td><td>GANZ</td><td>Triple-phasor engine with 5-tuplet grid and phrase skipping</td></tr>
+    <tr><td>11</td><td>BLAKE</td><td>Breath-phrase engine with 4-note stable motif</td></tr>
+    <tr><td>12</td><td>APHEX</td><td>3-track polyrhythmic engine (4/4, warped, 5/4)</td></tr>
+    <tr><td>13</td><td>AUTECHRE</td><td>8-step pattern with rule-based transformation</td></tr>
+    <tr><td>14</td><td>STEPWAVE</td><td>Scale-degree stepping engine with micro-sequencing</td></tr>
+  </tbody>
+</table>
+<p><strong>Mapped layers (applied per-step, all at once):</strong></p>
+<ul>
+  <li><strong>Gate</strong>: <code>velocity &gt; 0 &amp;&amp; gateRatio &gt; 0</code>, modulated by POWER cooldown</li>
+  <li><strong>Note</strong>: Scale degree from algorithm output</li>
+  <li><strong>Slide</strong>: Algorithm-specific slide probability (modulated by VAR)</li>
+  <li><strong>GateOffset</strong>: Timing offset from algorithm</li>
+  <li><strong>Length</strong>: Gate length ratio from algorithm</li>
+  <li><strong>Retrigger</strong>: Trill count or polyrhythm subdivision count</li>
+  <li><strong>GateProbability</strong>: Velocity-based probability; accents set to 100%</li>
+</ul>
+<p><strong>Variation blend:</strong> Each layer independently rolls against the VAR parameter — at 100% all generated values are used, at 0% all original values are kept.</p>
+
+<h2 id="s3">3. A/B Preview Workflow</h2>
+<p>Generators with A/B support (Random, Euclidean, Algo) follow a two-state workflow:</p>
+<pre><code>              ┌─────────────────┐
+              │    ORIGINAL     │  ← generator opens here
+              │ (sequence data) │
+              └────────┬────────┘
+                       │
+            Turn encoder OR
+           Press Shift+Step
+                       │
+                       ▼
+              ┌─────────────────┐
+              │    PREVIEW      │
+              │  (generated)    │
+              └────────┬────────┘
+                       │
+            ┌──────────┴──────────┐
+            │                     │
+         Press F0            Context menu
+            │                     │
+            ▼                     ├── REGEN → restart with fresh params
+    ┌───────────────┐             ├── CANCEL → discard, return to original
+    │   Toggle:     │             └── COMMIT → accept preview
+    │ ORIGINAL ◄──► │
+    │   PREVIEW     │
+    └───────────────┘</code></pre>
+<p><strong>Workflow steps:</strong></p>
+<ol class="steps">
+  <li><strong>Enter</strong>: Generator opens in ORIGINAL state. No data is modified. Footer shows "ORIGINAL" under the A/B label.</li>
+  <li><strong>Generate preview</strong>: Turn the encoder (with no function key held), or press <span class="kbd">Shift+Step</span>. The generator creates a preview and switches to PREVIEW state. Footer shows the seed value or "CURRENT."</li>
+  <li><strong>Toggle A/B</strong>: Press <span class="kbd">F0</span> to switch between ORIGINAL and PREVIEW. The footer label updates to show which state is active.</li>
+  <li><strong>Adjust parameters</strong>: Hold <span class="kbd">F1</span>-<span class="kbd">F4</span> and turn the encoder to adjust generator parameters in real time. The preview updates automatically.</li>
+  <li><strong>Commit or Cancel</strong>:
+    <ul>
+      <li><strong>Context menu → COMMIT</strong>: Accept the preview. The generated data replaces the original sequence. The generator closes.</li>
+      <li><strong>Context menu → CANCEL</strong>: Discard the preview. The original sequence is restored.</li>
+      <li><strong>Close without action</strong> (e.g., press <span class="kbd">Back</span>): Automatically discards the preview and restores the original.</li>
+    </ul>
+  </li>
+  <li><strong>Re-entering</strong>: After committing, reopening the generator shows the committed data as the new ORIGINAL. After canceling, the original data remains unchanged.</li>
+</ol>
+
+<h2 id="s4">4. Common Controls</h2>
+
+<h3>Footer Functions (F0-F4)</h3>
+<table>
+  <thead><tr><th>F-key</th><th>Random</th><th>Euclidean</th><th>Algo</th></tr></thead>
+  <tbody>
+    <tr><td><span class="kbd">F0</span></td><td>A/B toggle</td><td>A/B toggle</td><td>A/B toggle</td></tr>
+    <tr><td><span class="kbd">F1</span></td><td>VAR</td><td>OFFSET</td><td>ALGO</td></tr>
+    <tr><td><span class="kbd">F2</span></td><td>RANGE</td><td>STEPS</td><td>FLOW</td></tr>
+    <tr><td><span class="kbd">F3</span></td><td>BIAS</td><td>BEATS</td><td>ORNMT</td></tr>
+    <tr><td><span class="kbd">F4</span></td><td>(context menu)</td><td>(context menu)</td><td>POWER</td></tr>
+  </tbody>
+</table>
+<ul>
+  <li><strong>A/B toggle (<span class="kbd">F0</span>)</strong>: Switch between original and preview state. Blocked until first preview is generated.</li>
+  <li><strong>Param edit (<span class="kbd">F1</span>-<span class="kbd">F4</span>)</strong>: Hold function key and turn encoder to adjust the parameter.</li>
+</ul>
+
+<h3>Encoder</h3>
+<ul>
+  <li><strong>Bare encoder turn</strong> (no function key): Triggers a new preview (Random = reseed, Euclidean = new pattern, Algo = reseed).</li>
+  <li><strong><span class="kbd">F1</span>-<span class="kbd">F4</span> + encoder</strong>: Adjust the corresponding parameter.</li>
+</ul>
+
+<h3>Step Buttons</h3>
+<ul>
+  <li><strong><span class="kbd">Shift+Step</span></strong>: Generates a new preview (re-rolls the seed for Random and Algo, re-randomizes for Euclidean).</li>
+  <li><strong>Step selection</strong>: Works as in the sequence edit page — select steps to constrain generation scope.</li>
+</ul>
+
+<h3>Section Navigation (64-step sequences)</h3>
+<ul>
+  <li><strong>Left/Right buttons</strong>: Cycle through sections (banks) of 16 steps.</li>
+  <li><strong>Bank separators</strong>: Vertical lines at 16-step boundaries. Current bank is highlighted.</li>
+  <li><strong>Bank frame</strong>: Horizontal lines framing the active section.</li>
+  <li><strong>Non-active banks</strong>: Dimmed in the visualization.</li>
+  <li><strong>Playhead</strong>: Current playback position cursor.</li>
+</ul>
+
+<h3>Common Context Menu Items</h3>
+<table>
+  <thead><tr><th>Generator</th><th>Item 0</th><th>Item 1</th><th>Item 2</th><th>Item 3</th><th>Item 4</th></tr></thead>
+  <tbody>
+    <tr><td>Random</td><td>(empty)</td><td>SMOOTH N</td><td>REGEN</td><td>CANCEL</td><td>COMMIT</td></tr>
+    <tr><td>Algo</td><td>(empty)</td><td>VAR N</td><td>REGEN</td><td>CANCEL</td><td>COMMIT</td></tr>
+    <tr><td>Euclidean</td><td>NEW RAND</td><td>RESEED</td><td>REVERT</td><td>COMMIT</td><td>(empty)</td></tr>
+  </tbody>
+</table>
+<p><strong>Access</strong>: Press <span class="kbd">Page</span>, short-press <span class="kbd">GEN</span>, or <strong>double-tap <span class="kbd">Page</span></strong> on the Generator page.</p>
+<p><strong>Item descriptions:</strong></p>
+<ul>
+  <li><strong>SMOOTH N / VAR N</strong>: Opens a quick-edit dialog for the Smooth/Variation parameter</li>
+  <li><strong>REGEN</strong>: Resets to default parameters and returns to ORIGINAL state</li>
+  <li><strong>CANCEL / REVERT</strong>: Discard preview, restore original sequence, close</li>
+  <li><strong>COMMIT</strong>: Accept preview, write to sequence, close</li>
+  <li><strong>NEW RAND</strong>: Re-randomize all parameters and generate a new preview</li>
+  <li><strong>RESEED</strong>: Re-roll the seed only, keep current parameters, generate new preview</li>
+</ul>
+
+<h2 id="s5">5. Random Generator</h2>
+<p>The Random generator operates on a single layer at a time (the currently selected layer). It generates values within the layer's valid range.</p>
+<h3>Variation blend</h3>
+<p>The <code>VAR</code> parameter controls how much of the generated data is kept vs. how much original data survives. At 100%, all generated values are used. At 0%, all original values are kept. The blend is applied per-step — some steps may keep original values while others use generated ones.</p>
+<p>The algorithm is seed-driven: the same seed with the same VAR/RANGE/BIAS always produces the same output.</p>
+
+<h2 id="s6">6. Algo Generator</h2>
+<p>The Algo generator runs one of 15 Tuesday algorithms against the full NoteSequence (all active steps) in a single pass. Unlike the Random generator which operates layer-by-layer, Algo generates gate, note, slide, offset, length, retrigger, and probability in one pass.</p>
+<h3>Gate density control (POWER)</h3>
+<p>The POWER parameter simulates a cooldown-based density gate. Higher values produce more gates per sequence; lower values create sparser patterns. POWER=16 passes all gates, POWER=0 passes none.</p>
+<h3>Variation blend</h3>
+<p>Like the Random generator, each layer independently rolls against the VAR parameter. A step may get the generated note but keep the original gate, or get the generated gate but keep the original note. This is set in the context menu (shortcut: <span class="kbd">F4</span> opens context menu, then item 1 for VAR quick edit).</p>
+<h3>Algorithm state</h3>
+<p>Each algorithm is deterministic: the same ALGO/FLOW/ORNMT/SEED combination always produces the same sequence. The seed is mixed into the RNG seed derivation rather than modifying the FLOW or ORNMT parameters directly.</p>
+
+<h2 id="s7">7. Euclidean Generator</h2>
+<p>Generates a Euclidean rhythm: distributes <code>Beats</code> gates evenly across <code>Steps</code> positions with an <code>Offset</code> rotation.</p>
+<ul>
+  <li><strong>STEPS</strong>: Total positions (max 16 for Euclidean)</li>
+  <li><strong>BEATS</strong>: Number of gates to distribute</li>
+  <li><strong>OFFSET</strong>: Rotation offset for the pattern</li>
+</ul>
+<p>The visualization shows filled/empty step cells: filled = gate, empty = rest.</p>
+
+<h2 id="s8">8. Init Layer / Init Steps</h2>
+<ul>
+  <li><strong>Init Layer</strong>: Resets the current edit layer to its default value. The default depends on the layer type (e.g., Gate = off, Note = C, etc.). If steps are selected, only those steps are affected.</li>
+  <li><strong>Init Steps</strong>: Clears all step data (gate, note, slide, layer values). If steps are selected, only those steps are affected. If no steps are selected, the entire active range is cleared.</li>
+</ul>
+<div class="gotcha"><strong>Immediate, no preview.</strong> Both are immediate actions with no preview. A confirmation dialog may appear for destructive operations.</div>
+
+<h2 id="s9">9. Layer-Specific Visualization</h2>
+<p>The Random and Algo generators display a profile graph using the current sequence edit layer. The visualization adapts to the layer type:</p>
+<table>
+  <thead><tr><th>Layer</th><th>Visualization</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Gate</td><td>Gate blocks</td><td>Filled/empty rectangles per step</td></tr>
+    <tr><td>Note</td><td>Note contour</td><td>Stair-step pitch graph (2 rows: value + vertical connector)</td></tr>
+    <tr><td>Slide</td><td>Slide markers</td><td>Filled rectangles at bottom of each gated step</td></tr>
+    <tr><td>Length</td><td>Length bars</td><td>Variable-height bars proportional to length value</td></tr>
+    <tr><td>Retrigger / Pulse Count</td><td>Repeat stripes</td><td>Vertical stripes proportional to repeat count</td></tr>
+    <tr><td>GateOffset</td><td>Centered profile</td><td>Value centered on baseline (positive = above, negative = below)</td></tr>
+    <tr><td>Probability, Range, Variation, etc.</td><td>Offset profile</td><td>0-255 value from top of plot area</td></tr>
+    <tr><td>Accumulator Trigger</td><td>Boolean markers</td><td>Small dots for enabled steps</td></tr>
+    <tr><td>Gate Mode / Harmony / Inversion / Voicing</td><td>Offset profile</td><td>Same offset profile (values may clamp to layer range)</td></tr>
+  </tbody>
+</table>
+<p>All visualizations include:</p>
+<ul>
+  <li><strong>Bank separators</strong>: Vertical lines at 16-step boundaries</li>
+  <li><strong>Bank frame</strong>: Horizontal lines framing the active section</li>
+  <li><strong>Playhead</strong>: Current playback position cursor</li>
+  <li><strong>Active bank highlight</strong>: Current bank is bright; others are dimmed</li>
+</ul>
+
+<h2 id="s10">10. Context Menu</h2>
+<p>The context menu provides additional actions beyond the footer buttons.</p>
+<p><strong>Opening</strong>: <span class="kbd">Page</span> button, short-press <span class="kbd">GEN</span>, or double-tap <span class="kbd">Page</span> on the Generator page.</p>
+<p><strong>Random &amp; Algo menus:</strong></p>
+<pre><code>┌─────────────────┐
+│                 │  ← empty slot (padding)
+│ SMOOTH / VAR N  │  ← opens quick-edit for smooth/variation
+│ REGEN           │  ← reset to defaults, return to ORIGINAL
+│ CANCEL          │  ← discard preview, restore original
+│ COMMIT          │  ← accept preview
+└─────────────────┘</code></pre>
+<p><strong>Euclidean menu:</strong></p>
+<pre><code>┌─────────────────┐
+│ NEW RAND        │  ← re-randomize all params, generate preview
+│ RESEED          │  ← re-roll seed only, generate preview
+│ REVERT          │  ← discard preview, restore original
+│ COMMIT          │  ← accept preview
+└─────────────────┘</code></pre>
+
+<h2>Technical Notes</h2>
+<ul>
+  <li><strong>RAM</strong>: Generators are heap-allocated when opened and freed on exit. The A/B preview buffer (~9.5 KB for NoteSequence) is also heap-allocated on first preview generation.</li>
+  <li><strong>Determinism</strong>: Random and Algo generators are fully deterministic. Same seed + same parameters = same output, across reboots.</li>
+  <li><strong>Focus</strong>: Track selection is locked while a generator is open. Changing tracks cancels the generator automatically.</li>
+</ul>
+
+<div class="footer">Generator System — xformer firmware manual.</div>
+
+</div>
+</body>
+</html>
