@@ -38,17 +38,24 @@ XFORMER is a fork of the Phazerville PER|FORMER firmware with XFORMER-specific t
 ### Manuals and Tools
 
 - [XFORMER Manual](./manuals/XFORMER_MANUAL.md) - Complete guide to XFORMER firmware features
-- [TUESDAY Manual](./manuals/TUESDAY_MANUAL.md) - Algo track (generative sequencing) documentation
-- [DISCRETE Manual](./manuals/DISCRETEMAP_MANUAL.md) - Discrete track (threshold-based sequencing) guide
-- [INDEXED Manual](./manuals/INDEXED_MANUAL.md) - Indexed track (duration-based sequencing) guide
-- [CURVE Studio](./manuals/CURVE_Stidio.md) - Curve track enhancements and features
-- [ROUTES](./manuals/ROUTES.md) - Routing and signal flow documentation
-- T9Type - [Full](./manuals/T9Type-manual.md), [Ops](./manuals/T9Type-ops.md), [Track](./manuals/T9Type-learn.md)
 
+**Track manuals** (each has a matching `.html` with embedded OLED screen renders):
+- [Note](./manuals/NOTE_MANUAL.md) - core melodic step sequencer
+- [Curve](./manuals/CURVE_MANUAL.md) - shape-per-step CV
+- [Stochastic](./manuals/STOCHASTIC_MANUAL.md) - probabilistic rhythm + melody
+- [PhaseFlux](./manuals/PHASEFLUX_MANUAL.md) - 4×4 pulse synthesizer
+- [Tuesday (Algo)](./manuals/TUESDAY_MANUAL.md) - generative algorithm sequencing
+- [Indexed](./manuals/INDEXED_MANUAL.md) - duration-indexed sequencing
+- [Discrete](./manuals/DISCRETE_MANUAL.md) - threshold-map sequencing
+- [Fractal](./manuals/FRACTAL_MANUAL.md) - section-sampled looper
+
+**System manuals:**
+- [Routing](./manuals/ROUTING_MANUAL.md) - routing engine, targets/sources, track-page setup
+- [Modulators](./manuals/MODULATOR_MANUAL.md) - modulators, JF mode, Geode, and the MO.*/G.* Teletype ops
+- [Generator](./manuals/GENERATOR.md) - algorithmic sequence generators (Random/Algo/Euclidean) for Note & Curve
+- T9Type - [Track guide](./manuals/T9type-learn.md), [Full reference](./manuals/T9type-manual.md), [Ops](./manuals/T9type-ops.md)
 
 - [Scala (.scl) to .SCA (performer SCA)](./scripts/SCL-TO-SCA/) - conversion script
-- [HTML Shapes Visualizer](./manuals/curve-and-route-shapers.html) - helper to
-visualize Curve Studio shapes and routing additions with a sound engine
 
 
 ### Warnings
