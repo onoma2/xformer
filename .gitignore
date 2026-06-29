@@ -111,3 +111,23 @@ skills/
 
 # graphify cache
 graphify-out/cache/
+
+# --- dev/agent/tooling artifacts: kept on the dev branch, not in the clean repo ---
+# in-source build output
+CMakeFiles/
+CMakeCache.txt
+build.log
+# agent / tooling scratch dirs
+.scratch/
+.tasks/
+.pi/
+.cowork/
+.playwright-mcp/
+graphify-out/
+.graphify-teletype-scope/
+# agent process scripts / notes
+.graphify_step*.py
+builder_part*.py
+COWORK.md
+STATUS.md
+TASK.md
