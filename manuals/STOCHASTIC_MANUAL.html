@@ -256,6 +256,10 @@
 
 <h3>LIVE page</h3>
 <p>The performance knob grid. Footer F-keys: rhythm-mode toggle, melody-mode toggle, NewR, NewM, NEXT.</p>
+<figure>
+  <img class="shot" src="../ui-preview/stochastic-manual/stoch-live.png" alt="LIVE page — constellation of recent events">
+  <figcaption>LIVE page. The constellation plots recent events; brighter rings are newer, the marbles haze tracks Bias/Spread. Two tiny rows above show all 16 knob values; a held step swaps them for its full name and value. Fresh-track footer reads <code>LiveR / LiveM / NewR / NewM / NEXT</code>.</figcaption>
+</figure>
 <ul>
   <li><span class="kbd">F1</span> <code>LoopR</code>/<code>LiveR</code> — toggle rhythm mode Live↔Loop.</li>
   <li><span class="kbd">F2</span> <code>LoopM</code>/<code>LiveM</code> — toggle melody mode Live↔Loop.</li>
@@ -281,6 +285,10 @@
 
 <h3>LOOP page</h3>
 <p>The Loop-shaping and evolution grid. Footer F-keys mirror LIVE (rhythm/melody toggles, NewR, NewM, NEXT).</p>
+<figure>
+  <img class="shot" src="../ui-preview/stochastic-manual/stoch-loop.png" alt="LOOP page — loop tape with window brackets">
+  <figcaption>LOOP page. The tape shows every step; bracket marks the <code>first..last</code> play window, the bright slot is currently audible, bar height encodes pitch. Two patience meters fill below; side bars are Mask/Tilt per domain. Footer reads <code>LoopR / LoopM / NewR / NewM / NEXT</code> in Loop mode.</figcaption>
+</figure>
 <table>
   <thead><tr><th>Step</th><th>Param</th><th>Step</th><th>Param</th></tr></thead>
   <tbody>
@@ -298,6 +306,10 @@
 
 <h3>PITCH page</h3>
 <p>Scale-degree tickets. Header <code>SCALE TICKETS</code>. Each step S1-S16 selects a degree (degree index = bank × 16 + step); the encoder edits that degree's ticket (or all held degrees). A single held degree reads <code>DEG n: &lt;weight or EXCL&gt;</code>.</p>
+<figure>
+  <img class="shot" src="../ui-preview/stochastic-manual/stoch-pitch.png" alt="PITCH page — per-degree ticket bars">
+  <figcaption>SCALE TICKETS. One bar per scale degree; taller = more weight, the box marks the selected degree, the bright bar is the degree playing now, an X marks an excluded degree. Left readout is the selected degree's weight, right shows <code>DROT / MROT</code>.</figcaption>
+</figure>
 <ul>
   <li><span class="kbd">F1</span> <code>LoopM</code>/<code>LiveM</code> — toggle melody mode.</li>
   <li><span class="kbd">F2</span> <code>NewM</code> — capture/renew melody.</li>
@@ -309,6 +321,10 @@
 
 <h3>DURATION page</h3>
 <p>Duration-slot tickets. Header <code>DURATION TICKETS</code>. Steps S1-S8 select a duration slot; the encoder edits that slot's ticket weight. The label shows the divisor-relative duration name and the weight.</p>
+<figure>
+  <img class="shot" src="../ui-preview/stochastic-manual/stoch-duration.png" alt="DURATION page — per-slot ticket bars">
+  <figcaption>DURATION TICKETS. Eight bars, one per LUT slot, labelled with the divisor-relative duration. The box marks the selected slot, the bright bar is the duration playing now, flat baselines are zero-weight slots. Left shows the selected slot's weight; <code>REST %</code> sits top-right.</figcaption>
+</figure>
 <ul>
   <li><span class="kbd">F1</span> <code>LoopR</code>/<code>LiveR</code> — toggle rhythm mode.</li>
   <li><span class="kbd">F2</span> <code>NewR</code> — capture/renew rhythm.</li>

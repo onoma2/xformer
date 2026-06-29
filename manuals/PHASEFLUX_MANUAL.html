@@ -234,6 +234,10 @@
 <h2 id="p7">Part 7 · The Edit Page</h2>
 <p><span class="kbd">Page+S0</span> opens the PhaseFlux edit page. The left side is the 4×4 stage grid; the right side is the per-cell scope + parameter list (or a full-width scope for ACCUM / MACRO). One <strong>topic SET</strong> is active at a time, cycled with <span class="kbd">Left/Right</span>:</p>
 <pre><code>TEMP → PTCH → ACCUM.N → ACCUM.P → MACRO</code></pre>
+<figure>
+  <img class="shot" src="../ui-preview/phaseflux-manual/phflx-temp-p0.png" alt="PhaseFlux edit page, TEMP topic page 0">
+  <figcaption>Edit page: 4×4 stage grid (left), temporal scope with pulse rings (center), parameter list + F-key footer (right).</figcaption>
+</figure>
 <p>Within a topic, <span class="kbd">F1</span>-<span class="kbd">F4</span> address parameter slots and <span class="kbd">F5</span> = Next cycles the topic's pages. F1-F4 either select a slot for the encoder, or — for binary fields on page 2 — flip directly on press. The encoder edits the selected slot; <span class="kbd">Shift</span> (or encoder-press) is the coarse/secondary modifier.</p>
 
 <h3>Step grid</h3>
@@ -255,8 +259,20 @@
   </tbody>
 </table>
 <p><code>*</code> = press-to-flip toggle. Re-pressing <span class="kbd">F1</span> Len on P1 arms <strong>Len-TR</strong>: the encoder transfers length between the cursor cell and the next, conserving the sum (mirrors Indexed DUR-TR).</p>
+<figure>
+  <img class="shot" src="../ui-preview/phaseflux-manual/phflx-temp-p1.png" alt="TEMP topic page 1: Len / FlipV / FlipH / Mask">
+  <figcaption>TEMP P1 — Len, FlipV, FlipH, Mask.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="../ui-preview/phaseflux-manual/phflx-temp-p2.png" alt="TEMP topic page 2: Wind / Rep">
+  <figcaption>TEMP P2 — Wind, Rep (F3/F4 blank).</figcaption>
+</figure>
 
 <h3>PTCH topic (<code>_currentSet</code> 1)</h3>
+<figure>
+  <img class="shot" src="../ui-preview/phaseflux-manual/phflx-ptch-p0.png" alt="PTCH topic page 0, Cell mode">
+  <figcaption>PTCH P0 (Cell mode) — pitch scope shows the per-cell contour; F1-F4 = Curve, Warp, Resp, Note.</figcaption>
+</figure>
 <p>Cell mode (3 pages):</p>
 <table>
   <thead><tr><th>Page</th><th>F1</th><th>F2</th><th>F3</th><th>F4</th><th>F5</th></tr></thead>
@@ -274,6 +290,10 @@
     <tr><td>P1</td><td>Note</td><td>Span</td><td>FlipV*</td><td>FlipH*</td><td>Next</td></tr>
   </tbody>
 </table>
+<figure>
+  <img class="shot" src="../ui-preview/phaseflux-manual/phflx-ptchg-p0.png" alt="PTCH.G topic page 0, Global mode">
+  <figcaption>PTCH.G P0 (Global mode) — scope draws stage 0's master curve (ST1 badge); F4 = Rate.</figcaption>
+</figure>
 <p>In Global mode Curve/Warp/Resp/FlipV/FlipH and Rate edit stage 0 (the master curve); Note and Span still edit the cursor cell.</p>
 
 <h3>ACCUM.N / ACCUM.P topics (<code>_currentSet</code> 2 / 3, 2 pages)</h3>
@@ -285,6 +305,14 @@
   </tbody>
 </table>
 <p>F2 on P0 shows the current Accum Mode (Stage/Sequence) but is not editable from here — change it on the sequence list (Part 8). Ac.St and Trig are per-stage (multi-cell aware); Order/Reset/Polar are sequence-level. The full-width strip draws each cell's counter offset with glyphs for Order, Polarity, and Reset.</p>
+<figure>
+  <img class="shot" src="../ui-preview/phaseflux-manual/phflx-accum-n.png" alt="ACCUM.N topic, note accumulator strip">
+  <figcaption>ACCUM.N — 1×16 cell strip with per-cell step pancakes and S/P trigger glyphs; left margin shows Order / Polarity / Reset.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="../ui-preview/phaseflux-manual/phflx-accum-p.png" alt="ACCUM.P topic, pulse accumulator strip">
+  <figcaption>ACCUM.P — same strip for the pulse-count counter.</figcaption>
+</figure>
 
 <h3>MACRO topic (<code>_currentSet</code> 4, 2 pages)</h3>
 <table>
@@ -295,6 +323,10 @@
   </tbody>
 </table>
 <p>P0 nudges are uniform per-cell offsets added to every stage. <strong>Snap</strong> (press) quantizes each non-skipped stage's length to the nearest binary note value, conserving total length. <strong>Zero</strong> (press) resets the five magnitude macros (the four nudges + GWarp) to 0; Global Phase is left alone. MACRO draws a full-width scope of all 16 stages stitched along X, live to every macro.</p>
+<figure>
+  <img class="shot" src="../ui-preview/phaseflux-manual/phflx-macro-p0.png" alt="MACRO topic, full-width composite scope">
+  <figcaption>MACRO P0 — full-width scope stitches every non-skipped stage's temporal curve along X; F1-F4 = WarpN, RespN, PulsN, LenN.</figcaption>
+</figure>
 
 <h3>Quick-edit (Page + bottom row)</h3>
 <ul>

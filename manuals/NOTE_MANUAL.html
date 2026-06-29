@@ -108,6 +108,19 @@
   </tbody>
 </table>
 <p>The F4 group's tail depends on the sequence's harmony role: master sequences expose Inversion then Voicing; follower sequences expose Harmony Role; off sequences loop straight back to Note.</p>
+<p>The same 16-step grid stays on screen as you cycle layers; only the cell drawn under each gate box and the highlighted footer key change. The header label echoes the active layer.</p>
+<figure>
+  <img class="shot" src="../ui-preview/note-manual/edit-gate.png" alt="STEPS page on the Gate layer">
+  <figcaption>GATE layer — filled boxes are gates on; the footer highlights GATE.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="../ui-preview/note-manual/edit-length.png" alt="STEPS page on the Length layer">
+  <figcaption>LENGTH layer — a gate-length bar per step; "T" marks tied (length 0). Footer highlights LENGTH.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="../ui-preview/note-manual/edit-condition.png" alt="STEPS page on the Condition layer">
+  <figcaption>CONDITION layer — short condition labels (F, P, 1, !F …) under each step. Footer highlights COND.</figcaption>
+</figure>
 
 <h3>All per-step layers, defaults, ranges</h3>
 <p>Defaults are from <code>Step::clear()</code>. Ranges are the value-type bit widths.</p>
@@ -171,6 +184,10 @@
 
 <h2 id="p3">Part 3 · The Edit Page</h2>
 <p><span class="kbd">Page+S0</span> (with the track selected) opens the STEPS edit page. The 16-step keypad maps to the current loop section; Left/Right move between four sections.</p>
+<figure>
+  <img class="shot" src="../ui-preview/note-manual/edit-note.png" alt="STEPS page on the Note layer">
+  <figcaption>STEPS page on the Note layer: gate boxes over two-line note names (pitch + octave). The bright box is the playing step; steps 4–5 are selected. Footer highlights NOTE.</figcaption>
+</figure>
 <h3>F-keys, encoder, Shift</h3>
 <ul>
   <li><span class="kbd">F1</span>–<span class="kbd">F5</span> switch/cycle the active layer. The active function is shown in the header.</li>

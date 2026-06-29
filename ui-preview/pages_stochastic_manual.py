@@ -46,13 +46,15 @@ def render_loop(canvas):
 def _ticket_bars(canvas, items, *, selected, active, x0, y_base, col_w, max_h):
     """Generic ticket bar chart. items: list of (label, ticket). ticket -1 =
     excluded (dash), 0 = flat baseline, 1..100 = weighted height."""
+    canvas.set_blend_mode(BlendMode.Set)
     canvas.set_font(Font.Tiny)
     for i, (label, ticket) in enumerate(items):
         cx = x0 + i * col_w
         bw = col_w - 3
         if ticket < 0:
             canvas.set_color(Color.Low)
-            canvas.hline(cx, y_base, bw)
+            canvas.line(cx, y_base - 5, cx + bw - 1, y_base)
+            canvas.line(cx, y_base, cx + bw - 1, y_base - 5)
         else:
             h = 2 + (ticket * (max_h - 2)) // 100 if ticket > 0 else 2
             is_act = (i == active)
@@ -68,24 +70,44 @@ def _ticket_bars(canvas, items, *, selected, active, x0, y_base, col_w, max_h):
 
 
 def render_pitch(canvas):
+    # Mirrors drawPitchPage: header mode "SCALE TICKETS", per-degree bars with
+    # baseline, selected/active cursor underline, "DEG n:" readout (left) and
+    # DROT/MROT (right). 7-degree major scale, 4th excluded, degree 5 active.
     WindowPainter.clear(canvas)
-    WindowPainter.draw_header(canvas, mode="STOCH")
-    WindowPainter.draw_active_function(canvas, "SCALE TICKETS")
-    # 7 major-scale degrees with a tonal weighting; 4th excluded.
-    items = [("1", 80), ("2", 20), ("3", 50), ("4", -1), ("5", 70), ("6", 15), ("7", 30)]
-    _ticket_bars(canvas, items, selected=4, active=2,
-                 x0=20, y_base=46, col_w=30, max_h=28)
+    WindowPainter.draw_header(canvas, mode="SCALE TICKETS")
+    tickets = [80, 20, 50, -1, 70, 15, 30]
+    items = [(str(i + 1), t) for i, t in enumerate(tickets)]
+    _ticket_bars(canvas, items, selected=2, active=4,
+                 x0=20, y_base=46, col_w=30, max_h=22)
+    canvas.set_blend_mode(BlendMode.Set)
+    canvas.set_font(Font.Small)
+    canvas.set_color(Color.Bright)
+    canvas.draw_text(8, 18, "DEG 3: 50")
+    canvas.set_font(Font.Tiny)
+    canvas.set_color(Color.Medium)
+    rot = "DROT:+0 MROT:+0"
+    canvas.draw_text(PageWidth - canvas.text_width(rot) - 8, 18, rot)
     _restamp_footer(canvas, ["LiveM", "NewM", "DROT", "MROT", "NEXT"])
 
 
 def render_duration(canvas):
+    # Mirrors drawDurationPage: header mode "DURATION TICKETS", 8 LUT slots with
+    # baseline, active slot 1/16 (idx 5), selected slot 1/8 (idx 3), "1/8: n"
+    # readout (left) and "REST n%" tiny (right).
     WindowPainter.clear(canvas)
-    WindowPainter.draw_header(canvas, mode="STOCH")
-    WindowPainter.draw_active_function(canvas, "DURATION TICKETS")
+    WindowPainter.draw_header(canvas, mode="DURATION TICKETS")
     items = [(DUR_LABELS[i], t) for i, t in
-             enumerate([0, 0, -1, 40, 0, 70, 0, 0])]
-    _ticket_bars(canvas, items, selected=5, active=3,
-                 x0=14, y_base=46, col_w=29, max_h=28)
+             enumerate([0, 0, 0, 40, 0, 70, 0, 0])]
+    _ticket_bars(canvas, items, selected=3, active=5,
+                 x0=14, y_base=46, col_w=29, max_h=22)
+    canvas.set_blend_mode(BlendMode.Set)
+    canvas.set_font(Font.Small)
+    canvas.set_color(Color.Bright)
+    canvas.draw_text(8, 18, "1/8: 40")
+    rest = "REST 15%"
+    canvas.set_font(Font.Tiny)
+    canvas.set_color(Color.Bright)
+    canvas.draw_text(PageWidth - canvas.text_width(rest) - 8, 18, rest)
     _restamp_footer(canvas, ["LiveR", "NewR", "RST", None, "NEXT"])
 
 

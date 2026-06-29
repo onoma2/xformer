@@ -179,6 +179,15 @@
 <h2 id="p5">Part 5 · The Sequence Page</h2>
 <p><span class="kbd">Page+S0</span> opens the Discrete edit page (header <strong>DMAP</strong>). It draws a threshold bar across the top, a live input cursor, and a three-row info block for the eight stages of the current section. Four sections of eight stages each; <span class="kbd">LEFT</span> / <span class="kbd">RIGHT</span> step through them.</p>
 
+<figure>
+  <img class="shot" src="../ui-preview/discrete-manual/dmap-edit.png" alt="Discrete edit page, threshold mode">
+  <figcaption>Threshold mode (<code>DMAP: THR</code>). Top bar = per-stage thresholds with the live input cursor (tall, bright). Rows: direction (<code>^</code> Rise, <code>v</code> Fall, <code>x</code> Both, <code>-</code> Off), threshold, note. The active stage is brightest; the side brackets mark the threshold row.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="../ui-preview/discrete-manual/dmap-edit-note.png" alt="Discrete edit page, note mode">
+  <figcaption>Note mode (<code>DMAP: NOTE</code>) — encoder press toggles modes; the side brackets drop to the note row. Off stages show <code>--</code>.</figcaption>
+</figure>
+
 <h3>The footer (F1-F5), normal mode</h3>
 <table>
   <thead><tr><th>Key</th><th>Shows</th><th>Press</th></tr></thead>
@@ -233,6 +242,10 @@
   <li><strong>COPY</strong> / <strong>PASTE</strong> copy and paste the whole sequence (paste enabled only when the clipboard holds a Discrete sequence).</li>
   <li><strong>GEN</strong> enters the generator.</li>
 </ul>
+<figure>
+  <img class="shot" src="../ui-preview/discrete-manual/dmap-init.png" alt="INIT target submenu footer">
+  <figcaption>INIT submenu footer: <code>ALL</code> / <code>THR</code> / <code>NOTE</code> / (blank) / <code>X</code>.</figcaption>
+</figure>
 
 <h3>GEN (generator)</h3>
 <p>GEN runs in two footer steps. First a <strong>kind</strong>: <code>RAND</code> / <code>LIN</code> / <code>LOG</code> / <code>EXP</code> / <code>X</code>. Then a <strong>target</strong>:</p>
@@ -240,6 +253,18 @@
   <li>RAND target row: <code>ALL</code> / <code>THR</code> / <code>NOTE</code> / <code>TOG</code> / <code>X</code> (TOG randomizes directions).</li>
   <li>LIN/LOG/EXP target row: <code>ALL</code> / <code>THR</code> / <code>NOTE5</code> / <code>NOTE2</code> / <code>X</code> — NOTE5 spreads notes wide (−63..+64), NOTE2 narrow (0..+32). Threshold shaping is linear / √ / ^1.3 across −99..99.</li>
 </ul>
+<figure>
+  <img class="shot" src="../ui-preview/discrete-manual/dmap-gen-kind.png" alt="GEN kind footer">
+  <figcaption>GEN step 1 — choose kind: <code>RAND</code> / <code>LIN</code> / <code>LOG</code> / <code>EXP</code> / <code>X</code>.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="../ui-preview/discrete-manual/dmap-gen-rand.png" alt="GEN RAND target footer">
+  <figcaption>GEN step 2, RAND target row: <code>ALL</code> / <code>THR</code> / <code>NOTE</code> / <code>TOG</code> / <code>X</code>.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="../ui-preview/discrete-manual/dmap-gen-shape.png" alt="GEN LIN/LOG/EXP target footer">
+  <figcaption>GEN step 2, LIN/LOG/EXP target row: <code>ALL</code> / <code>THR</code> / <code>NOTE5</code> / <code>NOTE2</code> / <code>X</code>.</figcaption>
+</figure>
 
 <h3>Page+Step quick edits</h3>
 <table>
