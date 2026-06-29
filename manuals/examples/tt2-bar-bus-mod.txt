@@ -1,0 +1,36 @@
+NAME BAR & BUS
+BAR & BUS - xformer-specific modulation study built on BAR, BUS, E.*, LFO.*.
+Everything is locked to the Performer transport bar, not the internal metro.
+  I  : arm a fast AD envelope on CV 1 (per-CV E.*) and a slow sine LFO on CV 2.
+  M  : CV 3 = a 1-bar ramp (BAR). BUS 1 publishes the bar phase to every other
+       track's global bus. Re-trigger the CV 1 envelope every 4 ticks. Gate
+       TR 1 high across the second half of each bar.
+  1  : IN 1 re-fires the CV 1 envelope and zeroes the tick counter.
+  2  : IN 2 reads BUS 1 back and parks it on CV 4 (quantized via #CO).
+Patch: CV 1 -> VCA env, CV 2 -> filter LFO, CV 3 -> 1-bar ramp, TR 1 -> gate.
+#I
+M 125
+E.A 1 4
+E.D 1 200
+LFO.R 2 4000
+LFO.A 2 70
+#1
+E.T 1
+A 0
+#2
+CV 4 N BUS 1
+#M
+CV 3 V BAR
+BUS 1 BAR
+IF EZ MOD A 4: E.T 1
+IF GT BAR 8192: TR.P 1
+A ADD A 1
+#CO
+9 -1 0 -1
+9 -1 0 -1
+9 -1 0 -1
+4 1 0 0
+9 -1 0 -1
+9 -1 0 -1
+9 -1 0 -1
+9 -1 0 -1

@@ -1,0 +1,93 @@
+NAME MINI PULSE
+MINI PULSE - a 4-scene TT2-Mini set (one evolving performance: intro -> build
+-> peak -> outro). TT2-Mini has scripts 1, 2 and M only (no Init), 2 trigger
+inputs, 4 patterns. Each scene below is a complete Mini program; the four
+together fill the track's four scene slots.
+Patch (all scenes): TR 1 -> kick, TR 2 -> hat, CV 1 -> bass, CV 2 -> pluck.
+
+=== SCENE 1 / INTRO ===
+Sparse: kick every 4 ticks, bass walks pattern 0.
+#M
+A ADD A 1
+IF EZ MOD A 4: TR.P 1
+CV 1 N P MOD A 8
+#P
+8	0	0	0
+1	1	1	1
+0	0	0	0
+7	0	0	0
+0	0	0	0
+3	0	0	0
+5	0	0	0
+7	0	0	0
+10	0	0	0
+12	0	0	0
+15	0	0	0
+19	0	0	0
+
+=== SCENE 2 / BUILD ===
+Adds a 5-in-8 euclid hat on TR 2. IN 1 drops a manual kick.
+#1
+TR.P 1
+#M
+A ADD A 1
+IF EZ MOD A 4: TR.P 1
+IF ER 5 8 A: TR.P 2
+CV 1 N P MOD A 8
+#P
+8	0	0	0
+1	1	1	1
+0	0	0	0
+7	0	0	0
+0	0	0	0
+3	0	0	0
+5	0	0	0
+7	0	0	0
+10	0	0	0
+12	0	0	0
+15	0	0	0
+19	0	0	0
+
+=== SCENE 3 / PEAK ===
+Busy: 7-in-8 hat, kick every other tick, octave-up pluck fills on CV 2.
+#1
+TR.P 2
+#M
+A ADD A 1
+IF EZ MOD A 2: TR.P 1
+IF ER 7 8 A: TR.P 2
+CV 1 N P MOD A 8
+PROB 40: CV 2 N ADD 12 P RRAND 0 7
+#P
+8	0	0	0
+1	1	1	1
+0	0	0	0
+7	0	0	0
+0	0	0	0
+3	0	0	0
+5	0	0	0
+7	0	0	0
+10	0	0	0
+12	0	0	0
+15	0	0	0
+19	0	0	0
+
+=== SCENE 4 / OUTRO ===
+Thinning out: kick every 8 ticks, occasional bass note only.
+#M
+A ADD A 1
+IF EZ MOD A 8: TR.P 1
+PROB 20: CV 1 N P RRAND 0 7
+#P
+8	0	0	0
+1	1	1	1
+0	0	0	0
+7	0	0	0
+0	0	0	0
+3	0	0	0
+5	0	0	0
+7	0	0	0
+10	0	0	0
+12	0	0	0
+15	0	0	0
+19	0	0	0

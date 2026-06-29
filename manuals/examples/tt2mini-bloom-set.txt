@@ -1,0 +1,80 @@
+NAME MINI BLOOM
+MINI BLOOM - a 4-scene TT2-Mini set, a slowly blooming generative dyad piece.
+TT2-Mini = scripts 1, 2 and M only (no Init), 2 trigger inputs, 4 patterns.
+The four scenes thicken from a single drone to a wandering two-voice cloud and
+fade back. Pattern 0 is a 5-note pentatonic table in every scene.
+Patch (all scenes): CV 1 -> voice A, CV 2 -> voice B, TR 1/2 -> percussion.
+
+=== SCENE 1 / DRONE ===
+One voice arpeggiates the pentatonic; a soft pulse every 8 ticks.
+#M
+A ADD A 1
+CV 1 N P MOD A 5
+IF EZ MOD A 8: TR.P 1
+#P
+5	0	0	0
+1	1	1	1
+0	0	0	0
+4	0	0	0
+0	0	0	0
+3	0	0	0
+5	0	0	0
+7	0	0	0
+10	0	0	0
+
+=== SCENE 2 / DUET ===
+Coin-toss adds a fifth above on voice B. IN 1 forces a pulse.
+#1
+TR.P 1
+#M
+A ADD A 1
+CV 1 N P MOD A 5
+IF TOSS: CV 2 N ADD 7 P MOD A 5
+IF EZ MOD A 4: TR.P 1
+#P
+5	0	0	0
+1	1	1	1
+0	0	0	0
+4	0	0	0
+0	0	0	0
+3	0	0	0
+5	0	0	0
+7	0	0	0
+10	0	0	0
+
+=== SCENE 3 / CLOUD ===
+Both voices wander: a drunk pointer on voice A, random octave on voice B,
+a 3-in-8 euclid on TR 2.
+#M
+X DRUNK
+CV 1 N P MOD X 5
+PROB 50: CV 2 N ADD 12 P RRAND 0 4
+IF ER 3 8 A: TR.P 2
+A ADD A 1
+#P
+5	0	0	0
+1	1	1	1
+0	0	0	0
+4	0	0	0
+0	0	0	0
+3	0	0	0
+5	0	0	0
+7	0	0	0
+10	0	0	0
+
+=== SCENE 4 / FADE ===
+Thinning: occasional high note, a slow pulse every 16 ticks.
+#M
+A ADD A 1
+PROB 30: CV 1 N ADD 12 P MOD A 5
+IF EZ MOD A 16: TR.P 1
+#P
+5	0	0	0
+1	1	1	1
+0	0	0	0
+4	0	0	0
+0	0	0	0
+3	0	0	0
+5	0	0	0
+7	0	0	0
+10	0	0	0

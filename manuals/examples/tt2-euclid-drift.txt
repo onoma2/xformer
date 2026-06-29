@@ -1,0 +1,43 @@
+NAME EUCLID DRIFT
+EUCLID DRIFT - self-running generative euclidean study (general TT2).
+Internal METRO drives everything; no external clock required.
+  M  : engine. A counts ticks. 5-in-8 euclid -> TR 1. Pattern 0 walks a
+       minor-pentatonic line to CV 1. Downbeat every 16 -> TR 2.
+       25% chance: an octave-up random pluck on CV 2 (quantized via #CO).
+  1  : patch a reset/clock to IN 1 -> rephases the walk, accent on TR 3.
+Patch: TR 1 -> hat, TR 2 -> kick, TR 3 -> accent, CV 1 -> melody, CV 2 -> pluck.
+#I
+M 125
+SEED 101
+P.N 0
+#1
+A 0
+TR.P 3
+#M
+A ADD A 1
+IF ER 5 8 A: TR.P 1
+CV 1 N P MOD A 8
+IF EZ MOD A 16: TR.P 2
+PROB 25: CV 2 N ADD 12 P RRAND 0 7
+#P
+8	0	0	0
+1	1	1	1
+0	0	0	0
+7	0	0	0
+0	0	0	0
+3	0	0	0
+5	0	0	0
+7	0	0	0
+10	0	0	0
+7	0	0	0
+5	0	0	0
+3	0	0	0
+#CO
+9 -1 0 -1
+4 6 0 0
+9 -1 0 -1
+9 -1 0 -1
+9 -1 0 -1
+9 -1 0 -1
+9 -1 0 -1
+9 -1 0 -1

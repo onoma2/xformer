@@ -1,0 +1,34 @@
+NAME CROSS CONDUCTOR
+CROSS CONDUCTOR - xformer cross-track piece. This TT2 track conducts other
+Performer tracks instead of making sound itself.
+Layout it expects: track 2 = any pattern track, track 3 = a Teletype track,
+track 4 = a Note track, route 1 = some CV source (RT readback).
+  I  : reset the section counter, set a half-second metro.
+  M  : A counts. Every 8 ticks cycle track 2 across patterns 1..4 (WP.SET).
+       Every 4 ticks fire script 1 on track 3 (WS). CV 1 tracks route 1 (RT).
+       30% chance: drop a random note on a random step of track 4 (WNN).
+  1  : IN 1 fires track 3 script 1 by hand and pulses TR 1.
+  2  : IN 2 throws track 2 onto a random pattern (1..4).
+#TI
+1
+2
+3
+4
+5
+6
+7
+8
+#I
+M 480
+A 0
+#1
+WS 3 1
+TR.P 1
+#2
+WP.SET 2 RRAND 1 4
+#M
+A ADD A 1
+IF EZ MOD A 8: WP.SET 2 ADD 1 MOD A 4
+IF EZ MOD A 4: WS 3 1
+CV 1 N RT 1
+PROB 30: WNN 4 RRAND 0 15 N RRAND 0 12

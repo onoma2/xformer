@@ -1,0 +1,33 @@
+NAME DRUNK WALK
+DRUNK WALK - random-walk melody in the codex turing tradition (general TT2).
+A bounded drunk pointer (0..7) indexes a minor-pentatonic table; gates come
+from a 3-in-8 euclid and a coin toss, so the line wanders but stays in key.
+  M  : X steps the drunk walk. CV 1 = pattern[X] as a note. A counts ticks:
+       3-in-8 euclid -> TR 1. 35% chance -> TR 2 (ghost note).
+  1  : patch IN 1 to re-zero the phase counter.
+Patch: CV 1 -> osc pitch, TR 1 -> envelope, TR 2 -> ghost/accent.
+#I
+M 200
+DRUNK.MAX 7
+SEED 7
+#1
+A 0
+#M
+X DRUNK
+CV 1 N P X
+A ADD A 1
+IF ER 3 8 A: TR.P 1
+PROB 35: TR.P 2
+#P
+8	0	0	0
+1	1	1	1
+0	0	0	0
+7	0	0	0
+0	0	0	0
+3	0	0	0
+5	0	0	0
+7	0	0	0
+10	0	0	0
+12	0	0	0
+15	0	0	0
+19	0	0	0
