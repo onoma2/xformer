@@ -4,6 +4,9 @@
 
 ## [0.7.9]
 
+> **⚠️ BREAKING CHANGE — projects are NOT backward compatible.**
+> Projects saved with **0.6.0 (or earlier) will not load** on 0.7.9: the project format/version changed and loading now strictly rejects older versions. **Back up and re-create your projects** before updating.
+
 ### Added
 - **Stochastic Track** (inspired by Stochastic Inspiration Generator / Proteus / Vermona meloDICER): probabilistic rhythm + melody, Live re-rolls / Loop locks, scale-degree & duration tickets, pitch-bell distribution, burst clusters, per-cycle evolution (patience/mutate/jump/sleep)
 - **PhaseFlux Track** (inspired by IoLabs Flux): 16-cell (4×4) pulse synthesizer — per-stage temporal + pitch curves, 8 grid-traversal patterns, note/pulse accumulators, Cell/Global pitch modes, macro nudges
