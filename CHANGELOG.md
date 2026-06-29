@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [0.7.9]
+
+### Added
+- **Stochastic Track** (inspired by Stochastic Inspiration Generator / Proteus / Vermona meloDICER): probabilistic rhythm + melody, Live re-rolls / Loop locks, scale-degree & duration tickets, pitch-bell distribution, burst clusters, per-cycle evolution (patience/mutate/jump/sleep)
+- **PhaseFlux Track** (inspired by IoLabs Flux): 16-cell (4×4) pulse synthesizer — per-stage temporal + pitch curves, 8 grid-traversal patterns, note/pulse accumulators, Cell/Global pitch modes, macro nudges
+- **Fractal Track** (inspired by Qu-Bit Bloom 2): section-sampled CV/gate looper — captures another track with its feel (Event cadence + Feel fidelity), reshapes via chained branch transforms and scale-snapped ornaments
+- **TT2** native Teletype-V2 track + **TT2-Mini** variant (3 scripts, 4 seamless scenes)
+- **Cross-track Teletype ops**: `WPN` (cross-track pattern cell, full PN normalisation) and `WS` (trigger another TT track's script, host-swapped, recursion-capped)
+- **TV shared variable bank**: `TV i` — 16 `int16` values shared across all TT-family tracks (session-global, ephemeral)
+- **Generators**: track-agnostic generator system; **Helical** generator for the Indexed track (Nebulae-2 autoregressive fold-feedback map)
+- **Modulators**: JustF (Just Friends) bank rate-link mode; **Geode** 6-voice rhythmic engine; `MO.*` / `G.*` Teletype ops
+- **Manuals**: firmware-grounded Markdown + self-contained HTML manuals (with OLED screen renders) for every track engine plus Routing, Modulators, and the Generator system; a sounding engine-comparison page
+
+### Changed
+- Firmware version display to 0.7.9
+- README: per-engine Eurorack inspirations, refreshed manual index
+
 ## [0.6.0]
 
 ### Added
