@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Curve Track — manual</title>
+<style>
+  :root{
+    --blue:#2563eb; --amber:#ca8a04; --green:#16a34a; --red:#dc2626; --purp:#7c3aed;
+    --ink:#1a1a1a; --mut:#5b5b5b; --line:#e5e5e5; --card:#ffffff; --bg:#fafafa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; line-height:1.5;}
+  .wrap{max-width:880px; margin:0 auto; padding:32px 24px 90px}
+  h1{font-size:1.75rem; line-height:1.2; margin:0 0 6px}
+  h2{font-size:1.32rem; line-height:1.25; margin:46px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--blue)}
+  h2.geo{border-color:var(--green)}
+  h2.adv{border-color:var(--purp)}
+  h3{font-size:1.06rem; margin:24px 0 6px}
+  .lede{color:var(--mut); font-size:1.05rem; margin:0 0 8px}
+  p{margin:10px 0}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#f0f0f3; padding:1px 5px; border-radius:4px; font-size:.9em}
+  pre{background:#1a1a1a; color:#f0f0f0; padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:.86rem; line-height:1.45; margin:12px 0}
+  pre code{background:none; padding:0; color:inherit; font-size:1em}
+  .kbd{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#1a1a1a; color:#fff; padding:2px 7px; border-radius:5px; font-size:.82em; white-space:nowrap}
+  .tag{display:inline-block; font-size:.7rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:99px; vertical-align:middle}
+  .t-blue{background:#e8effe; color:var(--blue)} .t-amber{background:#fbf1d9; color:var(--amber)}
+  .t-green{background:#e3f5ea; color:var(--green)} .t-purp{background:#efe7fd; color:var(--purp)}
+  .t-red{background:#fdeeee; color:var(--red)}
+
+  .note{border-left:4px solid var(--blue); background:#f3f7ff; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .warn{border-left:4px solid var(--amber); background:#fdf8ec; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .gotcha{border-left:4px solid var(--red); background:#fdeeee; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:.93rem}
+  th,td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top}
+  thead th{background:#e8effe; color:var(--blue)}
+  tbody tr:nth-child(even){background:#fafafa}
+  td code{white-space:nowrap}
+
+  figure{margin:18px 0; text-align:center}
+  figcaption{color:var(--mut); font-size:.85rem; margin-top:6px}
+  .shot{display:block; width:100%; max-width:520px; margin:14px auto 2px; image-rendering:pixelated;
+    border:1px solid #333; border-radius:4px; background:#000}
+  .cap{text-align:center; color:var(--mut); font-size:.84rem; margin:0 0 6px}
+
+  .steps{counter-reset:step; list-style:none; padding:0; margin:14px 0}
+  .steps>li{counter-increment:step; position:relative; padding:12px 12px 12px 56px; margin:10px 0;
+    background:var(--card); border:1px solid var(--line); border-radius:8px}
+  .steps>li::before{content:counter(step); position:absolute; left:12px; top:12px; width:30px; height:30px;
+    border-radius:50%; background:var(--blue); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:.95rem}
+
+  .toc{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:16px 0; columns:2; font-size:.93rem}
+  @media(max-width:620px){.toc{columns:1}}
+  .toc a{color:var(--blue); text-decoration:none} .toc a:hover{text-decoration:underline}
+  .footer{margin-top:48px; padding-top:14px; border-top:1px solid var(--line); color:var(--mut); font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Curve Track — manual</h1>
+<p class="lede">A shape-per-step CV/gate sequencer. Each step is one of 25 curve shapes scaled between Min and Max, with gates derived live from the curve and a per-pattern Chaos / Wavefolder / Filter chain.</p>
+
+<div class="toc">
+  <a href="#p1">1. Overview</a><br>
+  <a href="#p2">2. The Curve Shapes</a><br>
+  <a href="#p3">3. The Signal Chain</a><br>
+  <a href="#p4">4. Gate Generation</a><br>
+  <a href="#p5">5. The Step Edit Page</a><br>
+  <a href="#p6">6. Playback &amp; Timing</a><br>
+  <a href="#p7">7. Track Setup</a><br>
+  <a href="#p8">8. Setup &amp; Routing</a>
+</div>
+
+<h2>Introduction</h2>
+<p>The Curve track is a <strong>shape-per-step CV/gate sequencer</strong>. Each step is not a note but a <strong>curve segment</strong> — one of 25 built-in shapes (ramp, exp, log, smooth, bell, triangle, step, multi-ramp …) scaled between a per-step <strong>Min</strong> and <strong>Max</strong> voltage. As the playhead sweeps a step it reads the shape continuously and emits CV; gates are derived from what the curve <em>does</em> (its peaks, troughs, zero crossings, slope, level) rather than from a stored on/off pattern. On top of the raw shape sits a per-pattern signal chain — <strong>Chaos</strong>, <strong>Wavefolder</strong>, <strong>DJ Filter</strong>, <strong>Crossfade</strong> — and a set of generative <strong>Curve Studio</strong> tools that draw, transform, and gate-stamp whole ranges of steps at once.</p>
+<p>Everything here is grounded in the firmware as built — defaults, ranges, enum members, key bindings, and step-grid maps come from the model, engine, and UI code.</p>
+
+<h3>Prerequisites</h3>
+<ul>
+  <li>Familiarity with the xformer track/sequence/edit page model (<span class="kbd">Page+S2</span> / <span class="kbd">Page+S1</span> / <span class="kbd">Page+S0</span>).</li>
+  <li>Understanding of CV/gate concepts in modular synthesis, and 1V/oct vs. modulation-CV ranges.</li>
+  <li>A free CV output to patch the track to (filter cutoff, VCA, pitch — anything CV-controlled).</li>
+</ul>
+
+<h2 id="p1">Part 1 · Overview</h2>
+<p>A Curve track plays a sequence of <strong>steps</strong>, but each step holds a <strong>shape</strong>, not a note:</p>
+<ol>
+  <li><strong>Each step</strong> stores a curve <strong>Shape</strong> (one of 25), a <strong>Min</strong> and <strong>Max</strong> level (8-bit, 0..255), a <strong>Gate</strong> event mask, and a <strong>Gate Parameter</strong> (trigger length or advanced-gate mode).</li>
+  <li><strong>The playhead</strong> advances step to step (grid-locked or free-running) and, within each step, sweeps a continuous fraction 0→1 through that step's shape.</li>
+  <li><strong>CV output</strong> is the shape value scaled into Min..Max, pushed through the per-pattern signal chain and limited to ±5V.</li>
+  <li><strong>Gate output</strong> is generated live from the curve: zero crossings, peaks, troughs, slope, or level comparators.</li>
+</ol>
+<p>There is no separate "note" — the curve <em>is</em> the data. A step playing <code>RampUp</code> from Min=0 to Max=255 is a rising ramp across that step; a <code>Bell</code> shape is a single smooth hump.</p>
+
+<h3>The two playback modes</h3>
+<table>
+  <thead><tr><th>Mode</th><th>Advance</th><th>Speed control</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Aligned</strong></td><td>grid-locked: a step lasts exactly <code>divisor</code> ticks</td><td>divisor + clock mult only</td></tr>
+    <tr><td><strong>Free</strong></td><td>phase-accumulator: step advances when an internal phase crosses 1.0</td><td><strong>Curve Rate</strong> (0–4×) modulates speed for audio-rate FM</td></tr>
+  </tbody>
+</table>
+<p>Aligned is quantized and rhythmic. Free is continuous and FM-capable; Curve Rate has no effect in Aligned mode. Both feed the same signal chain and 1kHz output interpolation. Play Mode is a track param (Part 7).</p>
+
+<div class="note"><strong>Where state lives.</strong> Per-step data (shape, shape variation, variation probability, min, max, gate events, gate parameter) lives on each <strong>step</strong>. Per-sequence params (range, divisor, clock mult, reset measure, run mode, first/last step, and the whole Chaos + Wavefolder + Filter + Crossfade chain) live on the <strong>sequence</strong>. Track-wide params (play mode, fill, mute, slide, offset, rotate, curve rate, global phase, the two probability biases) live on the <strong>track</strong>.</div>
+
+<h2 id="p2">Part 2 · The Curve Shapes</h2>
+<p>A step's <strong>Shape</strong> selects one of 25 functions, evaluated over a fraction <code>x</code> (0→1) that runs across the step. The result (0→1) is then scaled into the step's Min..Max.</p>
+<table>
+  <thead><tr><th>#</th><th>Name</th><th>Curve over the step</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>Low</td><td>flat at 0 (bottom)</td></tr>
+    <tr><td>1</td><td>High</td><td>flat at 1 (top)</td></tr>
+    <tr><td>2</td><td>RampUp</td><td>linear rise 0→1</td></tr>
+    <tr><td>3</td><td>RampDown</td><td>linear fall 1→0</td></tr>
+    <tr><td>4</td><td>ExpUp</td><td>exponential rise (x²)</td></tr>
+    <tr><td>5</td><td>ExpDown</td><td>exponential fall ((1−x)²)</td></tr>
+    <tr><td>6</td><td>LogUp</td><td>logarithmic rise (√x)</td></tr>
+    <tr><td>7</td><td>LogDown</td><td>logarithmic fall (√(1−x))</td></tr>
+    <tr><td>8</td><td>SmoothUp</td><td>S-curve rise (smoothstep)</td></tr>
+    <tr><td>9</td><td>SmoothDown</td><td>S-curve fall</td></tr>
+    <tr><td>10</td><td>RampUpHalf</td><td>ramp up in first half, flat 0 in second</td></tr>
+    <tr><td>11</td><td>RampDownHalf</td><td>ramp down in first half, flat 0 in second</td></tr>
+    <tr><td>12</td><td>ExpUpHalf</td><td>exp up in first half, then flat 0</td></tr>
+    <tr><td>13</td><td>ExpDownHalf</td><td>exp down in first half, then flat 0</td></tr>
+    <tr><td>14</td><td>LogUpHalf</td><td>log up in first half, then flat 0</td></tr>
+    <tr><td>15</td><td>LogDownHalf</td><td>log down in first half, then flat 0</td></tr>
+    <tr><td>16</td><td>SmoothUpHalf</td><td>smooth up in first half, then flat 0</td></tr>
+    <tr><td>17</td><td>SmoothDownHalf</td><td>smooth down in first half, then flat 0</td></tr>
+    <tr><td>18</td><td>Triangle</td><td>up then down, single peak at centre</td></tr>
+    <tr><td>19</td><td>Bell</td><td>raised-cosine hump (½−½·cos)</td></tr>
+    <tr><td>20</td><td>StepUp</td><td>0 for first half, jumps to 1</td></tr>
+    <tr><td>21</td><td>StepDown</td><td>1 for first half, drops to 0</td></tr>
+    <tr><td>22</td><td>ExpDown2x</td><td>two exp-down lobes across the step</td></tr>
+    <tr><td>23</td><td>ExpDown3x</td><td>three exp-down lobes</td></tr>
+    <tr><td>24</td><td>ExpDown4x</td><td>four exp-down lobes</td></tr>
+  </tbody>
+</table>
+<p>The shape index range is <code>0..Curve::Last-1</code> (24); the editor clamps to it. The <code>…Half</code> shapes fire in the first half of the step and rest at 0 for the second — one-shot envelopes per step. <code>ExpDown2x/3x/4x</code> pack 2/3/4 decay lobes into a single step.</p>
+
+<h3>Min / Max and inversion</h3>
+<ul>
+  <li><strong>Min</strong> and <strong>Max</strong> are 8-bit (0..255), normalized to 0..1, then denormalized into the sequence's voltage Range.</li>
+  <li>The shape scales as <code>min + value × (max − min)</code>. With <strong>Min &lt; Max</strong> the step rises into its shape; with <strong>Min &gt; Max</strong> the shape is <strong>inverted</strong> (the segment runs downward). Min=0, Max=255 is the default full-range step.</li>
+</ul>
+
+<h3>Shape Variation</h3>
+<p>Each step also stores a <strong>Shape Variation</strong> (a second shape index) and a <strong>Variation Probability</strong> (0..8). On each trigger the engine rolls: with probability <code>variationProbability/8</code> (plus the track's Shape P. Bias) the step plays its <strong>variation</strong> shape instead of its main shape — per-step shape randomness without changing the stored main shape.</p>
+
+<h2 id="p3">Part 3 · The Signal Chain</h2>
+<p>After the raw shape is evaluated and scaled, every Curve step's value flows through a fixed per-sequence chain before it reaches the CV output:</p>
+<pre><code>Step Shape → Chaos mix → Wavefolder → DJ Filter → Crossfade → Limiter (±5V) → 1kHz interp → Slide → CV out</code></pre>
+
+<h3>Chaos</h3>
+<p>A generative source mixed in <em>before</em> the wavefolder. It crossfades between the clean shape and a chaotic signal, so at 100% Amount you hear pure chaos and the output always stays in range.</p>
+<table>
+  <thead><tr><th>Param</th><th>Range</th><th>Default</th><th>Role</th></tr></thead>
+  <tbody>
+    <tr><td>Amount (AMT)</td><td>0–100%</td><td>0</td><td>dry/chaos crossfade depth</td></tr>
+    <tr><td>Rate (HZ)</td><td>0–127 → ~0.01–50 Hz</td><td>65</td><td>evolution speed (3-band curve)</td></tr>
+    <tr><td>Param 1 (HEAT)</td><td>0–100</td><td>45</td><td>algorithm parameter A</td></tr>
+    <tr><td>Param 2 (DAMP)</td><td>0–100</td><td>62</td><td>algorithm parameter B</td></tr>
+    <tr><td>Algorithm</td><td>Latoocarfian / Lorenz</td><td>Latoocarfian</td><td>stepped jumps vs. smooth attractor</td></tr>
+    <tr><td>Range</td><td>Mid / Below / Above</td><td>Mid</td><td>centre of the wiggle (mid / bottom-quarter / top-quarter)</td></tr>
+  </tbody>
+</table>
+<p>Latoocarfian has a stepped sample-and-hold character; Lorenz flows smoothly. The Range offset shifts the chaos centre into the bottom or top quarter of the voltage range.</p>
+
+<h3>Wavefolder</h3>
+<table>
+  <thead><tr><th>Param</th><th>Range</th><th>Default</th><th>Role</th></tr></thead>
+  <tbody>
+    <tr><td>Fold (FOLD)</td><td>0.00–1.00</td><td>0.00</td><td>folding amount (sine-based, exp-curved); 0 = bypass</td></tr>
+    <tr><td>Gain (GAIN)</td><td>0.00–2.00</td><td>0.00</td><td>input gain into the folder (mapped to internal 1×–5×)</td></tr>
+  </tbody>
+</table>
+<p>With Fold at 0 the folder is bypassed.</p>
+
+<h3>DJ Filter</h3>
+<p><code>FILTER</code>, one knob, <strong>−1.00..+1.00</strong>, default 0:</p>
+<ul>
+  <li><strong>0 (centre)</strong>: dead zone, filter off.</li>
+  <li><strong>Negative</strong>: low-pass (more negative = lower cutoff).</li>
+  <li><strong>Positive</strong>: high-pass.</li>
+</ul>
+<p>The filter state is always computed (so it tracks the signal), but only applied when the control leaves the dead zone.</p>
+
+<h3>Crossfade</h3>
+<p><code>XFADE</code>, <strong>0.00..1.00</strong>, default <strong>1.00</strong> (fully wet). It blends the <strong>original phased shape</strong> (dry, pre-Chaos/folder/filter) against the <strong>processed</strong> signal. At 0.00 you hear the clean shape; at 1.00 the full processed chain. XFADE is <strong>non-routable</strong> (UI-only).</p>
+
+<h3>Limiter, interpolation, slide</h3>
+<p>The processed voltage is hard-clamped to <strong>±5V</strong>. The tick-rate sample is then linearly interpolated to ~1kHz to remove staircase artifacts, and finally passed through the track's <strong>Slide</strong> slew limiter (if Slide Time &gt; 0) plus the track <strong>Offset</strong>.</p>
+
+<h2 id="p4">Part 4 · Gate Generation</h2>
+<p>Curve tracks have <strong>no stored gate pattern</strong>. Gates are generated live from the curve each tick, driven by two per-step fields: the <strong>Gate event mask</strong> (4 bits) and the <strong>Gate parameter</strong> (0..7). The mask being zero or non-zero selects between two modes.</p>
+
+<h3>Event mode (mask ≠ 0)</h3>
+<p>When any event bit is set, the engine fires a <strong>trigger pulse</strong> when that curve event occurs. The pulse length comes from the gate parameter (exponential): <code>4 &lt;&lt; param</code> ticks, i.e. 4, 8, 16, 32, 64, 128, 256, 512 ticks.</p>
+<table>
+  <thead><tr><th>Bit</th><th>Constant</th><th>Event</th></tr></thead>
+  <tbody>
+    <tr><td>0 (1)</td><td>Peak</td><td>end of a rise (rising → flat/falling)</td></tr>
+    <tr><td>1 (2)</td><td>Trough</td><td>end of a fall (falling → flat/rising)</td></tr>
+    <tr><td>2 (4)</td><td>ZeroRise</td><td>upward zero crossing</td></tr>
+    <tr><td>3 (8)</td><td>ZeroFall</td><td>downward zero crossing</td></tr>
+  </tbody>
+</table>
+
+<h3>Advanced mode (mask = 0)</h3>
+<p>When the mask is zero, the gate parameter (0..7) selects a continuous <strong>gate mode</strong> that holds the gate high while a condition is true:</p>
+<table>
+  <thead><tr><th>Param</th><th>Mode</th><th>Gate high when</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>Off</td><td>never (no gate)</td></tr>
+    <tr><td>1</td><td>RisingSlope</td><td>curve is rising</td></tr>
+    <tr><td>2</td><td>FallingSlope</td><td>curve is falling</td></tr>
+    <tr><td>3</td><td>AnySlope</td><td>curve is moving (rising or falling)</td></tr>
+    <tr><td>4</td><td>Compare25</td><td>level &gt; 25% of range</td></tr>
+    <tr><td>5</td><td>Compare50</td><td>level &gt; 50% of range</td></tr>
+    <tr><td>6</td><td>Compare75</td><td>level &gt; 75% of range</td></tr>
+    <tr><td>7</td><td>Window</td><td>level between 25% and 75%</td></tr>
+  </tbody>
+</table>
+<div class="note">A muted Curve step silences both gate and CV (the CV target follows Mute Mode — Part 7). Fill can pass the gate even while muted.</div>
+
+<h2 id="p5">Part 5 · The Step Edit Page</h2>
+<p><span class="kbd">Page+S0</span> opens the Curve <strong>STEPS</strong> page. It is a single page with several <strong>edit modes</strong> cycled by <span class="kbd">F5</span>; F1–F4 pick the active per-step layer, the step keypad selects steps, and the encoder edits the selected step(s) on the active layer.</p>
+
+<h3>The layers (F1–F4)</h3>
+<p>The footer shows <strong>SHAPE · MIN · MAX · GATE · PHASE</strong>. F1–F4 select layers; F5 cycles edit modes (Step → Phase → Wavefolder → Chaos → back).</p>
+<ul>
+  <li><span class="kbd">F1</span> SHAPE — cycles <strong>Shape → Shape Variation → Variation Probability</strong> on repeated presses (<span class="kbd">Shift+F1</span> jumps straight to Shape). In the variation layers the main shape is dimmed and the variation shape drawn bright.</li>
+  <li><span class="kbd">F2</span> MIN — edit each step's Min level. The Min line is drawn across the curve.</li>
+  <li><span class="kbd">F3</span> MAX — edit each step's Max level.</li>
+  <li><span class="kbd">F4</span> GATE — cycles <strong>Gate Mode (parameter) → Gate Events (mask)</strong>. "GATE EVENTS" edits the Peak/Trough/Zero bit mask; "GATE MODE" edits the trigger length / advanced mode.</li>
+  <li><span class="kbd">F5</span> PHASE/NEXT — cycles the edit mode: <strong>Step → Global Phase → Wavefolder → Chaos → Step</strong>.</li>
+</ul>
+<p>Holding the active function key while turning the encoder on <strong>MIN/MAX</strong> moves Min and Max <strong>together</strong>. On the Min/Max layers a single unpersisted selected step is <strong>monitored</strong> — its level is driven to the output so you can dial it by ear.</p>
+
+<h3>Editing steps</h3>
+<ul>
+  <li><strong>Encoder</strong> on the selected step(s) edits the active layer. On Shape, no shift, ±1 shape index. On Min/Max, ±8 per detent (±1 with Shift or encoder-press for fine).</li>
+  <li><strong>Shift + encoder on Shape</strong>, multiple steps selected — builds a <strong>multi-step shape</strong>: the selection is rasterized into an ascending Min/Max staircase of the chosen shape.</li>
+  <li><strong>Shift + encoder on Min/Max</strong>, multiple steps selected — <strong>gradient edit</strong>: turning sets the last step's value and interpolates a linear ramp from the first selected step to it.</li>
+  <li><strong>Double-press a step</strong> (any layer, no shift) — toggles a <strong>Peak+Trough</strong> gate at 128-tick length (67% of beat), or clears it if already set.</li>
+</ul>
+
+<h3>Encoder edit-mode panels (F5)</h3>
+<p>Beyond Step, <span class="kbd">F5</span> reaches three full-width panels. In each, F1–F4 select a column; the encoder edits the focused column (press-turn to move the cursor).</p>
+<ul>
+  <li><span class="tag t-blue">Global Phase</span> Offsets the whole sequence read position 0–100% (canon / phase-shift). It is a <strong>track</strong> param.</li>
+  <li><span class="tag t-purp">Wavefolder</span> columns <strong>FOLD · GAIN · FILTER · XFADE · NEXT</strong> — the four signal-chain params (Part 3).</li>
+  <li><span class="tag t-amber">Chaos</span> columns <strong>AMT · HZ · HEAT · DAMP · NEXT</strong>. <span class="kbd">Shift+F1</span> cycles the Chaos <strong>Range</strong> (Mid/Below/Above); <span class="kbd">Shift+F2</span> cycles the <strong>Algorithm</strong>.</li>
+</ul>
+
+<h3>Step keypad and quick-edit</h3>
+<ul>
+  <li><span class="kbd">S1–S16</span> select steps (the curve and detail readouts follow the selection).</li>
+  <li><strong>Left / Right</strong> move the visible <strong>section</strong> of 16 steps (the sequence holds up to 64). <strong>Shift + Left/Right</strong> shifts the selected steps' data.</li>
+  <li><span class="kbd">Page + S9–S16</span> open the <strong>quick-edit</strong> overlay for, in order: First Step, Last Step, Run Mode, Divisor, Reset Measure, Range (last two slots inert).</li>
+</ul>
+
+<h3>Curve Studio shortcuts (Page + step)</h3>
+<p>Four context menus stamp whole step ranges. With no selection they act on the loop range; with a single step selected they run from that step to the loop end; with multiple steps selected they act on the selection.</p>
+<table>
+  <thead><tr><th>Shortcut</th><th>Menu</th><th>Items</th></tr></thead>
+  <tbody>
+    <tr><td><span class="kbd">Page + S5</span></td><td>LFO</td><td>TRI · SINE · SAW · SQUA · MM-RND (single-cycle waveforms; MM-RND randomizes Min/Max)</td></tr>
+    <tr><td><span class="kbd">Page + S4</span></td><td>Macro</td><td>MM-INIT · M-FM · M-DAMP · M-BOUNCE · M-RSTR (multi-step rasterized shapes)</td></tr>
+    <tr><td><span class="kbd">Page + S6</span></td><td>Transform</td><td>T-INV · T-REV · T-MIRR · T-ALGN · T-WALK (invert / reverse / mirror / align / smooth walk)</td></tr>
+    <tr><td><span class="kbd">Page + S14</span></td><td>Gate Presets</td><td>ZC+ · EOC/EOR · RISING · FALLING · &gt;50% (stamp gate events/modes onto the range)</td></tr>
+  </tbody>
+</table>
+<p>(Step indices are 0-based key positions; on the panel these are buttons 5, 6, 7, 15.)</p>
+
+<h3>Context menu (long-press)</h3>
+<p>In Step / Global-Phase mode: <strong>INIT · COPY · PASTE · DUPL · GEN</strong> (init steps, copy/paste step selection, duplicate the loop, run the sequence generator). In Wavefolder / Chaos mode the menu becomes <strong>INIT · RAND · COPY · PASTE</strong> acting on that panel's params.</p>
+
+<h3>LEDs</h3>
+<ul>
+  <li><strong>Steps S1–S16</strong>: red = current playing step or selected step; green = step has a gate event set, or is selected.</li>
+  <li>The selected sequence <strong>section</strong> is shown via the section LEDs.</li>
+  <li>While <span class="kbd">Page</span> is held: S9–S16 light green where a quick-edit slot is mapped, and the four Curve Studio shortcut keys (5, 6, 7, 15) light <strong>yellow</strong>.</li>
+</ul>
+
+<h2 id="p6">Part 6 · Playback &amp; Timing</h2>
+<p>These per-sequence params govern how the loop is read.</p>
+<table>
+  <thead><tr><th>Param</th><th>Range</th><th>Default</th><th>Role</th></tr></thead>
+  <tbody>
+    <tr><td>First Step</td><td>0–63</td><td>0 (shown as 1)</td><td>loop start</td></tr>
+    <tr><td>Last Step</td><td>0–63</td><td>15 (shown as 16)</td><td>loop end</td></tr>
+    <tr><td>Run Mode</td><td>Forward / Backward / Pendulum / PingPong / Random / Random Walk</td><td>Forward</td><td>traversal order</td></tr>
+    <tr><td>Divisor</td><td>1–768</td><td>192</td><td>ticks per step (Aligned); base step duration (Free)</td></tr>
+    <tr><td>Clock Mult</td><td>50–150%</td><td>100% (1.00×)</td><td>scales the divisor timing</td></tr>
+    <tr><td>Reset Measure</td><td>off / 1–128 bars</td><td>off</td><td>hard reset every N bars</td></tr>
+    <tr><td>Range</td><td>1V…5V Unipolar / 1V…5V Bipolar</td><td>5V Bipolar</td><td>output voltage range</td></tr>
+  </tbody>
+</table>
+<p><strong>True reverse</strong>: in Backward (and the down-leg of Pendulum/PingPong) the engine inverts the step fraction too, so the <em>shape</em> plays backwards, not just the step order. Pendulum and PingPong make seamless loops.</p>
+<p><strong>Rotate</strong> (track param, −64..64) rotates which physical step maps to each sequence position, without moving the loop window.</p>
+
+<h2 id="p7">Part 7 · Track Setup</h2>
+<p>These live on the <strong>track</strong> (<span class="kbd">Page+S2</span>), shared across all of the track's patterns.</p>
+<table>
+  <thead><tr><th>Param</th><th>Range</th><th>Default</th><th>Role</th></tr></thead>
+  <tbody>
+    <tr><td>Play Mode</td><td>Aligned / Free</td><td>—</td><td>grid-locked vs. phase-accumulator (FM)</td></tr>
+    <tr><td>Fill Mode</td><td>None / Variation / Next Pattern / Invert</td><td>—</td><td>what a fill substitutes</td></tr>
+    <tr><td>Mute Mode</td><td>Last Value / 0V / Min / Max</td><td>—</td><td>CV level while muted</td></tr>
+    <tr><td>Slide Time</td><td>0–100%</td><td>—</td><td>slew between step values</td></tr>
+    <tr><td>Offset</td><td>−5.00..+5.00V</td><td>—</td><td>DC offset added to the output</td></tr>
+    <tr><td>Rotate</td><td>−64..+64</td><td>—</td><td>rotate step-to-position mapping</td></tr>
+    <tr><td>Shape P. Bias</td><td>−8..+8 (×12.5%)</td><td>—</td><td>global bias on shape-variation probability</td></tr>
+    <tr><td>Gate P. Bias</td><td>−8..+8 (×12.5%)</td><td>—</td><td>global bias on gate probability</td></tr>
+    <tr><td>Curve Rate</td><td>0.00–4.00×</td><td>1.00×</td><td>Free-mode speed multiplier (no effect in Aligned)</td></tr>
+    <tr><td>Global Phase</td><td>0.00–1.00</td><td>0</td><td>sequence-wide read-position offset</td></tr>
+  </tbody>
+</table>
+<p><strong>Mute Mode</strong> sets where the CV parks when the track is muted: hold the last value, snap to 0V, or snap to the bottom/top of the range. <strong>Curve Rate</strong> only acts in Free mode; a minimum of 8 ticks/step is enforced so fast rates stay clean.</p>
+
+<h2 id="p8">Part 8 · Setup &amp; Routing</h2>
+<h3>Track-scope list (<span class="kbd">Page+S2</span>)</h3>
+<p><code>CurveTrackListModel</code> — track-wide params, in order:</p>
+<ol>
+  <li>Play Mode</li>
+  <li>Fill Mode</li>
+  <li>Mute Mode</li>
+  <li>Slide Time</li>
+  <li>Offset</li>
+  <li>Rotate</li>
+  <li>Shape P. Bias</li>
+  <li>Gate P. Bias</li>
+  <li>Curve Rate</li>
+  <li>Global Phase</li>
+</ol>
+
+<h3>Sequence-scope list (<span class="kbd">Page+S1</span>)</h3>
+<p><code>CurveSequenceListModel</code> — per-pattern quick-list, in order:</p>
+<ol>
+  <li>First Step</li>
+  <li>Last Step</li>
+  <li>Run Mode</li>
+  <li>Divisor</li>
+  <li>Clock Mult</li>
+  <li>Reset Measure</li>
+  <li>Range</li>
+</ol>
+<p>(The Chaos / Wavefolder / Filter / Crossfade params are not on this quick-list — they are edited on the F5 panels of the step page, Part 5.)</p>
+
+<h3>What is routable</h3>
+<p>A route targeting a Curve track can address these 19 params (the Curve param table). The RoutingPage groups them: Divisor and Clock Mult appear on the CLOCK band, Slide Time and Rotate on the PITCH band; the rest appear on the CURVE band.</p>
+<table>
+  <thead><tr><th>Track-level</th><th>Sequence-level</th></tr></thead>
+  <tbody>
+    <tr><td>Slide Time</td><td>Divisor</td></tr>
+    <tr><td>Offset</td><td>Clock Mult</td></tr>
+    <tr><td>Rotate</td><td>Run Mode</td></tr>
+    <tr><td>Shape P. Bias</td><td>First Step</td></tr>
+    <tr><td>Gate P. Bias</td><td>Last Step</td></tr>
+    <tr><td>Curve Rate</td><td>Wavefolder Fold</td></tr>
+    <tr><td>Phase (Global Phase)</td><td>Wavefolder Gain</td></tr>
+    <tr><td></td><td>DJ Filter</td></tr>
+    <tr><td></td><td>Chaos Amount</td></tr>
+    <tr><td></td><td>Chaos Rate</td></tr>
+    <tr><td></td><td>Chaos Param 1</td></tr>
+    <tr><td></td><td>Chaos Param 2</td></tr>
+  </tbody>
+</table>
+<div class="gotcha"><strong>Not routable:</strong> Play Mode, Fill Mode, Mute Mode, Reset Measure, Range, and the Crossfade (XFADE) control. Per-step fields (shape, min, max, gate) are not routing targets either — they are edited, not modulated.</div>
+
+<div class="footer">Curve Track — xformer firmware manual. Grounded in the model, engine, and UI source.</div>
+
+</div>
+</body>
+</html>

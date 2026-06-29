@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tuesday Track — manual</title>
+<style>
+  :root{
+    --blue:#2563eb; --amber:#ca8a04; --green:#16a34a; --red:#dc2626; --purp:#7c3aed;
+    --ink:#1a1a1a; --mut:#5b5b5b; --line:#e5e5e5; --card:#ffffff; --bg:#fafafa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; line-height:1.5;}
+  .wrap{max-width:880px; margin:0 auto; padding:32px 24px 90px}
+  h1{font-size:1.75rem; line-height:1.2; margin:0 0 6px}
+  h2{font-size:1.32rem; line-height:1.25; margin:46px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--blue)}
+  h2.geo{border-color:var(--green)}
+  h2.adv{border-color:var(--purp)}
+  h3{font-size:1.06rem; margin:24px 0 6px}
+  .lede{color:var(--mut); font-size:1.05rem; margin:0 0 8px}
+  p{margin:10px 0}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#f0f0f3; padding:1px 5px; border-radius:4px; font-size:.9em}
+  pre{background:#1a1a1a; color:#f0f0f0; padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:.86rem; line-height:1.45; margin:12px 0}
+  pre code{background:none; padding:0; color:inherit; font-size:1em}
+  .kbd{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#1a1a1a; color:#fff; padding:2px 7px; border-radius:5px; font-size:.82em; white-space:nowrap}
+  .tag{display:inline-block; font-size:.7rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:99px; vertical-align:middle}
+  .t-blue{background:#e8effe; color:var(--blue)} .t-amber{background:#fbf1d9; color:var(--amber)}
+  .t-green{background:#e3f5ea; color:var(--green)} .t-purp{background:#efe7fd; color:var(--purp)}
+  .t-red{background:#fdeeee; color:var(--red)}
+
+  .note{border-left:4px solid var(--blue); background:#f3f7ff; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .warn{border-left:4px solid var(--amber); background:#fdf8ec; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .gotcha{border-left:4px solid var(--red); background:#fdeeee; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:.93rem}
+  th,td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top}
+  thead th{background:#e8effe; color:var(--blue)}
+  tbody tr:nth-child(even){background:#fafafa}
+  td code{white-space:nowrap}
+
+  figure{margin:18px 0; text-align:center}
+  figcaption{color:var(--mut); font-size:.85rem; margin-top:6px}
+  .shot{display:block; width:100%; max-width:520px; margin:14px auto 2px; image-rendering:pixelated;
+    border:1px solid #333; border-radius:4px; background:#000}
+  .cap{text-align:center; color:var(--mut); font-size:.84rem; margin:0 0 6px}
+
+  .steps{counter-reset:step; list-style:none; padding:0; margin:14px 0}
+  .steps>li{counter-increment:step; position:relative; padding:12px 12px 12px 56px; margin:10px 0;
+    background:var(--card); border:1px solid var(--line); border-radius:8px}
+  .steps>li::before{content:counter(step); position:absolute; left:12px; top:12px; width:30px; height:30px;
+    border-radius:50%; background:var(--blue); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:.95rem}
+
+  .toc{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:16px 0; columns:2; font-size:.93rem}
+  @media(max-width:620px){.toc{columns:1}}
+  .toc a{color:var(--blue); text-decoration:none} .toc a:hover{text-decoration:underline}
+  .footer{margin-top:48px; padding-top:14px; border-top:1px solid var(--line); color:var(--mut); font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Tuesday Track — manual</h1>
+<p class="lede">A generative algorithm sequencer. Run one of 16 named algorithms from a deterministic seed, then reshape its output with loop, skew, glide, trills, masking, and scale.</p>
+
+<div class="toc">
+  <a href="#p1">1. Overview</a><br>
+  <a href="#p2">2. Algorithms</a><br>
+  <a href="#p3">3. Output Shaping</a><br>
+  <a href="#p4">4. Loop, Rotate, Skew, Start</a><br>
+  <a href="#p5">5. The Mask System</a><br>
+  <a href="#p6">6. Timing</a><br>
+  <a href="#p7">7. The Edit Page</a><br>
+  <a href="#p8">8. List View &amp; Routing</a>
+</div>
+
+<h2>Introduction</h2>
+<p>The Tuesday track stores no fixed step data — instead it runs one of 16 named algorithms (a port of the "Tuesday" generator) that produce notes, gates, and timing on every tick from a deterministic seed. Three knobs — <strong>Flow</strong>, <strong>Ornament</strong>, <strong>Power</strong> — drive that seed and shape the character; everything else (loop length, rotation, skew, glide, trills, masking, scale) reshapes the algorithm's output without touching what it generates.</p>
+<p>The same Flow + Ornament always produce the same sequence until you reseed. So a Tuesday track is reproducible: dial in a phrase you like and it comes back. Reseed when you want a fresh draw of the same algorithm without changing your parameter settings.</p>
+<p>Everything here is grounded in the firmware as built — defaults, ranges, enum members, key bindings, and step-grid maps come from the model, engine, and UI code.</p>
+
+<h3>Prerequisites</h3>
+<ul>
+  <li>Familiarity with the xformer track/sequence/edit page model (<span class="kbd">Page+S2</span> / <span class="kbd">Page+S1</span> / <span class="kbd">Page+S0</span>).</li>
+  <li>Understanding of CV/gate concepts in modular synthesis.</li>
+  <li>A basic grasp of scales and quantization, since Tuesday's output is scale-quantized.</li>
+</ul>
+
+<h2 id="p1">Part 1 · Overview</h2>
+<p>A Tuesday track has <strong>no per-step note data</strong> in the usual sense. Instead it:</p>
+<ol>
+  <li><strong>Seeds</strong> two random generators from Flow and Ornament. Generation is deterministic from those seeds.</li>
+  <li><strong>Generates</strong> a note, octave, gate, and timing every step by running the selected algorithm against its internal state.</li>
+  <li><strong>Shapes</strong> that output through density (Power), loop/rotate/skew, glide, trills, masking, and scale quantization on the way to CV/gate out.</li>
+</ol>
+<p>It is an algorithmic note source, not a step or sample sequencer. The sequence you hear is computed live, not stored.</p>
+<div class="note"><strong>Where state lives.</strong> Sequence params (algorithm, Flow/Ornament/Power, loop, rotate, skew, glide, trills, gate shaping, start, octave/transpose, divisor, mask) live on the <strong>sequence</strong> — one set per pattern. The scale group (scale / root note / scale rotate) is on the sequence, not the track. The track holds the play mode (Aligned / Free) and the per-pattern sequence array.</div>
+
+<h3>Seed, reset, reseed</h3>
+<ul>
+  <li><strong>Flow</strong> (1-16) seeds the main RNG; <strong>Ornament</strong> (1-16) seeds an auxiliary RNG (with a salt so Flow == Ornament still differs).</li>
+  <li><strong>reset</strong> wipes all engine state and re-seeds both RNGs from the current Flow/Ornament. It runs on track init, loop restart, and the Reset jam button.</li>
+  <li><strong>reseed</strong> (<span class="kbd">Shift+F5</span>, or the RESEED context action) advances both RNGs to a fresh draw and re-initializes the algorithm, keeping Flow/Ornament unchanged — a new random variation of the same setup.</li>
+</ul>
+
+<h2 id="p2">Part 2 · Algorithms</h2>
+<p>The <strong>Algorithm</strong> param selects one of 16 generators (id 0-15). Each has its own note selection, rhythm, and character. Flow and Ornament seed the draw and bias structural decisions; Power gates density.</p>
+<table>
+  <thead><tr><th>#</th><th>Name</th><th>What it generates</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>Test</td><td>Simple stepped reference sequence — octave sweeps or a scale walk. Constant velocity.</td></tr>
+    <tr><td>1</td><td>TriTrance</td><td>Three overlapping polyrhythmic layers on a 3-beat cycle: tight, swung, then accented with grace-note trills.</td></tr>
+    <tr><td>2</td><td>Stomper</td><td>Alternating high/low octave "stomps" with slides and countdown rest periods.</td></tr>
+    <tr><td>3</td><td>Markov</td><td>First-order Markov chain over 8 scale degrees; next note drawn from a transition matrix. Accent always on.</td></tr>
+    <tr><td>4</td><td>Chip1</td><td>Beat-synced chord arpeggio; chord stabs trigger a root/third/fifth trill.</td></tr>
+    <tr><td>5</td><td>Chip2</td><td>Ascending/descending arpeggio with dynamic chord length (3-7 notes) and rhythmic deadtime gaps.</td></tr>
+    <tr><td>6</td><td>Wobble</td><td>Twin phasor (slow + fast) mapped to scale degrees; Ornament controls phase-2 probability, accents get high slide chance.</td></tr>
+    <tr><td>7</td><td>ScaleWlk</td><td>Stateful 7-note scale walker; Flow sets direction (≤7 walks down, &gt;7 walks up). StepTrill fires rapid bursts.</td></tr>
+    <tr><td>8</td><td>Window</td><td>Twin phasor: slow anchor notes/accents over fast texture, with a Markov walk voice and periodic auto-mutation.</td></tr>
+    <tr><td>9</td><td>Minimal</td><td>Burst/silence alternation; burst sections density-gate staccato notes. Conservative glide and trill.</td></tr>
+    <tr><td>10</td><td>Ganz</td><td>Triple phasor (1×/5×/7×) on a 5-tuplet grid with phrase-skip muting and four note-selection modes.</td></tr>
+    <tr><td>11</td><td>Blake</td><td>Stable 4-note motif over an 8-bar breath LFO; real/ghost/whisper articulation and occasional sub-bass drops.</td></tr>
+    <tr><td>12</td><td>Aphex</td><td>Three independent polyrhythms (4/3/5-beat) with a modifier track and a bass-override track; collision stress.</td></tr>
+    <tr><td>13</td><td>Autech</td><td>8-note pattern that mutates by rotation/mirror/inversion/shift on timer expiry; polyrhythm on off-grid beats.</td></tr>
+    <tr><td>14</td><td>StepWave</td><td>Scale-degree walk with polyrhythm; Flow biases direction, Ornament selects rapid vs spread timing.</td></tr>
+    <tr><td>15</td><td>Turing</td><td>Turing shift register with live drift; Power sets flip probability, Ornament sets range.</td></tr>
+  </tbody>
+</table>
+<div class="note">The Edit page footer truncates algorithm names to 7 characters. The List View shows the full name.</div>
+<h3>How Flow / Ornament / Power read</h3>
+<ul>
+  <li><strong>Flow</strong> (0-16) seeds the main RNG and drives big structural choices: mode select, phrase, walk direction, burst/breath lengths, pattern init.</li>
+  <li><strong>Ornament</strong> (0-16) seeds the auxiliary RNG and drives detail: pitch variation, velocity, micro-timing, phase-selection probability, register range.</li>
+  <li><strong>Power</strong> (0-16) is the <strong>density / cooldown</strong> control. The cooldown between notes is <code>17 - Power</code>, so Power 0 means no notes (max cooldown), Power 16 means notes nearly every step. Skew bends Power across the loop (Part 4).</li>
+</ul>
+
+<h2 id="p3">Part 3 · Output Shaping</h2>
+<h3>Gate length and offset</h3>
+<p>The algorithm emits a base gate ratio (nominally 75%, up to 200%). Two knobs scale it:</p>
+<ul>
+  <li><strong>Gate Length</strong> (<code>gateLength</code>, 0-100%, default 50%) scales the algorithm's gate ratio into actual gate-on ticks. Accented notes extend the gate by 50%.</li>
+  <li><strong>Gate Offset</strong> (<code>gateOffset</code>, 0-100%, default 0%) scales the algorithm's intended onset offset. At 50% it applies the algorithm's offset 1×; at 100% it doubles it, pushing the gate later within the step.</li>
+</ul>
+<h3>Glide, Trill, StepTrill</h3>
+<table>
+  <thead><tr><th>Param</th><th>List name</th><th>Range / default</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>Glide</td><td>Glide</td><td>0-100%, default 50%</td><td>Slide probability. When the algorithm flags a slide and Glide &gt; 0, CV interpolates to the target over a slide window (longer with higher Glide).</td></tr>
+    <tr><td>Trill</td><td>Old Trill</td><td>0-100%, default 50%</td><td>Re-trigger probability. Combined with the algorithm's articulation indicator; when it fires the gate ratchets (fires twice). List View only.</td></tr>
+    <tr><td>StepTrill</td><td>Trill (Edit page)</td><td>0-100%, default 0%</td><td>Intra-step subdivision. When the algorithm requests a trill count &gt;1 and StepTrill &gt; 0, the step subdivides into rapid micro-gates with independent pitches.</td></tr>
+  </tbody>
+</table>
+<div class="warn"><strong>Two trills, two layers.</strong> The Edit page "TRILL" knob is <strong>StepTrill</strong> (the new, intra-step subdivision). The List View exposes both: "Trill" (StepTrill) and "Old Trill" (the re-trigger ratchet). They are separate parameters.</div>
+<h3>CV update mode</h3>
+<p><code>CvUpdateMode</code> (List View, <strong>CV Mode</strong>) sets when CV moves:</p>
+<ul>
+  <li><strong>Free</strong> (default) — CV updates every step the algorithm produces a note, even when density gates the gate off. Continuous modulation.</li>
+  <li><strong>Gated</strong> — CV only updates when a gate actually fires. Traditional note-and-rest behavior (the original Tuesday behavior).</li>
+</ul>
+<h3>Scale quantization</h3>
+<p>Output is always quantized. The generated scale degree + octave runs through the selected scale, then Transpose (in scale degrees), Root Note offset, and the Octave offset are applied to reach the final CV.</p>
+<ul>
+  <li><strong>Scale</strong> (Default = project scale, Semitones = chromatic, or a named scale).</li>
+  <li><strong>Root Note</strong> (Default = project root, or C..B).</li>
+  <li><strong>Scale Rotate</strong> (Default = project rotate, or 0-31).</li>
+  <li><strong>Octave</strong> (-10..+10) and <strong>Transpose</strong> (-11..+11).</li>
+</ul>
+
+<h2 id="p4">Part 4 · Loop, Rotate, Skew, Start</h2>
+<h3>Loop length</h3>
+<p><code>LoopLength</code> indexes a fixed table of lengths. Index 0 is <strong>Inf</strong> (infinite/evolving, the default). Indices 1-29 map to: 1-16, then 19, 21, 24, 32, 35, 42, 48, 56, 64, 95, 96, 127, 128 steps.</p>
+<ul>
+  <li><strong>Inf</strong> — the algorithm runs free, never resetting its RNG. Patterns evolve.</li>
+  <li><strong>Finite</strong> — at the loop boundary the engine re-seeds from the initial seed, so the same N-step phrase repeats exactly.</li>
+</ul>
+<h3>Rotate</h3>
+<p><code>Rotate</code> (default 0) cyclically shifts the playback position within a finite loop. Its range is clamped to ±(loop length − 1), so it only applies when Loop is finite — the Edit page shows <strong>N/A</strong> for infinite loops, and rotation is forced to 0.</p>
+<h3>Skew</h3>
+<p><code>Skew</code> (-8..+8, default 0) bends <strong>Power</strong> across the loop:</p>
+<ul>
+  <li>Negative — lower density at the start, higher at the end (ramp up).</li>
+  <li>Positive — higher density at the start, lower at the end (ramp down).</li>
+</ul>
+<h3>Start</h3>
+<p><code>Start</code> (0-16, default 0) delays note generation by that many steps from track start. The mask system can extend this further with prime-number delays (Part 5).</p>
+
+<h2 id="p5">Part 5 · The Mask System</h2>
+<p>Masking filters the algorithm's output on and off in time, carving polyrhythms and rests out of the generated stream. While a tick is masked, the gate stays off.</p>
+<h3>Mask Parameter</h3>
+<p><code>MaskParameter</code> (0-15):</p>
+<ul>
+  <li><strong>0 = ALL</strong> (default) — no masking, every tick allowed.</li>
+  <li><strong>1-14</strong> — prime-number masks. The values, in order, are 2, 3, 5, 11, 19, 31, 43, 61, 89, 131, 197, 277, 409, 599.</li>
+  <li><strong>15 = NONE</strong> — mask everything (silence).</li>
+</ul>
+<p>In FREE mode the mask alternates allow/mask in blocks of <code>maskValue</code> ticks. In the grid-synced modes the masked block is <code>maskValue</code> ticks and the allowed block is derived from a quarter-note grid.</p>
+<h3>Time Mode</h3>
+<table>
+  <thead><tr><th>Mode</th><th>Behavior</th></tr></thead>
+  <tbody>
+    <tr><td>FREE (default)</td><td>Mask toggles purely by tick count, free-running.</td></tr>
+    <tr><td>QRT</td><td>Allowed block aligns to a quarter-note grid.</td></tr>
+    <tr><td>1.5Q</td><td>Allowed block aligns to a 1.5 quarter-note grid.</td></tr>
+    <tr><td>3QRT</td><td>Allowed block aligns to a 3 quarter-note grid.</td></tr>
+  </tbody>
+</table>
+<h3>Mask Progression</h3>
+<table>
+  <thead><tr><th>Mode</th><th>Step</th></tr></thead>
+  <tbody>
+    <tr><td>NO PROG (default)</td><td>Static mask, no advance.</td></tr>
+    <tr><td>PROG+1</td><td>Advance the prime index by 1 per cycle.</td></tr>
+    <tr><td>PROG+5</td><td>Advance by 5.</td></tr>
+    <tr><td>PROG+7</td><td>Advance by 7.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="p6">Part 6 · Timing</h2>
+<table>
+  <thead><tr><th>Param</th><th>Range</th><th>Default</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Divisor</td><td>1-768</td><td>12 (1/16)</td><td>Ticks per step at the hardware clock. Edited by known musical divisors.</td></tr>
+    <tr><td>Clock Mult</td><td>50-150%</td><td>100% (1.00x)</td><td>Scales tempo against the divisor; higher = faster steps.</td></tr>
+    <tr><td>Reset Measure</td><td>0-128 bars</td><td>0 (off)</td><td>Bar-based reset interval. 0 = off.</td></tr>
+    <tr><td>Play Mode</td><td>Aligned / Free</td><td>Aligned</td><td>Track-level. Aligned steps on the tick grid; Free derives the step from wallclock position.</td></tr>
+  </tbody>
+</table>
+<p>The effective step length combines Divisor and Clock Mult: a higher multiplier shortens the divisor and speeds up stepping.</p>
+
+<h2 id="p7">Part 7 · The Edit Page</h2>
+<p>The Edit page (<span class="kbd">Page+S0</span>) shows <strong>3 parameter pages</strong> of 4 slots each, plus a status box and a jam step grid. <span class="kbd">F1-F4</span> select a slot for the encoder; <span class="kbd">F5</span> (NEXT) advances to the next parameter page; <span class="kbd">Shift+F5</span> reseeds.</p>
+<h3>The three parameter pages</h3>
+<table>
+  <thead><tr><th>Page</th><th>F1</th><th>F2</th><th>F3</th><th>F4</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>ALGO (Algorithm)</td><td>FLOW (Flow)</td><td>ORN (Ornament)</td><td>POWER (Power)</td></tr>
+    <tr><td>2</td><td>LOOP (Loop Length)</td><td>ROT (Rotate)</td><td>GLIDE (Glide)</td><td>SKEW (Skew)</td></tr>
+    <tr><td>3</td><td>GATE (Gate Length)</td><td>GOFS (Gate Offset)</td><td>TRILL (StepTrill)</td><td>START (Start)</td></tr>
+  </tbody>
+</table>
+<p>The footer shows the four short names plus <strong>NEXT</strong>; a <code>[page/3]</code> indicator sits to the right and <code>[algo#]</code> above F1. The status box (top right) shows the current note name + gate indicator, the CV voltage, and the step/loop position.</p>
+<h3>Encoder</h3>
+<p>The encoder edits the selected slot's parameter. <strong>Shift</strong> accelerates the percentage params (Glide, Trill, StepTrill, Gate Length, Gate Offset, Clock Mult) by ×10.</p>
+<h3>The jam step grid (S1-S16)</h3>
+<p>The step keypad performs hands-on edits without leaving the page. Top row increases / speeds up, bottom row decreases / slows down:</p>
+<table>
+  <thead><tr><th>Col</th><th>S1-8 (top)</th><th>S9-16 (bottom)</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Octave +</td><td>Octave −</td></tr>
+    <tr><td>2</td><td>Transpose +</td><td>Transpose −</td></tr>
+    <tr><td>3</td><td>Root Note +</td><td>Root Note −</td></tr>
+    <tr><td>4</td><td>Divisor up (straight, faster)</td><td>Divisor down (straight, slower)</td></tr>
+    <tr><td>5</td><td>Divisor up (triplet, faster)</td><td>Divisor down (triplet, slower)</td></tr>
+    <tr><td>6</td><td>Divisor ÷2 (faster)</td><td>Divisor ×2 (slower)</td></tr>
+    <tr><td>7</td><td>Mask +</td><td>Mask −</td></tr>
+    <tr><td>8</td><td>Loop +</td><td>Loop −</td></tr>
+  </tbody>
+</table>
+<p><strong>Shift modifiers:</strong></p>
+<ul>
+  <li><span class="kbd">Shift+S8</span> — Run momentary: while held, the track stops; release restores its prior run state.</li>
+  <li><span class="kbd">Shift+S16</span> — Reset the sequence (shows "RESET").</li>
+</ul>
+<p><strong>LEDs:</strong> top row lights green when the value is above its default (octave/transpose/root up, divisor faster, mask up); bottom row lights red when below.</p>
+<h3>Context menu</h3>
+<p>Long-press the menu button:</p>
+<ul>
+  <li><strong>INIT</strong> — clear the sequence to defaults.</li>
+  <li><strong>RESEED</strong> — fresh seed draw, same Flow/Ornament.</li>
+  <li><strong>RAND</strong> — randomize all sequence parameters.</li>
+  <li><strong>COPY</strong> — copy sequence params to clipboard slot 1.</li>
+  <li><strong>PASTE</strong> — paste from clipboard slot 1.</li>
+</ul>
+<h3>Quick-edit (Page + S9-S16)</h3>
+<p>Holding <span class="kbd">Page</span> plus a bottom-row step performs clipboard/randomize actions:</p>
+<table>
+  <thead><tr><th>Step</th><th>Action</th></tr></thead>
+  <tbody>
+    <tr><td>S9</td><td>Copy to slot 1</td></tr>
+    <tr><td>S10</td><td>Copy to slot 2</td></tr>
+    <tr><td>S11</td><td>Copy to slot 3</td></tr>
+    <tr><td>S12</td><td>Paste from slot 1</td></tr>
+    <tr><td>S13</td><td>Paste from slot 2</td></tr>
+    <tr><td>S14</td><td>Paste from slot 3</td></tr>
+    <tr><td>S15</td><td>Randomize</td></tr>
+    <tr><td>S16</td><td>(inert)</td></tr>
+  </tbody>
+</table>
+<p><strong>LEDs:</strong> copy and randomize steps light; paste steps light only when their clipboard slot holds valid data.</p>
+<div class="note">The clipboard carries algorithm, Flow, Ornament, Power, loop, rotate, glide, skew, gate length, gate offset, StepTrill, start, octave, transpose, root note, divisor, and mask parameter. Other params (scale, time mode, mask progression, CV mode, etc.) are not copied.</div>
+
+<h2 id="p8">Part 8 · List View &amp; Routing</h2>
+<h3>Sequence list (<span class="kbd">Page+S1</span>)</h3>
+<p>The List View hosts every sequence parameter in order: Algorithm, Flow, Ornament, Power, Loop Length, Rotate, Glide, Skew, Gate Length, CV Mode, Old Trill, Start, Octave, Transpose, Divisor, Clock Mult, Reset Measure, Scale, Root Note, Scale Rotate, Mask Param, Time Mode, Mask Prog. The only context action here is <strong>INIT</strong> (clear the sequence).</p>
+<h3>Defaults and ranges</h3>
+<table>
+  <thead><tr><th>Param</th><th>Range</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td>Algorithm</td><td>0-15</td><td>0 (Test)</td></tr>
+    <tr><td>Flow</td><td>0-16</td><td>0</td></tr>
+    <tr><td>Ornament</td><td>0-16</td><td>0</td></tr>
+    <tr><td>Power</td><td>0-16</td><td>0</td></tr>
+    <tr><td>Loop Length</td><td>Inf, 1-128 (29 indices)</td><td>Inf</td></tr>
+    <tr><td>Rotate</td><td>±(loop−1)</td><td>0</td></tr>
+    <tr><td>Glide</td><td>0-100%</td><td>50%</td></tr>
+    <tr><td>Skew</td><td>-8..+8</td><td>0</td></tr>
+    <tr><td>Gate Length</td><td>0-100%</td><td>50%</td></tr>
+    <tr><td>CV Mode</td><td>Free / Gated</td><td>Free</td></tr>
+    <tr><td>Old Trill</td><td>0-100%</td><td>50%</td></tr>
+    <tr><td>StepTrill (Edit "TRILL")</td><td>0-100%</td><td>0%</td></tr>
+    <tr><td>Start</td><td>0-16</td><td>0</td></tr>
+    <tr><td>Octave</td><td>-10..+10</td><td>0</td></tr>
+    <tr><td>Transpose</td><td>-11..+11</td><td>0</td></tr>
+    <tr><td>Divisor</td><td>1-768</td><td>12 (1/16)</td></tr>
+    <tr><td>Clock Mult</td><td>50-150%</td><td>100% (1.00x)</td></tr>
+    <tr><td>Reset Measure</td><td>0-128 bars</td><td>0 (off)</td></tr>
+    <tr><td>Gate Offset</td><td>0-100%</td><td>0%</td></tr>
+    <tr><td>Scale</td><td>Default / Semitones / named</td><td>Default (project)</td></tr>
+    <tr><td>Root Note</td><td>Default / C..B</td><td>Default (project)</td></tr>
+    <tr><td>Scale Rotate</td><td>Default / 0-31</td><td>Default (project)</td></tr>
+    <tr><td>Mask Param</td><td>ALL, 1-14 primes, NONE</td><td>ALL</td></tr>
+    <tr><td>Time Mode</td><td>FREE / QRT / 1.5Q / 3QRT</td><td>FREE</td></tr>
+    <tr><td>Mask Prog</td><td>NO PROG / +1 / +5 / +7</td><td>NO PROG</td></tr>
+  </tbody>
+</table>
+<h3>What is routable</h3>
+<p>These Tuesday params are routing targets (all per-sequence):</p>
+<ul>
+  <li><code>Algorithm</code> (0-15)</li>
+  <li><code>Flow</code> (0-16)</li>
+  <li><code>Ornament</code> (0-16)</li>
+  <li><code>Power</code> (0-16)</li>
+  <li><code>Glide</code> (0-100%)</li>
+  <li><code>Trill</code> (Old Trill, 0-100%)</li>
+  <li><code>StepTrill</code> (0-100%)</li>
+  <li><code>GateLength</code> (0-100%)</li>
+  <li><code>GateOffset</code> (0-100%)</li>
+  <li><code>Rotate</code></li>
+  <li><code>Octave</code></li>
+  <li><code>Transpose</code></li>
+  <li><code>Divisor</code></li>
+  <li><code>ClockMult</code></li>
+  <li><code>Scale</code>, <code>RootNote</code> (via the shared scale targets)</li>
+</ul>
+<div class="gotcha"><strong>Not routable:</strong> Start, Skew, Loop Length, CV Mode, Reset Measure, Scale Rotate, Mask Param, Time Mode, Mask Prog.</div>
+
+<div class="footer">Tuesday Track — xformer firmware manual. Grounded in the model, engine, and UI source.</div>
+
+</div>
+</body>
+</html>

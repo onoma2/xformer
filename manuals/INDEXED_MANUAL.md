@@ -1,439 +1,394 @@
-# Indexed Track User Manual
+# Indexed Track Manual
 
-## 1. Introduction
+## Introduction
 
-The Indexed Track is a sophisticated sequencer track type that maps step indices to discrete output voltages using duration-based timing. Each step has an independent duration in clock ticks (scaled by the sequence divisor) and a note index that determines the output voltage when the step is active.
+The Indexed track is a **free-running, duration-indexed CV/gate sequencer**. Unlike a
+classic grid sequencer where every step occupies one clock pulse, each Indexed step
+carries its own **duration in ticks** and its own **gate length in ticks**. The track
+walks its steps back-to-back, holding each one for exactly as long as its duration says,
+so a sequence is a continuous timeline of variable-length notes rather than a fixed grid.
 
-This track type is ideal for:
-- Precise timing control with arbitrary step durations
-- Complex rhythmic patterns with non-musical divisions
-- CV sequences with custom timing relationships
-- External modulation of step parameters
+A note is stored as a **scale degree index** (`noteIndex`), not as raw volts. The engine
+looks that index up in the active scale at play time, so the same sequence transposes,
+re-scales, and re-roots without rewriting any step.
 
-The Indexed track provides:
-- Up to 48 controllable steps per sequence
-- Independent duration control for each step (0-1023 ticks)
-- Direct voltage lookup without octave math
-- Group-based CV modulation
-- Flexible sync modes
+On top of the steps sit two reshaping systems. **Math** applies an offline operation
+(add, multiply, ramp, randomise, quantise, …) to a target field across a group of steps.
+**Routes** feed two external CV/modulation inputs into duration, gate, or note at play
+time, scoped to step groups. Both are independent of the stored steps — Math rewrites
+them on commit, Routes leave them untouched and modulate live.
 
-## 2. Indexed Track Overview
+This manual is grounded in the firmware as built. Defaults, ranges, enum members,
+key bindings, and step-grid maps are taken from the model, engine, and UI code.
 
-### 2.1 What is Indexed?
+## Prerequisites
 
-The Indexed track creates a sequence where each step has an independent duration and note value. Unlike traditional sequencers that divide a measure into equal parts, each step in an Indexed sequence can have completely different timing, allowing for complex rhythmic patterns and precise timing control.
+Before working with the Indexed track you should have:
 
-Key concepts:
-- **Steps**: 48 controllable positions with independent duration and note values
-- **Durations**: Clock tick counts (0-1023) that determine step length (then scaled by divisor)
-- **Note Indices**: Voltage lookup indices (-63 to +63) that determine output voltage
-- **Groups**: A, B, C, D group membership for conditional CV modulation
+- Familiarity with the xformer track/sequence/edit page model (Page+S2 / Page+S1 / Page+S0).
+- Understanding of CV/gate and 1V/oct concepts in modular synthesis.
+- Comfort with the scale/root-note system, since Indexed notes are scale degrees, not fixed pitches.
 
-### 2.2 Timing System
+---
 
-The Indexed track uses a duration-based timing system:
+# Part 1: Overview
 
-**Step Timer**:
-- Counts up from 0 to the current step's effective duration
-- Effective duration = step duration × divisor
-- When reaching the duration value, advances to the next step
-- Provides precise timing control with tick-level accuracy
+## What the Indexed track is
 
-**Gate Timer**:
-- Counts down from the effective gate length in ticks
-- Effective gate = step gate × divisor
-- Determines how long gate output remains high
-- Gate length is clamped to step duration (OFF = 0, FULL = duration)
+An Indexed sequence is a list of up to **48 steps** (`MaxSteps`). Each step holds four
+fields packed into its data:
 
-**Duration Control**:
-- Each step has its own duration in clock ticks (0-1023)
-- Divisor scales all step durations and gate lengths
-- Allows arbitrary timing relationships while keeping a consistent scale for gate and duration
+- **noteIndex** — a signed scale-degree index, −63..+63, looked up in the active scale.
+- **duration** — how long the step holds, in ticks, 0..1023. 0 means skip.
+- **gateLength** — how long the gate stays high within the step, in ticks, 0..1023 (0 = off / silent).
+- **slide** — a flag that glides CV from the previous note instead of jumping.
 
-### 2.3 Output Modes
+Each step also carries a **group mask** (A/B/C/D, 4 bits) used by Math and Routes to scope
+operations to a subset of steps.
 
-The track has two main output behaviors:
+The track plays by advancing through the active steps in the selected run mode, holding
+each for its duration, and emitting one gate of the chosen length per step. Because steps
+are timed by ticks, not by clock pulses, the total length of a sequence is whatever its
+durations add up to — the edit page shows that running total in bars.
 
-**Gate Mode** (default): CV output only updates when a step becomes active
-**Always Mode**: CV output continuously updates regardless of step changes
+## The three layers of state
 
-## 3. UI Overview
+- **Track-wide params** (play mode, CV update mode, slide time, octave, transpose) live on
+  the **track** — shared across all patterns.
+- **Per-pattern params** (divisor, clock mult, length, loop, run mode, scale group, first
+  step, sync, reset measure, plus the two route configs and the mix mode) live on the
+  **sequence** — one set per w-pattern.
+- The **scale group** (scale / root note / rotate) lives on the **sequence**, not the track.
 
-### 3.1 Main Sequence Page
+---
 
-The main page displays sequence settings:
+# Part 2: Steps & Timing
 
-- **Top Row**: Divisor, Clock Mult, loop mode, active length settings
-- **Middle Row**: Scale selection and root note settings
-- **Bottom Row**: Sync mode and reset measure settings
-- **Context Menu**: Init and Route options via long-press
+## Step fields
 
-### 3.2 Step Editing Page (Page+S2)
+| Field | Range | Notes |
+|---|---|---|
+| noteIndex | −63..+63 | Signed scale degree; 0 = root. Stored as index, resolved to volts at play time. |
+| duration | 0..1023 ticks | 0 = skip (rapid-fired through). |
+| gateLength | 0..1023 ticks | 0 = OFF (silent step). Clamped to ≤ duration. |
+| slide | on/off | Glide CV from previous note using the track Slide Time. |
+| groupMask | A/B/C/D | Per-step group membership for Math/Route scoping. |
 
-The step editing page shows three rows per step:
+Gate length is always clamped to the step's duration: a step can't gate longer than it
+sounds. Setting duration to 0 forces gate to OFF.
 
-- **Note Row**: Edit note index for voltage output (±1 semitone, Shift=±12)
-- **Duration Row**: Edit step duration in ticks (±1 tick, Shift=±divisor)
-- **Gate Row**: Edit gate length in ticks (OFF or 1..1023; FULL equals duration). Normal steps 5 ticks, Shift steps 1.
+## How a step is held
 
-**Function Keys (Step Edit)**:
-- **F1**: Note edit mode
-- **F2**: Duration edit mode; press again to toggle **DUR-TR** (duration transfer)
-- **F3**: Gate edit mode
-- **F4**: Context cycle **SEQ → STEP → GROUPS**
-- **F5**: Math page
-- **Shift+F5**: Routes page
+`triggerStep` reads the active step, applies any route modulation, scales duration and
+gate by the sequence **divisor**, then sets a gate timer. The step is held until its
+elapsed ticks reach its (divisor-scaled) duration, then the engine advances. Advancement
+is driven by the clock's wallclock-derived tick position scaled by the **clock multiplier**,
+so timing stays phase-locked to the transport rather than drifting per tick.
 
-**Groups Context**:
-- **F1-F4**: Toggle group A-D for selected steps
-- **F5**: Back to edit context
+A step with duration 0 is skipped immediately — the engine fires through it and lands on
+the next non-zero step in the same tick.
 
-### 3.3 Footer Controls (Function Keys)
+## Divisor and clock multiplier
 
-**F1 - Clock Settings**:
-- **Divisor**: Time scale (1-768) applied to duration and gate ticks
-- **Clock Mult**: Per-sequence rate multiplier (0.50x-1.50x) that scales tick rate
-- **Loop**: On/Once mode for sequence behavior
-- **Active Length**: Dynamic step count (1-48) for sequence length
+- **Divisor** (`divisor`, 1..768, default **1**) multiplies every step's stored duration
+  and gate. At divisor 1, one stored tick equals one engine tick. Higher divisor stretches
+  the whole sequence proportionally. On the step editor, holding Shift while editing
+  duration nudges by the divisor amount.
+- **Clock Mult** (`clockMultiplier`, 50..150, default **100** = 1.00x) scales playback
+  speed continuously without touching stored durations.
 
-**F2 - Scale Settings**:
-- **Scale**: Project scale or track-specific scale selection
-- **Root**: Root note for chromatic scale mapping (C to B)
-- **First Step**: Rotation offset for sequence starting point
+## Run mode and loop
 
-**F3 - Sync Settings**:
-- **Sync Mode**: Off, Reset (bar-based), External sync
-- **Reset Measure**: Bars to reset sequence position
-- **CV Update**: Gate (only on step change) or Always (continuous)
+- **Run Mode** (`runMode`) uses the shared sequence run-mode traversal (Forward, Reverse,
+  Pendulum, Random, …). Default **Forward**.
+- **Loop** (`loop`, default **on**) — when off, the sequence plays once through its active
+  steps and stops.
+- **First Step** (`firstStep`) is a rotation offset: it shifts which stored step the walk
+  treats as index 0, without moving any data. Range 0..(length−1).
 
-**F4 - Track Settings**:
-- **Octave**: Octave offset for all output voltages
-- **Transpose**: Semitone offset for all output voltages
-- **CV Update**: Gate/Always mode selection
+## Reset and sync
 
-### 3.4 Step Operations
+- **Reset Measure** (`resetMeasure`, 0..128 bars, default **off**) re-aligns the sequence
+  to step 0 every N bars. Edited in powers of two with Shift.
+- **Sync** (`syncMode`) cycles Off / Reset. (An old External mode is retired and behaves as
+  Off; use a Reset route instead.)
 
-Context menu provides:
-- **Insert**: Add new step at cursor position, shifting subsequent steps
-- **Make First**: Set selected step as the sequence start
-- **Delete**: Remove step, shifting subsequent steps
-- **Copy**: Copy current step to clipboard
-- **Paste**: Paste clipboard content to current step
+---
 
-## 4. Step Parameters
+# Part 3: The Edit Page
 
-### 4.1 Duration Parameters
+Page+S0 on an Indexed track opens **INDEXED EDIT**. The 48 steps are split into **3
+sections of 16** (`SectionCount` = 3); the **Left/Right** keys move between sections, and
+the LED ring shows the selected section.
 
-Duration determines how long a step remains active:
+The top of the page is a **timeline bar**: each non-zero step is drawn as a block whose
+**width is its duration** and whose filled inner portion is its **gate length**. The
+currently playing step is medium-bright; selected steps are bright. Below the bar, an info
+line shows total **bars** and the delta to the nearest bar/beat boundary, plus the
+selected step's duration / gate / note (with note name and resolved volts).
 
-**Range**: 0 to 1023 clock ticks
-- 0 duration steps are skipped immediately
-- Higher values create longer step durations
-- Independent for each step in sequence
+## Edit modes (F1-F3)
 
-**Timing Control**:
-- Normal encoder: ±1 tick adjustment
-- Shift + encoder: ±divisor adjustment for musical timing
-- Allows for precise timing relationships
+The footer F-keys pick which field the step keypad and encoder edit:
 
-**Practical Ranges**:
-- 1 tick: Shortest possible step
-- 48 ticks: 32nd note at 192 PPQN (divisor = 1)
-- 192 ticks: Quarter note at 192 PPQN (divisor = 1)
-- 768 ticks: Whole note at 192 PPQN (divisor = 1)
+| Key | Mode | Encoder edits | Shift |
+|---|---|---|---|
+| F1 | **DUR** (Duration) | duration ±1 tick | ± divisor |
+| F1 again | **DUR-TR** (Duration Transfer) | moves ticks from this step to the next (steal/give) | ± divisor |
+| F2 | **GATE** | gate ±5 ticks | ±1 tick (fine) |
+| F3 | **NOTE** | note ±1 degree | ± octave (chromatic scales) |
+| F3 again | **SLIDE** | encoder toggles slide on the selection | — |
 
-### 4.2 Gate Parameters
+F1 and F3 are toggles: pressing them again while already in that mode flips into the
+transfer / slide sub-mode. Selecting a different mode clears those sub-modes.
 
-Gate length determines how long gate output remains high:
+When the Note mode is active and a single step is held (not persisted), that step is
+**monitored** — its CV is forced to the output so you hear the pitch while editing.
 
-**Gate Scale**:
-- OFF (0) keeps the gate low
-- 1..1023 are direct tick lengths
-- FULL equals the step duration
+## Selecting and editing steps
 
-**Clamping**:
-- Gate length is clamped to step duration
-- If you dial past duration it snaps to FULL (display shows duration ticks)
+- **Step keys (S1-S16)** select steps in the current section; multi-select is supported.
+- **Double-press a step** toggles its gate between OFF and the minimum gate length.
+- **Encoder** applies the active edit to all selected steps. With **Shift + multiple
+  steps selected**, the encoder writes a **linear ramp** from the first to the last
+  selected step (for note, duration, or gate).
 
-**Editing**:
-- Normal encoder: coarse steps (5 ticks)
-- Shift + encoder: fine steps (1 tick)
+## Groups (F4 → GRPS)
 
-### 4.3 Note Index Parameters
+**F4** cycles the context: Sequence → Step → Groups. In **Groups** mode the footer becomes
+**A B C D**, and F1-F4 toggle the selected steps' membership in groups A-D. With no steps
+selected, pressing a group key **selects every step in that group**. The page shows each
+group's member count and the focused step's membership.
 
-Note index determines output voltage when step is active:
+## Context menus (F4 = SEQ / STEP)
 
-**Range**: -63 to +63 maps to output voltage
-- Direct lookup in selected scale
-- No octave math or modulo operations
-- -63 = lowest possible voltage, +63 = highest
+In Edit mode, F4 also flips the long-press context menu between **Sequence** scope and
+**Step** scope:
 
-**Scale Mapping**:
-- Based on selected scale and root note settings
-- -63 = lowest scale note, +63 = highest scale note
-- Converted using scale's note-to-voltage mapping
+- **Sequence menu**: INIT (clear sequence), COPY, PASTE, GENER (run a generator into the
+  active field — InitLayer / InitSteps / Euclidean / Random / Helical).
+- **Step menu**: INSERT, MAKE 1ST (rotate so the selected step becomes step 1), DELETE,
+  COPY, PASTE.
 
-## 5. Advanced Features
+## Footer F5 — Math / Routes
 
-### 5.1 Step Operations
+- **F5** opens the **Math** page.
+- **Shift + F5** opens the **Route Config** page.
 
-The Indexed track includes powerful step operations:
+## Quick-edit overlay (Page + S8-S16)
 
-**Insert Function**:
-- Add new step at current position
-- Shifts subsequent steps to the right
-- Clones properties from previous step
+Holding **Page** lights the lower step row as a quick-edit strip:
 
-**Make First Function**:
-- Sets the current step as the sequence start
-- Rotates playback so the selected step is first
+| Step | Action |
+|---|---|
+| S8 | **Split** — hold and turn encoder to choose 2-8 pieces, release to split selected steps |
+| S9 | **Merge** — hold and turn to choose how many following steps to fold into one |
+| S10 | **Swap** — hold and turn to pick an offset, release to swap the selected step with the one that far ahead |
+| S11 | **Run Mode** quick-edit |
+| S12 | **Piano voicing** — hold and turn to pick a chord voicing, release to apply |
+| S13 | **Guitar voicing** — same, guitar bank |
+| S14 | (macro shortcut, see below) |
+| S15 | inert |
 
-**Split Function**:
-- Divides a step's duration into two equal parts
-- First half gets ceil(duration/2), second gets floor(duration/2)
-- Preserves all other step properties
+**Page + S4 / S5 / S6 / S14** open macro context menus directly (yellow LEDs):
 
-**Delete Function**:
-- Removes current step from sequence
-- Shifts subsequent steps to the left
-- Maintains sequence continuity
+- **S4 Rhythm** — Euclidean 3/9, Clave 5/20, Tuplet 7/28, Poly 3-5/5-7, M-TALA (each press alternates short/long cycle).
+- **S5 Waveform** — TRI, 2TRI, 3TRI, 2SAW, 3SAW note contours.
+- **S6 Melodic** — SCALE (asc/desc), ARP, CHORD, MODAL, M-MEL.
+- **S14 Duration/Transform** — D-LOG, D-EXP, Q-MEAS (quantise to bars), REV, MIRR.
 
-### 5.2 Group-Based Modulation
+Macros act on the selected step range, or the whole active length if nothing is selected.
 
-Each step can belong to one or more groups (A, B, C, D):
+**LEDs (edit):** each present step is green; a step with a gate is red; a selected step is
+yellow. The selected section is shown on the ring.
 
-**Group Assignment**:
-- Steps can be in multiple groups simultaneously
-- Groups A-D provide routing targets for CV modulation
-- Groups can be toggled per step
+---
 
-**Route Configuration**:
-- Route A and Route B can target different parameters
-- Targets: Duration, Gate Length, Note Index
-- Amount: -200% to +200% modulation depth
-- Enabled: On/Off for each route
+# Part 4: Math
 
-### 5.3 Route Combination Modes
+**F5** on the edit page opens **MATH** — an offline transform applied to step fields. It
+holds **two operation slots, A and B**, both applied (A then B) when you commit. Math
+edits the stored steps; it is not a live modulation.
 
-Multiple routes can be combined in different ways:
+## Per-slot config
 
-**A to B**: Apply Route A then Route B sequentially
-**Mux**: Average of Route A and Route B values
-**Min**: Use minimum of Route A and Route B values
-**Max**: Use maximum of Route A and Route B values
+Each slot (A/B) has four parameters, picked with F1-F4 (pressing the focused F-key again
+toggles between slot A and B):
 
-### 5.4 Routing Improvements
+| F-key | Param | Members |
+|---|---|---|
+| F1 | **TARGET** | DUR / GATE / NOTE |
+| F2 | **OP** | ADD, SUB, MUL, DIV, SET, RAND, JIT, RAMP, QNT |
+| F3 | **VALUE** | integer; range depends on op+target |
+| F4 | **GROUPS** | which steps the op hits |
 
-Recent updates to the routing system include:
+The encoder edits the focused param. The page shows **N=** the count of steps the slot's
+group selection currently affects.
 
-**Enhanced Indexed Routing**:
-- Improved routing note handling for more accurate modulation
-- Better integration between groups and routing parameters
-- Corrected routing source selection for Indexed tracks
-- Enhanced LED feedback for routing status
+## The 9 operators
 
-**Group Routing Enhancements**:
-- More responsive group assignment
-- Improved visual feedback when groups are active
-- Better handling of multiple simultaneous group assignments
+| Op | Effect |
+|---|---|
+| ADD | field + value |
+| SUB | field − value |
+| MUL | field × value |
+| DIV | field ÷ value (value ≥ 1) |
+| SET | field = value |
+| RAND | field = random in 0..value |
+| JIT | field += random in ±value |
+| RAMP | linear ramp of `value` spread across the affected steps (first→last) |
+| QNT | round field to nearest multiple of value |
 
-### 5.5 Math Operations (F5)
+Value ranges clamp to the target: duration/gate to 1023 ticks, note to −63..+64;
+MUL/DIV cap at 400. The Value step size honours Shift (×10 for MUL/DIV, ± divisor for
+duration, ±5 for gate, ± octave for note).
 
-The Math page allows you to apply batch operations to selected steps (or all steps/groups).
+## Group scope
 
-**Available Operations**:
-- **Add/Sub/Mul/Div**: Basic arithmetic
-- **Set**: Set all values to a fixed number
-- **Rand**: Randomize values
-- **Jitter**: Add random jitter to existing values
-- **Ramp**: Create a linear ramp across selected steps (start to end)
-- **Quant**: Quantize values to nearest multiple (e.g., quantize duration to 16 ticks)
+GROUPS cycles A, B, C, D individually, the 1-15 combined masks, then **UNGR** (ungrouped
+steps only), **SEL** (the steps that were selected on the edit page when Math opened), and
+**ALL**. Default **ALL**.
 
-## 6. External CV Modulation
+## Commit
 
-### 6.1 Setup for External CV
+**F5** reads **COMMIT** when either slot changed; pressing it applies A then B to every
+matching step, then resets both slots. With no change, F5 / Shift+F5 just exits. (A
+hardware keyboard's Enter commits, Escape cancels.)
 
-To use external CV modulation with Indexed track:
+---
 
-1. Configure Route A or Route B parameters
-2. Set target groups (A-D) that will respond to this route
-3. Select target parameter (Duration/Gate/Note)
-4. Set modulation amount (-200% to +200%)
-5. Enable the route
-6. Route CV sources to IndexedA or IndexedB targets
+# Part 5: Routes (live modulation)
 
-### 6.2 Applications
+**Shift+F5** on the edit page opens **ROUTE CONFIG**. Routes feed two external CV inputs
+— **Indexed A** and **Indexed B** — into step fields at play time, leaving the stored
+steps untouched. There are two route slots (**Route A**, **Route B**) plus a **Mix** mode.
 
-**Duration Modulation**:
-- LFOs can stretch or compress step timing
-- Envelopes can dynamically change sequence speed
-- Random CV creates timing variations
+## Per-route config
 
-**Gate Length Modulation**:
-- LFOs can modulate note lengths
-- Envelopes can create dynamic gate patterns
-- Random CV varies note durations
+Each route (A/B) has four parameters, picked with F1-F4 (re-pressing the focused F-key
+swaps between Route A and Route B):
 
-**Note Index Modulation**:
-- External CV transposes entire sequences
-- LFOs create pitch vibrato
-- Envelopes create pitch bends
+| F-key | Param | Members |
+|---|---|---|
+| F1 | **SOURCE** | OFF / A / B — which CV input (Indexed A or Indexed B) drives this route |
+| F2 | **GROUPS** | which steps the route modulates |
+| F3 | **TARGET** | DUR / GATE / NOTE |
+| F4 | **AMOUNT** | −200%..+200%, default +100% |
 
-## 7. Internal Sequencing
+A route is active only when its source is not OFF and the step matches its group mask.
+The page shows **N=** affected steps. Left/Right moves focus between Route A, Route B, and
+Mix.
 
-### 7.1 Duration-Based Sequencing
+## How modulation is applied
 
-The Indexed track uses accumulator-based timing:
-- Step timer counts up to current step's duration
-- When threshold reached, advances to next step
-- Gate timer counts down independently from calculated gate duration
+The two CV inputs (`Indexed A` / `Indexed B`) are routing targets fed from the global
+routing system (each −100..+100, scaled to ±1.0). At trigger time each active route scales
+its CV input by its amount and applies it to the chosen field:
 
-### 7.2 Loop vs Once Mode
+- **Duration** — percentage scaling: `1.0 + mod` multiplies the stored duration.
+- **NoteIndex** — 100% amount equals one octave in the current scale (modulation scaled by
+  notes-per-octave).
+- **GateLength** — additive tick offset.
 
-**Loop Mode**:
-- Sequence restarts from first step after last step
-- Continuous playback of entire sequence
-- Good for rhythmic patterns
+## Mix mode
 
-**Once Mode**:
-- Sequence stops after reaching last step
-- Gate goes low when sequence stops
-- Good for one-time melodic phrases
+When both routes target the **same** parameter, the **Mix** mode (encoder to change)
+decides how the two contributions combine:
 
-### 7.3 Sync Modes
+| Mode | Result |
+|---|---|
+| AtoB | sequential — both add (default) |
+| MUX | average of A and B |
+| MIN | min(A, B) |
+| MAX | max(A, B) |
 
-**Off**: No external sync, runs independently
-**Reset Measure**: Reset to first step at specified bar intervals
-**External**: Reset to first step on external gate/clock input
+If the routes hit different fields, each is applied independently regardless of Mix.
 
-## 8. Practical Examples
+## Commit
 
-### 8.1 Basic Rhythmic Pattern
+**F5** reads **COMMIT** when staged config differs from what's saved; pressing it writes
+Route A, Route B, and Mix into the sequence. Shift+F5 cancels. Routes are committed config,
+not auto-applied while you edit.
 
-1. Set up 8 steps with varying durations
-2. Assign gate length around half the duration (e.g., 96 ticks for 192-tick steps)
-3. Set different note indices for CV output
-4. Set Loop mode to On for continuous playback
-5. Use short durations for fast notes, longer for sustained notes
+---
 
-### 8.2 External LFO Modulation
+# Part 6: Output & Voltage
 
-1. Create sequence with moderate durations
-2. Set up Route A to target Duration
-3. Assign steps to Group A
-4. Route external LFO to IndexedA target
-5. Set modulation amount to ±50%
-6. LFO will stretch and compress timing
+## Note resolution
 
-### 8.3 Polyrythmic Sequence
+A step's CV is computed by looking its `noteIndex` up in the active scale, after adding
+the track's **octave** (× notes-per-octave) and **transpose** (semitones). For chromatic
+scales the **root note** offset is added in volts. The sequence's scale/root override the
+project's; when set to default they fall back to the project scale group.
 
-1. Create sequence with different duration ratios (e.g., 3:4:5)
-2. Use different note indices for musical interest
-3. Set appropriate gate lengths for desired note overlap
-4. Use external sync for precise timing with other tracks
+## CV update mode
 
-## 9. Shortcuts and Tips
+`CvUpdateMode` (track param) controls when CV refreshes:
 
-### 9.1 Quick Navigation
+- **Gate** (default) — CV updates only on gated steps.
+- **Always** — CV updates on every step, even silent ones, and keeps emitting CV while muted.
 
-- **Page+S1**: Jump to sequence settings page
-- **Page+S2**: Jump to step editing page
-- **Page+S3**: Jump to track settings page
-- **Context Menu**: Long press on context key for options
+## Slide
 
-### 9.2 Quick Edit (Page+Steps 8-15)
+A step's **slide** flag, with the track **Slide Time** (0..100%), glides CV from the
+previous value to the new note over time instead of stepping. Slide Time 0 disables the
+glide even on slide steps.
 
-- **Page+Step 8**: Split (requires step selection)
-- **Page+Step 9**: Merge with next (first selected step only)
-- **Page+Step 10**: Swap (hold + encoder to choose offset, release to apply)
-- **Page+Step 11**: Run Mode (quick edit list)
-- **Page+Step 12**: Piano Voicings (hold + encoder)
-- **Page+Step 13**: Guitar Voicings (hold + encoder)
-- **Steps 14-15**: Reserved for macros
+## Play mode
 
-**Voicing Quick Edit**:
-- Hold the quick edit key and turn the encoder to choose a voicing, release to apply
-- "OFF" leaves notes unchanged
-- "ROOT" uses the first selected step's note index as the root
-- "C0" uses the track/project root from C0 (non-accumulating)
-- One selected step applies across active steps; multiple selected steps apply only to those steps
+`PlayMode` (track param): **Aligned** (default) or **Free** — both advance by duration off
+the wallclock tick position; Aligned stays phase-locked to the transport.
 
-### 9.3 Macro Shortcuts (Page+Steps 4, 5, 6, 14)
+## Mute and activity
 
-Macros provide powerful generative and transformative operations on sequences. All macros operate on:
-- **Selected steps** (if any are selected)
-- **Full active length** (if no selection)
+Muting gates the audible output (gate drops, and CV holds unless CV Update is Always).
+Activity reflects the **pre-mute intended gate** — whether the step *would* have gated —
+so a muted Indexed track still reports activity as a potential source for other tracks.
 
-**Page+Step 4 - Rhythm Generators** (YELLOW LED):
-- **3/9**: Cycles even subdivisions with 3 steps, then 9 steps (fills 768 ticks)
-- **5/20**: Cycles even subdivisions with 5 steps, then 20 steps (fills 768 ticks)
-- **7/28**: Cycles even subdivisions with 7 steps, then 28 steps (fills 768 ticks)
-- **3-5/5-7**: Cycles grouped patterns (3+5) and (5+7), each fit to 768 ticks
-- **M-TALA**: Cycles Khand (5+7), Tihai (2-1-2 x3), Dhamar (5-2-3-4)
+> **Gate-output quirk.** `gateOutput()` returns the **post-mute** gate (it ANDs in
+> `!mute()` and the transport-running flag), while `activity()` returns the pre-mute
+> intended gate. The two disagree while muted: activity reads true on a step that would
+> gate, but the gate output is held low. This is the current behaviour as built.
 
-**Page+Step 5 - Waveforms** (YELLOW LED):
-- **TRI**: Single triangle dip (shorter in the middle, longer at the ends)
-- **2TRI**: Two triangle dips across the range
-- **3TRI**: Three triangle dips across the range
-- **2SAW**: Two saw ramps (short at the start of each segment)
-- **3SAW**: Three saw ramps (short at the start of each segment)
+---
 
-**Page+Step 6 - Melodic Generators** (YELLOW LED):
-- **SCALE**: Scale fill generator - ascending/descending major scale
-- **ARP**: Arpeggio pattern generator - cycles through Up, Down, Up-Down, Triad patterns
-- **CHORD**: Chord progression generator - I-IV-V, I-V-vi, ii-V-I progressions
-- **MODAL**: Modal melody generator - Dorian, Phrygian, Lydian, Mixolydian modes
-- **M-MEL**: Random melody generator - pentatonic scale with random octaves
+# Part 7: Setup & Routing
 
-**Page+Step 14 - Duration & Transform** (YELLOW LED):
-- **D-LOG**: Duration logarithmic curve - slow start, accelerating end
-- **D-EXP**: Duration exponential curve - fast start, slowing end
-- **D-TRI**: Duration triangle curve - accelerate then decelerate
-- **REV**: Reverse step order - mirrors all step properties
-- **MIRR**: Mirror steps around midpoint - copies first half to second half
+## Track-scope list (Page+S2)
 
-**New Macro Features**:
-- **Improved Macro Selection**: Macros now operate more reliably with step selection
-- **Enhanced Rhythm Generators**: Better distribution algorithms for more musical results
-- **Advanced Melodic Generators**: Improved scale and chord generation algorithms
-- **Waveform Macros**: More sophisticated waveform generation with better timing quantization
-- **Macro Persistence**: Macro settings are now properly saved and restored
-- **Enhanced Group Operations**: Better handling of group-based operations in macros
+Track-wide params, hosted by the Indexed track list:
 
-### 9.4 Editing Tips
+- Play Mode (Aligned / Free)
+- CV Update (Gate / Always)
+- Slide Time (0-100%)
+- Octave (−10..+10)
+- Transpose (−60..+60)
 
-- Use Shift+encoder for fine duration adjustments
-- Split function is great for subdividing longer steps
-- Use rotation (First Step) to start sequence from different points
-- Group modulation allows for complex interactions
-- Minimum gate length (1 tick) creates precise short pulses
+## Sequence-scope list (Page+S1)
 
-### 9.4 Performance Considerations
+Per-pattern params:
 
-- Duration calculations use minimal CPU resources
-- Group-based modulation adds some processing overhead
-- Complex scale mappings may have slight performance impact
-- Maximum 48 steps keeps memory usage reasonable
+Divisor, Clock Mult, Length, Active, Loop, Run Mode, Scale, Root Note, Scale Rotate,
+First Step, Sync, Reset Measure.
 
-## 10. Troubleshooting
+(**Length** appends/trims steps; **Active** sets the active step count directly — both read
+out the active length.)
 
-### 10.1 No Output
+## What is routable
 
-- Verify track is not muted
-- Check that sequence has active steps
-- Ensure step durations are not all zero
-- Confirm scale settings are appropriate
+These Indexed params appear as routing targets:
 
-### 10.2 Unexpected Timing
+- **Sequence-scope:** Divisor, Clock Mult, Scale, Root Note, First Step, Run Mode.
+- **Track-scope:** Slide Time, Octave, Transpose.
+- **Modulation inputs:** **Indexed A** and **Indexed B** — the two CV destinations the
+  Route Config page reads. Route these from any routing source to drive duration / gate /
+  note live.
 
-- Check step durations for expected values
-- Verify divisor settings match expectations
-- Ensure loop/once mode is set correctly
-- Check for zero-duration steps that get skipped
+Length, Active, Loop, Sync, Reset Measure, Scale Rotate, Play Mode, and CV Update are not
+routable.
 
-### 10.3 Sync Issues
+## The two reshaping systems at a glance
 
-- Verify sync mode settings
-- Check if external sync source is properly configured
-- Ensure reset measure values are appropriate
-- Confirm sequence is not getting stuck on zero-duration steps
+- **Math (F5)** — offline. Two op slots rewrite stored step fields on commit, group-scoped.
+- **Routes (Shift+F5)** — live. Two CV inputs modulate duration / gate / note at play time,
+  group-scoped, combined via Mix when they target the same field.

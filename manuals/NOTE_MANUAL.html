@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Note Track — manual</title>
+<style>
+  :root{
+    --blue:#2563eb; --amber:#ca8a04; --green:#16a34a; --red:#dc2626; --purp:#7c3aed;
+    --ink:#1a1a1a; --mut:#5b5b5b; --line:#e5e5e5; --card:#ffffff; --bg:#fafafa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; line-height:1.5;}
+  .wrap{max-width:880px; margin:0 auto; padding:32px 24px 90px}
+  h1{font-size:1.75rem; line-height:1.2; margin:0 0 6px}
+  h2{font-size:1.32rem; line-height:1.25; margin:46px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--blue)}
+  h2.geo{border-color:var(--green)}
+  h2.adv{border-color:var(--purp)}
+  h3{font-size:1.06rem; margin:24px 0 6px}
+  .lede{color:var(--mut); font-size:1.05rem; margin:0 0 8px}
+  p{margin:10px 0}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#f0f0f3; padding:1px 5px; border-radius:4px; font-size:.9em}
+  pre{background:#1a1a1a; color:#f0f0f0; padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:.86rem; line-height:1.45; margin:12px 0}
+  pre code{background:none; padding:0; color:inherit; font-size:1em}
+  .kbd{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#1a1a1a; color:#fff; padding:2px 7px; border-radius:5px; font-size:.82em; white-space:nowrap}
+  .tag{display:inline-block; font-size:.7rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:99px; vertical-align:middle}
+  .t-blue{background:#e8effe; color:var(--blue)} .t-amber{background:#fbf1d9; color:var(--amber)}
+  .t-green{background:#e3f5ea; color:var(--green)} .t-purp{background:#efe7fd; color:var(--purp)}
+  .t-red{background:#fdeeee; color:var(--red)}
+
+  .note{border-left:4px solid var(--blue); background:#f3f7ff; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .warn{border-left:4px solid var(--amber); background:#fdf8ec; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .gotcha{border-left:4px solid var(--red); background:#fdeeee; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:.93rem}
+  th,td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top}
+  thead th{background:#e8effe; color:var(--blue)}
+  tbody tr:nth-child(even){background:#fafafa}
+  td code{white-space:nowrap}
+
+  figure{margin:18px 0; text-align:center}
+  figcaption{color:var(--mut); font-size:.85rem; margin-top:6px}
+  .shot{display:block; width:100%; max-width:520px; margin:14px auto 2px; image-rendering:pixelated;
+    border:1px solid #333; border-radius:4px; background:#000}
+  .cap{text-align:center; color:var(--mut); font-size:.84rem; margin:0 0 6px}
+
+  .steps{counter-reset:step; list-style:none; padding:0; margin:14px 0}
+  .steps>li{counter-increment:step; position:relative; padding:12px 12px 12px 56px; margin:10px 0;
+    background:var(--card); border:1px solid var(--line); border-radius:8px}
+  .steps>li::before{content:counter(step); position:absolute; left:12px; top:12px; width:30px; height:30px;
+    border-radius:50%; background:var(--blue); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:.95rem}
+
+  .toc{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:16px 0; columns:2; font-size:.93rem}
+  @media(max-width:620px){.toc{columns:1}}
+  .toc a{color:var(--blue); text-decoration:none} .toc a:hover{text-decoration:underline}
+  .footer{margin-top:48px; padding-top:14px; border-top:1px solid var(--line); color:var(--mut); font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Note Track — manual</h1>
+<p class="lede">The core melodic sequencer. Sixteen steps per pattern, each a stack of per-step layers — pitch, gate, length, probability, retrigger, slide, condition — over sequence-wide scale/timing and track-wide octave/bias params.</p>
+
+<div class="toc">
+  <a href="#p1">1. Overview</a><br>
+  <a href="#p2">2. Per-Step Layers</a><br>
+  <a href="#p3">3. The Edit Page</a><br>
+  <a href="#p4">4. Timing &amp; Traversal</a><br>
+  <a href="#p5">5. Accumulator &amp; Harmony</a><br>
+  <a href="#p6">6. Output &amp; Recording</a><br>
+  <a href="#p7">7. Setup &amp; Routing</a>
+</div>
+
+<h2>Introduction</h2>
+<p>The Note track is the most-featured track in xformer: every other track type borrows its timing, scale, and routing conventions from here. A Note step is not a single value — it is a stack of <strong>per-step layers</strong> edited one at a time, plus <strong>sequence-wide</strong> params (scale, run mode, divisor) and <strong>track-wide</strong> params (octave, transpose, slide time, biases). The engine reads all of them every tick to decide whether the gate fires, how long, at what pitch, and how often.</p>
+<p>Everything here is grounded in the firmware as built — defaults, ranges, enum members, key bindings, and step-grid maps come from the model, engine, and UI code.</p>
+
+<h3>Prerequisites</h3>
+<ul>
+  <li>Familiarity with the xformer track/sequence/edit page model (<span class="kbd">Page+S2</span> / <span class="kbd">Page+S1</span> / <span class="kbd">Page+S0</span>).</li>
+  <li>Understanding of CV/gate concepts in modular synthesis (1V/oct, gate high/low).</li>
+  <li>A grasp of the scale/root-note system — the Note track quantizes its output to a scale.</li>
+</ul>
+
+<h2 id="p1">Part 1 · Overview</h2>
+<p>A Note track holds many patterns (plus snapshot slots). Each pattern is a <code>NoteSequence</code> of 16 <code>Step</code>s. The active pattern plays; its loop window (<code>firstStep</code>..<code>lastStep</code>) is read each clock division according to the run mode.</p>
+<p>Three scopes of state:</p>
+<ul>
+  <li><span class="tag t-blue">Per-step</span> note, gate, gate prob, gate offset, slide, retrigger + prob, length + variation, condition, accumulator trigger, pulse count, gate mode, harmony overrides. One value per step, per layer.</li>
+  <li><span class="tag t-green">Sequence-wide</span> scale group (scale/root/rotate), divisor, clock mult, reset measure, run mode, first/last step, traversal mode (Linear / Re:Rene / Ikra). One set per pattern.</li>
+  <li><span class="tag t-purp">Track-wide</span> play mode, fill mode, CV update mode, slide time, octave, transpose, rotate, and four probability/length biases. Shared across all patterns.</li>
+</ul>
+<h3>How a step plays</h3>
+<p>Every divisor boundary the engine advances the sequence state, picks the current step, then runs it through, in order: condition check → gate probability → gate-mode/pulse logic → retrigger subdivision → length → note evaluation (variation + accumulator + harmony) → scale quantization → slide. The gate and CV are scheduled into sorted queues and emitted at the right tick with swing applied.</p>
+
+<h2 id="p2">Part 2 · Per-Step Layers</h2>
+<p>Steps are edited one layer at a time. The five function keys group the layers; pressing a function key again cycles to the next layer in that group. <span class="kbd">Shift+F1..F5</span> jump directly to the primary layer of each group (Shift+F4 instead resets the accumulator runtime value).</p>
+<table>
+  <thead><tr><th>Key</th><th>Label</th><th>Cycles through</th></tr></thead>
+  <tbody>
+    <tr><td><span class="kbd">F1</span></td><td>GATE</td><td>Gate → Gate Probability → Gate Offset → Slide → (back)</td></tr>
+    <tr><td><span class="kbd">F2</span></td><td>RETRIG</td><td>Retrigger → Retrigger Probability → Pulse Count → Gate Mode → (back)</td></tr>
+    <tr><td><span class="kbd">F3</span></td><td>LENGTH</td><td>Length → Length Variation Range → Length Variation Probability → (back)</td></tr>
+    <tr><td><span class="kbd">F4</span></td><td>NOTE</td><td>Note → Note Var Range → Note Var Probability → Accumulator → Harmony layers → (back)</td></tr>
+    <tr><td><span class="kbd">F5</span></td><td>COND</td><td>Condition</td></tr>
+  </tbody>
+</table>
+<p>The F4 group's tail depends on the sequence's harmony role: master sequences expose Inversion then Voicing; follower sequences expose Harmony Role; off sequences loop straight back to Note.</p>
+
+<h3>All per-step layers, defaults, ranges</h3>
+<p>Defaults are from <code>Step::clear()</code>. Ranges are the value-type bit widths.</p>
+<table>
+  <thead><tr><th>Layer</th><th>Default</th><th>Range</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Gate</td><td>off</td><td>0–1</td><td>step fires or not</td></tr>
+    <tr><td>Gate Probability</td><td>7 (100%)</td><td>0–7</td><td>chance the gate fires; biased by track Gate P. Bias</td></tr>
+    <tr><td>Gate Offset</td><td>0</td><td>0–7</td><td>delays the gate within the step (fraction of divisor); negative delay not yet allowed</td></tr>
+    <tr><td>Slide</td><td>off</td><td>0–1</td><td>glide CV from previous note over Slide Time</td></tr>
+    <tr><td>Retrigger</td><td>0</td><td>0–3</td><td>extra subdivided gates inside the step</td></tr>
+    <tr><td>Retrigger Probability</td><td>7 (100%)</td><td>0–7</td><td>chance the retrigger count applies; biased by Retrig P. Bias</td></tr>
+    <tr><td>Pulse Count</td><td>0 (1 pulse)</td><td>0–7</td><td>holds the step across N+1 divisor pulses</td></tr>
+    <tr><td>Gate Mode</td><td>0 (All)</td><td>0–3</td><td>which pulses gate: All / First / Hold / FirstLast</td></tr>
+    <tr><td>Length</td><td>3 (mid)</td><td>0–7</td><td>gate length as fraction of the division; 0 = trig (fixed 6 ms)</td></tr>
+    <tr><td>Length Variation Range</td><td>0</td><td>-7..+7</td><td>random length spread; sign sets direction</td></tr>
+    <tr><td>Length Variation Probability</td><td>7 (100%)</td><td>0–7</td><td>chance the length variation applies</td></tr>
+    <tr><td>Note</td><td>0 (root)</td><td>-63..+63</td><td>scale degree; quantized to the sequence scale</td></tr>
+    <tr><td>Note Variation Range</td><td>0</td><td>-63..+63</td><td>random note spread; sign sets direction; biased by Note P. Bias</td></tr>
+    <tr><td>Note Variation Probability</td><td>7 (100%)</td><td>0–7</td><td>chance the note variation applies</td></tr>
+    <tr><td>Condition</td><td>Off</td><td>see table</td><td>gate gating by fill / pre / first / loop count</td></tr>
+    <tr><td>Accumulator (ACCUM)</td><td>OFF</td><td>OFF / S / ±1..±7</td><td>per-step accumulator drive (Part 5)</td></tr>
+    <tr><td>Harmony Role</td><td>SEQ</td><td>SEQ/Root/3rd/5th/7th/Off</td><td>follower-only per-step chord-tone override</td></tr>
+    <tr><td>Inversion</td><td>SEQ</td><td>SEQ/Root/1st/2nd/3rd</td><td>master-only per-step inversion override</td></tr>
+    <tr><td>Voicing</td><td>SEQ</td><td>always SEQ</td><td>feature dropped; reads back as SEQ</td></tr>
+  </tbody>
+</table>
+<div class="gotcha"><strong>Length 0 is a trig, not a rest.</strong> A zero-length step fires a single fixed 6 ms gate (tempo-independent wall-clock), bypassing retrigger and Hold mode. It draws as <code>T</code>.</div>
+
+<h3>Gate Mode and Pulse Count</h3>
+<p>Pulse Count holds one step across <strong>pulseCount + 1</strong> divisor pulses. Gate Mode decides which of those pulses actually gate:</p>
+<table>
+  <thead><tr><th>Mode</th><th>Display</th><th>Fires on</th></tr></thead>
+  <tbody>
+    <tr><td>0 All</td><td><code>A</code></td><td>every pulse (default)</td></tr>
+    <tr><td>1 First</td><td><code>1</code></td><td>first pulse only</td></tr>
+    <tr><td>2 Hold</td><td><code>H</code></td><td>first pulse, one long gate spanning all pulses</td></tr>
+    <tr><td>3 FirstLast</td><td><code>1L</code></td><td>first and last pulse</td></tr>
+  </tbody>
+</table>
+
+<h3>Conditions</h3>
+<p>The Condition layer gates the step on a runtime predicate. <code>Pre</code>/<code>NotPre</code> reference the previous conditional step's result; <code>Fill</code> references the fill state; <code>First</code> references iteration 0; <code>Loop</code>/<code>NotLoop</code> fire on every Nth loop with an offset.</p>
+<table>
+  <thead><tr><th>Condition</th><th>Short</th><th>Fires when</th></tr></thead>
+  <tbody>
+    <tr><td>Off</td><td><code>-</code></td><td>always</td></tr>
+    <tr><td>Fill</td><td><code>F</code></td><td>fill active</td></tr>
+    <tr><td>!Fill</td><td><code>!F</code></td><td>fill not active</td></tr>
+    <tr><td>Pre</td><td><code>P</code></td><td>previous conditional step passed</td></tr>
+    <tr><td>!Pre</td><td><code>!P</code></td><td>previous conditional step failed</td></tr>
+    <tr><td>First</td><td><code>1</code></td><td>first iteration of the loop</td></tr>
+    <tr><td>!First</td><td><code>!1</code></td><td>not the first iteration</td></tr>
+    <tr><td>Loop2..Loop8</td><td><code>2:1</code>…</td><td>iteration matches base/offset cycle</td></tr>
+    <tr><td>!Loop2..!Loop8</td><td><code>!2:1</code>…</td><td>inverted loop cycle</td></tr>
+  </tbody>
+</table>
+
+<h3>Note quantization</h3>
+<p>The stored Note value is a scale degree (-63..+63, 0 = root). The engine adds octave + transpose, optional note variation, optional accumulator offset, optional harmony, then converts to volts through the selected scale. Chromatic scales add the root note as a 1/12 V offset; non-chromatic scales fold root into the scale lookup.</p>
+
+<h2 id="p3">Part 3 · The Edit Page</h2>
+<p><span class="kbd">Page+S0</span> (with the track selected) opens the STEPS edit page. The 16-step keypad maps to the current loop section; Left/Right move between four sections.</p>
+<h3>F-keys, encoder, Shift</h3>
+<ul>
+  <li><span class="kbd">F1</span>–<span class="kbd">F5</span> switch/cycle the active layer. The active function is shown in the header.</li>
+  <li><strong>Encoder</strong> edits the selected step(s) on the current layer. On Note/Note-Range layers, <strong>Shift</strong> + encoder jumps by a full octave (chromatic scales only).</li>
+  <li><strong>Encoder press</strong> toggles the gate of the selected steps (off if all selected are on, else on).</li>
+  <li><span class="kbd">Shift+F4</span> resets the accumulator runtime value (shows "ACCUM RESET").</li>
+</ul>
+<h3>Step keypad behaviour</h3>
+<ul>
+  <li><strong>Tap a step (Gate layer)</strong> toggles its gate.</li>
+  <li><strong>Double-tap a step (any non-Gate layer)</strong> toggles its gate without leaving the layer.</li>
+  <li><strong>Hold a step + tap another</strong> range-selects; the encoder then edits all selected steps.</li>
+  <li><strong>Hold a step + F1–F5</strong> sets that step's note to octave 1–5 (quick octave set).</li>
+  <li><strong>Shift + Left/Right</strong> shifts the selected steps (or the whole loop) left/right by one.</li>
+</ul>
+<h3>LED colours</h3>
+<ul>
+  <li>Current playing step: <strong>red</strong>.</li>
+  <li>Selected steps: <strong>red + green</strong> (always green when selected).</li>
+  <li>Gate layer: lit <strong>green</strong> where the step gate is on.</li>
+  <li>Accumulator layer: lit <strong>green</strong> where the step has an accumulator trigger.</li>
+  <li>Other layers: green follows the gate state.</li>
+  <li>The four section LEDs show the selected sequence section.</li>
+  <li>Holding <span class="kbd">Page</span> (no Shift) lights S9–S16 green for the available quick-edit slots.</li>
+</ul>
+<h3>Context menu (long-press)</h3>
+<table>
+  <thead><tr><th>Item</th><th>Action</th></tr></thead>
+  <tbody>
+    <tr><td>INIT</td><td>clear all steps to default</td></tr>
+    <tr><td>COPY</td><td>copy selected steps to the clipboard</td></tr>
+    <tr><td>PASTE</td><td>paste steps from the clipboard (enabled only if clipboard holds note steps)</td></tr>
+    <tr><td>DUPL</td><td>duplicate the loop, extending Last Step</td></tr>
+    <tr><td>GEN</td><td>open the generator (Init Layer / Init Steps / Euclidean / Random / Algo)</td></tr>
+  </tbody>
+</table>
+<div class="note"><strong>Step detail overlay.</strong> Turning the encoder on a selected step pops a detail box showing the layer's value as a percentage, count, note name, or condition name, depending on the layer. It auto-dismisses.</div>
+
+<h2 id="p4">Part 4 · Timing &amp; Traversal</h2>
+<h3>Per-sequence timing params</h3>
+<table>
+  <thead><tr><th>Param</th><th>Default</th><th>Range</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Divisor (Div X)</td><td>12</td><td>1–768</td><td>clock ticks per step</td></tr>
+    <tr><td>Clock Mult</td><td>100 (1.00x)</td><td>50–150</td><td>scales the effective divisor</td></tr>
+    <tr><td>Reset Measure</td><td>0 (off)</td><td>0–128 bars</td><td>re-syncs the sequence every N bars</td></tr>
+    <tr><td>Run Mode</td><td>Forward</td><td>see below</td><td>traversal order</td></tr>
+    <tr><td>First Step</td><td>step 1</td><td>step 1–64</td><td>loop window start</td></tr>
+    <tr><td>Last Step</td><td>step 16</td><td>step 1–64</td><td>loop window end</td></tr>
+    <tr><td>Mode</td><td>Linear</td><td>Linear / Re:Rene / Ikra</td><td>traversal engine</td></tr>
+  </tbody>
+</table>
+<h3>Run modes</h3>
+<p><code>Types::RunMode</code>: Forward, Backward, Pendulum, PingPong, Random, Random Walk.</p>
+<h3>Play mode (track-wide)</h3>
+<ul>
+  <li><strong>Aligned</strong> (default) — steps advance on divisor boundaries phase-locked to the master clock; pulse-count and retriggers are honoured.</li>
+  <li><strong>Free</strong> — the step index is computed from the free-running clock position; allows Re:Rene and Ikra traversal.</li>
+</ul>
+<h3>Traversal modes (Mode)</h3>
+<ul>
+  <li><strong>Linear</strong> — standard single-sequence playback.</li>
+  <li><strong>Re:Rene</strong> — an 8×8 X/Y grid walk (Free play mode only). X and Y advance on their own divisors; the Y divisor can be driven by another track's gate (Div Y Source = Gate, Div Y Track = T1..N). Steps outside first/last are skipped.</li>
+  <li><strong>Ikra</strong> — a second independent note loop (Note First/Note Last) advances on its own Div N divisor while the rhythm loop advances on Div X, so pitch and rhythm phase against each other.</li>
+</ul>
+
+<h2 id="p5">Part 5 · Accumulator &amp; Harmony</h2>
+<h3>Accumulator</h3>
+<p>The accumulator adds a drifting offset to note pitch. It is a sequence-wide engine (enabled, min/max bounds, step value, direction, order) plus a <strong>per-step trigger</strong> value on the ACCUM layer:</p>
+<ul>
+  <li><code>OFF</code> (<code>--</code>) — step does not drive the accumulator.</li>
+  <li><code>S</code> — step uses the sequence's global step value.</li>
+  <li><code>±1..±7</code> — step overrides the step value (and sign flips direction) for that tick.</li>
+</ul>
+<p>Trigger modes (sequence-wide) decide when the accumulator ticks: per <strong>Step</strong> (once per step, first pulse), per <strong>Gate</strong> (each gating pulse), or per <strong>Retrigger</strong> (each subdivision). Mode <strong>Stage</strong> applies the offset only to triggered steps; <strong>Track</strong> applies the current value to every step. <span class="kbd">Shift+F4</span> on the edit page resets the runtime value to its floor.</p>
+<h3>Harmony</h3>
+<p>A Note sequence has a <strong>harmony role</strong>: Off, Master, or one of four Follower roles (Root/3rd/5th/7th). A follower watches a <strong>master track</strong> (another Note track) and harmonizes the master's current note into a chord, then plays the chord tone for its role.</p>
+<ul>
+  <li><strong>Master</strong> settings: harmony scale/mode (0–6), inversion (0–3), voicing (0–3), transpose (±24 semitones). Per-step Inversion override available on the master.</li>
+  <li><strong>Follower</strong>: follows <code>masterTrackIndex</code> (0–7); role is the chord tone it plays. Per-step Harmony Role override available on the follower.</li>
+</ul>
+<div class="gotcha"><strong>Self/type guards.</strong> A follower pointing at its own track, or at a non-Note master, falls back to playing its own base note. If the master is out of range, the follower clamps to its own current step.</div>
+
+<h2 id="p6">Part 6 · Output &amp; Recording</h2>
+<h3>CV update mode (track-wide)</h3>
+<ul>
+  <li><strong>Gate</strong> (default) — CV updates only on gating steps.</li>
+  <li><strong>Always</strong> — CV updates every step even when the gate is muted.</li>
+</ul>
+<h3>Slide</h3>
+<p><code>Slide Time</code> (track-wide, 0–100%) sets the glide time. A step's Slide flag makes the CV ramp from the previous note toward the new note over that time; without slide the CV jumps.</p>
+<h3>Fill (track-wide)</h3>
+<p><code>Fill Mode</code>: None / Gates / Next Pattern / Condition. Fill replaces gates, swaps in the next pattern's sequence, or activates <code>Fill</code>-conditioned steps while fill is held. <code>Fill Muted</code> controls whether fill still applies when the track is muted.</p>
+<h3>Live &amp; step recording</h3>
+<ul>
+  <li><strong>Live recording</strong> captures incoming MIDI/CV into steps quantized to the divisor, writing gate, note, and length; in Overwrite record mode, ungated steps in the played window are cleared.</li>
+  <li><strong>Step recording</strong> advances a record cursor; played notes write one step at a time.</li>
+  <li><strong>Monitoring</strong> — selecting a step on the Note layer (when stopped) sounds it; live MIDI input can be monitored per the project monitor mode.</li>
+</ul>
+
+<h2 id="p7">Part 7 · Setup &amp; Routing</h2>
+<h3>Track-scope list (<span class="kbd">Page+S2</span>)</h3>
+<p>Track-wide params, hosted by the generic Track page (<code>NoteTrackListModel</code>):</p>
+<table>
+  <thead><tr><th>Param</th><th>Default</th><th>Range</th></tr></thead>
+  <tbody>
+    <tr><td>Play Mode</td><td>Aligned</td><td>Aligned / Free</td></tr>
+    <tr><td>Fill Mode</td><td>None</td><td>None / Gates / Next Pattern / Condition</td></tr>
+    <tr><td>Fill Muted</td><td>no</td><td>yes/no</td></tr>
+    <tr><td>CV Update Mode</td><td>Gate</td><td>Gate / Always</td></tr>
+    <tr><td>Slide Time</td><td>0%</td><td>0–100%</td></tr>
+    <tr><td>Octave</td><td>0</td><td>-10..+10</td></tr>
+    <tr><td>Transpose</td><td>0</td><td>-100..+100 (routed range -60..+60)</td></tr>
+    <tr><td>Rotate</td><td>0</td><td>-64..+64</td></tr>
+    <tr><td>Gate P. Bias</td><td>0</td><td>-7..+7 (shown ±%)</td></tr>
+    <tr><td>Retrig P. Bias</td><td>0</td><td>-7..+7</td></tr>
+    <tr><td>Length Bias</td><td>0</td><td>-7..+7</td></tr>
+    <tr><td>Note P. Bias</td><td>0</td><td>-7..+7</td></tr>
+  </tbody>
+</table>
+<h3>Sequence-scope list (<span class="kbd">Page+S1</span>)</h3>
+<p>Per-pattern params (<code>NoteSequenceListModel</code>); rows shown depend on Mode:</p>
+<ul>
+  <li><strong>Linear:</strong> Mode, First Step, Last Step, Run Mode, Div X, Clock Mult, Reset Measure, Scale, Root Note, Scale Rotate.</li>
+  <li><strong>Re:Rene</strong> adds: Div Y, Y Src, Y Trk.</li>
+  <li><strong>Ikra</strong> adds: Note First, Note Last, Div N.</li>
+</ul>
+<p>The quick-edit overlay (<span class="kbd">Page</span> + S9–S16 on the edit page) exposes, in order: First Step, Last Step, Run Mode, Div X, Reset Measure, Scale, Root Note.</p>
+<h3>What is routable</h3>
+<p>Track-scope routing targets:</p>
+<ul>
+  <li><code>SlideTime</code>, <code>Octave</code>, <code>Transpose</code>, <code>Rotate</code></li>
+  <li><code>GateProbabilityBias</code>, <code>RetriggerProbabilityBias</code>, <code>LengthBias</code>, <code>NoteProbabilityBias</code></li>
+</ul>
+<p>Sequence-scope routing targets:</p>
+<ul>
+  <li><code>FirstStep</code>, <code>LastStep</code>, <code>RunMode</code>, <code>Divisor</code>, <code>ClockMult</code>, <code>Scale</code>, <code>RootNote</code></li>
+</ul>
+<p>Per-step layers (note, gate, length, condition, etc.) are <strong>not</strong> routable — they are step data, edited on the grid, not modulation targets.</p>
+
+<div class="footer">Note Track — xformer firmware manual. Grounded in the model, engine, and UI source.</div>
+
+</div>
+</body>
+</html>

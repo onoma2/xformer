@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Discrete Track — manual</title>
+<style>
+  :root{
+    --blue:#2563eb; --amber:#ca8a04; --green:#16a34a; --red:#dc2626; --purp:#7c3aed;
+    --ink:#1a1a1a; --mut:#5b5b5b; --line:#e5e5e5; --card:#ffffff; --bg:#fafafa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; line-height:1.5;}
+  .wrap{max-width:880px; margin:0 auto; padding:32px 24px 90px}
+  h1{font-size:1.75rem; line-height:1.2; margin:0 0 6px}
+  h2{font-size:1.32rem; line-height:1.25; margin:46px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--blue)}
+  h2.geo{border-color:var(--green)}
+  h2.adv{border-color:var(--purp)}
+  h3{font-size:1.06rem; margin:24px 0 6px}
+  .lede{color:var(--mut); font-size:1.05rem; margin:0 0 8px}
+  p{margin:10px 0}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#f0f0f3; padding:1px 5px; border-radius:4px; font-size:.9em}
+  pre{background:#1a1a1a; color:#f0f0f0; padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:.86rem; line-height:1.45; margin:12px 0}
+  pre code{background:none; padding:0; color:inherit; font-size:1em}
+  .kbd{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#1a1a1a; color:#fff; padding:2px 7px; border-radius:5px; font-size:.82em; white-space:nowrap}
+  .tag{display:inline-block; font-size:.7rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:99px; vertical-align:middle}
+  .t-blue{background:#e8effe; color:var(--blue)} .t-amber{background:#fbf1d9; color:var(--amber)}
+  .t-green{background:#e3f5ea; color:var(--green)} .t-purp{background:#efe7fd; color:var(--purp)}
+  .t-red{background:#fdeeee; color:var(--red)}
+
+  .note{border-left:4px solid var(--blue); background:#f3f7ff; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .warn{border-left:4px solid var(--amber); background:#fdf8ec; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .gotcha{border-left:4px solid var(--red); background:#fdeeee; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:.93rem}
+  th,td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top}
+  thead th{background:#e8effe; color:var(--blue)}
+  tbody tr:nth-child(even){background:#fafafa}
+  td code{white-space:nowrap}
+
+  figure{margin:18px 0; text-align:center}
+  figcaption{color:var(--mut); font-size:.85rem; margin-top:6px}
+  .shot{display:block; width:100%; max-width:520px; margin:14px auto 2px; image-rendering:pixelated;
+    border:1px solid #333; border-radius:4px; background:#000}
+  .cap{text-align:center; color:var(--mut); font-size:.84rem; margin:0 0 6px}
+
+  .steps{counter-reset:step; list-style:none; padding:0; margin:14px 0}
+  .steps>li{counter-increment:step; position:relative; padding:12px 12px 12px 56px; margin:10px 0;
+    background:var(--card); border:1px solid var(--line); border-radius:8px}
+  .steps>li::before{content:counter(step); position:absolute; left:12px; top:12px; width:30px; height:30px;
+    border-radius:50%; background:var(--blue); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:.95rem}
+
+  .toc{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:16px 0; columns:2; font-size:.93rem}
+  @media(max-width:620px){.toc{columns:1}}
+  .toc a{color:var(--blue); text-decoration:none} .toc a:hover{text-decoration:underline}
+  .footer{margin-top:48px; padding-top:14px; border-top:1px solid var(--line); color:var(--mut); font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Discrete Track — manual</h1>
+<p class="lede">A threshold map. One moving input scans 32 stages; whichever threshold it crosses fires that stage's note and gate. Drive it from an internal ramp for melody, or from external CV for quantizing.</p>
+
+<div class="toc">
+  <a href="#p1">1. Overview</a><br>
+  <a href="#p2">2. Input &amp; Stages</a><br>
+  <a href="#p3">3. Gate, Slew &amp; Pluck</a><br>
+  <a href="#p4">4. Playback Timing</a><br>
+  <a href="#p5">5. The Sequence Page</a><br>
+  <a href="#p6">6. Generators, Voicings &amp; Macros</a><br>
+  <a href="#p7">7. The Scanner</a><br>
+  <a href="#p8">8. Setup &amp; Routing</a>
+</div>
+
+<h2>Introduction</h2>
+<p>The Discrete track does not step through a sequence of notes. It watches one moving input — an internal ramp or an external CV — and fires one of up to 32 <strong>stages</strong> whenever that input crosses the stage's threshold in the stage's direction. The stage that fires emits a note (CV) and a gate. Sweep the input and the map plays back as a melody; drive it from outside and the same map becomes a quantizer / CV shaper.</p>
+<p>It is a <strong>stateless ramp</strong> engine. Nothing is remembered between ticks: each tick recomputes the ramp phase from the clock position, compares the current input against the previous input, and lets any crossed threshold claim the active stage. Pause, reset, or change pattern and the whole picture rebuilds from the clock.</p>
+<p>Everything here is grounded in the firmware as built — defaults, ranges, enum members, key bindings, and step-grid maps come from the model, engine, and UI code.</p>
+
+<h3>Prerequisites</h3>
+<ul>
+  <li>Familiarity with the xformer track/sequence/edit page model (<span class="kbd">Page+S2</span> / <span class="kbd">Page+S1</span> / <span class="kbd">Page+S0</span>).</li>
+  <li>Understanding of CV/gate concepts in modular synthesis, in particular 1V/oct pitch and ±5V CV.</li>
+  <li>For External mode, a routing channel set up to feed the track's input.</li>
+</ul>
+
+<h2 id="p1">Part 1 · Overview</h2>
+<p>The track owns <strong>32 stages</strong>. Each stage holds three things:</p>
+<ul>
+  <li>a <strong>threshold</strong> (−100..+100), the position in the voltage window it watches,</li>
+  <li>a <strong>direction</strong> (Rise / Fall / Off / Both), the edge it watches for,</li>
+  <li>a <strong>note index</strong> (−63..+63), the scale degree it emits when it fires.</li>
+</ul>
+<p>A single moving <strong>input</strong> scans the window. When it crosses a stage's threshold in that stage's direction, that stage becomes the <strong>active stage</strong>: its note converts to output CV and a gate fires. The active stage holds until another stage's threshold is crossed (an Off active stage releases to silence).</p>
+<p>The input comes from one of three <strong>clock sources</strong>:</p>
+<ul>
+  <li><span class="tag t-green">Internal Saw</span> a −5V→+5V sawtooth ramp, period set by the divisor.</li>
+  <li><span class="tag t-green">Internal Tri</span> a −5V→+5V triangle (up then down), same period.</li>
+  <li><span class="tag t-purp">External</span> a routed CV input (the <em>DMap Input</em> route).</li>
+</ul>
+<div class="note"><strong>Where state lives.</strong> Track-wide params (Play Mode, CV Update) live on the <strong>track</strong>. Per-pattern params (clock source, sync, divisor, gate length, loop, range, scale group, slew, pluck, octave/transpose/offset, and all 32 stages) live on the <strong>sequence</strong>. The scale group is on the sequence, not the track; root note clamps to 0..11 (C..B).</div>
+
+<h2 id="p2">Part 2 · Input &amp; Stages</h2>
+
+<h3>Clock source and the ramp</h3>
+<p>The internal ramp always spans the <strong>full ±5V</strong>, regardless of the Above/Below range — the range only moves where the thresholds sit, not where the ramp goes. <strong>Internal Saw</strong> rises linearly −5V→+5V then snaps back; <strong>Internal Tri</strong> rises −5V→+5V over the first half of the period and falls +5V→−5V over the second.</p>
+<p>Period in ticks is <code>divisor ÷ (clock multiplier as a fraction)</code>: a higher clock multiplier shortens the period (faster sweeps), a higher divisor lengthens it. <strong>External</strong> ignores the internal ramp and reads the <em>DMap Input</em> route value (clamped −5V..+5V) as the live input each tick.</p>
+
+<h3>Loop vs Once</h3>
+<p><strong>Loop</strong> (default) cycles the ramp forever. <strong>Once</strong> sweeps a single period, then <strong>holds its final value</strong> (+5V, phase 1.0) and stops until a reset or a Loop↔Once toggle restarts it.</p>
+<div class="note"><strong>External + Once</strong> tracks an external sweep: it arms when the input first enters the range window (5% tolerance), then declares the sweep <strong>done</strong> once the input has covered ≥90% of the range span. While done, the active stage is frozen — no re-scanning until reset/restart/pattern change. Direction-agnostic, so an LFO or envelope that misses the exact endpoints still completes.</div>
+
+<h3>Stage direction</h3>
+<table>
+  <thead><tr><th>Direction</th><th>Fires when</th><th>OLED / LED</th></tr></thead>
+  <tbody>
+    <tr><td>Rise</td><td>input crosses from below to at/above the threshold</td><td><code>^</code> / green</td></tr>
+    <tr><td>Fall</td><td>input crosses from above to at/below the threshold</td><td><code>v</code> / red</td></tr>
+    <tr><td>Both</td><td>either edge crosses the threshold</td><td><code>x</code> / yellow</td></tr>
+    <tr><td>Off</td><td>never; stage disabled</td><td><code>-</code> / unlit</td></tr>
+  </tbody>
+</table>
+<p>Stages are scanned in index order and the <strong>first</strong> crossing wins. A stage stays active until some other stage is crossed. The init/default direction is <strong>Off</strong>.</p>
+
+<h3>Threshold modes: Position vs Length</h3>
+<p>The Above (<code>rangeHigh</code>) and Below (<code>rangeLow</code>) params define the voltage window the thresholds live in. The mode decides how each stage's −100..+100 maps into that window:</p>
+<table>
+  <thead><tr><th>Mode</th><th>Default</th><th>Mapping</th></tr></thead>
+  <tbody>
+    <tr><td>Position</td><td>yes</td><td>Each stage's −100..+100 maps <strong>linearly</strong> to Below..Above. 0 lands at the midpoint; each threshold is an absolute trigger voltage.</td></tr>
+    <tr><td>Length</td><td>—</td><td>Each stage's value is a <strong>proportional length</strong>. The values become cumulative interval ends across the window, partitioning the span by weight. All stages at −100 → even distribution.</td></tr>
+  </tbody>
+</table>
+<p>Changing the range or the mode marks the threshold cache dirty and recomputes on the next tick.</p>
+
+<h3>Note index → CV</h3>
+<p>A stage's note index (−63..+63) is a scale degree. Output volts come from the sequence's selected scale: <code>noteToVolts(noteIndex + octave·notesPerOctave + transpose)</code>. On a chromatic scale the root note adds <code>root × (1/12)</code> volts. The <strong>Offset</strong> param adds a flat CV bias (centivolts ×0.01 = volts) on top of the resolved note.</p>
+<p>The <strong>CV Update mode</strong> (track-scope) decides when pitch params are read:</p>
+<ul>
+  <li><strong>Gate</strong> (default) — octave / transpose / root are <strong>sampled at the gate trigger</strong>. Changing them mid-note does not retune the held note until the next gate. Muted in Gate mode, CV output drops to 0V.</li>
+  <li><strong>Always</strong> — pitch params read live every update; CV updates continuously regardless of stage changes.</li>
+</ul>
+
+<h2 id="p3">Part 3 · Gate, Slew &amp; Pluck</h2>
+
+<h3>Gate length</h3>
+<p>When a new stage becomes active, a gate fires for a length derived from the step. <strong>Gate Len 0% = "T"</strong> is a fixed short pulse (a few ticks), independent of step length; <strong>1..100%</strong> is that percentage of the step's tick length.</p>
+
+<h3>Slew</h3>
+<p><strong>Slew</strong> (0 = Off, 1..100%) smooths CV between stages by limiting the pitch rate — up to 48 semitones/sec at Slew=1 (fast), scaling down to a slow glide near Slew=100. With Slew off the CV jumps instantly. Slew enabled also flags the outgoing MIDI note as a slide.</p>
+
+<h3>Pluck</h3>
+<p><strong>Pluck</strong> (−100..+100, 0 = Off) adds a pitch transient at note onset. The note starts bent away from its target and decays linearly back to pitch:</p>
+<ul>
+  <li>magnitude up to ~200 cents (2 semitones), onset glide 10..450ms, both scaled by a square curve of |Pluck|;</li>
+  <li><strong>sign sets direction</strong>: Pluck &gt; 0 bends <em>up</em> into the note, Pluck &lt; 0 bends <em>down</em>;</li>
+  <li>higher |Pluck| adds more random jitter (10%..50%) to depth and time, so repeated notes vary.</li>
+</ul>
+<div class="warn"><strong>Pluck is per-sequence and not routable.</strong></div>
+
+<h2 id="p4">Part 4 · Playback Timing</h2>
+<table>
+  <thead><tr><th>Param</th><th>Default</th><th>Range / members</th></tr></thead>
+  <tbody>
+    <tr><td>Clock</td><td>Internal Saw</td><td>Internal Saw / Internal Tri / External</td></tr>
+    <tr><td>Divisor</td><td>192</td><td>1..768</td></tr>
+    <tr><td>Clock Mult</td><td>1.00x</td><td>0.50x..1.50x (50..150%)</td></tr>
+    <tr><td>Gate Len</td><td>T (0%)</td><td>0..100%</td></tr>
+    <tr><td>Loop</td><td>Loop</td><td>Loop / Once</td></tr>
+    <tr><td>Reset Measure</td><td>8 bars</td><td>off / 1..128 bars</td></tr>
+    <tr><td>Sync</td><td>Off</td><td>Off / Reset (External retired → behaves as Off)</td></tr>
+  </tbody>
+</table>
+<p><strong>Sync = Reset</strong> realigns the ramp to a bar boundary every <em>Reset Measure</em> bars (a reset re-zeros the ramp to −5V/phase 0 and clears stage/CV/gate/pluck state). The legacy <em>External</em> sync member is inert — re-anchor from outside via a Reset route instead.</p>
+<p><strong>Play Mode</strong> (track-scope) is Aligned (ramp phase locks to the bar grid) or Free (ramp runs from its own free clock position).</p>
+
+<h2 id="p5">Part 5 · The Sequence Page</h2>
+<p><span class="kbd">Page+S0</span> opens the Discrete edit page (header <strong>DMAP</strong>). It draws a threshold bar across the top, a live input cursor, and a three-row info block for the eight stages of the current section. Four sections of eight stages each; <span class="kbd">LEFT</span> / <span class="kbd">RIGHT</span> step through them.</p>
+
+<h3>The footer (F1-F5), normal mode</h3>
+<table>
+  <thead><tr><th>Key</th><th>Shows</th><th>Press</th></tr></thead>
+  <tbody>
+    <tr><td>F1</td><td><code>SAW</code> / <code>TRI</code> / <code>EXT</code></td><td>cycle clock source</td></tr>
+    <tr><td>F2</td><td>range-macro name (e.g. <code>-5/+5</code>)</td><td>advance to next range macro</td></tr>
+    <tr><td>F3</td><td><code>POS</code> / <code>LEN</code></td><td>toggle Position / Length threshold mode</td></tr>
+    <tr><td>F4</td><td><code>LOOP</code> / <code>ONCE</code></td><td>toggle loop mode</td></tr>
+    <tr><td>F5</td><td>sync short (<code>OFF</code> / <code>RM</code>)</td><td>cycle sync mode</td></tr>
+  </tbody>
+</table>
+<p>The F2 <strong>range macros</strong> snap Above/Below to a preset window:</p>
+<table>
+  <thead><tr><th>Macro</th><th>Above / Below</th><th>Macro</th><th>Above / Below</th></tr></thead>
+  <tbody>
+    <tr><td>Full</td><td>−5 / +5</td><td>Btm</td><td>−5 / −4</td></tr>
+    <tr><td>Inv</td><td>+5 / −5</td><td>Ass</td><td>−1 / +4</td></tr>
+    <tr><td>Pos</td><td>0 / +5</td><td>BAss</td><td>+3 / −2</td></tr>
+    <tr><td>Neg</td><td>−5 / 0</td><td>Top</td><td>+4 / +5</td></tr>
+  </tbody>
+</table>
+
+<h3>The step keypad (S1-S16)</h3>
+<p>Two rows of 8, acting on the eight stages of the current section:</p>
+<ul>
+  <li><strong>Bottom row (S1-S8) = stage SELECT.</strong> Plain press selects exclusively; holding one and pressing another multi-selects. Holding a bottom key drives the engine <strong>monitor</strong> (auditions that stage's note while stopped). Shift + bottom = toggle in/out of the selection without changing edit mode.</li>
+  <li><strong>Top row (S9-S16) = direction EDIT.</strong> Plain press selects that stage and cycles its direction (Off→Rise→Fall→Both). Shift + top = select every stage sharing the pressed stage's direction.</li>
+</ul>
+<div class="note"><strong>Double-click</strong> a bottom-row step (plain) auto-places its threshold at the <strong>midpoint between its nearest active neighbours</strong> — range ends (−100 / +100) substitute when a neighbour is missing (message <code>THR BETWEEN</code>). <strong>Shift + double-click</strong> selects all stages with the same value (note value in note-edit mode, otherwise threshold).</div>
+
+<h3>The encoder</h3>
+<p>Pressing the encoder toggles the edit mode between <strong>Threshold</strong> and <strong>Note</strong>. It then edits the selected stage(s):</p>
+<ul>
+  <li><strong>Threshold</strong> — ±1 fine, <strong>±10 with Shift</strong> (clamped −99..99).</li>
+  <li><strong>Note</strong> — ±1; <strong>Shift jumps an octave</strong> on chromatic scales only.</li>
+  <li><strong>All 32 selected</strong> switches to a rotate of all values: thresholds rotate (Shift fine / no-Shift ×8 coarse), note indices rotate one step.</li>
+</ul>
+
+<h3>Stage edit LEDs</h3>
+<ul>
+  <li>Top row (direction): Rise green, Fall red, Both yellow, Off unlit.</li>
+  <li>Bottom row (select/active): selected yellow, active-but-unselected green, else unlit.</li>
+</ul>
+<p>The OLED threshold bar marks each non-Off stage as an upward tick (tallest = active, mid = selected) and draws the live input as a bright cursor. The info block shows direction char / threshold / note name per stage, the active stage brightest.</p>
+
+<h2 id="p6">Part 6 · Generators, Voicings &amp; Macros</h2>
+
+<h3>The context menu</h3>
+<p>The context-menu key opens: <strong>INIT</strong>, <strong>COPY</strong>, <strong>PASTE</strong>, <strong>GEN</strong>.</p>
+<ul>
+  <li><strong>INIT</strong> enters a footer target submenu: <code>ALL</code> / <code>THR</code> / <code>NOTE</code> / (blank) / <code>X</code>. ALL clears the whole sequence (re-seeds the fret-pattern thresholds, all stages Off, notes 0); THR re-seeds thresholds only; NOTE zeroes notes.</li>
+  <li><strong>COPY</strong> / <strong>PASTE</strong> copy and paste the whole sequence (paste enabled only when the clipboard holds a Discrete sequence).</li>
+  <li><strong>GEN</strong> enters the generator.</li>
+</ul>
+
+<h3>GEN (generator)</h3>
+<p>GEN runs in two footer steps. First a <strong>kind</strong>: <code>RAND</code> / <code>LIN</code> / <code>LOG</code> / <code>EXP</code> / <code>X</code>. Then a <strong>target</strong>:</p>
+<ul>
+  <li>RAND target row: <code>ALL</code> / <code>THR</code> / <code>NOTE</code> / <code>TOG</code> / <code>X</code> (TOG randomizes directions).</li>
+  <li>LIN/LOG/EXP target row: <code>ALL</code> / <code>THR</code> / <code>NOTE5</code> / <code>NOTE2</code> / <code>X</code> — NOTE5 spreads notes wide (−63..+64), NOTE2 narrow (0..+32). Threshold shaping is linear / √ / ^1.3 across −99..99.</li>
+</ul>
+
+<h3>Page+Step quick edits</h3>
+<table>
+  <thead><tr><th>Combo</th><th>Action</th></tr></thead>
+  <tbody>
+    <tr><td><span class="kbd">Page+S9</span></td><td>Range High (Above)</td></tr>
+    <tr><td><span class="kbd">Page+S10</span></td><td>Range Low (Below)</td></tr>
+    <tr><td><span class="kbd">Page+S11</span></td><td>Divisor</td></tr>
+    <tr><td><span class="kbd">Page+S12</span></td><td>Piano voicing (held; encoder scrolls bank, release applies)</td></tr>
+    <tr><td><span class="kbd">Page+S13</span></td><td>Guitar voicing (held; encoder scrolls bank, release applies)</td></tr>
+  </tbody>
+</table>
+<p>Range High / Low / Divisor open the standard quick-edit overlay. Voicing quick-edits apply a chord shape across the active stages (selection-limited if more than one selected); the selected stage's note is the root, <code>C0</code> resets from the track/project root, <code>ROOT</code> is a safe no-op.</p>
+<ul>
+  <li>Piano banks: ROOT, C0, MAJ13, MAJ6/9, MIN13, MIN6/9, MINMAJ9, DOM13, M9B5, DIM7, AUG9, AUGMAJ9, SUS2(9), SUS4(11).</li>
+  <li>Guitar banks: ROOT, C0, MAJ, MIN, 7, MAJ7, MIN7, 6, MIN6, 9, 13, SUS2, SUS4, ADD9, AUG, M7B5, DIM7.</li>
+</ul>
+
+<h3>Page+Step macros</h3>
+<p>Four step combos open threshold/note macro menus (yellow LEDs):</p>
+<ul>
+  <li><span class="kbd">Page+S5</span> <strong>Distribution:</strong> <code>I-8</code>, <code>I-5(2)</code>, <code>I-7(3)</code>, <code>I-9(4)</code>, <code>I-FRET</code>. Even-distribute thresholds across stage groups; I-FRET round-robin interleaves across the four sections.</li>
+  <li><span class="kbd">Page+S6</span> <strong>Cluster:</strong> <code>M-CLUSTER</code>, <code>M-AR4</code>, <code>M-SWELL</code>, <code>M-ISWELL</code>, <code>M-STRUM</code>. Operate on active stages (selection-limited if more than one selected).</li>
+  <li><span class="kbd">Page+S7</span> <strong>Distribute Active:</strong> <code>E-ACT</code>, <code>E-RISE</code>, <code>E-FALL</code>, <code>E-BOTH</code>, <code>NORM</code>. Even-spread thresholds by direction filter; NORM expands the current spread to fill −100..+100.</li>
+  <li><span class="kbd">Page+S15</span> <strong>Transform:</strong> <code>FLIP</code>, <code>T-REV</code>, <code>T-INV</code>, <code>N-MIRR</code>, <code>N-REV</code>. FLIP cycles all directions; T-* transform thresholds; N-* transform note indices.</li>
+</ul>
+
+<h2 id="p7">Part 7 · The Scanner</h2>
+<p>The <strong>DMap Scan</strong> route lets an external CV reshape the map live. Route a CV source to <em>DMap Scan</em> (value 0..34):</p>
+<ul>
+  <li><code>0</code> = bottom dead zone, <code>1..32</code> = stages 0..31, <code>33</code>/<code>34</code> = top dead zone.</li>
+  <li>Each time the scanned value <strong>enters a new stage's segment</strong>, that stage's direction cycles (Off→Rise→Fall→Both).</li>
+</ul>
+<p>Sweep a fader or slow LFO across the scan input to "draw" directions across the map in real time. The dead zones at the extremes toggle nothing.</p>
+
+<h2 id="p8">Part 8 · Setup &amp; Routing</h2>
+
+<h3>Track-scope list (Page+S2)</h3>
+<p>Track-wide params, hosted by the generic Track page:</p>
+<ul>
+  <li>Play Mode (Aligned / Free)</li>
+  <li>CV Update (Gate / Always)</li>
+</ul>
+
+<h3>Sequence-scope list (Page+S1)</h3>
+<p>Per-pattern params, in order: Clock, Sync, Divisor, Clock Mult, Gate Len, Loop, Reset Measure, Threshold (mode), Above, Below, Scale, Root, Scale Rotate, Slew, Pluck, Octave, Transpose, Offset.</p>
+<table>
+  <thead><tr><th>Param</th><th>Default</th><th>Range</th></tr></thead>
+  <tbody>
+    <tr><td>Divisor</td><td>192</td><td>1..768</td></tr>
+    <tr><td>Clock Mult</td><td>1.00x</td><td>50..150%</td></tr>
+    <tr><td>Gate Len</td><td>T (0%)</td><td>0..100%</td></tr>
+    <tr><td>Reset Measure</td><td>8 bars</td><td>off / 1..128</td></tr>
+    <tr><td>Above (rangeHigh)</td><td>+5.0V</td><td>−5.0..+5.0V</td></tr>
+    <tr><td>Below (rangeLow)</td><td>−5.0V</td><td>−5.0..+5.0V</td></tr>
+    <tr><td>Scale</td><td>Project</td><td>Project / track scales</td></tr>
+    <tr><td>Root</td><td>C (0)</td><td>0..11 (C..B)</td></tr>
+    <tr><td>Scale Rotate</td><td>Default</td><td>Default / 0..31</td></tr>
+    <tr><td>Slew</td><td>Off</td><td>0..100%</td></tr>
+    <tr><td>Pluck</td><td>Off</td><td>−100..+100</td></tr>
+    <tr><td>Octave</td><td>0</td><td>−10..+10</td></tr>
+    <tr><td>Transpose</td><td>0</td><td>−60..+60</td></tr>
+    <tr><td>Offset</td><td>+0.00V</td><td>−5.00..+5.00V (−500..+500 cV)</td></tr>
+  </tbody>
+</table>
+
+<h3>What is routable</h3>
+<p>Routing targets exposed for a Discrete track:</p>
+<ul>
+  <li><code>DMap Input</code> — the External-mode input CV (−5..+5V).</li>
+  <li><code>DMap Scan</code> — the scanner (0..34, cycles stage directions).</li>
+  <li><code>DMap Above</code> (rangeHigh) and <code>DMap Below</code> (rangeLow) (−5..+5V).</li>
+  <li>Shared sequence/track params: Divisor, Clock Mult, Scale, Root Note, Slew (Slide Time), Octave, Transpose, Offset.</li>
+</ul>
+<div class="gotcha"><code>DMap Sync</code> is retired (folds into the universal Align/Reset). <strong>Pluck and Gate Length are not routable.</strong></div>
+
+<h3>Initialization (the fret pattern)</h3>
+<p>INIT (ALL) re-seeds every stage with an interleaved <strong>fret-pattern</strong> threshold distribution — round-robin across the four sections, ~6.5 units apart overall — with all directions Off and all notes 0. Enabling a stage (changing its direction) lights up a pre-spaced threshold without re-placing it.</p>
+
+<div class="footer">Discrete Track manual · grounded in the firmware as built (model, engine, UI).</div>
+
+</div>
+</body>
+</html>

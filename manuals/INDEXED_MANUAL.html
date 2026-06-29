@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Indexed Track — manual</title>
+<style>
+  :root{
+    --blue:#2563eb; --amber:#ca8a04; --green:#16a34a; --red:#dc2626; --purp:#7c3aed;
+    --ink:#1a1a1a; --mut:#5b5b5b; --line:#e5e5e5; --card:#ffffff; --bg:#fafafa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; line-height:1.5;}
+  .wrap{max-width:880px; margin:0 auto; padding:32px 24px 90px}
+  h1{font-size:1.75rem; line-height:1.2; margin:0 0 6px}
+  h2{font-size:1.32rem; line-height:1.25; margin:46px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--blue)}
+  h2.geo{border-color:var(--green)}
+  h2.adv{border-color:var(--purp)}
+  h3{font-size:1.06rem; margin:24px 0 6px}
+  .lede{color:var(--mut); font-size:1.05rem; margin:0 0 8px}
+  p{margin:10px 0}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#f0f0f3; padding:1px 5px; border-radius:4px; font-size:.9em}
+  pre{background:#1a1a1a; color:#f0f0f0; padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:.86rem; line-height:1.45; margin:12px 0}
+  pre code{background:none; padding:0; color:inherit; font-size:1em}
+  .kbd{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#1a1a1a; color:#fff; padding:2px 7px; border-radius:5px; font-size:.82em; white-space:nowrap}
+  .tag{display:inline-block; font-size:.7rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:99px; vertical-align:middle}
+  .t-blue{background:#e8effe; color:var(--blue)} .t-amber{background:#fbf1d9; color:var(--amber)}
+  .t-green{background:#e3f5ea; color:var(--green)} .t-purp{background:#efe7fd; color:var(--purp)}
+  .t-red{background:#fdeeee; color:var(--red)}
+
+  .note{border-left:4px solid var(--blue); background:#f3f7ff; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .warn{border-left:4px solid var(--amber); background:#fdf8ec; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .gotcha{border-left:4px solid var(--red); background:#fdeeee; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:.93rem}
+  th,td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top}
+  thead th{background:#e8effe; color:var(--blue)}
+  tbody tr:nth-child(even){background:#fafafa}
+  td code{white-space:nowrap}
+
+  figure{margin:18px 0; text-align:center}
+  figcaption{color:var(--mut); font-size:.85rem; margin-top:6px}
+  .shot{display:block; width:100%; max-width:520px; margin:14px auto 2px; image-rendering:pixelated;
+    border:1px solid #333; border-radius:4px; background:#000}
+  .cap{text-align:center; color:var(--mut); font-size:.84rem; margin:0 0 6px}
+
+  .steps{counter-reset:step; list-style:none; padding:0; margin:14px 0}
+  .steps>li{counter-increment:step; position:relative; padding:12px 12px 12px 56px; margin:10px 0;
+    background:var(--card); border:1px solid var(--line); border-radius:8px}
+  .steps>li::before{content:counter(step); position:absolute; left:12px; top:12px; width:30px; height:30px;
+    border-radius:50%; background:var(--blue); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:.95rem}
+
+  .toc{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:16px 0; columns:2; font-size:.93rem}
+  @media(max-width:620px){.toc{columns:1}}
+  .toc a{color:var(--blue); text-decoration:none} .toc a:hover{text-decoration:underline}
+  .footer{margin-top:48px; padding-top:14px; border-top:1px solid var(--line); color:var(--mut); font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Indexed Track — manual</h1>
+<p class="lede">A free-running, duration-indexed CV/gate sequencer. Each step carries its own length and gate in ticks; notes are stored as scale degrees and resolved at play time.</p>
+
+<div class="toc">
+  <a href="#p1">1. Overview</a><br>
+  <a href="#p2">2. Steps &amp; Timing</a><br>
+  <a href="#p3">3. The Edit Page</a><br>
+  <a href="#p4">4. Math</a><br>
+  <a href="#p5">5. Routes (live modulation)</a><br>
+  <a href="#p6">6. Output &amp; Voltage</a><br>
+  <a href="#p7">7. Setup &amp; Routing</a>
+</div>
+
+<h2>Introduction</h2>
+<p>The Indexed track is a <strong>free-running, duration-indexed CV/gate sequencer</strong>. Unlike a classic grid sequencer where every step occupies one clock pulse, each Indexed step carries its own <strong>duration in ticks</strong> and its own <strong>gate length in ticks</strong>. The track walks its steps back-to-back, holding each one for exactly as long as its duration says, so a sequence is a continuous timeline of variable-length notes rather than a fixed grid.</p>
+<p>A note is stored as a <strong>scale degree index</strong> (<code>noteIndex</code>), not as raw volts. The engine looks that index up in the active scale at play time, so the same sequence transposes, re-scales, and re-roots without rewriting any step.</p>
+<p>On top of the steps sit two reshaping systems. <strong>Math</strong> applies an offline operation (add, multiply, ramp, randomise, quantise, …) to a target field across a group of steps. <strong>Routes</strong> feed two external CV/modulation inputs into duration, gate, or note at play time, scoped to step groups. Both are independent of the stored steps — Math rewrites them on commit, Routes leave them untouched and modulate live.</p>
+<p>This manual is grounded in the firmware as built. Defaults, ranges, enum members, key bindings, and step-grid maps are taken from the model, engine, and UI code.</p>
+
+<h3>Prerequisites</h3>
+<ul>
+  <li>Familiarity with the xformer track/sequence/edit page model (Page+S2 / Page+S1 / Page+S0).</li>
+  <li>Understanding of CV/gate and 1V/oct concepts in modular synthesis.</li>
+  <li>Comfort with the scale/root-note system, since Indexed notes are scale degrees, not fixed pitches.</li>
+</ul>
+
+<h2 id="p1">Part 1: Overview</h2>
+
+<h3>What the Indexed track is</h3>
+<p>An Indexed sequence is a list of up to <strong>48 steps</strong> (<code>MaxSteps</code>). Each step holds four fields packed into its data:</p>
+<ul>
+  <li><strong>noteIndex</strong> — a signed scale-degree index, −63..+63, looked up in the active scale.</li>
+  <li><strong>duration</strong> — how long the step holds, in ticks, 0..1023. 0 means skip.</li>
+  <li><strong>gateLength</strong> — how long the gate stays high within the step, in ticks, 0..1023 (0 = off / silent).</li>
+  <li><strong>slide</strong> — a flag that glides CV from the previous note instead of jumping.</li>
+</ul>
+<p>Each step also carries a <strong>group mask</strong> (A/B/C/D, 4 bits) used by Math and Routes to scope operations to a subset of steps.</p>
+<p>The track plays by advancing through the active steps in the selected run mode, holding each for its duration, and emitting one gate of the chosen length per step. Because steps are timed by ticks, not by clock pulses, the total length of a sequence is whatever its durations add up to — the edit page shows that running total in bars.</p>
+
+<h3>The three layers of state</h3>
+<ul>
+  <li><strong>Track-wide params</strong> (play mode, CV update mode, slide time, octave, transpose) live on the <strong>track</strong> — shared across all patterns.</li>
+  <li><strong>Per-pattern params</strong> (divisor, clock mult, length, loop, run mode, scale group, first step, sync, reset measure, plus the two route configs and the mix mode) live on the <strong>sequence</strong> — one set per w-pattern.</li>
+  <li>The <strong>scale group</strong> (scale / root note / rotate) lives on the <strong>sequence</strong>, not the track.</li>
+</ul>
+
+<h2 id="p2">Part 2: Steps &amp; Timing</h2>
+
+<h3>Step fields</h3>
+<table>
+  <thead><tr><th>Field</th><th>Range</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>noteIndex</code></td><td>−63..+63</td><td>Signed scale degree; 0 = root. Stored as index, resolved to volts at play time.</td></tr>
+    <tr><td><code>duration</code></td><td>0..1023 ticks</td><td>0 = skip (rapid-fired through).</td></tr>
+    <tr><td><code>gateLength</code></td><td>0..1023 ticks</td><td>0 = OFF (silent step). Clamped to ≤ duration.</td></tr>
+    <tr><td><code>slide</code></td><td>on/off</td><td>Glide CV from previous note using the track Slide Time.</td></tr>
+    <tr><td><code>groupMask</code></td><td>A/B/C/D</td><td>Per-step group membership for Math/Route scoping.</td></tr>
+  </tbody>
+</table>
+<p>Gate length is always clamped to the step's duration: a step can't gate longer than it sounds. Setting duration to 0 forces gate to OFF.</p>
+
+<h3>How a step is held</h3>
+<p><code>triggerStep</code> reads the active step, applies any route modulation, scales duration and gate by the sequence <strong>divisor</strong>, then sets a gate timer. The step is held until its elapsed ticks reach its (divisor-scaled) duration, then the engine advances. Advancement is driven by the clock's wallclock-derived tick position scaled by the <strong>clock multiplier</strong>, so timing stays phase-locked to the transport rather than drifting per tick.</p>
+<p>A step with duration 0 is skipped immediately — the engine fires through it and lands on the next non-zero step in the same tick.</p>
+
+<h3>Divisor and clock multiplier</h3>
+<ul>
+  <li><strong>Divisor</strong> (<code>divisor</code>, 1..768, default <strong>1</strong>) multiplies every step's stored duration and gate. At divisor 1, one stored tick equals one engine tick. Higher divisor stretches the whole sequence proportionally. On the step editor, holding Shift while editing duration nudges by the divisor amount.</li>
+  <li><strong>Clock Mult</strong> (<code>clockMultiplier</code>, 50..150, default <strong>100</strong> = 1.00x) scales playback speed continuously without touching stored durations.</li>
+</ul>
+
+<h3>Run mode and loop</h3>
+<ul>
+  <li><strong>Run Mode</strong> (<code>runMode</code>) uses the shared sequence run-mode traversal (Forward, Reverse, Pendulum, Random, …). Default <strong>Forward</strong>.</li>
+  <li><strong>Loop</strong> (<code>loop</code>, default <strong>on</strong>) — when off, the sequence plays once through its active steps and stops.</li>
+  <li><strong>First Step</strong> (<code>firstStep</code>) is a rotation offset: it shifts which stored step the walk treats as index 0, without moving any data. Range 0..(length−1).</li>
+</ul>
+
+<h3>Reset and sync</h3>
+<ul>
+  <li><strong>Reset Measure</strong> (<code>resetMeasure</code>, 0..128 bars, default <strong>off</strong>) re-aligns the sequence to step 0 every N bars. Edited in powers of two with Shift.</li>
+  <li><strong>Sync</strong> (<code>syncMode</code>) cycles Off / Reset. (An old External mode is retired and behaves as Off; use a Reset route instead.)</li>
+</ul>
+
+<h2 id="p3">Part 3: The Edit Page</h2>
+<p>Page+S0 on an Indexed track opens <strong>INDEXED EDIT</strong>. The 48 steps are split into <strong>3 sections of 16</strong> (<code>SectionCount</code> = 3); the <span class="kbd">Left</span>/<span class="kbd">Right</span> keys move between sections, and the LED ring shows the selected section.</p>
+<p>The top of the page is a <strong>timeline bar</strong>: each non-zero step is drawn as a block whose <strong>width is its duration</strong> and whose filled inner portion is its <strong>gate length</strong>. The currently playing step is medium-bright; selected steps are bright. Below the bar, an info line shows total <strong>bars</strong> and the delta to the nearest bar/beat boundary, plus the selected step's duration / gate / note (with note name and resolved volts).</p>
+
+<h3>Edit modes (F1-F3)</h3>
+<table>
+  <thead><tr><th>Key</th><th>Mode</th><th>Encoder edits</th><th>Shift</th></tr></thead>
+  <tbody>
+    <tr><td><span class="kbd">F1</span></td><td><strong>DUR</strong> (Duration)</td><td>duration ±1 tick</td><td>± divisor</td></tr>
+    <tr><td><span class="kbd">F1</span> again</td><td><strong>DUR-TR</strong> (Duration Transfer)</td><td>moves ticks from this step to the next (steal/give)</td><td>± divisor</td></tr>
+    <tr><td><span class="kbd">F2</span></td><td><strong>GATE</strong></td><td>gate ±5 ticks</td><td>±1 tick (fine)</td></tr>
+    <tr><td><span class="kbd">F3</span></td><td><strong>NOTE</strong></td><td>note ±1 degree</td><td>± octave (chromatic scales)</td></tr>
+    <tr><td><span class="kbd">F3</span> again</td><td><strong>SLIDE</strong></td><td>encoder toggles slide on the selection</td><td>—</td></tr>
+  </tbody>
+</table>
+<p>F1 and F3 are toggles: pressing them again while already in that mode flips into the transfer / slide sub-mode. Selecting a different mode clears those sub-modes.</p>
+<div class="note">When the Note mode is active and a single step is held (not persisted), that step is <strong>monitored</strong> — its CV is forced to the output so you hear the pitch while editing.</div>
+
+<h3>Selecting and editing steps</h3>
+<ul>
+  <li><strong>Step keys (S1-S16)</strong> select steps in the current section; multi-select is supported.</li>
+  <li><strong>Double-press a step</strong> toggles its gate between OFF and the minimum gate length.</li>
+  <li><strong>Encoder</strong> applies the active edit to all selected steps. With <strong>Shift + multiple steps selected</strong>, the encoder writes a <strong>linear ramp</strong> from the first to the last selected step (for note, duration, or gate).</li>
+</ul>
+
+<h3>Groups (F4 → GRPS)</h3>
+<p><span class="kbd">F4</span> cycles the context: Sequence → Step → Groups. In <strong>Groups</strong> mode the footer becomes <strong>A B C D</strong>, and F1-F4 toggle the selected steps' membership in groups A-D. With no steps selected, pressing a group key <strong>selects every step in that group</strong>. The page shows each group's member count and the focused step's membership.</p>
+
+<h3>Context menus (F4 = SEQ / STEP)</h3>
+<p>In Edit mode, F4 also flips the long-press context menu between <strong>Sequence</strong> scope and <strong>Step</strong> scope:</p>
+<ul>
+  <li><strong>Sequence menu</strong>: INIT (clear sequence), COPY, PASTE, GENER (run a generator into the active field — InitLayer / InitSteps / Euclidean / Random / Helical).</li>
+  <li><strong>Step menu</strong>: INSERT, MAKE 1ST (rotate so the selected step becomes step 1), DELETE, COPY, PASTE.</li>
+</ul>
+
+<h3>Footer F5 — Math / Routes</h3>
+<ul>
+  <li><span class="kbd">F5</span> opens the <strong>Math</strong> page.</li>
+  <li><span class="kbd">Shift + F5</span> opens the <strong>Route Config</strong> page.</li>
+</ul>
+
+<h3>Quick-edit overlay (Page + S8-S16)</h3>
+<p>Holding <span class="kbd">Page</span> lights the lower step row as a quick-edit strip:</p>
+<table>
+  <thead><tr><th>Step</th><th>Action</th></tr></thead>
+  <tbody>
+    <tr><td>S8</td><td><strong>Split</strong> — hold and turn encoder to choose 2-8 pieces, release to split selected steps</td></tr>
+    <tr><td>S9</td><td><strong>Merge</strong> — hold and turn to choose how many following steps to fold into one</td></tr>
+    <tr><td>S10</td><td><strong>Swap</strong> — hold and turn to pick an offset, release to swap the selected step with the one that far ahead</td></tr>
+    <tr><td>S11</td><td><strong>Run Mode</strong> quick-edit</td></tr>
+    <tr><td>S12</td><td><strong>Piano voicing</strong> — hold and turn to pick a chord voicing, release to apply</td></tr>
+    <tr><td>S13</td><td><strong>Guitar voicing</strong> — same, guitar bank</td></tr>
+    <tr><td>S14</td><td>(macro shortcut, see below)</td></tr>
+    <tr><td>S15</td><td>inert</td></tr>
+  </tbody>
+</table>
+<p><strong>Page + S4 / S5 / S6 / S14</strong> open macro context menus directly (yellow LEDs):</p>
+<ul>
+  <li><strong>S4 Rhythm</strong> — Euclidean 3/9, Clave 5/20, Tuplet 7/28, Poly 3-5/5-7, M-TALA (each press alternates short/long cycle).</li>
+  <li><strong>S5 Waveform</strong> — TRI, 2TRI, 3TRI, 2SAW, 3SAW note contours.</li>
+  <li><strong>S6 Melodic</strong> — SCALE (asc/desc), ARP, CHORD, MODAL, M-MEL.</li>
+  <li><strong>S14 Duration/Transform</strong> — D-LOG, D-EXP, Q-MEAS (quantise to bars), REV, MIRR.</li>
+</ul>
+<p>Macros act on the selected step range, or the whole active length if nothing is selected.</p>
+<div class="note"><strong>LEDs (edit):</strong> each present step is green; a step with a gate is red; a selected step is yellow. The selected section is shown on the ring.</div>
+
+<h2 id="p4">Part 4: Math</h2>
+<p><span class="kbd">F5</span> on the edit page opens <strong>MATH</strong> — an offline transform applied to step fields. It holds <strong>two operation slots, A and B</strong>, both applied (A then B) when you commit. Math edits the stored steps; it is not a live modulation.</p>
+
+<h3>Per-slot config</h3>
+<p>Each slot (A/B) has four parameters, picked with F1-F4 (pressing the focused F-key again toggles between slot A and B):</p>
+<table>
+  <thead><tr><th>F-key</th><th>Param</th><th>Members</th></tr></thead>
+  <tbody>
+    <tr><td><span class="kbd">F1</span></td><td><strong>TARGET</strong></td><td>DUR / GATE / NOTE</td></tr>
+    <tr><td><span class="kbd">F2</span></td><td><strong>OP</strong></td><td>ADD, SUB, MUL, DIV, SET, RAND, JIT, RAMP, QNT</td></tr>
+    <tr><td><span class="kbd">F3</span></td><td><strong>VALUE</strong></td><td>integer; range depends on op+target</td></tr>
+    <tr><td><span class="kbd">F4</span></td><td><strong>GROUPS</strong></td><td>which steps the op hits</td></tr>
+  </tbody>
+</table>
+<p>The encoder edits the focused param. The page shows <strong>N=</strong> the count of steps the slot's group selection currently affects.</p>
+
+<h3>The 9 operators</h3>
+<table>
+  <thead><tr><th>Op</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>ADD</td><td>field + value</td></tr>
+    <tr><td>SUB</td><td>field − value</td></tr>
+    <tr><td>MUL</td><td>field × value</td></tr>
+    <tr><td>DIV</td><td>field ÷ value (value ≥ 1)</td></tr>
+    <tr><td>SET</td><td>field = value</td></tr>
+    <tr><td>RAND</td><td>field = random in 0..value</td></tr>
+    <tr><td>JIT</td><td>field += random in ±value</td></tr>
+    <tr><td>RAMP</td><td>linear ramp of <code>value</code> spread across the affected steps (first→last)</td></tr>
+    <tr><td>QNT</td><td>round field to nearest multiple of value</td></tr>
+  </tbody>
+</table>
+<p>Value ranges clamp to the target: duration/gate to 1023 ticks, note to −63..+64; MUL/DIV cap at 400. The Value step size honours Shift (×10 for MUL/DIV, ± divisor for duration, ±5 for gate, ± octave for note).</p>
+
+<h3>Group scope</h3>
+<p>GROUPS cycles A, B, C, D individually, the 1-15 combined masks, then <strong>UNGR</strong> (ungrouped steps only), <strong>SEL</strong> (the steps that were selected on the edit page when Math opened), and <strong>ALL</strong>. Default <strong>ALL</strong>.</p>
+
+<h3>Commit</h3>
+<p><span class="kbd">F5</span> reads <strong>COMMIT</strong> when either slot changed; pressing it applies A then B to every matching step, then resets both slots. With no change, F5 / Shift+F5 just exits. (A hardware keyboard's Enter commits, Escape cancels.)</p>
+
+<h2 id="p5">Part 5: Routes (live modulation)</h2>
+<p><span class="kbd">Shift+F5</span> on the edit page opens <strong>ROUTE CONFIG</strong>. Routes feed two external CV inputs — <strong>Indexed A</strong> and <strong>Indexed B</strong> — into step fields at play time, leaving the stored steps untouched. There are two route slots (<strong>Route A</strong>, <strong>Route B</strong>) plus a <strong>Mix</strong> mode.</p>
+
+<h3>Per-route config</h3>
+<p>Each route (A/B) has four parameters, picked with F1-F4 (re-pressing the focused F-key swaps between Route A and Route B):</p>
+<table>
+  <thead><tr><th>F-key</th><th>Param</th><th>Members</th></tr></thead>
+  <tbody>
+    <tr><td><span class="kbd">F1</span></td><td><strong>SOURCE</strong></td><td>OFF / A / B — which CV input (Indexed A or Indexed B) drives this route</td></tr>
+    <tr><td><span class="kbd">F2</span></td><td><strong>GROUPS</strong></td><td>which steps the route modulates</td></tr>
+    <tr><td><span class="kbd">F3</span></td><td><strong>TARGET</strong></td><td>DUR / GATE / NOTE</td></tr>
+    <tr><td><span class="kbd">F4</span></td><td><strong>AMOUNT</strong></td><td>−200%..+200%, default +100%</td></tr>
+  </tbody>
+</table>
+<p>A route is active only when its source is not OFF and the step matches its group mask. The page shows <strong>N=</strong> affected steps. Left/Right moves focus between Route A, Route B, and Mix.</p>
+
+<h3>How modulation is applied</h3>
+<p>The two CV inputs (<code>Indexed A</code> / <code>Indexed B</code>) are routing targets fed from the global routing system (each −100..+100, scaled to ±1.0). At trigger time each active route scales its CV input by its amount and applies it to the chosen field:</p>
+<ul>
+  <li><strong>Duration</strong> — percentage scaling: <code>1.0 + mod</code> multiplies the stored duration.</li>
+  <li><strong>NoteIndex</strong> — 100% amount equals one octave in the current scale (modulation scaled by notes-per-octave).</li>
+  <li><strong>GateLength</strong> — additive tick offset.</li>
+</ul>
+
+<h3>Mix mode</h3>
+<p>When both routes target the <strong>same</strong> parameter, the <strong>Mix</strong> mode (encoder to change) decides how the two contributions combine:</p>
+<table>
+  <thead><tr><th>Mode</th><th>Result</th></tr></thead>
+  <tbody>
+    <tr><td>AtoB</td><td>sequential — both add (default)</td></tr>
+    <tr><td>MUX</td><td>average of A and B</td></tr>
+    <tr><td>MIN</td><td>min(A, B)</td></tr>
+    <tr><td>MAX</td><td>max(A, B)</td></tr>
+  </tbody>
+</table>
+<p>If the routes hit different fields, each is applied independently regardless of Mix.</p>
+
+<h3>Commit</h3>
+<p><span class="kbd">F5</span> reads <strong>COMMIT</strong> when staged config differs from what's saved; pressing it writes Route A, Route B, and Mix into the sequence. Shift+F5 cancels. Routes are committed config, not auto-applied while you edit.</p>
+
+<h2 id="p6">Part 6: Output &amp; Voltage</h2>
+
+<h3>Note resolution</h3>
+<p>A step's CV is computed by looking its <code>noteIndex</code> up in the active scale, after adding the track's <strong>octave</strong> (× notes-per-octave) and <strong>transpose</strong> (semitones). For chromatic scales the <strong>root note</strong> offset is added in volts. The sequence's scale/root override the project's; when set to default they fall back to the project scale group.</p>
+
+<h3>CV update mode</h3>
+<ul>
+  <li><strong>Gate</strong> (default) — CV updates only on gated steps.</li>
+  <li><strong>Always</strong> — CV updates on every step, even silent ones, and keeps emitting CV while muted.</li>
+</ul>
+
+<h3>Slide</h3>
+<p>A step's <strong>slide</strong> flag, with the track <strong>Slide Time</strong> (0..100%), glides CV from the previous value to the new note over time instead of stepping. Slide Time 0 disables the glide even on slide steps.</p>
+
+<h3>Play mode</h3>
+<p><code>PlayMode</code> (track param): <strong>Aligned</strong> (default) or <strong>Free</strong> — both advance by duration off the wallclock tick position; Aligned stays phase-locked to the transport.</p>
+
+<h3>Mute and activity</h3>
+<p>Muting gates the audible output (gate drops, and CV holds unless CV Update is Always). Activity reflects the <strong>pre-mute intended gate</strong> — whether the step <em>would</em> have gated — so a muted Indexed track still reports activity as a potential source for other tracks.</p>
+<div class="gotcha"><strong>Gate-output quirk.</strong> <code>gateOutput()</code> returns the <strong>post-mute</strong> gate (it ANDs in <code>!mute()</code> and the transport-running flag), while <code>activity()</code> returns the pre-mute intended gate. The two disagree while muted: activity reads true on a step that would gate, but the gate output is held low. This is the current behaviour as built.</div>
+
+<h2 id="p7">Part 7: Setup &amp; Routing</h2>
+
+<h3>Track-scope list (Page+S2)</h3>
+<p>Track-wide params, hosted by the Indexed track list:</p>
+<ul>
+  <li>Play Mode (Aligned / Free)</li>
+  <li>CV Update (Gate / Always)</li>
+  <li>Slide Time (0-100%)</li>
+  <li>Octave (−10..+10)</li>
+  <li>Transpose (−60..+60)</li>
+</ul>
+
+<h3>Sequence-scope list (Page+S1)</h3>
+<p>Per-pattern params: Divisor, Clock Mult, Length, Active, Loop, Run Mode, Scale, Root Note, Scale Rotate, First Step, Sync, Reset Measure.</p>
+<p>(<strong>Length</strong> appends/trims steps; <strong>Active</strong> sets the active step count directly — both read out the active length.)</p>
+
+<h3>What is routable</h3>
+<p>These Indexed params appear as routing targets:</p>
+<ul>
+  <li><strong>Sequence-scope:</strong> Divisor, Clock Mult, Scale, Root Note, First Step, Run Mode.</li>
+  <li><strong>Track-scope:</strong> Slide Time, Octave, Transpose.</li>
+  <li><strong>Modulation inputs:</strong> <strong>Indexed A</strong> and <strong>Indexed B</strong> — the two CV destinations the Route Config page reads. Route these from any routing source to drive duration / gate / note live.</li>
+</ul>
+<p>Length, Active, Loop, Sync, Reset Measure, Scale Rotate, Play Mode, and CV Update are not routable.</p>
+
+<h3>The two reshaping systems at a glance</h3>
+<ul>
+  <li><strong>Math (F5)</strong> — offline. Two op slots rewrite stored step fields on commit, group-scoped.</li>
+  <li><strong>Routes (Shift+F5)</strong> — live. Two CV inputs modulate duration / gate / note at play time, group-scoped, combined via Mix when they target the same field.</li>
+</ul>
+
+<div class="footer">Indexed Track manual — grounded in the firmware as built.</div>
+
+</div>
+</body>
+</html>

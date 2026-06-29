@@ -1,413 +1,371 @@
-# Algo Track User Manual
-
-## 1. Introduction
-
-The Algo Track (formerly known as Tuesday Track) is an advanced sequencer track type that uses algorithmic generation to create complex, evolving musical sequences. Rather than storing fixed step values, the Algo track uses mathematical algorithms to generate note values, rhythms, and patterns in real-time.
-
-This track type is ideal for:
-- Generative music and evolving patterns
-- Complex rhythmic structures
-- Algorithmic composition
-- Soundtrack and ambient music
-- Random but controlled musical output
+# Tuesday Track Manual
 
-The Algo track provides:
-- Multiple algorithm types (Test, Tri, Stomper, Markov, Chip, Wobble, etc.)
-- Parameter control (Flow, Ornament, Power, etc.)
-- Loop length and rotation controls
-- Glide and trill effects
-- Scale-based voltage output
-
-## 2. Algo Track Overview
-
-### 2.1 What is Algo?
-
-The Algo track generates musical sequences using mathematical algorithms rather than fixed step data. Each algorithm has its own unique approach to generating note values, rhythms, and patterns. The track processes these algorithms on each clock tick to determine the current note and gate outputs.
-
-Key concepts:
-- **Algorithms**: 15 different generation algorithms with unique behaviors
-- **Parameters**: Flow, Ornament, and Power control algorithm behavior
-- **Loop Length**: Controls pattern repetition (0 = infinite/evolving)
-- **Glide/Trill**: Smooth transitions and rapid note repetitions
-
-### 2.2 Algorithm Types
-
-The Algo track includes several algorithm categories:
+## Introduction
 
-**Melodic Algorithms**:
-- **ScaleWlk**: Walks up/down scale degrees
-- **Markov**: Markov chain-based note generation
-- **Blake**: Breath-like melodic phrases
-- **Window**: Slow anchor notes with fast texture
-
-**Rhythmic Algorithms**:
-- **TriTrance**: Bouncy, rhythmic patterns
-- **Stomper**: Stomping rhythmic sequences
-- **Autech**: Complex pattern-based sequences
-- **Minimal**: Burst/silence rhythmic patterns
+The Tuesday track is a **generative algorithm sequencer**. It stores no fixed step
+data — instead it runs one of 16 named algorithms (a port of the "Tuesday"
+generator) that produce notes, gates, and timing on every tick from a deterministic
+seed. Three knobs — **Flow**, **Ornament**, **Power** — drive that seed and shape the
+character; everything else (loop length, rotation, skew, glide, trills, masking,
+scale) reshapes the algorithm's output without touching what it generates.
 
-**Harmonic Algorithms**:
-- **Chip1/Chip2**: Arpeggiated chord progressions
-- **Aphex**: Multi-voice pattern sequences
-- **Ganz**: Multi-layered harmonic structures
+The same Flow + Ornament always produce the same sequence until you reseed. So a
+Tuesday track is reproducible: dial in a phrase you like, and it comes back. Reseed
+when you want a fresh draw of the same algorithm without changing your parameter
+settings.
 
-**Experimental Algorithms**:
-- **Wobble**: Phase-based oscillating patterns
-- **StepWave**: Stepped wave patterns
-
-### 2.3 Output Modes
-
-The track has two main output behaviors (selectable in List View):
-
-**Free Mode**: CV output updates every step regardless of gate state. Best for continuous modulation.
-**Gated Mode**: CV output only updates when a gate fires. Best for traditional note sequencing.
-
-### 2.4 List View Parameters
-
-In addition to the main Edit Page, the Algo track offers a comprehensive List View containing all available parameters. This view provides access to advanced settings not found on the main pages.
-
-**Full Parameter List:**
-- **Algorithm**: Generation algorithm selection
-- **Flow/Ornament/Power**: Core algorithm controls
-- **Loop Length**: Pattern repetition length
-- **Rotate**: Loop offset
-- **Glide**: Slide probability
-- **Skew**: Density distribution
-- **Gate Length**: Note duration scaling
-- **Gate Offset**: Gate timing offset
-- **CV Mode**: Free or Gated CV update behavior
-- **Retrig Prob**: (Old Trill) Probability of re-triggering the envelope
-- **Trill**: (Step Trill) Intra-step subdivision probability (New Trill)
-- **Start**: Start offset
-- **Octave/Transpose**: Pitch offsets
-- **Divisor**: Clock division
-- **Clock Mult**: Per-sequence clock multiplier (0.50x-1.50x)
-- **Reset Measure**: Automatic reset interval
-- **Scale/Root Note**: Quantization settings
-- **Mask Param**: Rhythmic masking control
-- **Time Mode**: Advanced mask timing behavior
-- **Mask Prog**: Automatic mask progression
-
-## 3. UI Overview
+This manual is grounded in the firmware as built. Defaults, ranges, enum members,
+key bindings, and step-grid maps are taken from the model, engine, and UI code.
 
-### 3.1 Main Sequence Page
+## Prerequisites
 
-The main page displays sequence settings:
+Before working with the Tuesday track you should have:
 
-- **Top Row**: Algorithm selection and parameter controls
-- **Middle Row**: Loop and timing controls
-- **Bottom Row**: Gate and start parameters
-- **Status Box**: Visual feedback showing current note (with gate indicator), output voltage, and step position
-- **Context Menu**: Init, Reseed, Randomize, Copy, and Paste options
+- Familiarity with the xformer track/sequence/edit page model (Page+S2 / Page+S1 / Page+S0).
+- Understanding of CV/gate concepts in modular synthesis.
+- A basic grasp of scales and quantization, since Tuesday's output is scale-quantized.
 
-### 3.2 Parameter Pages
+---
 
-The Algo track has three parameter pages accessible via F1-F4:
+# Part 1: Overview
 
-**Page 1** (F1-F4): Algorithm, Flow, Ornament, Power
-- **Algorithm**: Selects the generation algorithm (0-14)
-- **Flow**: Controls primary algorithm parameter (0-16)
-- **Ornament**: Controls secondary algorithm parameter (0-16)
-- **Power**: Controls note density/cooldown (0-16)
+## What the Tuesday track is
 
-**Page 2** (F1-F4): Loop, Rotate, Glide, Skew
-- **Loop**: Pattern length (0=Infinite, 1-29=2-128 steps)
-- **Rotate**: Loop rotation offset (±63 steps when loop enabled)
-- **Glide**: Slide probability (0-100%)
-- **Skew**: Density curve across loop (-8 to +8)
+A Tuesday track has **no per-step note data** in the usual sense. Instead it:
 
-**Page 3** (F1-F4): Gate Length, Gate Offset, Trill, Start
-- **Gate Length**: Gate duration scaling (0-100%)
-- **Gate Offset**: Gate timing offset (0-100%)
-- **Trill**: (Step Trill) Intra-step subdivision probability (0-100%)
-- **Start**: Starting position (0-16)
+1. **Seeds** two random generators from Flow and Ornament. Generation is deterministic from those seeds.
+2. **Generates** a note, octave, gate, and timing every step by running the selected algorithm against its internal state.
+3. **Shapes** that output through density (Power), loop/rotate/skew, glide, trills, masking, and scale quantization on the way to CV/gate out.
 
-### 3.3 Footer Controls (Function Keys)
+It is an algorithmic note source, not a step or sample sequencer. The sequence you
+hear is computed live, not stored.
 
-**F1-F4**: Select parameter on current page for encoder control
-**F5**: Next parameter page (or Shift+F5 to reseed)
-**NEXT**: Visual indicator showing current parameter page
+## Where state lives
 
-### 3.4 Context Menu
+- **Sequence params** (algorithm, Flow/Ornament/Power, loop, rotate, skew, glide, trills, gate shaping, start, octave/transpose, divisor, mask) live on the **sequence** — one set per pattern.
+- The **scale group** (scale / root note / scale rotate) lives on the **sequence**, not the track.
+- The **track** holds the play mode (Aligned / Free) and the per-pattern sequence array.
 
-Accessible via long-press on the menu button:
+## Seed, reset, reseed
 
-- **INIT**: Clear and reset sequence to defaults
-- **RESEED**: Restart algorithm with new random seed
-- **RAND**: Randomize all parameters for the current sequence
-- **COPY**: Copy sequence parameters
-- **PASTE**: Paste sequence parameters
+- **Flow** (1-16) seeds the main RNG; **Ornament** (1-16) seeds an auxiliary RNG (with a salt so Flow == Ornament still differs).
+- **reset** wipes all engine state and re-seeds both RNGs from the current Flow/Ornament. It runs on track init, loop restart, and the Reset jam button.
+- **reseed** (Shift+F5, or the RESEED context action) advances both RNGs to a fresh draw and re-initializes the algorithm, keeping Flow/Ornament unchanged — a new random variation of the same setup.
 
-## 4. Algorithm Parameters
+---
 
-### 4.1 Algorithm Parameter
+# Part 2: Algorithms
 
-Controls which generation algorithm is active:
-
-**Range**: 0 to 14:
-- 0: **Test** - Basic algorithm for testing
-- 1: **TriTrance** - Triangular/trance-like patterns
-- 2: **Stomper** - Stomping rhythmic patterns
-- 3: **Markov** - Markov chain note generation
-- 4: **Chip1** - Arpeggiated chip-tune patterns 1
-- 5: **Chip2** - Arpeggiated chip-tune patterns 2
-- 6: **Wobble** - Phase-based oscillating patterns
-- 7: **ScaleWlk** - Walking scale patterns
-- 8: **Window** - Anchor notes with texture
-- 9: **Minimal** - Burst/silence patterns
-- 10: **Ganz** - Multi-layered structures
-- 11: **Blake** - Breath-like phrases
-- 12: **Aphex** - Multi-voice patterns
-- 13: **Autech** - Rule-based patterns
-- 14: **StepWave** - Stepped wave patterns
-
-### 4.2 Flow and Ornament Parameters
+The **Algorithm** param selects one of 16 generators (id 0-15). Each has its own note
+selection, rhythm, and character. Flow and Ornament seed the draw and bias structural
+decisions; Power gates density.
 
-These control algorithm-specific parameters:
+## The 16 algorithms
 
-**Flow** (0-16):
-- Primary algorithm control parameter
-- Different meaning per algorithm
-- Often controls pattern complexity or behavior
+| # | Name | What it generates |
+|---|---|---|
+| 0 | Test | Simple stepped reference sequence — octave sweeps or a scale walk. Constant velocity. |
+| 1 | TriTrance | Three overlapping polyrhythmic layers on a 3-beat cycle: tight, swung, then accented with grace-note trills. |
+| 2 | Stomper | Alternating high/low octave "stomps" with slides and countdown rest periods. |
+| 3 | Markov | First-order Markov chain over 8 scale degrees; next note drawn from a transition matrix. Accent always on. |
+| 4 | Chip1 | Beat-synced chord arpeggio; chord stabs trigger a root/third/fifth trill. |
+| 5 | Chip2 | Ascending/descending arpeggio with dynamic chord length (3-7 notes) and rhythmic deadtime gaps. |
+| 6 | Wobble | Twin phasor (slow + fast) mapped to scale degrees; Ornament controls phase-2 probability, accents get high slide chance. |
+| 7 | ScaleWlk | Stateful 7-note scale walker; Flow sets direction (≤7 walks down, >7 walks up). StepTrill fires rapid bursts. |
+| 8 | Window | Twin phasor: slow anchor notes/accents over fast texture, with a Markov walk voice and periodic auto-mutation. |
+| 9 | Minimal | Burst/silence alternation; burst sections density-gate staccato notes. Conservative glide and trill. |
+| 10 | Ganz | Triple phasor (1×/5×/7×) on a 5-tuplet grid with phrase-skip muting and four note-selection modes. |
+| 11 | Blake | Stable 4-note motif over an 8-bar breath LFO; real/ghost/whisper articulation and occasional sub-bass drops. |
+| 12 | Aphex | Three independent polyrhythms (4/3/5-beat) with a modifier track and a bass-override track; collision stress. |
+| 13 | Autech | 8-note pattern that mutates by rotation/mirror/inversion/shift on timer expiry; polyrhythm on off-grid beats. |
+| 14 | StepWave | Scale-degree walk with polyrhythm; Flow biases direction, Ornament selects rapid vs spread timing. |
+| 15 | Turing | Turing shift register with live drift; Power sets flip probability, Ornament sets range. |
 
-**Ornament** (0-16):
-- Secondary algorithm control parameter
-- Different meaning per algorithm
-- Often controls variation or ornamentation
+> The Edit page footer truncates algorithm names to 7 characters. The List View shows
+> the full name.
 
-### 4.3 Power Parameter
+## How Flow / Ornament / Power read
 
-Controls note density and cooldown:
+- **Flow** (0-16) seeds the main RNG and drives big structural choices: mode select, phrase, walk direction, burst/breath lengths, pattern init.
+- **Ornament** (0-16) seeds the auxiliary RNG and drives detail: pitch variation, velocity, micro-timing, phase-selection probability, register range.
+- **Power** (0-16) is the **density / cooldown** control. The cooldown between notes is `17 - Power`, so Power 0 means no notes (max cooldown), Power 16 means notes nearly every step. Skew bends Power across the loop (see Part 4).
 
-**Range**: 0 to 16
-- Lower values = higher cooldown = sparser patterns
-- Higher values = lower cooldown = denser patterns
-- Acts as a note probability/gating parameter
+---
 
-## 5. Advanced Features
+# Part 3: Output Shaping
 
-### 5.1 Loop Controls
-
-The Algo track includes sophisticated loop controls:
+## Gate length and offset
 
-**Loop Length**:
-- 0: Infinite/evolving patterns (default)
-- 1-29: Finite loops of 2-128 steps
-- Allows for repeating patterns within algorithmic generation
+The algorithm emits a base gate ratio (nominally 75%, up to 200%). Two knobs scale it:
 
-**Rotation**:
-- Shifts the loop start position (±63 steps)
-- Only available when loop length > 0
-- Creates variations without changing algorithm parameters
+- **Gate Length** (`gateLength`, 0-100%, default 50%) scales the algorithm's gate ratio into actual gate-on ticks. Accented notes extend the gate by 50%.
+- **Gate Offset** (`gateOffset`, 0-100%, default 0%) scales the algorithm's intended onset offset. At 50% it applies the algorithm's offset 1×; at 100% it doubles it, pushing the gate later within the step.
 
-**Skew**:
-- Bipolar (-8 to +8) distribution control
-- Affects density curve across loop length
-- Creates front-loaded or back-loaded patterns
+## Glide, Trill, StepTrill
 
-### 5.2 Glide and Trill Effects
+Three independent expressive effects:
 
-**Glide** (0-100%):
-- Probability of smooth transitions between notes
-- Creates portamento/sliding effects
-- Adds expressiveness to algorithmic output
+| Param | List name | Range / default | Effect |
+|---|---|---|---|
+| Glide | Glide | 0-100%, default 50% | Slide probability. When the algorithm flags a slide and Glide > 0, CV interpolates to the target over a slide window (longer with higher Glide). |
+| Trill | Old Trill | 0-100%, default 50% | Re-trigger probability. Combined with the algorithm's articulation indicator; when it fires the gate ratchets (fires twice). List View only. |
+| StepTrill | Trill (Edit page) | 0-100%, default 0% | Intra-step subdivision. When the algorithm requests a trill count >1 and StepTrill > 0, the step subdivides into rapid micro-gates with independent pitches. |
 
-**Trill (Step Trill)** (0-100%):
-- Probability of rapid note subdivisions (intra-step)
-- Creates rapid note repetitions
-- Adds rhythmic complexity
+> **Two trills, two layers.** The Edit page "TRILL" knob is **StepTrill** (the new,
+> intra-step subdivision). The List View exposes both: "Trill" (StepTrill) and "Old
+> Trill" (the re-trigger ratchet). They are separate parameters.
 
-**Retrig Prob (Old Trill)** (0-100%):
-- Probability of re-triggering the envelope
-- Available in List View only
-- Independent of Step Trill
+## CV update mode
 
-**Gate Offset** (0-100%):
-- Timing offset for gate firing
-- Allows for syncopation and timing variation
-- Adjusts gate timing relative to step
+`CvUpdateMode` (List View, **CV Mode**) sets when CV moves:
 
-### 5.3 Reseed Function
+- **Free** (default) — CV updates every step the algorithm produces a note, even when density gates the gate off. Continuous modulation.
+- **Gated** — CV only updates when a gate actually fires. Traditional note-and-rest behavior (the original Tuesday behavior).
 
-**Reseed** (Shift+F5):
-- Restarts algorithm with new random seed
-- Creates new variation of same algorithm
-- Useful for live performance to refresh patterns
+## Scale quantization
 
-### 5.4 Mask Parameter (Jam Surface Only)
+Output is always quantized. The generated scale degree + octave runs through the
+selected scale, then Transpose (in scale degrees), Root Note offset, and the Octave
+offset are applied to reach the final CV.
 
-**Mask**:
-- Accessible via Jam Surface (Step 7 for increment, Step 14 for decrement)
-- Controls a rhythmic masking effect that hides specific ticks based on a prime-number sequence.
-- Creates evolving polyrhythms and rests by filtering the algorithm's output.
-- 0 = All (No masking)
-- 15 = None (Mute all)
-- 1-14 = Prime-based rhythmic masks
+- **Scale** (Default = project scale, Semitones = chromatic, or a named scale).
+- **Root Note** (Default = project root, or C..B).
+- **Scale Rotate** (Default = project rotate, or 0-31).
+- **Octave** (-10..+10) and **Transpose** (-11..+11).
 
-### 5.5 Advanced Masking (List View Only)
+---
 
-**Time Mode**:
-- Controls how the mask timing interacts with the grid.
-- **FREE**: Masking toggles based on tick count (free-running).
-- **QRT**: Masking aligns to quarter-note grid.
-- **1.5Q**: Masking aligns to 1.5 quarter-note grid.
-- **3QRT**: Masking aligns to 3 quarter-note grid.
+# Part 4: Loop, Rotate, Skew, Start
 
-**Mask Progression**:
-- Automatically evolves the mask parameter over time.
-- **NO PROG**: Static mask.
-- **PROG+1**: Increments mask index by 1 per cycle.
-- **PROG+5**: Increments mask index by 5 per cycle.
-- **PROG+7**: Increments mask index by 7 per cycle.
+## Loop length
 
-## 6. External CV Integration
+`LoopLength` indexes a fixed table of lengths. Index 0 is **Inf** (infinite/evolving,
+the default). Indices 1-29 map to: 1-16, then 19, 21, 24, 32, 35, 42, 48, 56, 64, 95,
+96, 127, 128 steps.
 
-### 6.1 Routing Setup
+- **Inf** — the algorithm runs free, never resetting its RNG. Patterns evolve.
+- **Finite** — at the loop boundary the engine re-seeds from the initial seed, so the same N-step phrase repeats exactly.
 
-The Algo track supports CV routing to parameters:
+## Rotate
 
-**Routable Parameters**:
-- Algorithm, Flow, Ornament, Power
-- Glide, Trill, Gate Length, Gate Offset
-- Divisor, Clock Mult, Rotate, Octave, Transpose
+`Rotate` (default 0) cyclically shifts the playback position within a finite loop. Its
+range is clamped to ±(loop length − 1), so it only applies when Loop is finite — the
+Edit page shows **N/A** for infinite loops, and rotation is forced to 0.
 
-**Usage**:
-- Route CV sources to algorithm parameters
-- Create evolving parameter changes
-- Modulate algorithm behavior with external sources
+## Skew
 
-### 6.2 Applications
+`Skew` (-8..+8, default 0) bends **Power** across the loop:
 
-**Parameter Modulation**:
-- LFOs modulate Flow/Ornament for evolving patterns
-- Envelopes modulate Power for dynamic density
-- Random CV modulates Algorithm for morphing
+- Negative — lower density at the start, higher at the end (ramp up).
+- Positive — higher density at the start, lower at the end (ramp down).
 
-**Scale Integration**:
-- Output quantized to selected scale
-- Supports chromatic and named scales
-- Root note and octave transposition available
+## Start
 
-## 7. Internal Sequencing
+`Start` (0-16, default 0) delays note generation by that many steps from track start.
+The mask system can extend this further with prime-number delays (Part 5).
 
-### 7.1 Algorithmic Generation
+---
 
-The Algo track uses mathematical algorithms to generate:
-- Note values based on scale degrees
-- Rhythmic patterns and gate timing
-- Probability-based variations
-- Stateful pattern evolution
+# Part 5: The Mask System
 
-### 7.2 Timing Control
+Masking filters the algorithm's output on and off in time, carving polyrhythms and
+rests out of the generated stream. While a tick is masked, the gate stays off.
 
-**Divisor**: Clock division (1-768) controls step rate
-**Clock Mult**: Per-sequence multiplier (0.50x-1.50x) applied to divisor timing
-**Gate Length**: Controls gate duration scaling (0-100%)
-**Reset Measure**: Bar-based reset timing (0-128 bars)
+## Mask Parameter
 
-### 7.3 Scale Quantization
+`MaskParameter` (0-15):
 
-**Scale Selection**:
-- Project scale (default)
-- Track-specific scales (0-19+)
-- Chromatic/Semitones option
+- **0 = ALL** (default) — no masking, every tick allowed.
+- **1-14** — prime-number masks. The values, in order, are 2, 3, 5, 11, 19, 31, 43, 61, 89, 131, 197, 277, 409, 599.
+- **15 = NONE** — mask everything (silence).
 
-**Transposition**:
-- Octave offset (-10 to +10)
-- Semitone offset (-11 to +11)
-- Root note override (C to B)
+In FREE mode the mask alternates allow/mask in blocks of `maskValue` ticks. In the
+grid-synced modes the masked block is `maskValue` ticks and the allowed block is
+derived from a quarter-note grid.
 
-## 8. Practical Examples
+## Time Mode
 
-### 8.1 Ambient Pad Generation
+`TimeMode` (List View) sets how the mask aligns to the clock:
 
-1. Select Algorithm 7 (ScaleWlk)
-2. Set Flow to 8, Ornament to 6
-3. Set Power to 4 for sparse notes
-4. Set Glide to 75% for smooth transitions
-5. Use a slow divisor (e.g., 768 for whole notes)
-6. Select a rich harmonic scale
+| Mode | Behavior |
+|---|---|
+| FREE (default) | Mask toggles purely by tick count, free-running. |
+| QRT | Allowed block aligns to a quarter-note grid. |
+| 1.5Q | Allowed block aligns to a 1.5 quarter-note grid. |
+| 3QRT | Allowed block aligns to a 3 quarter-note grid. |
 
-### 8.2 Rhythmic Pattern Generation
+## Mask Progression
 
-1. Select Algorithm 2 (Stomper)
-2. Set Flow to 10 for active patterns
-3. Set Power to 12 for dense notes
-4. Set Trill to 40% for rhythmic complexity
-5. Use medium divisor (e.g., 48 for 8th notes)
-6. Apply to drum CV/Gate outputs
+`MaskProgression` (List View) auto-advances the mask index each cycle:
 
-### 8.3 Melodic Variation
+| Mode | Step |
+|---|---|
+| NO PROG (default) | Static mask, no advance. |
+| PROG+1 | Advance the prime index by 1 per cycle. |
+| PROG+5 | Advance by 5. |
+| PROG+7 | Advance by 7. |
 
-1. Select Algorithm 3 (Markov)
-2. Set Flow to 5 for conservative changes
-3. Set Ornament to 12 for variation
-4. Set Gate Length to 50% for note separation
-5. Use Scale and Root settings for tonal center
-6. Apply Reseed periodically for new variations
+---
 
-## 9. Shortcuts and Tips
+# Part 6: Timing
 
-### 9.1 Quick Navigation
+Per-sequence timing parameters:
 
-- **F1-F4**: Select parameter for encoder control
-- **F5**: Cycle between parameter pages
-- **Shift+F5**: Reseed algorithm with new seed
-- **Context Menu**: Long press for options
+| Param | Range | Default | Notes |
+|---|---|---|---|
+| Divisor | 1-768 | 12 (1/16) | Ticks per step at the hardware clock. Edited by known musical divisors. |
+| Clock Mult | 50-150% | 100% (1.00x) | Scales tempo against the divisor; higher = faster steps. |
+| Reset Measure | 0-128 bars | 0 (off) | Bar-based reset interval. 0 = off. |
+| Play Mode | Aligned / Free | Aligned | Track-level. Aligned steps on the tick grid; Free derives the step from wallclock position. |
 
-### 9.2 Quick Edit (Page+Steps 9-16)
+The effective step length combines Divisor and Clock Mult: a higher multiplier
+shortens the divisor and speeds up stepping.
 
-- **Page+Step 9**: Copy parameters to Slot 1
-- **Page+Step 10**: Copy parameters to Slot 2
-- **Page+Step 11**: Copy parameters to Slot 3
-- **Page+Step 12**: Paste parameters from Slot 1
-- **Page+Step 13**: Paste parameters from Slot 2
-- **Page+Step 14**: Paste parameters from Slot 3
-- **Page+Step 15**: Randomize (randomizes all parameters)
+---
 
-### 9.3 Editing Tips
+# Part 7: The Edit Page
 
-- Start with Algorithm 7 (ScaleWlk) for melodic output
-- Use Power parameter to control note density
-- Set Loop Length to 0 for infinite evolution
-- Use Gate Length to control note overlap
-- Try different scales for harmonic variety
+The Edit page (Page+S0) shows **3 parameter pages** of 4 slots each, plus a status box
+and a jam step grid. **F1-F4** select a slot for the encoder; **F5 (NEXT)** advances to
+the next parameter page; **Shift+F5** reseeds.
 
-### 9.4 Jam Surface (Step Buttons)
+## The three parameter pages
 
-| Step | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Top | Octave + | Transpose + | Root Note + | Div up (straight) | Div up (triplet) | Div /2 (faster) | Mask + | Loop +<br>Shift: Run momentary |
-| Bottom | Octave - | Transpose - | Root Note - | Div down (straight) | Div down (triplet) | Div x2 (slower) | Mask - | Loop -<br>Shift: Reset |
+| Page | F1 | F2 | F3 | F4 |
+|---|---|---|---|---|
+| 1 | ALGO (Algorithm) | FLOW (Flow) | ORN (Ornament) | POWER (Power) |
+| 2 | LOOP (Loop Length) | ROT (Rotate) | GLIDE (Glide) | SKEW (Skew) |
+| 3 | GATE (Gate Length) | GOFS (Gate Offset) | TRILL (StepTrill) | START (Start) |
+
+The footer shows the four short names plus **NEXT**; a `[page/3]` indicator sits to the
+right and `[algo#]` above F1. The status box (top right) shows the current note name +
+gate indicator, the CV voltage, and the step/loop position.
+
+## Encoder
+
+The encoder edits the selected slot's parameter. **Shift** accelerates the percentage
+params (Glide, Trill, StepTrill, Gate Length, Gate Offset, Clock Mult) by ×10.
+
+## The jam step grid (S1-S16)
+
+The step keypad performs hands-on edits without leaving the page. Top row increases /
+speeds up, bottom row decreases / slows down:
+
+| Col | S1-8 (top) | S9-16 (bottom) |
+|---|---|---|
+| 1 | Octave + | Octave − |
+| 2 | Transpose + | Transpose − |
+| 3 | Root Note + | Root Note − |
+| 4 | Divisor up (straight, faster) | Divisor down (straight, slower) |
+| 5 | Divisor up (triplet, faster) | Divisor down (triplet, slower) |
+| 6 | Divisor ÷2 (faster) | Divisor ×2 (slower) |
+| 7 | Mask + | Mask − |
+| 8 | Loop + | Loop − |
 
 **Shift modifiers:**
-- **Shift+Step 8**: Run momentary (press = stop, release = play if running, or hold to temporarily run if stopped)
-- **Shift+Step 16**: Reset (restart sequence from start)
 
-**Behavior notes:**
-- Top row buttons generally increase values or speed up (smaller divisor).
-- Bottom row buttons generally decrease values or slow down (larger divisor).
-- Mask parameter allows for rhythmic filtering of the algorithm's output.
+- **Shift+S8** — Run momentary: while held, the track stops; release restores its prior run state.
+- **Shift+S16** — Reset the sequence (shows "RESET").
 
-## 10. Troubleshooting
+**LEDs:** top row lights green when the value is above its default (octave/transpose/root
+up, divisor faster, mask up); bottom row lights red when below.
 
-### 10.1 No Output
+## Context menu
 
-- Verify track is not muted
-- Check that algorithm is generating notes
-- Ensure divisor is set appropriately
-- Confirm scale settings are valid
+Long-press the menu button:
 
-### 10.2 Unexpected Patterns
+- **INIT** — clear the sequence to defaults.
+- **RESEED** — fresh seed draw, same Flow/Ornament.
+- **RAND** — randomize all sequence parameters.
+- **COPY** — copy sequence params to clipboard slot 1.
+- **PASTE** — paste from clipboard slot 1.
 
-- Check algorithm parameters (Flow, Ornament, Power)
-- Verify loop length settings
-- Ensure appropriate scale is selected
-- Try Reseed to refresh algorithm state
+## Quick-edit (Page + S9-S16)
 
-### 10.3 Sync Issues
+Holding **Page** plus a bottom-row step performs clipboard/randomize actions:
 
-- Verify divisor settings match expectations
-- Check reset measure settings
-- Ensure external sync sources are properly configured
-- Confirm algorithm is not getting stuck in state
+| Step | Action |
+|---|---|
+| S9 | Copy to slot 1 |
+| S10 | Copy to slot 2 |
+| S11 | Copy to slot 3 |
+| S12 | Paste from slot 1 |
+| S13 | Paste from slot 2 |
+| S14 | Paste from slot 3 |
+| S15 | Randomize |
+| S16 | (inert) |
+
+**LEDs:** copy and randomize steps light; paste steps light only when their clipboard
+slot holds valid data.
+
+> The clipboard carries algorithm, Flow, Ornament, Power, loop, rotate, glide, skew,
+> gate length, gate offset, StepTrill, start, octave, transpose, root note, divisor, and
+> mask parameter. Other params (scale, time mode, mask progression, CV mode, etc.) are
+> not copied.
+
+---
+
+# Part 8: The List View & Routing
+
+## Sequence list (Page+S1)
+
+The List View hosts every sequence parameter in order:
+
+Algorithm, Flow, Ornament, Power, Loop Length, Rotate, Glide, Skew, Gate Length, CV
+Mode, Old Trill, Start, Octave, Transpose, Divisor, Clock Mult, Reset Measure, Scale,
+Root Note, Scale Rotate, Mask Param, Time Mode, Mask Prog.
+
+The only context action here is **INIT** (clear the sequence).
+
+## Defaults and ranges
+
+| Param | Range | Default |
+|---|---|---|
+| Algorithm | 0-15 | 0 (Test) |
+| Flow | 0-16 | 0 |
+| Ornament | 0-16 | 0 |
+| Power | 0-16 | 0 |
+| Loop Length | Inf, 1-128 (29 indices) | Inf |
+| Rotate | ±(loop−1) | 0 |
+| Glide | 0-100% | 50% |
+| Skew | -8..+8 | 0 |
+| Gate Length | 0-100% | 50% |
+| CV Mode | Free / Gated | Free |
+| Old Trill | 0-100% | 50% |
+| StepTrill (Edit "TRILL") | 0-100% | 0% |
+| Start | 0-16 | 0 |
+| Octave | -10..+10 | 0 |
+| Transpose | -11..+11 | 0 |
+| Divisor | 1-768 | 12 (1/16) |
+| Clock Mult | 50-150% | 100% (1.00x) |
+| Reset Measure | 0-128 bars | 0 (off) |
+| Gate Offset | 0-100% | 0% |
+| Scale | Default / Semitones / named | Default (project) |
+| Root Note | Default / C..B | Default (project) |
+| Scale Rotate | Default / 0-31 | Default (project) |
+| Mask Param | ALL, 1-14 primes, NONE | ALL |
+| Time Mode | FREE / QRT / 1.5Q / 3QRT | FREE |
+| Mask Prog | NO PROG / +1 / +5 / +7 | NO PROG |
+
+## What is routable
+
+These Tuesday params are routing targets (all per-sequence):
+
+- `Algorithm` (0-15)
+- `Flow` (0-16)
+- `Ornament` (0-16)
+- `Power` (0-16)
+- `Glide` (0-100%)
+- `Trill` (Old Trill, 0-100%)
+- `StepTrill` (0-100%)
+- `GateLength` (0-100%)
+- `GateOffset` (0-100%)
+- `Rotate`
+- `Octave`
+- `Transpose`
+- `Divisor`
+- `ClockMult`
+- `Scale`, `RootNote` (via the shared scale targets)
+
+**Not routable:** Start, Skew, Loop Length, CV Mode, Reset Measure, Scale Rotate, Mask
+Param, Time Mode, Mask Prog.

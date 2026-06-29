@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PhaseFlux Track — manual</title>
+<style>
+  :root{
+    --blue:#2563eb; --amber:#ca8a04; --green:#16a34a; --red:#dc2626; --purp:#7c3aed;
+    --ink:#1a1a1a; --mut:#5b5b5b; --line:#e5e5e5; --card:#ffffff; --bg:#fafafa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; line-height:1.5;}
+  .wrap{max-width:880px; margin:0 auto; padding:32px 24px 90px}
+  h1{font-size:1.75rem; line-height:1.2; margin:0 0 6px}
+  h2{font-size:1.32rem; line-height:1.25; margin:46px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--blue)}
+  h2.geo{border-color:var(--green)}
+  h2.adv{border-color:var(--purp)}
+  h3{font-size:1.06rem; margin:24px 0 6px}
+  .lede{color:var(--mut); font-size:1.05rem; margin:0 0 8px}
+  p{margin:10px 0}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#f0f0f3; padding:1px 5px; border-radius:4px; font-size:.9em}
+  pre{background:#1a1a1a; color:#f0f0f0; padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:.86rem; line-height:1.45; margin:12px 0}
+  pre code{background:none; padding:0; color:inherit; font-size:1em}
+  .kbd{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#1a1a1a; color:#fff; padding:2px 7px; border-radius:5px; font-size:.82em; white-space:nowrap}
+  .tag{display:inline-block; font-size:.7rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:99px; vertical-align:middle}
+  .t-blue{background:#e8effe; color:var(--blue)} .t-amber{background:#fbf1d9; color:var(--amber)}
+  .t-green{background:#e3f5ea; color:var(--green)} .t-purp{background:#efe7fd; color:var(--purp)}
+  .t-red{background:#fdeeee; color:var(--red)}
+
+  .note{border-left:4px solid var(--blue); background:#f3f7ff; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .warn{border-left:4px solid var(--amber); background:#fdf8ec; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .gotcha{border-left:4px solid var(--red); background:#fdeeee; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:.93rem}
+  th,td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top}
+  thead th{background:#e8effe; color:var(--blue)}
+  tbody tr:nth-child(even){background:#fafafa}
+  td code{white-space:nowrap}
+
+  figure{margin:18px 0; text-align:center}
+  figcaption{color:var(--mut); font-size:.85rem; margin-top:6px}
+  .shot{display:block; width:100%; max-width:520px; margin:14px auto 2px; image-rendering:pixelated;
+    border:1px solid #333; border-radius:4px; background:#000}
+  .cap{text-align:center; color:var(--mut); font-size:.84rem; margin:0 0 6px}
+
+  .steps{counter-reset:step; list-style:none; padding:0; margin:14px 0}
+  .steps>li{counter-increment:step; position:relative; padding:12px 12px 12px 56px; margin:10px 0;
+    background:var(--card); border:1px solid var(--line); border-radius:8px}
+  .steps>li::before{content:counter(step); position:absolute; left:12px; top:12px; width:30px; height:30px;
+    border-radius:50%; background:var(--blue); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:.95rem}
+
+  .toc{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:16px 0; columns:2; font-size:.93rem}
+  @media(max-width:620px){.toc{columns:1}}
+  .toc a{color:var(--blue); text-decoration:none} .toc a:hover{text-decoration:underline}
+  .footer{margin-top:48px; padding-top:14px; border-top:1px solid var(--line); color:var(--mut); font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>PhaseFlux Track — manual</h1>
+<p class="lede">A 16-cell pulse synthesizer. Each cell of a 4×4 grid fires a scheduled burst of gate pulses with an independent temporal shape and pitch shape, walked through a selectable traversal with per-stage accumulators and sequence-wide macros.</p>
+
+<div class="toc">
+  <a href="#p1">1. Overview</a><br>
+  <a href="#p2">2. The Stage Parameter Matrix</a><br>
+  <a href="#p3">3. Cycle, Traversal &amp; Timing</a><br>
+  <a href="#p4">4. Pitch Mode — Cell vs Global</a><br>
+  <a href="#p5">5. The Pulse / Curve Pipeline</a><br>
+  <a href="#p6">6. Accumulators</a><br>
+  <a href="#p7">7. The Edit Page</a><br>
+  <a href="#p8">8. Setup &amp; Routing</a>
+</div>
+
+<h2>Introduction</h2>
+<p>The PhaseFlux track is a <strong>16-cell pulse synthesizer</strong>. The 16 cells form a 4×4 grid; each cell is a <strong>stage</strong> that, when its slot comes up in the cycle, fires a scheduled burst of gate pulses. Every stage carries two independent shapes: a <strong>temporal</strong> shape that decides <em>when</em> the pulses land inside the slot, and a <strong>pitch</strong> shape that decides <em>what note</em> each pulse plays. Stages are walked in a selectable traversal (a top-down snake plus seven René-mk2 access patterns), drift over time through per-stage note and pulse <strong>accumulators</strong>, and respond live to sequence-wide <strong>macro nudges</strong>.</p>
+<p>It generates everything itself from the per-stage parameter matrix — there is no source track to sample. One stage with four pulses across a beat is the default; push the curves, warps, windows, repeats and accumulators and the same grid produces evolving polyrhythmic phrases.</p>
+<p>Everything here is grounded in the firmware as built — defaults, ranges, enum members, key bindings, and step-grid maps come from the model, engine, and UI code.</p>
+
+<h3>Prerequisites</h3>
+<ul>
+  <li>Familiarity with the xformer track/sequence/edit page model (<span class="kbd">Page+S2</span> / <span class="kbd">Page+S1</span> / <span class="kbd">Page+S0</span>).</li>
+  <li>Understanding of CV/gate concepts in modular synthesis, and scale-degree pitch.</li>
+  <li>A track set to PhaseFlux mode; the engine drives one gate + one CV output.</li>
+</ul>
+
+<h2 id="p1">Part 1 · Overview</h2>
+<p>A PhaseFlux <strong>sequence</strong> holds 16 <strong>stages</strong> laid out as a 4×4 grid. The engine builds a cycle from the in-range, non-skipped stages and walks them slot by slot:</p>
+<ol>
+  <li><strong>Cycle build</strong> — each stage's <code>length</code> (in divisor units) sets its slot width. Skipped/out-of-range stages contribute zero (Adaptive) or stay as a silent slot (Fixed). The sum is the cycle length in ticks.</li>
+  <li><strong>Per-slot schedule</strong> — when a slot becomes active, the engine builds a list of pulses for that stage: <code>pulseCount</code> triggers placed by the temporal shape, each carrying a CV from the pitch shape.</li>
+  <li><strong>Pulse fire</strong> — at each tick the engine fires any scheduled pulse whose trigger time was reached, raising the gate for its gate-length and pushing the pulse's CV to the output.</li>
+</ol>
+<p>The two shapes per stage are orthogonal:</p>
+<ul>
+  <li><span class="tag t-blue">Temporal</span> curve / warp / response / window / repeat / mask / phase shift / gate length / pulse count. Decides pulse <em>timing</em> and <em>density</em> inside the slot.</li>
+  <li><span class="tag t-purp">Pitch</span> curve / warp / response / range / direction / base pitch / window / repeat / melody mask / tilt. Decides the <em>note</em> each pulse plays, snapped to the sequence scale.</li>
+</ul>
+<p>On top of both sit per-stage <span class="tag t-amber">Accumulators</span> (note + pulse counters that drift the values each cycle) and sequence-wide macros (uniform nudges, global phase, cycle warp).</p>
+<div class="note"><strong>Where state lives.</strong> Track-wide params (play/fill/CV-update modes, slide, octave, transpose) live on the <strong>track</strong>. Per-pattern params (the 16 stages, divisor, traversal, loop bounds, pitch mode/rate, cycle length, accumulator configs, macros, the scale group) live on the <strong>sequence</strong> — one set per w-pattern.</div>
+
+<h2 id="p2">Part 2 · The Stage Parameter Matrix</h2>
+<p>Every stage stores the same field set. Two axes (temporal, pitch) plus per-stage accumulator wiring. All per-stage edits target the cursor cell, or every cell in an active multi-select.</p>
+
+<h3>Temporal fields</h3>
+<table>
+  <thead><tr><th>Field</th><th>Default</th><th>Range</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>Pulse Count (<code>Puls</code>)</td><td>4 (stages 0-3), 0 (4-15)</td><td>0-16</td><td>Pulses fired in the slot. 0 = silent stage</td></tr>
+    <tr><td>Length (<code>Len</code>)</td><td>4</td><td>1-127</td><td>Slot width in divisor units (4 = one beat at 1/16)</td></tr>
+    <tr><td>Curve</td><td>Linear</td><td>Linear / Bell / Bounce</td><td>Temporal density curve (Bounce = ExpDown3x)</td></tr>
+    <tr><td>Warp</td><td>0</td><td>±64</td><td>PowerBend on pulse position before the curve</td></tr>
+    <tr><td>Response</td><td>0</td><td>±64</td><td>PowerBend on the curve output</td></tr>
+    <tr><td>FlipV</td><td>off</td><td>on/off</td><td>Mirror the curve value (vertical)</td></tr>
+    <tr><td>FlipH</td><td>off</td><td>on/off</td><td>Reflect the pulse schedule around the slot midpoint</td></tr>
+    <tr><td>Window</td><td>Off</td><td>Off / Focus70 / Focus50 / Polarize70 / Polarize50</td><td>Drop pulses outside the visible band</td></tr>
+    <tr><td>Repeat</td><td>x1</td><td>x1 / x2 / x3 / x5</td><td>Split the slot into N sub-sections, one curve copy each</td></tr>
+    <tr><td>Mask</td><td>Off</td><td>8 patterns</td><td>Mute selected pulses (LSB = pulse 0)</td></tr>
+    <tr><td>Mask Shift</td><td>0</td><td>0-7</td><td>Rotate the mask pattern</td></tr>
+    <tr><td>Phase Shift</td><td>0</td><td>0-7</td><td>Shift all triggers by N×0.125 of the slot</td></tr>
+    <tr><td>Gate Length</td><td>50</td><td>0-100</td><td>Pulse gate as a percent of the pulse period</td></tr>
+  </tbody>
+</table>
+<p><strong>Mask patterns</strong> (set bit mutes that pulse): Off, OneInTwo, OneInThree, OneInFour, TwoInThree, TwoInFour, ThreeInFour, OneInEight.</p>
+<div class="warn"><strong>Gate-length rules</strong> (<code>kMinPulseGateTicks</code> = 6): <code>0</code> drops the pulse; <code>1</code> is an always-audible minimum, floored at 6 ticks; <code>≥2</code> scales by percent and drops the pulse if the computed gate is shorter than 6 ticks.</div>
+
+<h3>Pitch fields</h3>
+<table>
+  <thead><tr><th>Field</th><th>Default</th><th>Range</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>Base Pitch (<code>Note</code>)</td><td>0</td><td>±63 degrees</td><td>Stage's root scale degree</td></tr>
+    <tr><td>Curve</td><td>Ramp</td><td>Ramp / Bell / Triangle / Bounce</td><td>Pitch contour across the pulses (Bounce = ExpDown3x)</td></tr>
+    <tr><td>Warp</td><td>0</td><td>±64</td><td>PowerBend on phase before the curve</td></tr>
+    <tr><td>Response</td><td>0</td><td>±64</td><td>PowerBend on the curve output</td></tr>
+    <tr><td>FlipV</td><td>off</td><td>on/off</td><td>Mirror the curve value</td></tr>
+    <tr><td>FlipH</td><td>off</td><td>on/off</td><td>Mirror the phase input</td></tr>
+    <tr><td>Range (<code>Span</code>)</td><td>One</td><td>Half / One / Two / Three</td><td>Pitch span: 0.5 / 1 / 2 / 3 octaves</td></tr>
+    <tr><td>Direction (<code>Dir</code>)</td><td>Up</td><td>Up / Down / Bipolar</td><td>Apply the curve offset up, down, or centered</td></tr>
+    <tr><td>Window</td><td>Off</td><td>Off / Focus70 / Focus50 / Polarize70 / Polarize50</td><td>Hold pitch at the nearest visible boundary in hidden bands</td></tr>
+    <tr><td>Repeat</td><td>x1</td><td>x1 / x2 / x3 / x5</td><td>Repeat the pitch curve N times across the slot</td></tr>
+    <tr><td>Mask Melody (<code>Mask</code>)</td><td>100</td><td>0-100</td><td>Tonal filter on note centrality; 100 = all pass</td></tr>
+    <tr><td>Tilt Melody (<code>Tilt</code>)</td><td>0</td><td>0-100</td><td>Anti-tonal filter on inverted centrality; 0 = off</td></tr>
+  </tbody>
+</table>
+<p>Mask Melody and Tilt Melody form an orthogonal union: a pulse plays if it passes <strong>either</strong> filter (mask keeps central scale tones, tilt keeps the outliers). Final note = base pitch + accumulator offset + octave + transpose + the direction-applied curve offset, converted to volts through the sequence scale.</p>
+
+<h3>Per-stage accumulator fields</h3>
+<table>
+  <thead><tr><th>Field</th><th>Default</th><th>Range</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>Note Step (<code>Ac.St</code>)</td><td>0</td><td>±7 (UI), ±15 (storage)</td><td>Scale-degree drift applied per trigger</td></tr>
+    <tr><td>Pulse Step (<code>Ac.St</code>)</td><td>0</td><td>±7</td><td>Pulse-count drift applied per trigger</td></tr>
+    <tr><td>Note Trigger (<code>Trig</code>)</td><td>Stage</td><td>Stage / Pulse</td><td>Advance the note counter per stage, or per pulse</td></tr>
+    <tr><td>Pulse Trigger (<code>Trig</code>)</td><td>Stage</td><td>Stage / Pulse</td><td>Advance the pulse counter per stage, or per pulse</td></tr>
+  </tbody>
+</table>
+<p>The step value is the per-stage amount; the <strong>scope, order, polarity, reset, and limits</strong> that govern how the counter walks are sequence-level (Part 6).</p>
+
+<h2 id="p3">Part 3 · Cycle, Traversal &amp; Timing</h2>
+<h3>How the cycle is built</h3>
+<p>Each in-range non-skipped stage's <code>length</code> (plus the Len Nudge macro) sets its slot's tick width. <code>length × divisor</code>, scaled by clock multiplier, gives the ticks; the cumulative table over the traversal order yields the cycle length. An all-skipped sequence is idle (gate held low, counters frozen).</p>
+<ul>
+  <li><strong>Loop bounds</strong> — <code>First Stage</code> / <code>Last Stage</code> restrict the played cycle to stages <code>[first..last]</code> by grid index. Out-of-range stages contribute zero. A single stage loops when first == last.</li>
+  <li><strong>Cycle Length</strong> — <strong>Adaptive</strong> (default in clear): skipped stages drop out of the cycle entirely. <strong>Fixed</strong>: skipped stages keep their slot but emit silence (Note-track-like grid feel).</li>
+</ul>
+<h3>Traversal patterns</h3>
+<table>
+  <thead><tr><th>#</th><th>Name</th><th>Walk</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>Snake</td><td>Top-down boustrophedon (default)</td></tr>
+    <tr><td>1</td><td>Rows</td><td>Bottom-up rows, all left→right (René P1)</td></tr>
+    <tr><td>2</td><td>SnakeUp</td><td>Snake bottom-up (René P2)</td></tr>
+    <tr><td>3</td><td>Cols</td><td>Columns bottom-up, right column first (René P3)</td></tr>
+    <tr><td>4</td><td>ColSnake</td><td>Columns zigzag, down/up alternating (René P4)</td></tr>
+    <tr><td>5</td><td>Spiral</td><td>Outward from bottom-left (René P5)</td></tr>
+    <tr><td>6</td><td>Inward</td><td>Inner-to-outer counter-clockwise (René P6)</td></tr>
+    <tr><td>7</td><td>Diag</td><td>Anti-diagonal scan from bottom-left (René P7)</td></tr>
+  </tbody>
+</table>
+<h3>Timing params (per sequence)</h3>
+<ul>
+  <li><strong>Divisor</strong> — default 12 (1/16 at PPQN 48), clamped to the divisor table.</li>
+  <li><strong>Clock Mult</strong> — 50-150%, default 100% (1.00x).</li>
+  <li><strong>Reset Measure</strong> — off / N bars, default off. A light reset: re-anchors the cycle, clears pulse-fire and gate, preserves accumulator counters.</li>
+  <li><strong>Global Phase</strong> — 0.00-1.00, fraction of the cycle to shift the read position.</li>
+  <li><strong>Cycle Warp (<code>GWarp</code>)</strong> — ±64 PowerBend on the cycle position, bending <em>where</em> each stage sits without changing total cycle length.</li>
+</ul>
+
+<h2 id="p4">Part 4 · Pitch Mode — Cell vs Global</h2>
+<p><code>Pitch Mode</code> (per sequence) sets where the pitch curve comes from:</p>
+<ul>
+  <li><strong>Cell</strong> (default) — each stage uses its <strong>own</strong> pitch curve, evaluated against the pulse positions inside its slot.</li>
+  <li><strong>Global</strong> — every stage's pitch is driven by <strong>stage 0's</strong> curve, sampled against a free-running pitch phase that advances at <code>Pitch Rate</code>. Stages share one evolving contour instead of carrying their own.</li>
+</ul>
+<h3>Pitch Rate (Global mode)</h3>
+<p><code>Pitch Rate</code> is a P:T ratio index, 17 entries, default <strong>1:1</strong> (index 9, locked). Off-ratios drift the curve across cycles. The full table:</p>
+<table>
+  <thead><tr><th>Idx</th><th>Ratio</th><th>Idx</th><th>Ratio</th><th>Idx</th><th>Ratio</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>1:7</td><td>6</td><td>7:9</td><td>12</td><td>11:9</td></tr>
+    <tr><td>1</td><td>1:5</td><td>7</td><td>11:12</td><td>13</td><td>9:7</td></tr>
+    <tr><td>2</td><td>1:3</td><td>8</td><td>16:17</td><td>14</td><td>7:5</td></tr>
+    <tr><td>3</td><td>2:5</td><td><strong>9</strong></td><td><strong>1:1</strong></td><td>15</td><td>5:3</td></tr>
+    <tr><td>4</td><td>3:5</td><td>10</td><td>18:17</td><td>16</td><td>9:5</td></tr>
+    <tr><td>5</td><td>5:7</td><td>11</td><td>13:12</td><td></td><td></td></tr>
+  </tbody>
+</table>
+<p>The pitch-phase accumulator advances every tick regardless of mode, so flipping Cell↔Global is seamless — Global picks up wherever the accumulator is.</p>
+
+<h2 id="p5">Part 5 · The Pulse / Curve Pipeline</h2>
+<p>For each pulse the engine runs two parallel chains, then masks and schedules.</p>
+<p><strong>Temporal chain</strong> — seed the pulse at <code>index / pulseCount</code>, apply Warp then split by Repeat into a sub-section + local position; drop it if the local position is outside the Window band; run it through the Curve, then Response and FlipV; add the Phase Shift; place it at <code>position × slot ticks</code>. FlipH reflects the whole schedule around the slot midpoint at the end.</p>
+<p><strong>Pitch chain</strong> — take the pulse's phase (Cell: the pulse position; Global: the free-running pitch phase projected to the trigger time); run Warp → Repeat → Window-hold → FlipH → Curve → Response → FlipV; scale by the range in degrees and apply the direction; add base pitch, accumulator offset, octave, transpose; pass the melody-mask / tilt filter; convert to volts.</p>
+<p><strong>Mask</strong> gates on the original pulse index (survives reordering). Accepted pulses are sorted by trigger time; overlapping gates merge via gate retrigger. Up to 16 pulses (<code>kMaxPulses</code>) per slot.</p>
+<div class="note"><strong>Continuous CV.</strong> With track CV Update = Always the pitch chain is evaluated every tick from the stage phase, producing a smooth envelope between pulses. With CV Update = Gate, CV updates only when a pulse fires.</div>
+
+<h2 id="p6">Part 6 · Accumulators</h2>
+<p>Two per-sequence counters drift the output as the cycle repeats: a <strong>note</strong> counter (degrees) and a <strong>pulse</strong> counter (pulse-count). Each stage contributes its own step (Part 2); the config below governs the walk.</p>
+<table>
+  <thead><tr><th>Field</th><th>Default</th><th>Range</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>Scope (Mode)</td><td>Stage (Local)</td><td>Stage / Sequence</td><td>Stage = per-cell counter; Sequence = one shared counter</td></tr>
+    <tr><td>Order</td><td>Wrap</td><td>Wrap / Pendulum / Hold / RTZ</td><td>How the counter behaves at its bounds</td></tr>
+    <tr><td>Polarity</td><td>Uni</td><td>Uni / Bi</td><td>Uni: bounds follow the step sign; Bi: bounds span both limits</td></tr>
+    <tr><td>Reset</td><td>0</td><td>0-15</td><td>Zero the counter every N cycle wraps (0 = never)</td></tr>
+    <tr><td>Pos Limit</td><td>note 28 / pulse 16</td><td>0-255</td><td>Positive bound</td></tr>
+    <tr><td>Neg Limit</td><td>note 28 / pulse 16</td><td>0-255</td><td>Negative bound</td></tr>
+  </tbody>
+</table>
+<p><strong>Scope</strong> — Local gives each stage its own counter (each cell drifts alone); Track shares counter 0 across all stages (the whole pattern transposes together). <strong>Trigger</strong> (per stage) picks whether each step lands per completed stage or per fired pulse. The pulse counter clamps on the <em>output</em> (pulse-count clipping is independent of the counter's wrap/pendulum bounds). Reset fires on cycle wrap.</p>
+
+<h2 id="p7">Part 7 · The Edit Page</h2>
+<p><span class="kbd">Page+S0</span> opens the PhaseFlux edit page. The left side is the 4×4 stage grid; the right side is the per-cell scope + parameter list (or a full-width scope for ACCUM / MACRO). One <strong>topic SET</strong> is active at a time, cycled with <span class="kbd">Left/Right</span>:</p>
+<pre><code>TEMP → PTCH → ACCUM.N → ACCUM.P → MACRO</code></pre>
+<p>Within a topic, <span class="kbd">F1</span>-<span class="kbd">F4</span> address parameter slots and <span class="kbd">F5</span> = Next cycles the topic's pages. F1-F4 either select a slot for the encoder, or — for binary fields on page 2 — flip directly on press. The encoder edits the selected slot; <span class="kbd">Shift</span> (or encoder-press) is the coarse/secondary modifier.</p>
+
+<h3>Step grid</h3>
+<ul>
+  <li><strong>Single press</strong> — move the edit cursor to that cell (drives scope + grid focus).</li>
+  <li><strong>Double press</strong> (no shift) — toggle <strong>skip</strong> on that cell.</li>
+  <li><strong>Shift+press / hold</strong> — multi-cell select; encoder edits apply to all selected.</li>
+  <li><strong>Shift+Shift</strong> — select-all / clear (StepSelection).</li>
+</ul>
+<p><strong>LEDs:</strong> red = playhead (active cell) or edit cursor; green = cell will fire (not skipped and length > 0); overlap shows yellow. With Page held, the bottom row is masked dark (quick-edit slots reserved).</p>
+
+<h3>TEMP topic (<code>_currentSet</code> 0, 3 pages)</h3>
+<table>
+  <thead><tr><th>Page</th><th>F1</th><th>F2</th><th>F3</th><th>F4</th><th>F5</th></tr></thead>
+  <tbody>
+    <tr><td>P0</td><td>Curve</td><td>Warp</td><td>Resp</td><td>Puls</td><td>Next</td></tr>
+    <tr><td>P1</td><td>Len</td><td>FlipV*</td><td>FlipH*</td><td>Mask</td><td>Next</td></tr>
+    <tr><td>P2</td><td>Wind</td><td>Rep</td><td>—</td><td>—</td><td>Next</td></tr>
+  </tbody>
+</table>
+<p><code>*</code> = press-to-flip toggle. Re-pressing <span class="kbd">F1</span> Len on P1 arms <strong>Len-TR</strong>: the encoder transfers length between the cursor cell and the next, conserving the sum (mirrors Indexed DUR-TR).</p>
+
+<h3>PTCH topic (<code>_currentSet</code> 1)</h3>
+<p>Cell mode (3 pages):</p>
+<table>
+  <thead><tr><th>Page</th><th>F1</th><th>F2</th><th>F3</th><th>F4</th><th>F5</th></tr></thead>
+  <tbody>
+    <tr><td>P0</td><td>Curve</td><td>Warp</td><td>Resp</td><td>Note</td><td>Next</td></tr>
+    <tr><td>P1</td><td>Span</td><td>Dir</td><td>FlipV*</td><td>FlipH*</td><td>Next</td></tr>
+    <tr><td>P2</td><td>Wind</td><td>Rep</td><td>Mask</td><td>Tilt</td><td>Next</td></tr>
+  </tbody>
+</table>
+<p>Global mode (2 pages, header reads <code>PTCH.G</code>):</p>
+<table>
+  <thead><tr><th>Page</th><th>F1</th><th>F2</th><th>F3</th><th>F4</th><th>F5</th></tr></thead>
+  <tbody>
+    <tr><td>P0</td><td>Curve</td><td>Warp</td><td>Resp</td><td>Rate</td><td>Next</td></tr>
+    <tr><td>P1</td><td>Note</td><td>Span</td><td>FlipV*</td><td>FlipH*</td><td>Next</td></tr>
+  </tbody>
+</table>
+<p>In Global mode Curve/Warp/Resp/FlipV/FlipH and Rate edit stage 0 (the master curve); Note and Span still edit the cursor cell.</p>
+
+<h3>ACCUM.N / ACCUM.P topics (<code>_currentSet</code> 2 / 3, 2 pages)</h3>
+<table>
+  <thead><tr><th>Page</th><th>F1</th><th>F2</th><th>F3</th><th>F4</th><th>F5</th></tr></thead>
+  <tbody>
+    <tr><td>P0</td><td>Ac.St</td><td>M:Sta / M:Seq</td><td>—</td><td>Order</td><td>Next</td></tr>
+    <tr><td>P1</td><td>Reset</td><td>Polar</td><td>Trig</td><td>—</td><td>Next</td></tr>
+  </tbody>
+</table>
+<p>F2 on P0 shows the current Accum Mode (Stage/Sequence) but is not editable from here — change it on the sequence list (Part 8). Ac.St and Trig are per-stage (multi-cell aware); Order/Reset/Polar are sequence-level. The full-width strip draws each cell's counter offset with glyphs for Order, Polarity, and Reset.</p>
+
+<h3>MACRO topic (<code>_currentSet</code> 4, 2 pages)</h3>
+<table>
+  <thead><tr><th>Page</th><th>F1</th><th>F2</th><th>F3</th><th>F4</th><th>F5</th></tr></thead>
+  <tbody>
+    <tr><td>P0</td><td>WarpN</td><td>RespN</td><td>PulsN</td><td>LenN</td><td>Next</td></tr>
+    <tr><td>P1</td><td>Phase</td><td>GWarp</td><td>Snap</td><td>Zero</td><td>Next</td></tr>
+  </tbody>
+</table>
+<p>P0 nudges are uniform per-cell offsets added to every stage. <strong>Snap</strong> (press) quantizes each non-skipped stage's length to the nearest binary note value, conserving total length. <strong>Zero</strong> (press) resets the five magnitude macros (the four nudges + GWarp) to 0; Global Phase is left alone. MACRO draws a full-width scope of all 16 stages stitched along X, live to every macro.</p>
+
+<h3>Quick-edit (Page + bottom row)</h3>
+<ul>
+  <li><span class="kbd">Page+S15</span> — shake the whole current topic (randomize all its pages).</li>
+  <li><span class="kbd">Page+S16</span> — shake only the current page.</li>
+</ul>
+<p>Shake excludes "chassis-feel" fields (length, base pitch, skip) and never sets pulse count to 0. TEMP/PTCH shake the cursor cell; ACCUM shakes non-skipped cells + config; MACRO is sequence-level.</p>
+
+<h3>Context menu</h3>
+<p>Long-press opens <strong>INIT / COPY / PASTE / DUP</strong>. INIT opens a sub-menu:</p>
+<ul>
+  <li><strong>STAGE</strong> — clear the cursor stage to defaults.</li>
+  <li><strong>TOPIC</strong> — reset the current topic's params (TEMP/PTCH = cursor cell, preserving length/base pitch; ACCUM = non-skipped cells + config; MACRO = macros + traversal + phase).</li>
+  <li><strong>SEQUENCE</strong> — clear the whole sequence.</li>
+  <li><strong>TRACK</strong> — clear the whole PhaseFlux track.</li>
+</ul>
+<p>COPY/PASTE move the sequence via the clipboard; <strong>DUP</strong> clones the current sequence into the next pattern slot and jumps there.</p>
+
+<h2 id="p8">Part 8 · Setup &amp; Routing</h2>
+<h3>Track-scope list (<span class="kbd">Page+S2</span>)</h3>
+<p>Track-wide params, in display order:</p>
+<ul>
+  <li>Play Mode (Aligned / Free / …)</li>
+  <li>Fill Mode (None / Gates / Next Pattern / Condition)</li>
+  <li>CV Update (Gate / Always)</li>
+  <li>Slide Time (0-100)</li>
+  <li>Octave (±10)</li>
+  <li>Transpose (±100; routed range ±60)</li>
+</ul>
+<h3>Sequence-scope list (<span class="kbd">Page+S1</span>)</h3>
+<p>Per-pattern params, in display order: Divisor, Clock Mult, Global Phase, Pitch Mode, Pitch Rate, Traversal, First Stage, Last Stage, Cycle Length, Note Accum Mode, Pulse Accum Mode, Warp Nudge, Resp Nudge, Pulse Nudge, Len Nudge, Cycle Warp, Scale, Root, Scale Rotate, Reset Measure.</p>
+<h3>What is routable</h3>
+<table>
+  <thead><tr><th>Target</th><th>Range</th><th>Scope</th></tr></thead>
+  <tbody>
+    <tr><td>Octave</td><td>±10</td><td>track</td></tr>
+    <tr><td>Transpose</td><td>±60</td><td>track</td></tr>
+    <tr><td>Slide Time</td><td>0-100</td><td>track</td></tr>
+    <tr><td>Divisor</td><td>1-768</td><td>sequence</td></tr>
+    <tr><td>Clock Mult</td><td>50-150</td><td>sequence</td></tr>
+    <tr><td>Scale</td><td>0-23</td><td>sequence</td></tr>
+    <tr><td>Root Note</td><td>0-11</td><td>sequence</td></tr>
+    <tr><td>Phase</td><td>0.0-1.0</td><td>sequence</td></tr>
+    <tr><td>Warp Nudge</td><td>±64</td><td>sequence</td></tr>
+    <tr><td>Resp Nudge</td><td>±64</td><td>sequence</td></tr>
+    <tr><td>Len Nudge</td><td>±64</td><td>sequence</td></tr>
+    <tr><td>Cyc Warp</td><td>±64</td><td>sequence</td></tr>
+    <tr><td>Pulse Nudge</td><td>±15</td><td>sequence</td></tr>
+  </tbody>
+</table>
+<p>The Sequence list exposes Divisor / Clock Mult / Scale / Root Note as routable rows; the Track list exposes Slide Time / Octave / Transpose. The five macro nudges, Cyc Warp, and Phase are routable through the param table. A/B inlets are not implemented. Per-stage fields and the accumulator configs are not routable.</p>
+
+<div class="footer">PhaseFlux Track — xformer firmware manual. Grounded in the model, engine, and UI source.</div>
+
+</div>
+</body>
+</html>

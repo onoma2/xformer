@@ -1,427 +1,362 @@
-# Discrete Track User Manual
+# Discrete Track Manual
 
-## 1. Introduction
+## Introduction
 
-The Discrete Track is a sophisticated sequencer track type that maps input voltages or internal ramps to discrete output stages. Each stage has a threshold, direction (Rise, Fall, Off), and note value that determines when and what voltage is output.
+The Discrete track is a **threshold map**. It does not step through a sequence
+of notes. Instead it watches one moving input — an internal ramp or an external
+CV — and fires one of up to 32 **stages** whenever that input crosses the stage's
+threshold in the stage's direction. The stage that fires emits a note (CV) and a
+gate. Sweep the input and the map plays back as a melody; drive it from outside
+and the same map becomes a quantizer / CV shaper.
 
-This track type is ideal for:
-- External CV processing and mapping
-- Complex internal voltage sequences
-- Threshold-based musical triggers
-- LFO and envelope following applications
+It is a **stateless ramp** engine. Nothing is "remembered" between ticks: each
+tick the engine recomputes the ramp phase from the clock position, compares the
+current input against the previous input, and lets any threshold that was
+crossed claim the active stage. Pause, reset, or change pattern and the whole
+picture is rebuilt from the clock.
 
-The Discrete track provides:
-- Up to 32 controllable stages per sequence
-- Flexible input sources (Internal ramps or external CV)
-- Position and Length threshold modes
-- Voltage range control
-- Built-in slew processing
+This manual is grounded in the firmware as built. Defaults, ranges, enum members,
+key bindings, and step-grid maps are taken from the model, engine, and UI code.
 
-## 2. Discrete Track Overview
+## Prerequisites
 
-### 2.1 What is Discrete?
+Before working with the Discrete track you should have:
 
-The Discrete track creates a mapping between input values (from internal ramps or external CV sources) and output stages. When the input crosses a stage's threshold in the specified direction, that stage becomes active and its note value is converted to CV output.
+- Familiarity with the xformer track/sequence/edit page model (Page+S2 / Page+S1 / Page+S0).
+- Understanding of CV/gate concepts in modular synthesis, in particular 1V/oct pitch and ±5V CV.
+- For External mode, a routing channel set up to feed the track's input.
 
-Key concepts:
-- **Stages**: 32 controllable positions that respond to input thresholds
-- **Thresholds**: Voltage levels that trigger stage activation (-100 to +100)
-- **Directions**: Rise (↑), Fall (↓), or Off for each stage
-- **Note Values**: Output voltages derived from scale and root note settings
+---
 
-### 2.2 Input Sources
+# Part 1: Overview
 
-The Discrete track supports multiple input sources:
+## What the Discrete track is
 
-**Internal Sawtooth**:
-- A bipolar ±5V ramp that cycles based on the track divisor
-- Provides consistent, clocked input for predictable stage triggering
-- Good for creating complex internal sequences
+The track owns **32 stages**. Each stage holds three things:
 
-**Internal Triangle**:
-- A bipolar ±5V triangle wave that cycles based on the track divisor
-- Provides smooth transitions with more even distribution across voltage range
-- Ideal for smoother threshold crossings
+- a **threshold** (−100..+100), the position in the voltage window where it watches,
+- a **direction** (Rise / Fall / Off / Both), the edge it watches for,
+- a **note index** (−63..+63), the scale degree it emits when it fires.
 
-**External**:
-- Uses routed CV input as the comparison source
-- Allows external LFOs, envelopes, or other CV sources to drive the mapping
-- Requires routing setup to connect CV input to the track
+A single moving **input** scans the window. When the input crosses a stage's
+threshold in that stage's direction, that stage becomes the **active stage**: its
+note converts to output CV and a gate fires. The active stage stays active until
+another stage's threshold is crossed (an Off active stage releases to silence).
 
-### 2.3 Output Modes
+The input comes from one of three **clock sources**:
 
-The track has two main output behaviors:
+- **Internal Saw** — a −5V→+5V sawtooth ramp, period set by the divisor.
+- **Internal Tri** — a −5V→+5V triangle (up then down), same period.
+- **External** — a routed CV input (the *DMap Input* route).
 
-**Gate Mode** (default): CV output only updates when a stage becomes active
-**Always Mode**: CV output continuously updates regardless of stage changes
+## The two pages of state
 
-## 3. UI Overview
+- **Track-wide params** (Play Mode, CV Update) live on the **track** — shared across all patterns.
+- **Per-pattern params** (clock source, sync, divisor, gate length, loop, range, scale group, slew, pluck, octave/transpose/offset, and all 32 stages) live on the **sequence** — one set per w-pattern.
+- The **scale group** (scale / root / scale-rotate) lives on the **sequence**, not the track. Root note clamps to 0..11 (C..B).
 
-### 3.1 Main Sequence Page
+---
 
-The main page displays the threshold mapping:
+# Part 2: Input & Stages
 
-- **Top Row**: Stage selection and direction editing (↑/↓/Off)
-- **Middle Row**: Threshold adjustment for selected stage
-- **Bottom Row**: Note value editing for selected stage
-- **Threshold Bar**: Visual representation of all 32 stages and current input position
-- **Stage Info**: Current note names and values for all stages
-- **Active Stage**: Highlighted in both visual bar and stage info
+## Clock source and the ramp
 
-### 3.2 Footer Controls (Function Keys)
+The internal ramp always spans the **full ±5V**, regardless of the Above/Below
+range — the range only moves where the thresholds sit, not where the ramp goes.
 
-**F1 - Clock Settings**:
-- **Source**: Internal Saw, Internal Tri, External
-- **Divisor**: Clock division (1-768) with power-of-2 adjustments
-- **Clock Mult**: Per-sequence multiplier (0.50x-1.50x) applied to divisor timing
-- **Loop**: On/Once mode for sweep behavior
-- **Gate Length**: 0% (pulse) to 100% gate duration
+- **Internal Saw** rises linearly from −5V to +5V across one period, then snaps back.
+- **Internal Tri** rises −5V→+5V over the first half of the period and falls +5V→−5V over the second half.
 
-**F2 - Threshold Settings**:
-- **Mode**: Position (absolute voltage) or Length (proportional distribution)
-- **Range**: ±5V, 0-5V, 0-2.5V options for voltage window
-- **Sync Mode**: Off, Reset (bar-based), External sync
+Period in ticks is `divisor ÷ (clock multiplier as a fraction)`: a higher clock
+multiplier shortens the period (faster sweeps), a higher divisor lengthens it.
 
-**F3 - Scale/Output Settings**:
-- **Scale**: Project scale or track-specific scale selection
-- **Root**: Root note for chromatic scale mapping (C to B)
-- **Slew**: On/Off to enable smooth voltage transitions
-- **CV Update**: Gate (only on stage change) or Always (continuous)
+**External** ignores the internal ramp entirely and reads the *DMap Input* route
+value (clamped −5V..+5V) as the live input each tick.
 
-**F4 - Routing Settings**:
-- **CV In**: Select routed CV input for External mode
-- **Gate**: Routing for gate behavior
-- **Fill**: Fill pattern routing
-- **Mute**: Track muting routing
-- **Reset**: Triggers a hard reset of the ramp and active stage on rising edge
-- **Scan**: Interactive stage direction toggling (see 5.4 Scanner)
+## Loop vs Once
 
-### 3.3 Stage Editing
+- **Loop** (default) — the ramp cycles forever.
+- **Once** — the ramp sweeps a single period, then **holds its final value** (+5V, phase 1.0) and stops until a reset or a Loop↔Once toggle restarts it.
 
-The top two rows allow multi-selection editing:
-- Hold multiple stage buttons to select multiple stages
-- Encoder adjusts all selected stages simultaneously
-- Shift + Encoder for fine adjustments (±1 vs ±8 steps)
+For External + Once the engine tracks an external sweep: it arms when the input
+first enters the range window (with a 5% tolerance), then declares the sweep
+**done** once the input has covered ≥90% of the range span. While done, the
+active stage is frozen — no further re-scanning until reset/restart/pattern
+change. Direction-agnostic, so an LFO or envelope that doesn't hit the exact
+endpoints still completes.
 
-## 4. Stage Parameters
+## Stage direction
 
-### 4.1 Direction Settings
+Each stage watches one edge of its threshold:
 
-Each stage has three direction modes:
+| Direction | Fires when | OLED / LED |
+|---|---|---|
+| Rise | input crosses from below to at/above the threshold | `^` / green |
+| Fall | input crosses from above to at/below the threshold | `v` / red |
+| Both | either edge crosses the threshold | `x` / yellow |
+| Off | never; stage disabled | `-` / unlit |
 
-**Rise (↑)**:
-- Stage triggers when input crosses threshold from below to above
-- Visualized as upward arrow in stage display
-- Common for envelope followers and attack detection
+Stages are scanned in index order and the **first** crossing found wins. A stage
+stays active until some other stage is crossed. The init/default direction for
+every stage is **Off**.
 
-**Fall (↓)**:
-- Stage triggers when input crosses threshold from above to below
-- Visualized as downward arrow in stage display
-- Common for decay detection and falling LFOs
+## Threshold modes: Position vs Length
 
-**Off (-)**:
-- Stage is disabled and will not trigger
-- Useful for creating gaps in sequences or disabling unused stages
+The Above (`rangeHigh`) and Below (`rangeLow`) params define the voltage window
+the thresholds live in. The threshold mode decides how each stage's −100..+100
+value maps into that window:
 
-### 4.2 Threshold Parameters
+| Mode | Default | Mapping |
+|---|---|---|
+| Position | **yes** | Each stage's −100..+100 maps **linearly** to Below..Above. 0 lands at the midpoint; each threshold is an absolute trigger voltage. |
+| Length | — | Each stage's value is treated as a **proportional length**. The values become cumulative interval ends across the window, so the stages partition the span by weight. (All stages at −100 → even distribution.) |
 
-Thresholds define voltage levels where stages trigger:
+Changing the range or the mode marks the threshold cache dirty and recomputes on
+the next tick.
 
-**Range**: -100 to +100 maps to configured voltage window
-- In Position mode: Each threshold maps to absolute voltage
-- In Length mode: Thresholds determine proportional segment lengths
+## Note index → CV
 
-**Position Mode**:
-- Each threshold maps directly to a voltage in the range window
-- Useful for precise voltage mapping
-- Example: With ±5V range, threshold 0 = 0V, threshold 50 = +2.5V
+A stage's note index (−63..+63) is a scale degree. Output volts come from the
+sequence's selected scale: `noteToVolts(noteIndex + octave·notesPerOctave +
+transpose)`. On a chromatic scale the root note adds `root × (1/12)` volts. The
+**Offset** param adds a flat CV bias (Offset is in centivolts, ×0.01 = volts) on
+top of the resolved note.
 
-**Length Mode**:
-- Thresholds determine proportional segment lengths in voltage range
-- Total of all threshold values determines distribution
-- Useful for creating musical scales and proportional mappings
+The **CV Update mode** (track-scope) decides when pitch params are read:
 
-### 4.3 Note Values
+- **Gate** (default) — octave / transpose / root are **sampled at the gate trigger** (sample-and-hold). Changing them mid-note does not retune the held note until the next gate. When muted in Gate mode the CV output drops to 0V.
+- **Always** — pitch params are read live every update; CV updates continuously regardless of stage changes.
 
-Note values determine output voltage when a stage is active:
+---
 
-**Range**: -63 to +63 maps to output voltage
-- Based on selected scale and root note settings
-- -63 = lowest possible voltage, +63 = highest
-- Converted using scale's note-to-voltage mapping
+# Part 3: Gate, Slew & Pluck
 
-## 5. Advanced Features
+## Gate length
 
-### 5.1 Generator Functions
+When a new stage becomes active, a gate fires for a length derived from the step:
 
-The Discrete track includes powerful generator functions:
+- **Gate Len 0% = "T"** — a fixed short pulse (a few ticks), independent of step length.
+- **Gate Len 1..100%** — that percentage of the step's tick length.
 
-**GEN Function**:
-- Access via long-press on STEP button
-- Choose generator type:
-  - **Random**: Classic randomization
-  - **Linear**: Linear ramp/distribution
-  - **Logarithmic**: Logarithmic curve
-  - **Exponential**: Exponential curve
-- Apply to thresholds, notes, or both:
-  - **NOTE5** (Wide): Generates notes in full range (-63 to +63)
-  - **NOTE2** (Narrow): Generates notes in narrow range (0 to +32)
-  - **THR**: Applies to thresholds only
-  - **TOG**: Toggle directions (Random mode only)
+## Slew
 
-### 5.2 Range Macros
+**Slew** (0 = Off, 1..100%) smooths CV between stages by limiting the pitch rate.
+Internally the max rate is 48 semitones/sec at Slew=1 (fast) scaling down to a
+slow glide near Slew=100. With Slew off the CV jumps instantly to each new note.
+Slew enabled also flags the outgoing MIDI note as a slide.
 
-Quick voltage range setup:
-- **Full**: -5V to +5V range
-- **Inv**: +5V to -5V range (inverted)
-- **Pos**: 0V to +5V range
-- **Neg**: -5V to 0V range
-- **Top**: +4V to +5V range (narrow top)
-- **Btm**: -5V to -4V range (narrow bottom)
-- **Ass**: -1V to +4V range (assymetric)
-- **BAss**: -2V to +3V range (balanced assymetric)
+## Pluck
 
-### 5.3 Group Operations
+**Pluck** (−100..+100, 0 = Off) adds a pitch transient at note onset. The note
+starts bent away from its target and decays linearly back to pitch:
 
-Multiple stages can be selected and edited simultaneously:
-- Hold multiple top row buttons to select multiple stages
-- Encoder adjusts all selected stages together
-- Shift + encoder for fine adjustment of all selected stages
-- Multi-stage threshold editing affects all selected stages
+- magnitude up to ~200 cents (2 semitones), and onset glide time 10..450ms, both scaled by a square curve of |Pluck|,
+- **sign sets direction**: Pluck > 0 bends *up* into the note, Pluck < 0 bends *down*,
+- higher |Pluck| also adds more random jitter (10%..50%) to depth and time, so repeated notes vary.
 
-### 5.4 Scanner (DMap Scan)
+Pluck is per-sequence and is **not** routable.
 
-The Scanner is a unique performance feature that allows external CV to dynamically modify the sequence structure.
+---
 
-- **How it works**: Route a CV source to the **DMap Scan** target.
-- **Behavior**: As the CV value changes, it "scans" through the 32 stages. When the scanner enters a stage's segment, it **toggles the direction** of that stage (cycling through ↑ → ↓ → Off).
-- **Application**: Use a manual fader or a slow LFO to "draw" or evolve the sequence pattern in real-time.
+# Part 4: Playback Timing
 
-## 6. External CV Processing
+Per-sequence timing params:
 
-### 6.1 Setup for External CV
+| Param | Default | Range / members |
+|---|---|---|
+| Clock | Internal Saw | Internal Saw / Internal Tri / External |
+| Divisor | 192 | 1..768 |
+| Clock Mult | 1.00x | 0.50x..1.50x (50..150%) |
+| Gate Len | T (0%) | 0..100% |
+| Loop | Loop | Loop / Once |
+| Reset Measure | 8 bars | off / 1..128 bars |
+| Sync | Off | Off / Reset (External retired → behaves as Off) |
 
-To use external CV with Discrete:
+**Sync = Reset** realigns the ramp to a bar boundary every *Reset Measure* bars
+(a reset re-zeros the ramp to −5V/phase 0 and clears stage/CV/gate/pluck state).
+The legacy *External* sync member is inert — re-anchor from outside via a Reset
+route instead.
 
-1. Set Input Source to "External"
-2. Configure CV Input routing to specify source track
-3. Set appropriate voltage Range for incoming signal
-4. Adjust stage thresholds to match expected CV range
-5. Configure appropriate Gate Length for desired response
+**Play Mode** (track-scope) is Aligned (ramp phase locks to the bar grid) or Free
+(ramp runs from its own free clock position).
 
-### 6.2 Applications
+---
 
-**Envelope Following**:
-- Feed audio-rate signals through a rectifier or envelope follower
-- Map envelope levels to discrete stages for dynamic control
-- Use with Length mode for proportional response
+# Part 5: The Sequence Page
 
-**LFO Shaping**:
-- Use complex LFO waveforms as input
-- Map different LFO voltages to different stages/notes
-- Create stepped versions of complex modulation sources
+Page+S0 opens the Discrete edit page (header **DMAP**). It draws a threshold bar
+across the top, a live input cursor, and a three-row info block for the eight
+stages of the current section. There are four sections of eight stages each;
+LEFT / RIGHT step through them.
 
-**CV Quantization**:
-- Map continuous CV to discrete musical notes
-- Use chromatic scale for voltage-to-note conversion
-- Apply scale quantization for musical intervals
+## The footer (F1-F5), normal mode
 
-## 7. Internal Sequencing
+| Key | Shows | Press |
+|---|---|---|
+| F1 | clock: `SAW` / `TRI` / `EXT` | cycle clock source |
+| F2 | range-macro name (e.g. `-5/+5`) | advance to next range macro |
+| F3 | `POS` / `LEN` | toggle Position / Length threshold mode |
+| F4 | `LOOP` / `ONCE` | toggle loop mode |
+| F5 | sync short label (`OFF` / `RM`) | cycle sync mode |
 
-### 7.1 Sawtooth Mode
+The F2 **range macros** snap Above/Below to a preset window:
 
-The internal sawtooth provides a linear voltage ramp:
-- Sweeps from -5V to +5V based on divisor setting
-- Consistent slope for predictable threshold crossings
-- Good for creating ascending/descending sequences
+| Macro | Above / Below |
+|---|---|
+| Full | −5 / +5 |
+| Inv | +5 / −5 |
+| Pos | 0 / +5 |
+| Neg | −5 / 0 |
+| Top | +4 / +5 |
+| Btm | −5 / −4 |
+| Ass | −1 / +4 |
+| BAss | +3 / −2 |
 
-### 7.2 Triangle Mode
+## The step keypad (S1-S16)
 
-The internal triangle provides a smooth triangle wave:
-- Bipolar ±5V triangle wave based on divisor
-- Smooth transitions perfect for Length mode
-- Symmetric up/down triggering opportunities
+The 16 step buttons are two rows of 8. They act on the eight stages of the
+current section:
 
-### 7.3 Sweep Control
-
-**Loop vs Once**:
-- **Loop**: Internal ramp repeats continuously
-- **Once**: Internal ramp runs once and holds final value
-- **Gate Length**: Controls duration of gate output per stage
-
-## 8. Practical Examples
-
-### 8.1 Basic Melody Generation
-
-1. Set Input Source to "Internal Saw"
-2. Create 8 stages with directions alternating between Rise and Fall
-3. Set thresholds evenly spaced across voltage range
-4. Assign ascending note values (0, 2, 4, 5, 7, 9, 11, 12) for scale
-5. Set Loop mode to On for continuous playback
-
-### 8.2 External LFO Shaping
-
-1. Set Input Source to "External"
-2. Route CV Input to source track (e.g., LFO on Track 1)
-3. Set Range to ±5V to match typical LFO outputs
-4. Create stages with Rise/Fall directions matching LFO shape
-5. Assign desired note values for each voltage threshold
-6. Enable Slew for smooth transitions between notes
-
-### 8.3 Envelope Follower
-
-1. Connect external envelope follower CV to CV input
-2. Set Input Source to "External"
-3. Configure 4-6 stages with appropriate thresholds
-4. Use Rise directions for attack detection
-5. Use Fall directions for release detection
-6. Map to different note values for dynamic pitch changes
-
-## 9. Shortcuts and Tips
-
-### 9.1 Quick Navigation
-
-- **F1-F4**: Jump directly to footer parameter pages
-- **Long press STEP**: Access Generator functions
-- **Long press any stage**: Enter multi-selection mode
-- **Shift + Stage**: Select multiple stages for batch editing
-
-### 9.2 Quick Edit (Page+Steps 9-15)
-
-- **Page+Step 9**: Range High
-- **Page+Step 10**: Range Low
-- **Page+Step 11**: Divisor
-- **Page+Step 12**: Piano Voicings (cycles through piano chord voicings, applies to active stages)
-- **Page+Step 13**: Guitar Voicings (cycles through guitar chord voicings, applies to active stages)
-- **Steps 14-15**: Reserved for macros
-
-**Voicing Quick Edit**:
-- Each press cycles to next voicing (NO, MAJ13, MAJ6/9, MIN13, etc.)
-- "NO" voicing does nothing (safe exit)
-- Applies to active stages only (direction not Off)
-- Selected stage note becomes the root
-- Voicing intervals are applied to active stages in order
-- More active stages than voicing notes = voicing repeats with transposition (0, +7, -7)
-- Useful for quickly creating chord progressions across threshold map
-
-**Voicing Quick Edit Improvements**:
-- Fixed voicing behavior for selected vs active stages
-- Corrected C0 voicing functionality (uses track/project root from C0, non-accumulating)
-- Improved voicing quickedit handling for more reliable operation
-- Better selection logic for voicing application
-
-**Double-Click Threshold Auto-Placement**:
-- Double-click any stage button (bottom row) to auto-place threshold
-- Threshold is set to midpoint between left and right active neighbors
-- If no left neighbor: uses range minimum (-100)
-- If no right neighbor: uses range maximum (+100)
-- Skips inactive (Off) stages when finding neighbors
-- Useful for quickly distributing thresholds evenly
-
-### 9.3 Macro Shortcuts (Page+Steps 4, 5, 6, 14)
-
-Macros provide powerful generative and transformative operations on threshold maps. Macros operate on all 32 stages.
-
-**Page+Step 4 - Distribution** (YELLOW LED):
-- **EVEN8**: Distribute first 8 stages evenly across full range (-100 to +100)
-- **EVEN16**: Distribute first 16 stages evenly across full range
-- **EVEN-ALL**: Distribute all 32 stages evenly across full range
-- **EVEN-GRP**: Round-robin interleaving across 4 groups (fret pattern initialization)
-- **EVEN-INV**: Inverted even distribution (max to min)
-
-**Page+Step 5 - Cluster** (YELLOW LED):
-- **M-CLUSTER**: Random clustering - creates 4 random clusters with controlled spread
-
-**Page+Step 6 - Distribute Active** (YELLOW LED):
-- **ACT**: Distribute all active (Rise/Fall/Both) stages evenly across range
-- **RISE**: Distribute only Rise stages evenly across range
-- **FALL**: Distribute only Fall stages evenly across range
-- **BOTH**: Distribute only Both stages evenly across range
-- **NORM**: Normalize thresholds - expand current range to fill full (-100 to +100)
-
-**Page+Step 14 - Transform** (YELLOW LED):
-- **FLIP**: Cycle all stage directions (Rise→Fall→Both→Off)
-- **T-MIRR**: Threshold mirror - copy first 16 to last 16 (reversed)
-- **T-REV**: Threshold reverse - reverse threshold order across all 32 stages
-- **N-MIRR**: Note mirror - copy first 16 note indices to last 16 (reversed)
-- **N-REV**: Note reverse - reverse note index order across all 32 stages
-
-**Macro Usage Tips**:
-- Macros operate on all 32 stages regardless of selection
-- Use distribution macros to create even spacing patterns
-- EVEN-GRP creates optimal guitar-fret-like spacing
-- NORM expands any threshold distribution to fill full range
-- M-CLUSTER creates organic, random groupings
-- Transform macros preserve stage directions
-- Combine FLIP with distribution for creative patterns
-- Use T-MIRR/N-MIRR to create symmetric patterns
-- Use T-REV/N-REV to completely reverse patterns
-
-### 9.4 Macro Improvements
-
-Recent updates to Discrete macros include:
-
-**Enhanced Macro Operations**:
-- Improved I_8, I_5(2), I_7(3), I_9(4) distribution macros for better even spacing
-- More reasonable M-CLUSTER algorithm with controlled spread
-- Fixed threshold inversion (T-INV) operation
-- Better handling of voicing for selected/active stages
-- Corrected voicing C0 behavior
-- Improved voicing quickedit functionality
-- Fixed double-click threshold editing
-
-**Macro Selection Logic**:
-- Macros now properly respect stage selection when appropriate
-- Active stage detection improved for more accurate macro application
-- Better handling of mixed active/inactive stages during macro operations
-
-### 9.5 Initialization Pattern
-
-When a Discrete sequence is initialized (INIT context menu), all 32 stages are set with:
-- **Thresholds**: Interleaved "fret pattern" distribution across -100 to +100
-- **Direction**: Off (all inactive)
-- **Note Index**: 0
-
-**Fret Pattern**:
-The initialization uses round-robin interleaving across all 4 sections:
-- Within each section: stages spaced ~26 units apart
-- Across sections: values interleave to create ~6.5 unit spacing overall
-- Creates optimal threshold distribution for guitar-fret-like CV scanning
-- Simply enable stages (change direction) to activate pre-spaced thresholds
-
-### 9.6 Editing Tips
-
-- Use Length mode for proportional musical mappings
-- Use Position mode for precise voltage control
-- Increase Gate Length for longer note sustains
-- Use Slew for smooth transitions between stages
-- Multi-select stages to edit multiple parameters simultaneously
-
-### 9.7 Performance Considerations
-
-- More active stages may consume slightly more CPU
-- External CV routing works with standard routing matrix
-- Internal ramps use minimal CPU resources
-- Complex scales may have slight performance impact
-
-## 10. Troubleshooting
-
-### 10.1 No Output
-
-- Verify track is not muted
-- Check gate mode settings
-- Ensure stages have proper directions (not all Off)
-- Confirm input voltage is within expected range
-
-### 10.2 Unexpected Behavior
-
-- Check threshold values aren't all the same
-- Verify Range settings match input/output expectations 
-- Ensure appropriate Input Source is selected
-- Check if Length mode vs Position mode is appropriate
-
-### 10.3 Sync Issues
-
-- Verify track divisor settings
-- Check if sync mode is interfering with timing
-- Ensure external sync source is properly configured if used
+- **Bottom row (S1-S8) = stage SELECT.** Plain press selects that stage exclusively; holding one and pressing another multi-selects. Holding a bottom key also drives the engine **monitor** (auditions that stage's note while the sequencer is stopped). Shift + bottom = toggle that stage in/out of the selection without changing edit mode.
+- **Top row (S9-S16) = direction EDIT.** Plain press selects that stage and cycles its direction (Off→Rise→Fall→Both). Shift + top = select every stage sharing the pressed stage's direction.
+
+**Double-click a bottom-row step** (plain) auto-places its threshold at the
+**midpoint between its nearest active neighbours** — range ends (−100 / +100)
+substitute when a neighbour is missing (message `THR BETWEEN`). **Shift +
+double-click** a bottom-row step selects all stages with the same value (note
+value in note-edit mode, otherwise threshold).
+
+## The encoder
+
+Pressing the encoder toggles the edit mode between **Threshold** and **Note**.
+The encoder then edits the selected stage(s):
+
+- **Threshold** — ±1 fine, **±10 with Shift** (clamped −99..99).
+- **Note** — ±1; **Shift jumps an octave** on chromatic scales only.
+- **All 32 selected** (full mask) switches to a rotate of all values: thresholds rotate (Shift fine / no-Shift ×8 coarse), note indices rotate one step.
+
+## Stage edit LEDs
+
+- Top row (direction): Rise green, Fall red, Both yellow, Off unlit.
+- Bottom row (select/active): selected yellow, active-but-unselected green, else unlit.
+
+The OLED threshold bar marks each non-Off stage as an upward tick (tallest =
+active, mid = selected) and draws the live input as a bright cursor. The info
+block shows direction char / threshold / note name per stage, the active stage
+brightest.
+
+---
+
+# Part 6: Generators, Voicings & Macros
+
+## The context menu
+
+The context-menu key opens: **INIT**, **COPY**, **PASTE**, **GEN**.
+
+- **INIT** enters a target submenu in the footer: `ALL` / `THR` / `NOTE` / (blank) / `X`. ALL clears the whole sequence (re-seeds the fret-pattern thresholds, all stages Off, notes 0); THR re-seeds thresholds only; NOTE zeroes notes.
+- **COPY** / **PASTE** copy and paste the whole sequence (paste only enabled when the clipboard holds a Discrete sequence).
+- **GEN** enters the generator (below).
+
+## GEN (generator)
+
+GEN runs in two footer steps. First choose a **kind**: `RAND` / `LIN` / `LOG` /
+`EXP` / `X`. Then choose a **target**:
+
+- RAND target row: `ALL` / `THR` / `NOTE` / `TOG` / `X` (TOG randomizes directions).
+- LIN/LOG/EXP target row: `ALL` / `THR` / `NOTE5` / `NOTE2` / `X` — NOTE5 spreads notes wide (−63..+64), NOTE2 narrow (0..+32). Threshold shaping is linear / √ / ^1.3 across −99..99.
+
+## Page+Step quick edits
+
+Holding **Page** + a step button:
+
+| Combo | Action |
+|---|---|
+| Page+S9 | Range High (Above) |
+| Page+S10 | Range Low (Below) |
+| Page+S11 | Divisor |
+| Page+S12 | Piano voicing (held; encoder scrolls bank, release applies) |
+| Page+S13 | Guitar voicing (held; encoder scrolls bank, release applies) |
+
+Range High / Range Low / Divisor open the standard quick-edit overlay. The
+voicing quick-edits apply a chord shape across the active stages (limited to the
+selection if more than one stage is selected); the selected stage's note is the
+root, `C0` resets from the track/project root, `ROOT` is a safe no-op.
+
+- Piano banks: ROOT, C0, MAJ13, MAJ6/9, MIN13, MIN6/9, MINMAJ9, DOM13, M9B5, DIM7, AUG9, AUGMAJ9, SUS2(9), SUS4(11).
+- Guitar banks: ROOT, C0, MAJ, MIN, 7, MAJ7, MIN7, 6, MIN6, 9, 13, SUS2, SUS4, ADD9, AUG, M7B5, DIM7.
+
+## Page+Step macros
+
+Four step combos open threshold/note macro menus (yellow LEDs):
+
+- **Page+S5 — Distribution:** `I-8`, `I-5(2)`, `I-7(3)`, `I-9(4)`, `I-FRET`. Even-distribute thresholds across stage groups; I-FRET round-robin interleaves across the four sections.
+- **Page+S6 — Cluster:** `M-CLUSTER`, `M-AR4`, `M-SWELL`, `M-ISWELL`, `M-STRUM`. Operate on active stages (selection-limited if more than one selected).
+- **Page+S7 — Distribute Active:** `E-ACT`, `E-RISE`, `E-FALL`, `E-BOTH`, `NORM`. Even-spread thresholds filtered by direction; NORM expands the current spread to fill −100..+100.
+- **Page+S15 — Transform:** `FLIP`, `T-REV`, `T-INV`, `N-MIRR`, `N-REV`. FLIP cycles all directions; T-* transform thresholds; N-* transform note indices.
+
+---
+
+# Part 7: The Scanner
+
+The **DMap Scan** route lets an external CV reshape the map live. Route a CV
+source to *DMap Scan* (value 0..34):
+
+- `0` = bottom dead zone, `1..32` = stages 0..31, `33`/`34` = top dead zone.
+- Each time the scanned value **enters a new stage's segment**, that stage's direction is cycled (Off→Rise→Fall→Both).
+
+Sweep a fader or slow LFO across the scan input to "draw" directions across the
+map in real time. The dead zones at the extremes toggle nothing.
+
+---
+
+# Part 8: Setup & Routing
+
+## Track-scope list (Page+S2)
+
+Track-wide params, hosted by the generic Track page:
+
+- Play Mode (Aligned / Free)
+- CV Update (Gate / Always)
+
+## Sequence-scope list (Page+S1)
+
+Per-pattern params, in order:
+
+Clock, Sync, Divisor, Clock Mult, Gate Len, Loop, Reset Measure, Threshold (mode),
+Above, Below, Scale, Root, Scale Rotate, Slew, Pluck, Octave, Transpose, Offset.
+
+| Param | Default | Range |
+|---|---|---|
+| Divisor | 192 | 1..768 |
+| Clock Mult | 1.00x | 50..150% |
+| Gate Len | T (0%) | 0..100% |
+| Reset Measure | 8 bars | off / 1..128 |
+| Above (rangeHigh) | +5.0V | −5.0..+5.0V |
+| Below (rangeLow) | −5.0V | −5.0..+5.0V |
+| Scale | Project | Project / track scales |
+| Root | C (0) | 0..11 (C..B) |
+| Scale Rotate | Default | Default / 0..31 |
+| Slew | Off | 0..100% |
+| Pluck | Off | −100..+100 |
+| Octave | 0 | −10..+10 |
+| Transpose | 0 | −60..+60 |
+| Offset | +0.00V | −5.00..+5.00V (−500..+500 cV) |
+
+## What is routable
+
+Routing targets exposed for a Discrete track:
+
+- `DMap Input` — the External-mode input CV (−5..+5V).
+- `DMap Scan` — the scanner (0..34, cycles stage directions).
+- `DMap Above` (rangeHigh) and `DMap Below` (rangeLow) (−5..+5V).
+- Shared sequence/track params: Divisor, Clock Mult, Scale, Root Note, Slew (Slide Time), Octave, Transpose, Offset.
+
+`DMap Sync` is retired (folds into the universal Align/Reset). **Pluck and Gate
+Length are not routable.**
+
+## Initialization (the fret pattern)
+
+INIT (ALL) re-seeds every stage with an **interleaved "fret-pattern" threshold
+distribution** — round-robin across the four sections, ~6.5 units apart overall —
+with all directions Off and all notes 0. Enabling a stage (changing its
+direction) lights up a pre-spaced threshold without re-placing it.
