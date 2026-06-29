@@ -12,7 +12,7 @@ XFORMER is a fork of the Phazerville PER|FORMER firmware with XFORMER-specific t
 - **Algo Track** (inspired by [TINRS Tuesday](https://www.thisisnotrocketscience.nl/eurorack/tuesday/)): Generative sequencing with deterministic behavior.
 - **Discrete Track** (inspired by [New Systems Instruments Discrete Map](https://nsinstruments.com/modules/dmap.html)): Threshold-based sequencing mapping inputs to stages.
 - **Indexed Track** (inspired by [Orthogonal Devices ER-101/102](https://www.orthogonaldevices.com/er-101.html)): Duration-based sequencing with independent step lengths.
-- **Stochastic Track** (inspired by Vermona meloDICER, Proteus, and Generator): Probabilistic rhythm + melody — Live re-rolls / Loop locks, scale-degree & duration tickets, a pitch-bell distribution.
+- **Stochastic Track** (inspired by Stochastic Inspiration Generator, Proteus, and Vermona meloDICER): Probabilistic rhythm + melody — Live re-rolls / Loop locks, scale-degree & duration tickets, a pitch-bell distribution.
 - **PhaseFlux Track** (inspired by IoLabs Flux): 16-cell (4×4) pulse synthesizer — per-stage temporal + pitch curves, walked phase-swept in absolute time.
 - **Fractal Track** (inspired by Qu-Bit Bloom 2): Section-sampled CV/gate looper — captures another track with its feel (Event + Feel), then reshapes the loop with branches and ornaments.
 - **T9Type Track** (a mildly stripped down version of [Monome Teletype](https://monome.org/past/teletype.html): Full TT VM running withing a track, yes you can have 8 T9types running. USB keyboard supported for script editing (see Keyboard Shortcuts in the manual). No I2C, No Grid.
