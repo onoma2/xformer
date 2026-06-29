@@ -229,6 +229,11 @@
 <h2 id="p5">Part 5 · The Step Edit Page</h2>
 <p><span class="kbd">Page+S0</span> opens the Curve <strong>STEPS</strong> page. It is a single page with several <strong>edit modes</strong> cycled by <span class="kbd">F5</span>; F1–F4 pick the active per-step layer, the step keypad selects steps, and the encoder edits the selected step(s) on the active layer.</p>
 
+<figure>
+  <img class="shot" src="../ui-preview/curve-manual/curve-step.png" alt="Curve STEPS page in default Shape mode">
+  <figcaption>Step mode (SHAPE layer): the 16-step curve lane, loop bracket markers, dotted step grid, step numbers, and the playhead sweeping a step. The footer reads SHAPE · MIN · MAX · GATE · PHASE.</figcaption>
+</figure>
+
 <h3>The layers (F1–F4)</h3>
 <p>The footer shows <strong>SHAPE · MIN · MAX · GATE · PHASE</strong>. F1–F4 select layers; F5 cycles edit modes (Step → Phase → Wavefolder → Chaos → back).</p>
 <ul>
@@ -238,6 +243,11 @@
   <li><span class="kbd">F4</span> GATE — cycles <strong>Gate Mode (parameter) → Gate Events (mask)</strong>. "GATE EVENTS" edits the Peak/Trough/Zero bit mask; "GATE MODE" edits the trigger length / advanced mode.</li>
   <li><span class="kbd">F5</span> PHASE/NEXT — cycles the edit mode: <strong>Step → Global Phase → Wavefolder → Chaos → Step</strong>.</li>
 </ul>
+
+<figure>
+  <img class="shot" src="../ui-preview/curve-manual/curve-step-gate.png" alt="Curve STEPS page on the GATE EVENTS layer">
+  <figcaption>GATE layer ("GATE EVENTS"): the per-step event row appears under the curve lane — four segments per step show the Peak / Trough / Zero-rise / Zero-fall mask bits. GATE is highlighted in the footer.</figcaption>
+</figure>
 <p>Holding the active function key while turning the encoder on <strong>MIN/MAX</strong> moves Min and Max <strong>together</strong>. On the Min/Max layers a single unpersisted selected step is <strong>monitored</strong> — its level is driven to the output so you can dial it by ear.</p>
 
 <h3>Editing steps</h3>
@@ -255,6 +265,16 @@
   <li><span class="tag t-purp">Wavefolder</span> columns <strong>FOLD · GAIN · FILTER · XFADE · NEXT</strong> — the four signal-chain params (Part 3).</li>
   <li><span class="tag t-amber">Chaos</span> columns <strong>AMT · HZ · HEAT · DAMP · NEXT</strong>. <span class="kbd">Shift+F1</span> cycles the Chaos <strong>Range</strong> (Mid/Below/Above); <span class="kbd">Shift+F2</span> cycles the <strong>Algorithm</strong>.</li>
 </ul>
+
+<figure>
+  <img class="shot" src="../ui-preview/curve-manual/curve-wavefolder.png" alt="Curve Wavefolder edit-mode panel">
+  <figcaption>Wavefolder panel (F5): four value+bar columns — FOLD, GAIN, FILTER (bipolar, centre-zero), XFADE — plus NEXT. The focused column's value is bright.</figcaption>
+</figure>
+
+<figure>
+  <img class="shot" src="../ui-preview/curve-manual/curve-chaos.png" alt="Curve Chaos edit-mode panel">
+  <figcaption>Chaos panel (F5): AMT (%), HZ (rate in Hz), HEAT, DAMP. The Range offset prints under AMT and the algorithm name under HZ (Latoocarfian wraps to two lines).</figcaption>
+</figure>
 
 <h3>Step keypad and quick-edit</h3>
 <ul>

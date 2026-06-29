@@ -263,6 +263,10 @@
 <p>Holding <span class="kbd">Page</span> + <span class="kbd">S9-S16</span> opens a <strong>quick-edit</strong> overlay for, in order: Rec First, Rec Last, Loop First, Loop Last, Orn First, Orn Last, Orn Rate, Orn Intensity. <span class="kbd">Page</span> + any other step exits.</p>
 
 <h3>Trunk page</h3>
+<figure>
+  <img class="shot" src="../ui-preview/fractal-manual/trunk.png" alt="Fractal Trunk hero page">
+  <figcaption>Trunk: captured-loop tape, nested rec/loop/orn zone lines, playhead, R.Skip + cell count.</figcaption>
+</figure>
 <p><span class="kbd">F1</span> REC / <span class="kbd">F2</span> LOOP / <span class="kbd">F3</span> ORN focus that bracket for the encoder; <span class="kbd">F4</span> R.Skip focuses R.Skip. The encoder nudges the focused edge by ±1 (Shift = the bracket's <em>last</em> edge). Step keypad — top row <span class="kbd">S1-8</span> adds, bottom row <span class="kbd">S9-16</span> subtracts:</p>
 <table>
   <thead><tr><th>Col</th><th>S1-8 (top, +)</th><th>S9-16 (bottom, −)</th></tr></thead>
@@ -280,14 +284,26 @@
 <p>All edge moves are nesting-clamped. On the Divisor column <strong>top = faster</strong> (lower divisor value). <strong>LEDs:</strong> top row dim green (+), bottom row dim red (−).</p>
 
 <h3>Branch page</h3>
+<figure>
+  <img class="shot" src="../ui-preview/fractal-manual/branch.png" alt="Fractal Branch hero page">
+  <figcaption>Branch: route readout, T+B chain blocks (playing border, queued Q), 8 transform-pool toggles.</figcaption>
+</figure>
 <p><span class="kbd">F1</span> CNT / <span class="kbd">F2</span> PATH / <span class="kbd">F4</span> SEED focus for the encoder (SEED also reseeds on press). <span class="kbd">F3</span> POOL selects the pool layer; an <strong>encoder click toggles the focused pool bit</strong>. Steps: <strong>top row</strong> <span class="kbd">S1..S(N+1)</span> queues a beat-synced jump to that segment; <strong>bottom row</strong> <span class="kbd">S9..S16</span> toggles the 8 transform-pool bits.</p>
 <p><strong>LEDs:</strong> top row — present segment dim green, playing bright amber, queued bright red. Bottom row — pool bit set = bright green.</p>
 
 <h3>Ornament page</h3>
+<figure>
+  <img class="shot" src="../ui-preview/fractal-manual/ornament.png" alt="Fractal Ornament hero page">
+  <figcaption>Ornament: Rate / Intensity bars with tier ticks, Scale + zone, last-fired (and queued) ornament.</figcaption>
+</figure>
 <p><span class="kbd">F1</span> RATE / <span class="kbd">F2</span> INT / <span class="kbd">F3</span> SCALE focus for the encoder; <span class="kbd">F4</span> LOCK toggles Lock. Steps <span class="kbd">S1-S15</span> queue a forced ornament (id 0-14), ignoring rate and zone. <strong>S16 is inert.</strong></p>
 <p><strong>LEDs:</strong> S1-S15 — slot dim green, last-fired dim red, queued bright amber.</p>
 
 <h3>Source page</h3>
+<figure>
+  <img class="shot" src="../ui-preview/fractal-manual/source.png" alt="Fractal Source hero page">
+  <figcaption>Source: SrcA / SrcB refs, gate-logic and cv-logic segmented rows, combined result readout.</figcaption>
+</figure>
 <p><span class="kbd">F1</span> SrcA / <span class="kbd">F2</span> SrcB focus the slot; <span class="kbd">F3</span> GATE / <span class="kbd">F4</span> CV focus the logic row. Steps: <strong>top row</strong> <span class="kbd">S1-S6</span> selects the gate-logic mode; <strong>bottom row</strong> <span class="kbd">S9-S15</span> selects the cv-logic mode; <span class="kbd">S16</span> <strong>randomizes both</strong> logics.</p>
 <p><strong>LEDs:</strong> selected mode bright green, other modes in the row dim green; S16 bright amber.</p>
 

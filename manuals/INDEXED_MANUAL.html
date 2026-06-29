@@ -148,6 +148,21 @@
 <p>Page+S0 on an Indexed track opens <strong>INDEXED EDIT</strong>. The 48 steps are split into <strong>3 sections of 16</strong> (<code>SectionCount</code> = 3); the <span class="kbd">Left</span>/<span class="kbd">Right</span> keys move between sections, and the LED ring shows the selected section.</p>
 <p>The top of the page is a <strong>timeline bar</strong>: each non-zero step is drawn as a block whose <strong>width is its duration</strong> and whose filled inner portion is its <strong>gate length</strong>. The currently playing step is medium-bright; selected steps are bright. Below the bar, an info line shows total <strong>bars</strong> and the delta to the nearest bar/beat boundary, plus the selected step's duration / gate / note (with note name and resolved volts).</p>
 
+<figure>
+  <img class="shot" src="../ui-preview/indexed-manual/indexed-edit.png" alt="Indexed edit page, nothing selected">
+  <figcaption>Edit page with no step selected: the timeline bar (block width = duration, inner fill = gate ticks), playing step medium-bright, and the STEP N/N info line.</figcaption>
+</figure>
+
+<figure>
+  <img class="shot" src="../ui-preview/indexed-manual/indexed-edit-selected.png" alt="Indexed edit page with a step selected">
+  <figcaption>A step selected (bright block, full gate fill): the info line shows total bars and the bar/beat delta, and the F1/F2/F3 row shows the selected step's duration / gate / note + volts.</figcaption>
+</figure>
+
+<figure>
+  <img class="shot" src="../ui-preview/indexed-manual/indexed-edit-groups.png" alt="Indexed edit page in Groups mode">
+  <figcaption>Groups mode (F4 → GRPS): the footer becomes A B C D, each column shows that group's member count and the focused step's <code>[A]</code>/<code>[-]</code> membership.</figcaption>
+</figure>
+
 <h3>Edit modes (F1-F3)</h3>
 <table>
   <thead><tr><th>Key</th><th>Mode</th><th>Encoder edits</th><th>Shift</th></tr></thead>
@@ -213,6 +228,16 @@
 <h2 id="p4">Part 4: Math</h2>
 <p><span class="kbd">F5</span> on the edit page opens <strong>MATH</strong> — an offline transform applied to step fields. It holds <strong>two operation slots, A and B</strong>, both applied (A then B) when you commit. Math edits the stored steps; it is not a live modulation.</p>
 
+<figure>
+  <img class="shot" src="../ui-preview/indexed-manual/indexed-math.png" alt="Indexed Math page">
+  <figcaption>Math page: slots A and B, each a row of TARGET · OP · VALUE · GROUPS · N=count. Here A = DUR MUL 2 (ALL, N=8) and B = NOTE RAMP 12 over group A (N=3); OP is the focused column.</figcaption>
+</figure>
+
+<figure>
+  <img class="shot" src="../ui-preview/indexed-manual/indexed-math-groups.png" alt="Indexed Math page with SEL and UNGR group scopes">
+  <figcaption>Group scope on the GROUPS column: slot A targets <strong>SEL</strong> (the steps selected when Math opened, N=2), slot B targets <strong>UNGR</strong> (ungrouped steps, N=5).</figcaption>
+</figure>
+
 <h3>Per-slot config</h3>
 <p>Each slot (A/B) has four parameters, picked with F1-F4 (pressing the focused F-key again toggles between slot A and B):</p>
 <table>
@@ -251,6 +276,16 @@
 
 <h2 id="p5">Part 5: Routes (live modulation)</h2>
 <p><span class="kbd">Shift+F5</span> on the edit page opens <strong>ROUTE CONFIG</strong>. Routes feed two external CV inputs — <strong>Indexed A</strong> and <strong>Indexed B</strong> — into step fields at play time, leaving the stored steps untouched. There are two route slots (<strong>Route A</strong>, <strong>Route B</strong>) plus a <strong>Mix</strong> mode.</p>
+
+<figure>
+  <img class="shot" src="../ui-preview/indexed-manual/indexed-routes.png" alt="Indexed Route Config page">
+  <figcaption>Route Config: Route A and Route B rows are SOURCE · GROUPS · TARGET · AMOUNT · N=, with the Mix mode on the bottom row. Here A routes input A into DUR at +100% (ALL), B routes input B into NOTE at +50% over group B; SOURCE is focused.</figcaption>
+</figure>
+
+<figure>
+  <img class="shot" src="../ui-preview/indexed-manual/indexed-routes-mix.png" alt="Indexed Route Config with Mix focused">
+  <figcaption>Both routes target the same field (DUR) so the Mix row decides how they combine — here <strong>MAX</strong>. Mix is focused (Left/Right reaches it); the footer F-key highlight clears in Mix focus.</figcaption>
+</figure>
 
 <h3>Per-route config</h3>
 <p>Each route (A/B) has four parameters, picked with F1-F4 (re-pressing the focused F-key swaps between Route A and Route B):</p>
