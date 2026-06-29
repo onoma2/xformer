@@ -5,7 +5,7 @@
 XFORMER is a fork of the Phazerville PER|FORMER firmware with XFORMER-specific track types and sequencing enhancements. It assumes familiarity with the standard PER|FORMER workflow.
 
 
-<a href="manuals/xformer.jpeg"><img src="manuals/xformer.jpeg"/></a> <a href="manuals/xformer.jpeg"><img src="manuals/xformer6.jpg"/></a>
+<a href="manuals/xformer.jpeg"><img src="manuals/xformer.jpeg"/></a> <a href="manuals/xformer.jpeg"><img src="manuals/xformer6.jpg"/></a> <a href="manuals/xformer079.png"><img src="manuals/xformer079.png"/></a>
 
 
 ### Key Features
