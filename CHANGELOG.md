@@ -13,6 +13,7 @@
 - **TV shared variable bank**: `TV i` — 16 `int16` values shared across all TT-family tracks (session-global, ephemeral)
 - **Generators**: track-agnostic generator system; **Helical** generator for the Indexed track (Nebulae-2 autoregressive fold-feedback map)
 - **Modulators**: JustF (Just Friends) bank rate-link mode; **Geode** 6-voice rhythmic engine; `MO.*` / `G.*` Teletype ops
+- **Routing system rework**: expanded routable-target families (per-track, per-sequence, play-state, BUS 1-4, plus dedicated targets for every new track engine), the Bias / Depth / Shaper / Combine route pipeline (Modulate-centered vs Absolute-sweep) with live shapers, the routing-matrix tab editor (DEPTH / SOURCE / SHAPER views + BUS lanes), inline MOD+/MOD- route setup from any track or sequence param page, and an independent interpolating CV router
 - **Manuals**: firmware-grounded Markdown + self-contained HTML manuals (with OLED screen renders) for every track engine plus Routing, Modulators, and the Generator system; a sounding engine-comparison page
 
 ### Changed
