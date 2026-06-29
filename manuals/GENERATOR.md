@@ -1,6 +1,6 @@
 # Generator System
 
-The Generator system provides algorithmic tools for creating and modifying Note and Curve sequence data. Accessed via long-press on the **GEN** button in Note/Curve sequence edit pages, generators produce deterministic output and support an A/B preview workflow to audition changes before committing.
+The Generator system provides algorithmic tools for creating and modifying Note, Curve, and Indexed sequence data. Accessed via long-press on the **GEN** button in a sequence edit page, generators produce deterministic output and support an A/B preview workflow to audition changes before committing. The available generator types depend on the track: Note and Curve tracks offer the **Algo** generator, while Indexed tracks offer **Helical** in its place.
 
 ---
 
@@ -12,10 +12,11 @@ The Generator system provides algorithmic tools for creating and modifying Note 
 4. [Common Controls](#4-common-controls)
 5. [Random Generator](#5-random-generator)
 6. [Algo Generator](#6-algo-generator)
-7. [Euclidean Generator](#7-euclidean-generator)
-8. [Init Layer / Init Steps](#8-init-layer--init-steps)
-9. [Layer-Specific Visualization](#9-layer-specific-visualization)
-10. [Context Menu](#10-context-menu)
+7. [Helical Generator](#7-helical-generator)
+8. [Euclidean Generator](#8-euclidean-generator)
+9. [Init Layer / Init Steps](#9-init-layer--init-steps)
+10. [Layer-Specific Visualization](#10-layer-specific-visualization)
+11. [Context Menu](#11-context-menu)
 
 ---
 
@@ -29,13 +30,16 @@ From a Note or Curve sequence edit page:
 
 Available generator types depend on the track:
 
-| Generator | Note Track | Curve Track | Description |
-|---|---|---|---|
-| Init Layer | ✅ | ✅ | Reset current layer to default values |
-| Init Steps | ✅ | ✅ | Clear all step data |
-| Euclidean | ✅ | ✅ | Distribute N gates evenly across M steps |
-| Random | ✅ | ✅ | Randomize step values per layer |
-| Algo | ✅ | ❌ | Tuesday algorithm engines on Note sequences |
+| Generator | Note Track | Curve Track | Indexed Track | Description |
+|---|---|---|---|---|
+| Init Layer | ✅ | ✅ | ✅ | Reset current layer to default values |
+| Init Steps | ✅ | ✅ | ✅ | Clear all step data |
+| Euclidean | ✅ | ✅ | ✅ | Distribute N gates evenly across M steps |
+| Random | ✅ | ✅ | ✅ | Randomize step values per layer |
+| Algo | ✅ | ❌ | ❌ | Tuesday algorithm engines on Note sequences |
+| Helical | ❌ | ❌ | ✅ | Autoregressive fold-feedback map on Indexed sequences |
+
+Indexed tracks offer **Helical** in the slot where Note/Curve tracks offer **Algo**.
 
 ---
 
@@ -112,6 +116,18 @@ Generates random values for the current edit layer. Seed-driven and deterministi
 - **GateProbability**: Velocity-based probability; accents set to 100%
 
 **Variation blend:** Each layer independently rolls against the VAR parameter — at 100% all generated values are used, at 0% all original values are kept.
+
+### Helical
+**Indexed track only.** Runs a deterministic coupled autoregressive (AR) fold-feedback map, ported from Nebulae 2's helical generator. Fills each step's note index, duration, and gate length from the feedback (duration dominates the feedback, ~35:1), reading the resolved scale/root off the Indexed sequence. Indexed tracks offer Helical in place of Algo. Supports A/B preview.
+
+**Parameters:**
+| Param | Function | Description |
+|---|---|---|
+| Seed | F0 (A/B toggle) | Re-roll for new initial conditions (deterministic per seed) |
+| Octave Range | F1+encoder | Octave span, 1–4 (default 2) |
+| Base | F2+encoder | Feedback base, 24–768 (default 192) |
+| Law Dir | F3+encoder | Law/fold direction, ±1 |
+| Helicity | F4+encoder | Law depth ×10, 1–20 (default 8 → 0.8) |
 
 ---
 
@@ -249,7 +265,24 @@ Each algorithm is deterministic: the same ALGO/FLOW/ORNMT/SEED combination alway
 
 ---
 
-## 7. Euclidean Generator
+## 7. Helical Generator
+
+**Indexed track only.** A deterministic coupled autoregressive (AR) fold-feedback map, ported from Nebulae 2's helical generator. It fills each step's note index, duration, and gate length from the feedback — duration dominates the feedback (~35:1) — reading the resolved scale and root off the Indexed sequence. On Indexed tracks it occupies the generator slot that Note/Curve tracks give to Algo.
+
+**Parameters:**
+| Param | Range | Default | Effect |
+|---|---|---|---|
+| Seed | 32-bit | — | Re-roll for new initial conditions; same seed + params is repeatable |
+| Octave Range | 1–4 | 2 | Octave span of the generated note indices |
+| Base | 24–768 | 192 | Feedback base scaling the map output |
+| Law Dir | ±1 | +1 | Law/fold direction |
+| Helicity | 1–20 | 8 | Law depth ×10 (8 → 0.8): higher = deeper fold |
+
+Re-rolling the seed produces new initial conditions; the same seed with the same parameters always reproduces the same sequence.
+
+---
+
+## 8. Euclidean Generator
 
 Generates a Euclidean rhythm: distributes `Beats` gates evenly across `Steps` positions with an `Offset` rotation.
 
@@ -261,7 +294,7 @@ The visualization shows filled/empty step cells: filled = gate, empty = rest.
 
 ---
 
-## 8. Init Layer / Init Steps
+## 9. Init Layer / Init Steps
 
 - **Init Layer**: Resets the current edit layer to its default value. The default depends on the layer type (e.g., Gate = off, Note = C, etc.). If steps are selected, only those steps are affected.
 - **Init Steps**: Clears all step data (gate, note, slide, layer values). If steps are selected, only those steps are affected. If no steps are selected, the entire active range is cleared.
@@ -270,7 +303,7 @@ Both are immediate actions with no preview. A confirmation dialog may appear for
 
 ---
 
-## 9. Layer-Specific Visualization
+## 10. Layer-Specific Visualization
 
 The Random and Algo generators display a profile graph using the current sequence edit layer. The visualization adapts to the layer type:
 
@@ -294,7 +327,7 @@ All visualizations include:
 
 ---
 
-## 10. Context Menu
+## 11. Context Menu
 
 The context menu provides additional actions beyond the footer buttons.
 

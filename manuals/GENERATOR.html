@@ -61,9 +61,9 @@
 <div class="wrap">
 
 <h1>Generator System — manual</h1>
-<p class="lede">Algorithmic Random / Algo / Euclidean generators for Note &amp; Curve sequences, with a deterministic A/B preview workflow to audition before committing.</p>
+<p class="lede">Algorithmic Random / Algo / Helical / Euclidean generators for Note, Curve &amp; Indexed sequences, with a deterministic A/B preview workflow to audition before committing.</p>
 
-<p>The Generator system provides algorithmic tools for creating and modifying Note and Curve sequence data. Accessed via long-press on the <span class="kbd">GEN</span> button in Note/Curve sequence edit pages, generators produce deterministic output and support an A/B preview workflow to audition changes before committing.</p>
+<p>The Generator system provides algorithmic tools for creating and modifying Note, Curve, and Indexed sequence data. Accessed via long-press on the <span class="kbd">GEN</span> button in a sequence edit page, generators produce deterministic output and support an A/B preview workflow to audition changes before committing. The available generator types depend on the track: Note and Curve tracks offer the <strong>Algo</strong> generator, while Indexed tracks offer <strong>Helical</strong> in its place.</p>
 
 <div class="toc">
   <a href="#s1">1. Accessing Generators</a><br>
@@ -72,10 +72,11 @@
   <a href="#s4">4. Common Controls</a><br>
   <a href="#s5">5. Random Generator</a><br>
   <a href="#s6">6. Algo Generator</a><br>
-  <a href="#s7">7. Euclidean Generator</a><br>
-  <a href="#s8">8. Init Layer / Init Steps</a><br>
-  <a href="#s9">9. Layer-Specific Visualization</a><br>
-  <a href="#s10">10. Context Menu</a>
+  <a href="#s7">7. Helical Generator</a><br>
+  <a href="#s8">8. Euclidean Generator</a><br>
+  <a href="#s9">9. Init Layer / Init Steps</a><br>
+  <a href="#s10">10. Layer-Specific Visualization</a><br>
+  <a href="#s11">11. Context Menu</a>
 </div>
 
 <h2 id="s1">1. Accessing Generators</h2>
@@ -87,15 +88,17 @@
 </ul>
 <p>Available generator types depend on the track:</p>
 <table>
-  <thead><tr><th>Generator</th><th>Note Track</th><th>Curve Track</th><th>Description</th></tr></thead>
+  <thead><tr><th>Generator</th><th>Note Track</th><th>Curve Track</th><th>Indexed Track</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td>Init Layer</td><td>✅</td><td>✅</td><td>Reset current layer to default values</td></tr>
-    <tr><td>Init Steps</td><td>✅</td><td>✅</td><td>Clear all step data</td></tr>
-    <tr><td>Euclidean</td><td>✅</td><td>✅</td><td>Distribute N gates evenly across M steps</td></tr>
-    <tr><td>Random</td><td>✅</td><td>✅</td><td>Randomize step values per layer</td></tr>
-    <tr><td>Algo</td><td>✅</td><td>❌</td><td>Tuesday algorithm engines on Note sequences</td></tr>
+    <tr><td>Init Layer</td><td>✅</td><td>✅</td><td>✅</td><td>Reset current layer to default values</td></tr>
+    <tr><td>Init Steps</td><td>✅</td><td>✅</td><td>✅</td><td>Clear all step data</td></tr>
+    <tr><td>Euclidean</td><td>✅</td><td>✅</td><td>✅</td><td>Distribute N gates evenly across M steps</td></tr>
+    <tr><td>Random</td><td>✅</td><td>✅</td><td>✅</td><td>Randomize step values per layer</td></tr>
+    <tr><td>Algo</td><td>✅</td><td>❌</td><td>❌</td><td>Tuesday algorithm engines on Note sequences</td></tr>
+    <tr><td>Helical</td><td>❌</td><td>❌</td><td>✅</td><td>Autoregressive fold-feedback map on Indexed sequences</td></tr>
   </tbody>
 </table>
+<p>Indexed tracks offer <strong>Helical</strong> in the slot where Note/Curve tracks offer <strong>Algo</strong>.</p>
 
 <h2 id="s2">2. Generator Types</h2>
 
@@ -176,6 +179,20 @@
   <li><strong>GateProbability</strong>: Velocity-based probability; accents set to 100%</li>
 </ul>
 <p><strong>Variation blend:</strong> Each layer independently rolls against the VAR parameter — at 100% all generated values are used, at 0% all original values are kept.</p>
+
+<h3>Helical</h3>
+<p><strong>Indexed track only.</strong> Runs a deterministic coupled autoregressive (AR) fold-feedback map, ported from Nebulae 2's helical generator. Fills each step's note index, duration, and gate length from the feedback (duration dominates the feedback, ~35:1), reading the resolved scale/root off the Indexed sequence. Indexed tracks offer Helical in place of Algo. Supports A/B preview.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead><tr><th>Param</th><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Seed</td><td><span class="kbd">F0</span> (A/B toggle)</td><td>Re-roll for new initial conditions (deterministic per seed)</td></tr>
+    <tr><td>Octave Range</td><td><span class="kbd">F1</span>+encoder</td><td>Octave span, 1–4 (default 2)</td></tr>
+    <tr><td>Base</td><td><span class="kbd">F2</span>+encoder</td><td>Feedback base, 24–768 (default 192)</td></tr>
+    <tr><td>Law Dir</td><td><span class="kbd">F3</span>+encoder</td><td>Law/fold direction, ±1</td></tr>
+    <tr><td>Helicity</td><td><span class="kbd">F4</span>+encoder</td><td>Law depth ×10, 1–20 (default 8 → 0.8)</td></tr>
+  </tbody>
+</table>
 
 <h2 id="s3">3. A/B Preview Workflow</h2>
 <p>Generators with A/B support (Random, Euclidean, Algo) follow a two-state workflow:</p>
@@ -293,7 +310,22 @@
 <h3>Algorithm state</h3>
 <p>Each algorithm is deterministic: the same ALGO/FLOW/ORNMT/SEED combination always produces the same sequence. The seed is mixed into the RNG seed derivation rather than modifying the FLOW or ORNMT parameters directly.</p>
 
-<h2 id="s7">7. Euclidean Generator</h2>
+<h2 id="s7">7. Helical Generator</h2>
+<p><strong>Indexed track only.</strong> A deterministic coupled autoregressive (AR) fold-feedback map, ported from Nebulae 2's helical generator. It fills each step's note index, duration, and gate length from the feedback — duration dominates the feedback (~35:1) — reading the resolved scale and root off the Indexed sequence. On Indexed tracks it occupies the generator slot that Note/Curve tracks give to Algo.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead><tr><th>Param</th><th>Range</th><th>Default</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>Seed</td><td>32-bit</td><td>—</td><td>Re-roll for new initial conditions; same seed + params is repeatable</td></tr>
+    <tr><td>Octave Range</td><td>1–4</td><td>2</td><td>Octave span of the generated note indices</td></tr>
+    <tr><td>Base</td><td>24–768</td><td>192</td><td>Feedback base scaling the map output</td></tr>
+    <tr><td>Law Dir</td><td>±1</td><td>+1</td><td>Law/fold direction</td></tr>
+    <tr><td>Helicity</td><td>1–20</td><td>8</td><td>Law depth ×10 (8 → 0.8): higher = deeper fold</td></tr>
+  </tbody>
+</table>
+<p>Re-rolling the seed produces new initial conditions; the same seed with the same parameters always reproduces the same sequence.</p>
+
+<h2 id="s8">8. Euclidean Generator</h2>
 <p>Generates a Euclidean rhythm: distributes <code>Beats</code> gates evenly across <code>Steps</code> positions with an <code>Offset</code> rotation.</p>
 <ul>
   <li><strong>STEPS</strong>: Total positions (max 16 for Euclidean)</li>
@@ -302,14 +334,14 @@
 </ul>
 <p>The visualization shows filled/empty step cells: filled = gate, empty = rest.</p>
 
-<h2 id="s8">8. Init Layer / Init Steps</h2>
+<h2 id="s9">9. Init Layer / Init Steps</h2>
 <ul>
   <li><strong>Init Layer</strong>: Resets the current edit layer to its default value. The default depends on the layer type (e.g., Gate = off, Note = C, etc.). If steps are selected, only those steps are affected.</li>
   <li><strong>Init Steps</strong>: Clears all step data (gate, note, slide, layer values). If steps are selected, only those steps are affected. If no steps are selected, the entire active range is cleared.</li>
 </ul>
 <div class="gotcha"><strong>Immediate, no preview.</strong> Both are immediate actions with no preview. A confirmation dialog may appear for destructive operations.</div>
 
-<h2 id="s9">9. Layer-Specific Visualization</h2>
+<h2 id="s10">10. Layer-Specific Visualization</h2>
 <p>The Random and Algo generators display a profile graph using the current sequence edit layer. The visualization adapts to the layer type:</p>
 <table>
   <thead><tr><th>Layer</th><th>Visualization</th><th>Description</th></tr></thead>
@@ -333,7 +365,7 @@
   <li><strong>Active bank highlight</strong>: Current bank is bright; others are dimmed</li>
 </ul>
 
-<h2 id="s10">10. Context Menu</h2>
+<h2 id="s11">11. Context Menu</h2>
 <p>The context menu provides additional actions beyond the footer buttons.</p>
 <p><strong>Opening</strong>: <span class="kbd">Page</span> button, short-press <span class="kbd">GEN</span>, or double-tap <span class="kbd">Page</span> on the Generator page.</p>
 <p><strong>Random &amp; Algo menus:</strong></p>
