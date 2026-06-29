@@ -219,8 +219,8 @@ void Project::clear() {
 #define STRESS_TIMING_DEMO 0
     // TT_CROSSTRACK_DEMO: when 1, the sim boots a TT2 cross-track patch (Full
     // track 0 conducts Mini track 1 — WP scene-switch + WS script-trigger)
-    // instead of the fractal project. Set to 0 for the fractal default.
-#define TT_CROSSTRACK_DEMO 1
+    // instead of the 8-track showcase default. Set to 0 for the showcase.
+#define TT_CROSSTRACK_DEMO 0
 #if STRESS_TIMING_DEMO
     // 8 active tracks across the heaviest engines at fast tempo. RAM-safe: only
     // ONE Stochastic track (two have hardfaulted on boot — see PROJECT.md).
@@ -262,40 +262,147 @@ void Project::clear() {
     setTempo(120.f);
     setScale(2); // 2 corresponds to H.Minor scale
 #else
-    // Fractal test project: track 8 mirrors parents on tracks 6 & 7.
-    // Teletype tracks stay present but UNSEEDED — empty scripts emit no gate/CV,
-    // so teletype doesn't interfere with the fractal capture (re-seed via the
-    // seedTeletypeV2Demo/seedTeletypeMiniDemo helpers when you want them back).
+    // Sim default: 8-track sparse ambient showcase, one engine per slot. Slow
+    // tempo + long, mismatched divisors so the tracks drift in and out of phase.
+    setTempo(58.f);
+    setScale(2); // H.Minor
+
+    // Track 0 — TeletypeV2: sparse script. 2s metro fires root then fifth, so a
+    // single gate every ~4s on each, scripts driving CV1/gate1.
     track(0).setTrackMode(Track::TrackMode::TeletypeV2);
+    {
+        auto &p = track(0).tt2Track().program();
+        loadScriptText(p, TT2_INIT_SCRIPT, "X 0\nM 2000\nM.ACT 1\n");
+        loadScriptText(p, TT2_METRO_SCRIPT,
+            "X ADD X 1\n"
+            "X MOD X 4\n"
+            "IF EQ X 0 : CV 1 N 0\n"
+            "IF EQ X 0 : TR.P 1\n"
+            "IF EQ X 2 : CV 1 N 7\n"
+            "IF EQ X 2 : TR.P 1\n");
+    }
 
-    // Tracks 2-5: Note, ambient gate patterns (not parents, just context).
-    noteSequence(1, 0).setLastStep(15);
-    noteSequence(1, 0).setGates({ 0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0 });
-    noteSequence(2, 0).setLastStep(15);
-    noteSequence(2, 0).setGates({ 0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0 });
-    noteSequence(3, 0).setLastStep(15);
-    noteSequence(3, 0).setGates({ 0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0 });
-    noteSequence(4, 0).setLastStep(15);
-    noteSequence(4, 0).setGates({ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 });
+    // Track 1 — TeletypeMini: scene-based mini scripts (per-scene tempo/pitch).
+    track(1).setTrackMode(Track::TrackMode::TeletypeMini);
+    seedTeletypeMiniDemo(track(1).tt2MiniTrack());
 
-    // Parent A — track 6 (index 5): Note, on-beat gates + an ascending line.
-    track(5).setTrackMode(Track::TrackMode::Note);
-    noteSequence(5, 0).setLastStep(15);
-    noteSequence(5, 0).setGates({ 1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0 });
-    for (int i = 0; i < 16; ++i) noteSequence(5, 0).step(i).setNote(i % 8);
+    // Track 2 — Indexed: route-driven note index. A slow Mod1 LFO routed to
+    // IndexedA transposes a short 5-note motif up/down ~1 octave over time.
+    track(2).setTrackMode(Track::TrackMode::Indexed);
+    track(2).indexedTrack().setOctave(-1);
+    {
+        auto &seq = indexedSequence(2, 0);
+        seq.setDivisor(144);
+        seq.setScale(2);
+        seq.setActiveLength(5);
+        static const int8_t motif[5] = { 0, 3, 2, 5, 4 };
+        for (int i = 0; i < 5; ++i) {
+            auto &s = seq.step(i);
+            s.setNoteIndex(motif[i]);
+            s.setDuration(192);   // quarter-length step
+            s.setGateLength(140); // long, breathing gate
+        }
+        IndexedSequence::RouteConfig rc;
+        rc.targetParam = IndexedSequence::ModTarget::NoteIndex;
+        rc.source = IndexedSequence::RouteSource::A;
+        rc.amount = 100.f;        // ±1 octave swing
+        seq.setRouteA(rc);
+    }
+    {
+        auto &mod = modulator(0);
+        mod.setShape(Modulator::Shape::Sine);
+        mod.setRateDomain(Modulator::RateDomain::Free);
+        mod.setRate(30);          // 0.30 Hz
+        mod.setDepth(110);
+        auto &rt = routing().route(routing().findEmptyRoute());
+        rt.setTarget(Routing::Target::IndexedA);
+        rt.setSource(Routing::Source::Mod1);
+        rt.setTracks(1 << 2);
+        rt.setMin(0.f);
+        rt.setMax(1.f);
+    }
 
-    // Parent B — track 7 (index 6): Note, off-beat gates + a contrasting line.
-    track(6).setTrackMode(Track::TrackMode::Note);
-    noteSequence(6, 0).setLastStep(15);
-    noteSequence(6, 0).setGates({ 0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1 });
-    for (int i = 0; i < 16; ++i) noteSequence(6, 0).step(i).setNote((i * 3) % 12);
+    // Track 3 — DiscreteMap: internal sawtooth ramp (no live CV needed) sweeps 5
+    // enabled stages once per ~2-bar period — a slow ascending arpeggio.
+    track(3).setTrackMode(Track::TrackMode::DiscreteMap);
+    {
+        auto &seq = discreteMapSequence(3, 0);
+        seq.setClockSource(DiscreteMapSequence::ClockSource::Internal);
+        seq.setDivisor(384);
+        seq.setScale(2);
+        seq.setOctave(-1);
+        seq.setGateLength(60);
+        static const int8_t thr[5]  = { -80, -40, 0, 40, 80 };
+        static const int8_t note[5] = { 0, 2, 3, 5, 7 };
+        for (int i = 0; i < 5; ++i) {
+            auto &st = seq.stage(i);
+            st.setThreshold(thr[i]);
+            st.setDirection(DiscreteMapSequence::Stage::TriggerDir::Rise);
+            st.setNoteIndex(note[i]);
+        }
+    }
 
-    // Track 8 (index 7): Fractal — mirrors A(track 6) + B(track 7), gate-OR /
-    // gated-CV, armed on every pattern so it captures as soon as you hit play.
+    // Track 4 — Stochastic: sparse generative loop. High rest, low complexity,
+    // narrow pitch field, full-length notes — slow drifting melody.
+    track(4).setTrackMode(Track::TrackMode::Stochastic);
+    track(4).stochasticTrack().setOctave(-1);
+    {
+        auto &seq = track(4).stochasticTrack().sequence(0);
+        seq.setScale(2);
+        seq.setDivisor(48);
+        seq.setClockMultiplier(60);
+        seq.setRest(80);
+        seq.setComplexity(15);
+        seq.setVariation(5);
+        seq.setRange(15);
+        seq.setMaskMelody(20);
+        seq.setNoteDuration(5);
+    }
+
+    // Track 5 — PhaseFlux: sparse stages, slow divisor. Few pulses per stage,
+    // long stage lengths, 1-in-4 mask — phase movement that breathes.
+    track(5).setTrackMode(Track::TrackMode::PhaseFlux);
+    track(5).phaseFluxTrack().setOctave(-2);
+    {
+        auto &seq = phaseFluxSequence(5, 0);
+        seq.setDivisor(288);
+        seq.setScale(2);
+        seq.setFirstStage(0);
+        seq.setLastStage(5);
+        static const int pulse[6] = { 1, 0, 1, 0, 2, 0 };
+        static const int pitch[6] = { 0, 2, 3, 5, 4, 7 };
+        for (int i = 0; i < 6; ++i) {
+            auto &st = seq.stage(i);
+            st.setPulseCount(pulse[i]);
+            st.setBasePitch(pitch[i]);
+            st.setGateLength(30);
+            st.setLength(12);
+            st.setMask(PhaseFluxSequence::MaskType::OneInFour);
+        }
+    }
+
+    // Track 6 — Tuesday: Turing machine (algorithm 15). Low flip power for a
+    // slowly-mutating drone, tight ornament, sparse mask, slow divisor.
+    track(6).setTrackMode(Track::TrackMode::Tuesday);
+    {
+        auto &seq = tuesdaySequence(6, 0);
+        seq.setAlgorithm(15); // Turing
+        seq.setDivisor(96);
+        seq.setScale(2);
+        seq.setOctave(-1);
+        seq.setFlow(8);
+        seq.setPower(2);
+        seq.setOrnament(2);
+        seq.setMaskParameter(4);
+        seq.setGateLength(30);
+    }
+
+    // Track 7 — Fractal: mirrors Stochastic (track 4) + Tuesday (track 6),
+    // gate-OR / gated-CV, armed on every pattern so it captures on play.
     track(7).setTrackMode(Track::TrackMode::Fractal);
     {
         auto &ft = track(7).fractalTrack();
-        ft.setSourceA(5);
+        ft.setSourceA(4);
         ft.setSourceB(6);
         ft.setGateLogic(FractalTrack::GateLogic::Or);
         ft.setCvLogic(FractalTrack::CvLogic::Gated);
@@ -304,9 +411,6 @@ void Project::clear() {
             ft.sequence(p).setRecordTrigger(1); // armed
         }
     }
-
-    setTempo(80.f);
-    setScale(2); // 2 corresponds to H.Minor scale
 #endif // TT_CROSSTRACK_DEMO
 #endif
 
