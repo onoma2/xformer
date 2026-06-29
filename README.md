@@ -51,6 +51,7 @@ XFORMER is a fork of the Phazerville PER|FORMER firmware with XFORMER-specific t
 
 **System manuals:**
 - [Routing](./manuals/ROUTING_MANUAL.md) - routing engine, targets/sources, track-page setup
+- [CV Router](./manuals/CVROUTER_MANUAL.md) - interpolating 4-lane CV crossfader (Scan collapse → Route pan)
 - [Modulators](./manuals/MODULATOR_MANUAL.md) - modulators, JF mode, Geode, and the MO.*/G.* Teletype ops
 - [Generator](./manuals/GENERATOR.md) - algorithmic sequence generators (Random/Algo/Euclidean) for Note & Curve
 - T9Type - [Track guide](./manuals/T9type-learn.md), [Full reference](./manuals/T9type-manual.md), [Ops](./manuals/T9type-ops.md)

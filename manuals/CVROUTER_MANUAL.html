@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CV Router — manual</title>
+<style>
+  :root{
+    --blue:#2563eb; --amber:#ca8a04; --green:#16a34a; --red:#dc2626; --purp:#7c3aed;
+    --ink:#1a1a1a; --mut:#5b5b5b; --line:#e5e5e5; --card:#ffffff; --bg:#fafafa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; line-height:1.5;}
+  .wrap{max-width:880px; margin:0 auto; padding:32px 24px 90px}
+  h1{font-size:1.75rem; line-height:1.2; margin:0 0 6px}
+  h2{font-size:1.32rem; line-height:1.25; margin:46px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--blue)}
+  h2.geo{border-color:var(--green)}
+  h2.adv{border-color:var(--purp)}
+  h3{font-size:1.06rem; margin:24px 0 6px}
+  .lede{color:var(--mut); font-size:1.05rem; margin:0 0 8px}
+  p{margin:10px 0}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#f0f0f3; padding:1px 5px; border-radius:4px; font-size:.9em}
+  pre{background:#1a1a1a; color:#f0f0f0; padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:.86rem; line-height:1.45; margin:12px 0}
+  pre code{background:none; padding:0; color:inherit; font-size:1em}
+  .kbd{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#1a1a1a; color:#fff; padding:2px 7px; border-radius:5px; font-size:.82em; white-space:nowrap}
+  .tag{display:inline-block; font-size:.7rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:99px; vertical-align:middle}
+  .t-blue{background:#e8effe; color:var(--blue)} .t-amber{background:#fbf1d9; color:var(--amber)}
+  .t-green{background:#e3f5ea; color:var(--green)} .t-purp{background:#efe7fd; color:var(--purp)}
+  .t-red{background:#fdeeee; color:var(--red)}
+
+  .note{border-left:4px solid var(--blue); background:#f3f7ff; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .warn{border-left:4px solid var(--amber); background:#fdf8ec; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .gotcha{border-left:4px solid var(--red); background:#fdeeee; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:.93rem}
+  th,td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top}
+  thead th{background:#e8effe; color:var(--blue)}
+  tbody tr:nth-child(even){background:#fafafa}
+  td code{white-space:nowrap}
+
+  figure{margin:18px 0; text-align:center}
+  figcaption{color:var(--mut); font-size:.85rem; margin-top:6px}
+  .shot{display:block; width:100%; max-width:520px; margin:14px auto 2px; image-rendering:pixelated;
+    border:1px solid #333; border-radius:4px; background:#000}
+  .cap{text-align:center; color:var(--mut); font-size:.84rem; margin:0 0 6px}
+
+  .steps{counter-reset:step; list-style:none; padding:0; margin:14px 0}
+  .steps>li{counter-increment:step; position:relative; padding:12px 12px 12px 56px; margin:10px 0;
+    background:var(--card); border:1px solid var(--line); border-radius:8px}
+  .steps>li::before{content:counter(step); position:absolute; left:12px; top:12px; width:30px; height:30px;
+    border-radius:50%; background:var(--blue); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:.95rem}
+
+  .toc{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:16px 0; columns:2; font-size:.93rem}
+  @media(max-width:620px){.toc{columns:1}}
+  .toc a{color:var(--blue); text-decoration:none} .toc a:hover{text-decoration:underline}
+  .footer{margin-top:48px; padding-top:14px; border-top:1px solid var(--line); color:var(--mut); font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>CV Router — manual</h1>
+<p class="lede">A 4-lane interpolating CV crossfader. Scan collapses four inputs to one signal; Route pans that signal across four outputs. Both controls morph continuously and are modulation targets.</p>
+
+<div class="toc">
+  <a href="#p1">1. Overview</a><br>
+  <a href="#p2">2. Lanes — Inputs &amp; Outputs</a><br>
+  <a href="#p3">3. Scan, Route &amp; Interpolation</a><br>
+  <a href="#p4">4. The CV Router Page</a><br>
+  <a href="#p5">5. Setup &amp; Routing</a>
+</div>
+
+<h2>Introduction</h2>
+<p>The CV Router is a <strong>4-lane interpolating CV crossfader/matrix</strong> — a Vostok-Trace-style patch point inside the firmware. It is <strong>not</strong> the parameter mod-matrix (that is the separate Routing subsystem with its own manual). The CV Router takes four CV inputs, collapses them to a single scanned signal with the <strong>Scan</strong> control, then steers that signal across the four output lanes with the <strong>Route</strong> control. Both controls interpolate continuously between adjacent lanes, so a slow turn morphs the signal from one lane to the next rather than switching abruptly.</p>
+<p>Each lane picks its own <strong>input source</strong> (a physical CV in, a CV bus, a modulator, or 0V) and its own <strong>output destination</strong> (a physical CV out, a CV bus, or none). Scan and Route are themselves modulation targets, so the whole crossfade can be swept by the mod-matrix.</p>
+<p>Everything here is grounded in the firmware as built — defaults, ranges, enum members, key bindings, and the evaluation math come from the model, engine, and UI code.</p>
+
+<h3>Prerequisites</h3>
+<ul>
+  <li>Familiarity with the xformer page model and the global project pages.</li>
+  <li>Understanding of CV/gate conventions in modular synthesis (1V/oct, ±5V).</li>
+  <li>Awareness of the <strong>CV bus</strong> (<code>BusCv</code>) — the internal shared CV rails that tracks, modulators, and this router can read and write.</li>
+</ul>
+
+<h2 id="p1">Part 1 · Overview</h2>
+<p>The router has exactly <strong>4 lanes</strong> (<code>CvRoute::LaneCount</code>). A lane is one column in the matrix, carrying an <strong>input source</strong> (what feeds it) and an <strong>output destination</strong> (where its result goes).</p>
+<p>The signal flow each frame is three stages:</p>
+<ol>
+  <li><strong>Sample</strong> — read all four lane inputs into an array of volts.</li>
+  <li><strong>Scan</strong> — collapse the four inputs to one signal by interpolating between adjacent lanes at the Scan position.</li>
+  <li><strong>Route</strong> — distribute that one signal across the four output lanes by interpolating between adjacent lanes at the Route position, then write each lane to its destination.</li>
+</ol>
+<p>Scan picks <em>which input</em> (or blend of two inputs) you hear; Route picks <em>which output</em> (or blend of two outputs) it lands on. With Scan and Route both at a lane's exact position, the router is a straight wire from that input lane to that output lane.</p>
+<div class="note"><strong>Where state lives.</strong> The router is <strong>project-scope</strong> — one <code>CvRoute</code> for the whole project (<code>Project::cvRoute()</code>), holding the four input enums, the four output enums, and the Scan + Route values. The engine evaluates it once per frame in <code>updateCvRouteOutputs()</code>. It is not per-track and not per-pattern.</div>
+
+<h2 id="p2">Part 2 · Lanes — Inputs &amp; Outputs</h2>
+
+<h3>Input sources</h3>
+<p>Each lane's input is one <code>InputSource</code> enum, resolved to volts in <code>updateCvRouteOutputs()</code>:</p>
+<table>
+  <thead><tr><th>Source</th><th>Volts fed to the lane</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>CV in (<code>CvIn</code>)</td><td>physical CV input channel <code>lane</code></td><td>the lane's matching hardware CV in</td></tr>
+    <tr><td>BUS (<code>Bus</code>)</td><td><code>busCv(lane)</code> — the CV bus rail for that lane</td><td>reads the shared internal CV rail</td></tr>
+    <tr><td>M1..M8 (<code>Mod1</code>..<code>Mod8</code>)</td><td>modulator value mapped <code>0..127 → −5..+5V</code></td><td>a modulator engine output</td></tr>
+    <tr><td>0V (<code>Off</code>)</td><td>constant <code>0.0V</code></td><td>silent lane</td></tr>
+  </tbody>
+</table>
+<div class="warn"><strong>Modulator sources are lane-locked.</strong> In the UI, lane <code>n</code> may only select the two modulators assigned to it: lane 0 offers M1/M2, lane 1 offers M3/M4, lane 2 offers M5/M6, lane 3 offers M7/M8 (<code>modLane = modIndex / 2</code>). The encoder walk skips any modulator that does not belong to the current lane. The engine itself can read any modulator, but the page will not let you set an off-lane one.</div>
+
+<h3>Output destinations</h3>
+<table>
+  <thead><tr><th>Destination</th><th>Behaviour</th></tr></thead>
+  <tbody>
+    <tr><td>CV R (<code>CvOut</code>)</td><td>lane result exposed via <code>cvRouteOutput(lane)</code>, clamped to ±5V, routed to a physical CV out jack assigned to the router</td></tr>
+    <tr><td>BUS (<code>Bus</code>)</td><td>lane result written to the CV bus rail (<code>setBusCv</code>) by the router writer; the lane's own <code>cvRouteOutput</code> reports 0V</td></tr>
+    <tr><td>NONE (<code>None</code>)</td><td>lane muted — <code>cvRouteOutput</code> is 0V and nothing is written to the bus</td></tr>
+  </tbody>
+</table>
+
+<h3>The Bus feedback flag</h3>
+<p>A lane reading from the bus while another lane writes to the bus forms a <strong>feedback loop</strong> through the shared rail. The page detects this — any lane with a <code>Bus</code> input <em>and</em> any lane with a <code>Bus</code> output present at once — and prints a small <strong><code>FB</code></strong> flag in the top-right corner as a warning.</p>
+<div class="gotcha"><strong>Same-lane Bus in+out is blocked.</strong> The encoder walk refuses to set a lane's input to <code>Bus</code> if that same lane already outputs to <code>Bus</code>, and refuses the reverse. The <code>FB</code> flag covers the cross-lane case, which the firmware still allows.</div>
+
+<h3>Clear / default state</h3>
+<p><code>CvRoute::clear()</code> sets every lane to <strong>CV in → CV R</strong> (input <code>CvIn</code>, output <code>CvOut</code>), Scan 0, Route 0. Cleared, the router is four straight wires from CV in <code>n</code> to CV R <code>n</code>, with Scan/Route parked at lane 0.</p>
+
+<figure>
+  <img class="shot" src="../ui-preview/cvrouter-manual/cvrouter-default.png" alt="CV Router page, default state">
+  <figcaption>Default: four CV in → CV R wires, Scan 0 / Route 0. The "X" crossover logo tops the page; lane 0 is bright at Scan/Route 0.</figcaption>
+</figure>
+
+<h2 id="p3">Part 3 · Scan, Route &amp; Interpolation</h2>
+<p>The two big controls share the same interpolation idea: a 0..100 percentage is mapped onto the 0..3 lane axis, and the firmware blends the two lanes that bracket that position.</p>
+
+<h3>Scan — collapse 4 inputs to 1 signal</h3>
+<p>Scan is <code>0..100</code>. The engine turns it into a lane position:</p>
+<pre><code>scanPos  = (scan / 100) × 3            // 0.0 .. 3.0 across the four lanes
+scanLow  = floor(scanPos)              // lower bracketing lane
+scanHigh = ceil(scanPos)               // upper bracketing lane
+scanT    = scanPos − scanLow           // fractional blend amount
+
+signal = inputs[scanLow] × (1 − scanT) + inputs[scanHigh] × scanT</code></pre>
+<p>Scan <strong>0</strong> is purely lane-0 input, Scan <strong>100</strong> is purely lane-3 input, Scan <strong>50</strong> is the midpoint between lane 1 and lane 2 (position 1.5). The result is a single scalar <code>signal</code> in volts — a continuous crossfade walking across the four inputs.</p>
+<table>
+  <thead><tr><th>Scan</th><th>Position</th><th>Result</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>0.0</td><td>lane 0 input alone</td></tr>
+    <tr><td>33</td><td>~1.0</td><td>lane 1 input alone</td></tr>
+    <tr><td>50</td><td>1.5</td><td>50% lane 1 + 50% lane 2</td></tr>
+    <tr><td>66</td><td>~2.0</td><td>lane 2 input alone</td></tr>
+    <tr><td>100</td><td>3.0</td><td>lane 3 input alone</td></tr>
+  </tbody>
+</table>
+
+<h3>Route — distribute the signal across 4 outputs</h3>
+<p>Route is also <code>0..100</code>, mapped the same way to a 0..3 position, but instead of blending <em>inputs</em> it builds a <strong>weight</strong> for each output lane:</p>
+<pre><code>routePos  = (route / 100) × 3
+routeLow  = floor(routePos)
+routeHigh = ceil(routePos)
+routeT    = routePos − routeLow
+
+if routeLow == routeHigh:               // landed exactly on a lane
+    weights[routeLow] = 1.0
+else:
+    weights[routeLow]  = 1 − routeT     // split between the two bracketing lanes
+    weights[routeHigh] = routeT</code></pre>
+<p>Each output lane then emits <code>signal × weights[lane]</code>. At most two adjacent lanes are ever non-zero, so Route pans the scanned signal across the outputs: Route 0 sends it all to lane 0, Route 100 to lane 3, Route 50 splits it evenly between lanes 1 and 2.</p>
+
+<h3>Defaults and ranges</h3>
+<table>
+  <thead><tr><th>Param</th><th>Range</th><th>Default</th><th>Routable</th></tr></thead>
+  <tbody>
+    <tr><td>Scan</td><td>0..100</td><td>0</td><td>yes (<code>CvRouteScan</code>)</td></tr>
+    <tr><td>Route</td><td>0..100</td><td>0</td><td>yes (<code>CvRouteRoute</code>)</td></tr>
+    <tr><td>Input source (per lane)</td><td>enum: CV in / Bus / 0V / M1..M8</td><td>CV in</td><td>no</td></tr>
+    <tr><td>Output dest (per lane)</td><td>enum: CV R / Bus / None</td><td>CV R</td><td>no</td></tr>
+  </tbody>
+</table>
+<div class="note">Scan and Route are <code>Routable&lt;uint8_t&gt;</code> values: they hold a base (the value you edit on the page) and accept a routed override from the mod-matrix. <code>scan()</code> / <code>route()</code> return the mod-matrix override if one is active, otherwise the base. Editing on the page nudges the <strong>base</strong>, so the value moves cleanly even while a route is overriding it.</div>
+
+<h2 id="p4">Part 4 · The CV Router Page</h2>
+<p>The page is a compact 2×5 grid: a row of four input cells plus a Scan readout, over a row of four output cells plus a Route readout. There is no header or footer — instead a small <strong>"X" crossover logo</strong> sits at the top (two crossing line pairs), and the optional <code>FB</code> feedback flag appears top-right.</p>
+<table>
+  <thead><tr><th>Column</th><th>Row 1 (inputs)</th><th>Row 2 (outputs)</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>lane 0 input</td><td>lane 0 output</td></tr>
+    <tr><td>2</td><td>lane 1 input</td><td>lane 1 output</td></tr>
+    <tr><td>3</td><td>lane 2 input</td><td>lane 2 output</td></tr>
+    <tr><td>4</td><td>lane 3 input</td><td>lane 3 output</td></tr>
+    <tr><td>5</td><td><code>&lt;scan&gt; SCAN</code></td><td><code>&lt;route&gt; ROUTE</code></td></tr>
+  </tbody>
+</table>
+
+<figure>
+  <img class="shot" src="../ui-preview/cvrouter-manual/cvrouter-mix.png" alt="CV Router page, mixed state with FB flag">
+  <figcaption>Mixed: lane 1 on the bus in+out, lane 2 input M3, lane 3 input 0V / output None. Scan 50 (focused, bright), Route 66 highlights lane 2. The <code>FB</code> flag warns of the bus loop.</figcaption>
+</figure>
+
+<h3>F-keys — column + row select</h3>
+<p>There is <strong>one combined selector</strong>. Pressing a function key sets the active column and <strong>toggles the edit row</strong> between Input and Output:</p>
+<ul>
+  <li><span class="kbd">F1</span>..<span class="kbd">F4</span> select lane column 0..3.</li>
+  <li><span class="kbd">F5</span> selects column 4 (the Scan / Route value cell).</li>
+  <li>Each press flips the row: Input → Output → Input → …</li>
+</ul>
+<p>Tapping the same F-key twice walks from that lane's input to its output. The bright cell shows the current focus (active column, active row).</p>
+
+<h3>Encoder — edit the focused cell</h3>
+<ul>
+  <li><strong>Column 4, Input row</strong> → edits <strong>Scan</strong> (<code>editScan</code>).</li>
+  <li><strong>Column 4, Output row</strong> → edits <strong>Route</strong> (<code>editRoute</code>).</li>
+  <li><strong>Columns 0..3, Input row</strong> → cycles that lane's <strong>input source</strong> (<code>cycleInput</code>).</li>
+  <li><strong>Columns 0..3, Output row</strong> → cycles that lane's <strong>output destination</strong> (<code>cycleOutput</code>).</li>
+</ul>
+<p><strong>Shift</strong> (or pressing the encoder) makes the step <strong>10</strong> instead of 1 — for Scan/Route this jumps in tens; for the lane enums it advances ten positions. The enum cycle wraps and skips forbidden choices (off-lane modulators, same-lane Bus in+out conflicts).</p>
+
+<h3>Lane-cell colour = interpolation focus</h3>
+<p>Each input cell is tinted by where <strong>Scan</strong> currently sits; each output cell by where <strong>Route</strong> sits. The lane whose anchor matches the value exactly (lane 0 = 0, lane 1 = 33, lane 2 = 66, lane 3 = 100) is drawn <strong>Bright</strong>; lanes adjacent to the current interpolation position glow <strong>MediumBright</strong> as the blend crosses into them; the rest are dim. The focused cell (active column + row) always overrides to <strong>Bright</strong>.</p>
+
+<h2 id="p5">Part 5 · Setup &amp; Routing</h2>
+
+<h3>Routable controls</h3>
+<p>Only <strong>Scan</strong> and <strong>Route</strong> are routing targets:</p>
+<ul>
+  <li><code>Routing::Target::CvRouteScan</code> — label <strong>"CVR Scan"</strong>.</li>
+  <li><code>Routing::Target::CvRouteRoute</code> — label <strong>"CVR Route"</strong>.</li>
+</ul>
+<p>Add a route in the mod-matrix with one of these as the destination to sweep the crossfade from an LFO, an envelope, a CV in, or any other routing source. The lane input/output enums are <strong>not</strong> routable — only the two continuous controls are.</p>
+
+<h3>Wiring lanes to physical jacks</h3>
+<p>A lane's <code>CvOut</code> result only reaches hardware if a physical CV out channel is assigned to the router. In the engine, CV out channels whose owning "track" index equals <code>CONFIG_TRACK_COUNT</code> (the router pseudo-track) are mapped to router lanes in order (<code>cvOutputCvRouteLane</code>), and that lane's <code>cvRouteOutput</code> becomes the jack's base CV. Lanes set to <code>Bus</code> or <code>None</code> do not drive a jack directly — Bus writes the shared rail, None is silent.</p>
+
+<h3>A worked patch</h3>
+<p>To crossfade two oscillators' pitch CVs and send the blend to one output:</p>
+<ol class="steps">
+  <li>On the page, <span class="kbd">F1</span> to focus lane 0 input, encoder to <strong>CV in 1</strong> (osc A pitch).</li>
+  <li><span class="kbd">F2</span> to focus lane 1 input, encoder to <strong>CV in 2</strong> (osc B pitch).</li>
+  <li><span class="kbd">F1</span> again to flip lane 0 to its output row — set it to <strong>CV R 1</strong>.</li>
+  <li><span class="kbd">F5</span> to focus the Scan cell, encoder to taste — 0 is all osc A, 33 is all osc B, values between morph.</li>
+  <li>Optionally add a <code>CVR Scan</code> route from an LFO to auto-sweep the blend.</li>
+</ol>
+<p>To feed the blend onto the bus instead, set the output destination to <strong>BUS</strong> on the target lane and read that bus rail elsewhere — watch for the <strong><code>FB</code></strong> flag if any lane is also reading the bus.</p>
+
+<div class="footer">CV Router — xformer firmware manual. Grounded in the model, engine, and UI source.</div>
+
+</div>
+</body>
+</html>
