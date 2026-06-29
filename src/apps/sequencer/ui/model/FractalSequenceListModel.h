@@ -13,6 +13,8 @@ public:
         LoopFirst,
         LoopLast,
         OrderMode,
+        BranchCount,
+        Path,
         Divisor,
         ClockMultiplier,
         ResetMeasure,
@@ -84,6 +86,10 @@ public:
             return Routing::Target::FractalOrnamentIntensity;
         case RecordTrigger:
             return Routing::Target::FractalRecordArm;
+        case BranchCount:
+            return Routing::Target::FractalBranchCount;
+        case Path:
+            return Routing::Target::FractalPath;
         case Scale:
             return Routing::Target::Scale;
         case RootNote:
@@ -103,6 +109,8 @@ private:
         case LoopFirst:         return "Loop First";
         case LoopLast:          return "Loop Last";
         case OrderMode:         return "Order Mode";
+        case BranchCount:       return "Branch Count";
+        case Path:              return "Path";
         case Divisor:           return "Divisor";
         case ClockMultiplier:   return "Clock Mult";
         case ResetMeasure:      return "Reset Measure";
@@ -134,6 +142,8 @@ private:
         case LoopFirst:         _sequence->printLoopFirst(str); break;
         case LoopLast:          _sequence->printLoopLast(str); break;
         case OrderMode:         _sequence->printOrderMode(str); break;
+        case BranchCount:       str("%d", _sequence->branchCount()); break;
+        case Path:              str("%d", _sequence->path()); break;
         case Divisor:           _sequence->printDivisor(str); break;
         case ClockMultiplier:   _sequence->printClockMultiplier(str); break;
         case ResetMeasure:      _sequence->printResetMeasure(str); break;
@@ -174,6 +184,8 @@ private:
         case LoopFirst:         _sequence->editLoopFirst(value, shift); break;
         case LoopLast:          _sequence->editLoopLast(value, shift); break;
         case OrderMode:         _sequence->editOrderMode(value, shift); break;
+        case BranchCount:       _sequence->setBranchCount(_sequence->branchCount() + value); break;
+        case Path:              _sequence->setPath(_sequence->path() + value * (shift ? 16 : 1)); break;
         case Divisor:           _sequence->editDivisor(value, shift); break;
         case ClockMultiplier:   _sequence->editClockMultiplier(value, shift); break;
         case ResetMeasure:      _sequence->editResetMeasure(value, shift); break;
@@ -206,6 +218,10 @@ private:
             return CONFIG_FRACTAL_MAX_CELLS;
         case OrderMode:
             return int(FractalSequence::OrderMode::Last);
+        case BranchCount:
+            return 8;
+        case Path:
+            return 256;
         case OrnamentRate:
         case OrnamentIntensity:
             return 101;
@@ -243,6 +259,8 @@ private:
         case OrnFirst:          return _sequence->ornFirst();
         case OrnLast:           return _sequence->ornLast();
         case OrderMode:         return int(_sequence->orderMode());
+        case BranchCount:       return _sequence->branchCount();
+        case Path:              return _sequence->path();
         case OrnamentRate:      return _sequence->ornamentRate();
         case OrnamentIntensity: return _sequence->ornamentIntensity();
         case RecordSkip:        return _sequence->recordSkip();
@@ -270,6 +288,8 @@ private:
         case OrnFirst:          return _sequence->setOrnFirst(index);
         case OrnLast:           return _sequence->setOrnLast(index);
         case OrderMode:         return _sequence->setOrderMode(FractalSequence::OrderMode(index));
+        case BranchCount:       return _sequence->setBranchCount(index);
+        case Path:              return _sequence->setPath(index);
         case OrnamentRate:      return _sequence->setOrnamentRate(index);
         case OrnamentIntensity: return _sequence->setOrnamentIntensity(index);
         case RecordSkip:        return _sequence->setRecordSkip(index);
