@@ -103,7 +103,7 @@ void SystemPage::draw(Canvas &canvas) {
         canvas.setBlendMode(BlendMode::Set);
         canvas.setColor(Color::Bright);
         canvas.drawText(4, 24, "CURRENT VERSION:");
-        FixedStringBuilder<24> str("%d.%d.%d %s", CONFIG_VERSION_MAJOR, CONFIG_VERSION_MINOR, CONFIG_VERSION_REVISION, CONFIG_VERSION_SUFFIX);
+        FixedStringBuilder<16> str("%d.%d.%d", CONFIG_VERSION_MAJOR, CONFIG_VERSION_MINOR, CONFIG_VERSION_REVISION);
         canvas.drawText(100, 24, str);
         canvas.drawText(4, 40, "PRESS AND HOLD ENCODER TO RESET TO BOOTLOADER");
 

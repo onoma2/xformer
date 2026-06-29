@@ -336,7 +336,7 @@ void MonitorPage::drawStats(Canvas &canvas) {
 void MonitorPage::drawVersion(Canvas &canvas) {
     canvas.setFont(Font::Small);
     canvas.drawTextCentered(0, 10, Width, 16, CONFIG_VERSION_NAME);
-    FixedStringBuilder<24> str("Version %d.%d.%d %s", CONFIG_VERSION_MAJOR, CONFIG_VERSION_MINOR, CONFIG_VERSION_REVISION, CONFIG_VERSION_SUFFIX);
+    FixedStringBuilder<16> str("Version %d.%d.%d", CONFIG_VERSION_MAJOR, CONFIG_VERSION_MINOR, CONFIG_VERSION_REVISION);
     canvas.drawTextCentered(0, 25, Width, 16, str);
 }
 
