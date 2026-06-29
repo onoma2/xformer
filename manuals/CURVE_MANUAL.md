@@ -320,14 +320,14 @@ These live on the **track** (Page+S2), shared across all of the track's patterns
 
 | Param | Range | Default | Role |
 |---|---|---|---|
-| Play Mode | Aligned / Free | — | grid-locked vs. phase-accumulator (FM) |
-| Fill Mode | None / Variation / Next Pattern / Invert | — | what a fill substitutes |
-| Mute Mode | Last Value / 0V / Min / Max | — | CV level while muted |
-| Slide Time | 0–100% | — | slew between step values |
-| Offset | −5.00..+5.00V | — | DC offset added to the output |
-| Rotate | −64..+64 | — | rotate step-to-position mapping |
-| Shape P. Bias | −8..+8 (×12.5%) | — | global bias on shape-variation probability |
-| Gate P. Bias | −8..+8 (×12.5%) | — | global bias on gate probability |
+| Play Mode | Aligned / Free | Free | grid-locked vs. phase-accumulator (FM) |
+| Fill Mode | None / Variation / Next Pattern / Invert | None | what a fill substitutes |
+| Mute Mode | Last Value / 0V / Min / Max | Last Value | CV level while muted |
+| Slide Time | 0–100% | 0 | slew between step values |
+| Offset | −5.00..+5.00V | 0.00V | DC offset added to the output |
+| Rotate | −64..+64 | 0 | rotate step-to-position mapping |
+| Shape P. Bias | −8..+8 (×12.5%) | 0 | global bias on shape-variation probability |
+| Gate P. Bias | −8..+8 (×12.5%) | 0 | global bias on gate probability |
 | Curve Rate | 0.00–4.00× | 1.00× | Free-mode speed multiplier (no effect in Aligned) |
 | Global Phase | 0.00–1.00 | 0 | sequence-wide read-position offset |
 

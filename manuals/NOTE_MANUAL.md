@@ -236,6 +236,9 @@ first pulse), per **Gate** (each gating pulse), or per **Retrigger** (each subdi
 Mode **Stage** applies the offset only to triggered steps; **Track** applies the current
 value to every step. **Shift+F4** on the edit page resets the runtime value to its floor.
 
+Defaults: step value **1**, min **0**, max **7**, with Mode **Track**, Polarity **Unipolar**,
+Direction **Up**, Order **Wrap**, Trigger **Step** (enabled).
+
 ## Harmony
 
 A Note sequence has a **harmony role**: Off, Master, or one of four Follower roles

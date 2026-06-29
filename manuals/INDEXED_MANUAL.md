@@ -358,11 +358,11 @@ so a muted Indexed track still reports activity as a potential source for other 
 
 Track-wide params, hosted by the Indexed track list:
 
-- Play Mode (Aligned / Free)
-- CV Update (Gate / Always)
-- Slide Time (0-100%)
-- Octave (−10..+10)
-- Transpose (−60..+60)
+- Play Mode (Aligned / Free; default Free)
+- CV Update (Gate / Always; default Gate)
+- Slide Time (0-100%; default 25%)
+- Octave (−10..+10; default 0)
+- Transpose (−60..+60; default 0)
 
 ## Sequence-scope list (Page+S1)
 
