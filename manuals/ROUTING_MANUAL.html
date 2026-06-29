@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Routing engine — manual</title>
+<style>
+  :root{
+    --blue:#2563eb; --amber:#ca8a04; --green:#16a34a; --red:#dc2626; --purp:#7c3aed;
+    --ink:#1a1a1a; --mut:#5b5b5b; --line:#e5e5e5; --card:#ffffff; --bg:#fafafa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; line-height:1.5;}
+  .wrap{max-width:880px; margin:0 auto; padding:32px 24px 90px}
+  h1{font-size:1.75rem; line-height:1.2; margin:0 0 6px}
+  h2{font-size:1.32rem; line-height:1.25; margin:46px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--blue)}
+  h2.geo{border-color:var(--green)}
+  h2.adv{border-color:var(--purp)}
+  h3{font-size:1.06rem; margin:24px 0 6px}
+  .lede{color:var(--mut); font-size:1.05rem; margin:0 0 8px}
+  p{margin:10px 0}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#f0f0f3; padding:1px 5px; border-radius:4px; font-size:.9em}
+  pre{background:#1a1a1a; color:#f0f0f0; padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:.86rem; line-height:1.45; margin:12px 0}
+  pre code{background:none; padding:0; color:inherit; font-size:1em}
+  .kbd{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#1a1a1a; color:#fff; padding:2px 7px; border-radius:5px; font-size:.82em; white-space:nowrap}
+  .tag{display:inline-block; font-size:.7rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:99px; vertical-align:middle}
+  .t-blue{background:#e8effe; color:var(--blue)} .t-amber{background:#fbf1d9; color:var(--amber)}
+  .t-green{background:#e3f5ea; color:var(--green)} .t-purp{background:#efe7fd; color:var(--purp)}
+  .t-red{background:#fdeeee; color:var(--red)}
+
+  .note{border-left:4px solid var(--blue); background:#f3f7ff; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .warn{border-left:4px solid var(--amber); background:#fdf8ec; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .gotcha{border-left:4px solid var(--red); background:#fdeeee; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:.93rem}
+  th,td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top}
+  thead th{background:#e8effe; color:var(--blue)}
+  tbody tr:nth-child(even){background:#fafafa}
+  td code{white-space:nowrap}
+
+  figure{margin:18px 0; text-align:center}
+  figcaption{color:var(--mut); font-size:.85rem; margin-top:6px}
+  .shot{display:block; width:100%; max-width:520px; margin:14px auto 2px; image-rendering:pixelated;
+    border:1px solid #333; border-radius:4px; background:#000}
+  .cap{text-align:center; color:var(--mut); font-size:.84rem; margin:0 0 6px}
+
+  .steps{counter-reset:step; list-style:none; padding:0; margin:14px 0}
+  .steps>li{counter-increment:step; position:relative; padding:12px 12px 12px 56px; margin:10px 0;
+    background:var(--card); border:1px solid var(--line); border-radius:8px}
+  .steps>li::before{content:counter(step); position:absolute; left:12px; top:12px; width:30px; height:30px;
+    border-radius:50%; background:var(--blue); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:.95rem}
+
+  .toc{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:16px 0; columns:2; font-size:.93rem}
+  @media(max-width:620px){.toc{columns:1}}
+  .toc a{color:var(--blue); text-decoration:none} .toc a:hover{text-decoration:underline}
+  .footer{margin-top:48px; padding-top:14px; border-top:1px solid var(--line); color:var(--mut); font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Routing engine — manual</h1>
+<p class="lede">The modulation matrix. Map a source onto a target parameter, recomputed every engine frame, shaped by depth, bias, a waveshaper, and a combine mode.</p>
+
+<div class="toc">
+  <a href="#p1">1. Overview</a><br>
+  <a href="#p2">2. Targets</a><br>
+  <a href="#p3">3. Sources</a><br>
+  <a href="#p4">4. Bias / Depth / Shaper / Combine</a><br>
+  <a href="#p5">5. The Routing page</a><br>
+  <a href="#p6">6. BUS &amp; MIDI tabs</a><br>
+  <a href="#p7">7. Route from the Note track page</a><br>
+  <a href="#p8">8. Reference</a>
+</div>
+
+<h2>Introduction</h2>
+<p>Routing is the <strong>modulation matrix</strong>: it maps a source — a CV input, a bus, a modulator, another output — onto a target parameter, recomputed every engine frame. One <em>route</em> is one source→target wire with its own depth, bias, shaper, and combine mode. Up to 16 routes live in a project; the page shows them as a scrollable grid of params × tracks, plus dedicated BUS and MIDI tabs.</p>
+<p>A route does not replace a parameter's value — it <strong>shapes</strong> the live source and adds the result on top of the edited base. The source runs through Bias, Depth, and an optional Shaper before it lands. Two combine modes decide whether the source modulates around the base (centered, bipolar) or sweeps the base from one end of the param's range to the other.</p>
+<p>Everything here is grounded in the firmware as built — defaults, ranges, enum members, key bindings, and target families come from the model, engine, and UI code.</p>
+
+<h3>Prerequisites</h3>
+<ul>
+  <li>Familiarity with the xformer track/sequence/edit page model (<span class="kbd">Page+S2</span> / <span class="kbd">Page+S1</span> / <span class="kbd">Page+S0</span>).</li>
+  <li>Understanding of CV/gate concepts in modular synthesis (1V/oct, ±5V).</li>
+  <li>A parameter you want to modulate, and a source (CV input, modulator, bus, or output) to drive it.</li>
+</ul>
+
+<h2 id="p1">Part 1 · Overview</h2>
+<p>A route holds:</p>
+<ul>
+  <li><strong>Target</strong> — what it drives (a param family member, Part 2).</li>
+  <li><strong>Source</strong> — what drives it (CV In, CV Out, Bus, Gate Out, Mod, MIDI).</li>
+  <li><strong>Tracks</strong> — for per-track targets, the bitmask of tracks the route applies to.</li>
+  <li><strong>Min / Max</strong> — the param-value window the source spans.</li>
+  <li><strong>Depth</strong> (per track, −100..+100%) — how hard the shaped source pushes.</li>
+  <li><strong>Bias</strong> (per track, −75..+75%) — offsets the source before depth.</li>
+  <li><strong>Shaper</strong> (per track) — an optional waveshape on the source.</li>
+  <li><strong>Combine</strong> — Modulate (centered) or Absolute (sweep from base).</li>
+  <li><strong>Scale source</strong> — a second source that dynamically scales the depth.</li>
+</ul>
+<div class="note"><strong>Two scopes of target.</strong> <em>Global</em> targets (Tempo, Swing, the CV-router controls, the four buses) have no track dimension — one value, one route. <em>Per-track</em> targets (Run, Reset, Transpose, Divisor, the engine params) carry an 8-bit track mask: one route can drive several tracks at once, with an independent depth per track.</div>
+<div class="note"><strong>Where routes live.</strong> All 16 routes live on the <strong>project</strong>, not on any track — a route survives pattern and track changes. The routed value is recomputed every frame from the live source and written as a transient override; the edited base value is never overwritten.</div>
+
+<h2 id="p2">Part 2 · Targets</h2>
+<p>A target is the parameter a route drives. They group into families; each member has a value range and a default route window. Ranges below come from the firmware's target-info table.</p>
+
+<h3>Engine / transport</h3>
+<table>
+  <thead><tr><th>Target</th><th>Range</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Play</td><td>off/on</td><td>start playback</td></tr>
+    <tr><td>Play Toggle</td><td>off/on</td><td>toggle play (conflicts with Play)</td></tr>
+    <tr><td>Record</td><td>off/on</td><td>arm record</td></tr>
+    <tr><td>Record Toggle</td><td>off/on</td><td>toggle record (conflicts with Record)</td></tr>
+    <tr><td>Tap Tempo</td><td>off/on</td><td>tap</td></tr>
+  </tbody>
+</table>
+
+<h3>Project <span class="tag t-blue">global</span></h3>
+<table>
+  <thead><tr><th>Target</th><th>Range</th><th>Default window</th></tr></thead>
+  <tbody>
+    <tr><td>Tempo</td><td>1..1000 BPM</td><td>100..200</td></tr>
+    <tr><td>Swing</td><td>50..75%</td><td>50..75</td></tr>
+    <tr><td>CVR Scan</td><td>0..100%</td><td>0..100</td></tr>
+    <tr><td>CVR Route</td><td>0..100%</td><td>0..100</td></tr>
+  </tbody>
+</table>
+
+<h3>Play-state <span class="tag t-green">per track</span></h3>
+<table>
+  <thead><tr><th>Target</th><th>Range</th></tr></thead>
+  <tbody>
+    <tr><td>Mute</td><td>off/on</td></tr>
+    <tr><td>Fill</td><td>off/on</td></tr>
+    <tr><td>Fill Amount</td><td>0..100%</td></tr>
+    <tr><td>Pattern</td><td>1..16</td></tr>
+  </tbody>
+</table>
+
+<h3>Track <span class="tag t-green">per track</span></h3>
+<table>
+  <thead><tr><th>Target</th><th>Range</th><th>Default window</th></tr></thead>
+  <tbody>
+    <tr><td>Run</td><td>off/on</td><td>—</td></tr>
+    <tr><td>Reset</td><td>off/on</td><td>—</td></tr>
+    <tr><td>Slide Time</td><td>0..100%</td><td>0..100</td></tr>
+    <tr><td>Octave</td><td>−10..+10</td><td>−1..+1</td></tr>
+    <tr><td>Transpose</td><td>−60..+60</td><td>−12..+12</td></tr>
+    <tr><td>Offset</td><td>−5.00..+5.00V</td><td>−1.00..+1.00V</td></tr>
+    <tr><td>Rotate</td><td>−64..+64</td><td>0..64</td></tr>
+    <tr><td>Gate P. Bias</td><td>−8..+8</td><td>full</td></tr>
+    <tr><td>Retrig P. Bias</td><td>−8..+8</td><td>full</td></tr>
+    <tr><td>Length Bias</td><td>−8..+8</td><td>full</td></tr>
+    <tr><td>Note P. Bias</td><td>−8..+8</td><td>full</td></tr>
+    <tr><td>Shape P. Bias</td><td>−8..+8</td><td>full</td></tr>
+    <tr><td>CV Out Rot</td><td>−8..+8</td><td>0..8</td></tr>
+    <tr><td>Gate Out Rot</td><td>−8..+8</td><td>0..8</td></tr>
+  </tbody>
+</table>
+
+<h3>Sequence <span class="tag t-green">per track</span></h3>
+<table>
+  <thead><tr><th>Target</th><th>Range</th><th>Default window</th></tr></thead>
+  <tbody>
+    <tr><td>First Step</td><td>1..64</td><td>full</td></tr>
+    <tr><td>Last Step</td><td>1..64</td><td>full</td></tr>
+    <tr><td>Run Mode</td><td>0..5 (Fwd..Random)</td><td>full</td></tr>
+    <tr><td>Divisor</td><td>1..768</td><td>6..24</td></tr>
+    <tr><td>Clock Mult</td><td>50..150%</td><td>full</td></tr>
+    <tr><td>Phase</td><td>0..1</td><td>—</td></tr>
+    <tr><td>Scale</td><td>0..MaxCount</td><td>full</td></tr>
+    <tr><td>Root Note</td><td>0..11</td><td>full</td></tr>
+  </tbody>
+</table>
+
+<h3>Bus <span class="tag t-blue">global</span></h3>
+<table>
+  <thead><tr><th>Target</th><th>Range</th></tr></thead>
+  <tbody>
+    <tr><td>BUS 1</td><td>−5.00..+5.00V</td></tr>
+    <tr><td>BUS 2</td><td>−5.00..+5.00V</td></tr>
+    <tr><td>BUS 3</td><td>−5.00..+5.00V</td></tr>
+    <tr><td>BUS 4</td><td>−5.00..+5.00V</td></tr>
+  </tbody>
+</table>
+<p>The buses are engine-owned ±5V CV rails. A route can write a bus; another route can read that same bus as a source — that is how routing chains across the matrix.</p>
+
+<h3>Engine families <span class="tag t-green">per track</span></h3>
+<p>Each track engine exposes its own routable params on a dedicated tab (NOTE / PHASEFLUX / CURVE / TUESDAY / DISCMAP / INDEXED / STOCH / FRACTAL):</p>
+<ul>
+  <li><strong>Tuesday</strong> — Algorithm, Flow, Ornament, Power, Glide, Trill, StepTrill, Gate Offset, Gate Length.</li>
+  <li><strong>Chaos / Wavefolder</strong> — Chaos Amount/Rate/P1/P2; Fold, Fold Gain, DJ Filter, Curve Rate.</li>
+  <li><strong>DiscreteMap</strong> — DMap Input, Scan, Sync, Above, Below.</li>
+  <li><strong>Indexed</strong> — Indexed A, Indexed B (base-less inlets: a new route defaults to full depth, since depth-0 would be silent).</li>
+  <li><strong>Stochastic</strong> — Mask, Gate Length, Tilt, Feel, Burst, Complexity, Contour, Note Duration, Variation, Rest, Slide, Sleep, Patience R, Mutate, Jump, Range, Bias, Spread, Burst Count, Burst Rate.</li>
+  <li><strong>Fractal</strong> — Branch Count, Path, Orn Rate, Orn Intens, Record Arm.</li>
+</ul>
+<div class="gotcha"><strong>Conflicts are guarded.</strong> Two routes can't drive the same target (same track, for per-track targets). Play/Play-Toggle and Record/Record-Toggle are mutually exclusive. The editor refuses the second.</div>
+
+<h2 id="p3">Part 3 · Sources</h2>
+<p>A source is what drives the route. The picker offers every member of the source enum in order, skipping only the bus that would self-route the target.</p>
+<table>
+  <thead><tr><th>Family</th><th>Members</th><th>Abbrev</th><th>Reads</th></tr></thead>
+  <tbody>
+    <tr><td>CV In</td><td>1-4</td><td>IN1-4</td><td>the panel CV inputs, raw volts (1V/oct)</td></tr>
+    <tr><td>CV Out</td><td>1-8</td><td>O1-8</td><td>the eight CV outputs, post-engine</td></tr>
+    <tr><td>Bus</td><td>1-4</td><td>B1-4</td><td>the four ±5V engine buses</td></tr>
+    <tr><td>MIDI</td><td>—</td><td>—</td><td>a configured MIDI event (Part 6)</td></tr>
+    <tr><td>Gate Out</td><td>1-8</td><td>G1-8</td><td>the eight gate outputs (0/1)</td></tr>
+    <tr><td>Mod</td><td>1-8</td><td>M1-8</td><td>the eight modulators, 0..127 mapped to ±5V</td></tr>
+  </tbody>
+</table>
+<p><code>None</code> is a valid source — a route with no source is inert until you pick one.</p>
+<div class="gotcha"><strong>Self-route is blocked.</strong> A bus source feeding the same bus target is refused; the encoder skips over it, and setting it directly snaps the source to None.</div>
+<div class="note"><strong>CV source range.</strong> A CV-In source carries a voltage range (default Bipolar ±5V). It sets how the raw input voltage normalizes into the route's 0..1 working value.</div>
+
+<h2 id="p4" class="adv">Part 4 · Bias / Depth / Shaper / Combine</h2>
+<p>A route does not just copy a source onto a param. It runs the source through a fixed pipeline.</p>
+<ol>
+  <li><strong>Normalize</strong> — the raw source becomes a 0..1 working value (a CV input uses its voltage range; a Mod scales 0..127 → 0..1).</li>
+  <li><strong>Bias</strong> (−75..+75%) — offsets the working value before depth. Re-centers an asymmetric source.</li>
+  <li><strong>Shaper</strong> — an optional waveshape. On the routing lane the live shapers are the stateless folds.</li>
+</ol>
+<table>
+  <thead><tr><th>Token</th><th>Shaper</th></tr></thead>
+  <tbody>
+    <tr><td>FLD</td><td>Triangle fold (center 0.5)</td></tr>
+    <tr><td>F30</td><td>Triangle fold, center 0.3</td></tr>
+    <tr><td>F70</td><td>Triangle fold, center 0.7</td></tr>
+    <tr><td>CRS</td><td>Crease (threshold 0.5)</td></tr>
+    <tr><td>C10</td><td>Crease, threshold 0.1</td></tr>
+    <tr><td>C90</td><td>Crease, threshold 0.9</td></tr>
+  </tbody>
+</table>
+<ol start="4">
+  <li><strong>Scale source</strong> — an optional second source multiplies the depth dynamically (None = identity gain of 1.0).</li>
+  <li><strong>Depth</strong> (−100..+100%) — how far the shaped source travels. Negative inverts.</li>
+  <li><strong>Combine</strong> — how the result lands on the param.</li>
+</ol>
+
+<h3>Modulate vs Absolute</h3>
+<p>The combine mode is the headline of how a route feels:</p>
+<ul>
+  <li><span class="tag t-blue">Modulate</span> (default) — the source is centered: a half-scale source produces zero change, full produces ±depth around the base. Neutral at source-center, bipolar. The base value still matters; the route wiggles around it.</li>
+  <li><span class="tag t-purp">Absolute</span> — the source sweeps from the base: source 0 leaves the base untouched, source 1 pushes a full depth×range travel in one direction. The base is the floor; the source pulls it up.</li>
+</ul>
+<p>Depth is the modulation amount for Modulate, and the travel span for Absolute. Routing depth scales to the destination's value range — +50% on Transpose is a larger pitch swing than +50% on Octave because the ranges differ.</p>
+
+<h2 id="p5">Part 5 · The Routing page</h2>
+<p>The routing page is a modal tab editor. A static tab ring runs across the top; <span class="kbd">Left</span>/<span class="kbd">Right</span> cycle the tabs. Each tab is a scrollable grid: param rows × 8 track columns. The grid cell shows, per the active view, the row's source, depth, scale, or shaper for that track.</p>
+
+<h3>The tabs</h3>
+<p>The ring, in order: <strong>PITCH · CLOCK · GLOB · NOTE · PHASEFLUX · CURVE · TUESDAY · DISCMAP · INDEXED · STOCH · FRACTAL · BUS · MIDI</strong>. The first three are cross-engine <em>bands</em> collecting shared pitch/clock/global params; the engine tabs list that engine's own params; BUS and MIDI are dedicated detail views.</p>
+
+<h3>The grid</h3>
+<ul>
+  <li><strong>Header</strong> — tab name (left, bright), the centered view tag (SOURCE / DEPTH / SCALE / SHAPER, dim), the combine state (MODULATE / ABSOLUTE) and the occupied-slot counter <code>n/16</code> (right). The counter goes bright when all 16 routes are used.</li>
+  <li><strong>Column headers</strong> — track number + engine letter (<code>1N</code>, <code>2C</code>, …). The cursor column is bright; columns whose engine doesn't own the cursor row's param are dim.</li>
+  <li><strong>Rows</strong> — the param name in the left gutter (38px bands, 52px engine tabs), then 8 cells: <code>-</code> ineligible, <code>.</code> eligible+unrouted, a value when routed. The right margin carries a per-row <code>M</code>/<code>A</code> combine marker.</li>
+  <li><strong>Scrollbar</strong> — right edge, when the list overflows the 4 visible rows.</li>
+</ul>
+
+<h3>The four cell views (F1 VIEW cycles)</h3>
+<p>F1 walks the cell view: <strong>SOURCE → DEPTH → SCALE → SHAPER → SOURCE</strong>.</p>
+<table>
+  <thead><tr><th>View</th><th>Cell shows</th></tr></thead>
+  <tbody>
+    <tr><td>SOURCE</td><td>the route's single source abbrev (one source per row)</td></tr>
+    <tr><td>DEPTH</td><td>per-track depth <code>+nn</code> (membership: non-zero depth = member)</td></tr>
+    <tr><td>SCALE</td><td>the route's scale-source abbrev (<code>.</code> = no scale gain)</td></tr>
+    <tr><td>SHAPER</td><td>the route's shaper token (FLD/CRS/…)</td></tr>
+  </tbody>
+</table>
+
+<figure>
+  <img class="shot" src="../ui-preview/routing-manual/routing-tab-global.png" alt="Routing GLOB tab, DEPTH view">
+  <figcaption>GLOB band, DEPTH view. Per-track depth values; CV Rot routed +50 on tracks 1-2 (ABSOLUTE, "A" marker); slot counter 3/16. Mirrors <code>RoutingPage::drawTabEditor</code>.</figcaption>
+</figure>
+
+<figure>
+  <img class="shot" src="../ui-preview/routing-manual/routing-tab-global-source.png" alt="Routing GLOB tab, SOURCE view">
+  <figcaption>Same band, SOURCE view (F1). Each routed row paints its single source on every eligible cell — Tempo←IN1, CVR Scan←M1. Mirrors the <code>MatrixView::Source</code> branch.</figcaption>
+</figure>
+
+<figure>
+  <img class="shot" src="../ui-preview/routing-manual/routing-tab-clock.png" alt="Routing CLOCK tab, DEPTH view">
+  <figcaption>CLOCK band, DEPTH view, cursor on track 3. Divisor routed +15 on tracks 1+4; Run routed +100 (ABSOLUTE) on track 3. Run/Reset are folded into the band.</figcaption>
+</figure>
+
+<figure>
+  <img class="shot" src="../ui-preview/routing-manual/routing-tab-shaper.png" alt="Routing GLOB tab, SHAPER view">
+  <figcaption>SHAPER view. Routed rows show their shaper token (FLD = triangle fold, CRS = crease). Mirrors the <code>MatrixView::Shaper</code> branch.</figcaption>
+</figure>
+
+<h3>Editing a route (F2 EDIT)</h3>
+<p>F2 toggles nav ↔ edit on the cursor row. On an unrouted row it creates a fresh inert draft (source None, depth 0) and opens on SOURCE; on a routed row it copies the live route into a draft. <strong>The live route is untouched until COMMIT</strong> — the draft is what the grid renders and edits.</p>
+<ul>
+  <li><strong>Encoder</strong> dials the focused field (SOURCE: source family; DEPTH: the cursor cell's depth; SCALE/SHAPER: that lane's value). Shift+encoder jumps whole source families.</li>
+  <li><span class="kbd">F1</span> VIEW — cycle the cell view.</li>
+  <li><span class="kbd">F3</span> MOD/ABS — toggle Modulate ↔ Absolute on the draft.</li>
+  <li><span class="kbd">F4</span> CANCEL — discard the draft (Shift+CANCEL on a routed row removes the committed route entirely).</li>
+  <li><span class="kbd">F5</span> COMMIT — write the draft live (only when the draft is valid).</li>
+  <li><span class="kbd">T1-T8</span> — move the cursor to that track's column. Shift+Tn spreads the cursor cell's depth to every eligible track sharing track n's engine.</li>
+</ul>
+<div class="note"><strong>LEDs.</strong> The routing page is modal and draws no step-grid LEDs of its own; the function row reflects the footer state (EDIT highlighted while editing).</div>
+
+<h2 id="p6">Part 6 · BUS &amp; MIDI tabs</h2>
+
+<h3>BUS tab</h3>
+<p>A per-lane detail view of the four ±5V buses. Each lane shows its live voltage as a bipolar bar, the one routing source feeding it with depth, and two activity lights — <strong>CVR</strong> (the CV-router is writing this lane this frame) and <strong>TT</strong> (Teletype is). A <strong>SAFE</strong> indicator marks bus-safety on.</p>
+<p>F2 EDIT opens the focused lane's route (or creates one); the encoder picks the source and depth; F3 toggles MOD/ABS (Shift+F3 toggles SAFE); F5 commits.</p>
+
+<figure>
+  <img class="shot" src="../ui-preview/routing-manual/routing-bus.png" alt="Routing BUS tab">
+  <figcaption>BUS tab, lane B1 focused. Live volts bars + values, the routing source/depth feeding each lane (B1←IN1 +50%, B2←M1 +30%, B3 empty "+", B4←G1 +100%), CVR/TT lights, SAFE on. Mirrors <code>RoutingPage::drawBus</code>.</figcaption>
+</figure>
+
+<h3>MIDI tab</h3>
+<p>Lists every route whose source is MIDI, one row each, with the target it drives, Port, Channel, Event, and CC/Note. The event kinds are CC Absolute, CC Relative, Pitch Bend, Note Momentary, Note Toggle, Note Velocity, Note Range. F2 EDIT opens the focused route; F1 walks the columns; F3 arms LEARN (capture the next incoming MIDI into the draft); F5 commits.</p>
+
+<h2 id="p7" class="geo">Part 7 · Set up a route from the Note track page</h2>
+<p>The in-context workflow: add a route to a parameter without leaving the edit page, then dial it. This example modulates <strong>Transpose</strong> on a NoteTrack from <strong>CV In 1</strong>, so an external CV transposes the sequence in real time.</p>
+
+<ol class="steps">
+<li><strong>Open the Note track param list.</strong> Hold <span class="kbd">Page</span> and press <span class="kbd">S2</span> (Track). The Note track page (a ListPage) shows the track-wide params: Slide Time, Octave, Transpose, Rotate, the bias params. (Per-sequence params like Divisor/Scale live on <span class="kbd">Page+S1</span>; either page hosts the same MOD+ flow.)</li>
+
+<li><strong>Focus a routable param.</strong> Turn the encoder (or <span class="kbd">Left</span>/<span class="kbd">Right</span>) to land the cursor on <strong>Transpose</strong>. On the Note track page the MOD+-routable rows are Slide Time, Octave, Transpose, Rotate, and the four probability biases — the params whose <code>routingTarget</code> is non-None.</li>
+
+<li><strong>Open the context menu and add the route.</strong> Long-press the encoder to open the page context menu. On an unrouted param it reads <strong>INIT · COPY · PASTE · DUPL · MOD+</strong>. Select <strong>MOD+</strong>. This creates a new route for Transpose on the selected track and drops you straight into edit, focused on the source.</li>
+
+<li><strong>Pick the source.</strong> The row is now in edit with the source focused. Turn the encoder to cycle the source: stop on <strong>CV In 1</strong> (shows as <code>IN1</code>). Shift+encoder jumps by source family (CvIn → CvOut → Bus → GateOut → Mod) if you need to skip ahead.</li>
+
+<li><strong>Set depth and combine.</strong> Press the encoder to leave source focus and move to depth. Turn it to set the depth, e.g. <strong>+50%</strong> — on Transpose (range −60..+60) that is a wide pitch swing. Press <span class="kbd">F3</span> to flip <strong>MOD</strong> (centered: CV around the base transpose) vs <strong>ABS</strong> (sweep: CV pulls the base up by depth×range).</li>
+
+<li><strong>Commit and hear it.</strong> Press <span class="kbd">F5 COMMIT</span> to write the route live. Now feed a CV into input 1 and the sequence transposes with it. The Transpose row keeps showing the live routed value; the edited base is unchanged underneath. To remove the route later, long-press → the menu now reads <strong>MOD-</strong>.</li>
+</ol>
+
+<div class="warn"><strong>MOD- removes only this track.</strong> On a per-track target, MOD- drops the selected track from the route's mask; the route survives if other tracks still use it.</div>
+
+<h2 id="p8">Part 8 · Reference</h2>
+
+<h3>Route capacity</h3>
+<p>A project holds <strong>16 routes</strong> (<code>CONFIG_ROUTE_COUNT</code>). The slot counter <code>n/16</code> in the header tracks occupancy; at 16 it goes bright and EDIT on an empty row reports <code>NO EMPTY ROUTES</code>.</p>
+
+<h3>Per-route fields</h3>
+<table>
+  <thead><tr><th>Field</th><th>Range</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td>Depth (per track)</td><td>−100..+100%</td><td>+100</td></tr>
+    <tr><td>Bias (per track)</td><td>−75..+75%</td><td>0</td></tr>
+    <tr><td>Shaper (per track)</td><td>None / fold / crease</td><td>None</td></tr>
+    <tr><td>Min / Max</td><td>0..1 normalized (shown in target units)</td><td>target's default window</td></tr>
+    <tr><td>Combine</td><td>Modulate / Absolute</td><td>Modulate</td></tr>
+    <tr><td>Scale source</td><td>any source except self</td><td>None</td></tr>
+  </tbody>
+</table>
+
+<h3>Inlet targets</h3>
+<p>DMap Input, DMap Scan, Indexed A, and Indexed B are <strong>base-less inlets</strong> — their getter reads the routed value from base 0, so a depth-0 route would be silent. A new route onto an inlet defaults to <strong>full depth</strong> instead of 0.</p>
+
+<div class="footer">Routing engine — xformer firmware manual. Grounded in the model, engine, and UI source.</div>
+
+</div>
+</body>
+</html>

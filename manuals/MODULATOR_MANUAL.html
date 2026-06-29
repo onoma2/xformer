@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modulator Bank — manual</title>
+<style>
+  :root{
+    --blue:#2563eb; --amber:#ca8a04; --green:#16a34a; --red:#dc2626; --purp:#7c3aed;
+    --ink:#1a1a1a; --mut:#5b5b5b; --line:#e5e5e5; --card:#ffffff; --bg:#fafafa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; line-height:1.5;}
+  .wrap{max-width:880px; margin:0 auto; padding:32px 24px 90px}
+  h1{font-size:1.75rem; line-height:1.2; margin:0 0 6px}
+  h2{font-size:1.32rem; line-height:1.25; margin:46px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--blue)}
+  h2.geo{border-color:var(--green)}
+  h2.adv{border-color:var(--purp)}
+  h3{font-size:1.06rem; margin:24px 0 6px}
+  .lede{color:var(--mut); font-size:1.05rem; margin:0 0 8px}
+  p{margin:10px 0}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#f0f0f3; padding:1px 5px; border-radius:4px; font-size:.9em}
+  pre{background:#1a1a1a; color:#f0f0f0; padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:.86rem; line-height:1.45; margin:12px 0}
+  pre code{background:none; padding:0; color:inherit; font-size:1em}
+  .kbd{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#1a1a1a; color:#fff; padding:2px 7px; border-radius:5px; font-size:.82em; white-space:nowrap}
+  .tag{display:inline-block; font-size:.7rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:99px; vertical-align:middle}
+  .t-blue{background:#e8effe; color:var(--blue)} .t-amber{background:#fbf1d9; color:var(--amber)}
+  .t-green{background:#e3f5ea; color:var(--green)} .t-purp{background:#efe7fd; color:var(--purp)}
+  .t-red{background:#fdeeee; color:var(--red)}
+
+  .note{border-left:4px solid var(--blue); background:#f3f7ff; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .warn{border-left:4px solid var(--amber); background:#fdf8ec; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .gotcha{border-left:4px solid var(--red); background:#fdeeee; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:.93rem}
+  th,td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top}
+  thead th{background:#e8effe; color:var(--blue)}
+  tbody tr:nth-child(even){background:#fafafa}
+  td code{white-space:nowrap}
+
+  figure{margin:18px 0; text-align:center}
+  figcaption{color:var(--mut); font-size:.85rem; margin-top:6px}
+  .shot{display:block; width:100%; max-width:520px; margin:14px auto 2px; image-rendering:pixelated;
+    border:1px solid #333; border-radius:4px; background:#000}
+  .cap{text-align:center; color:var(--mut); font-size:.84rem; margin:0 0 6px}
+
+  .steps{counter-reset:step; list-style:none; padding:0; margin:14px 0}
+  .steps>li{counter-increment:step; position:relative; padding:12px 12px 12px 56px; margin:10px 0;
+    background:var(--card); border:1px solid var(--line); border-radius:8px}
+  .steps>li::before{content:counter(step); position:absolute; left:12px; top:12px; width:30px; height:30px;
+    border-radius:50%; background:var(--blue); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:.95rem}
+
+  .toc{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:16px 0; columns:2; font-size:.93rem}
+  @media(max-width:620px){.toc{columns:1}}
+  .toc a{color:var(--blue); text-decoration:none} .toc a:hover{text-decoration:underline}
+  .footer{margin-top:48px; padding-top:14px; border-top:1px solid var(--line); color:var(--mut); font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Modulator Bank — manual</h1>
+<p class="lede">Eight independent CV sources running alongside the tracks — LFOs, envelopes, random walks, chaos, and a struck-spring resonator — plus two bank-wide modes (JustF rate-link and the Geode rhythmic engine).</p>
+
+<div class="toc">
+  <a href="#p1">1. Overview</a><br>
+  <a href="#p2">2. The 10 Shapes</a><br>
+  <a href="#p3">3. Rate Domain, Mode, Invert, Offset</a><br>
+  <a href="#p4">4. JustF (rate link)</a><br>
+  <a href="#p5">5. Geode (6-voice engine)</a><br>
+  <a href="#p6">6. The Modulator Page UI</a><br>
+  <a href="#p7">7. Routing the output</a><br>
+  <a href="#p8">8. Teletype ops (MO.* / G.*)</a><br>
+  <a href="#p9">9. Setup summary</a>
+</div>
+
+<h2>Introduction</h2>
+<p>The <strong>Modulator bank</strong> is a set of 8 independent CV sources that run alongside the tracks. Each slot generates a continuous control signal — an LFO, an envelope, a random walk, a chaotic attractor, or a struck-spring resonator — and routes it to CV outputs, the internal modulation bus, or MIDI. The bank is not a track: it has no steps and no pattern. It is a panel of motion you assign wherever you need it.</p>
+<p>On top of the per-slot shapes sit two <strong>bank-wide modes</strong> that retune the whole set at once: <strong>JustF</strong> (a Just Friends / <em>ochd</em>-style rate link, M1 master + harmonic spread) and <strong>Geode</strong> (a 6-voice Just-Friends rhythmic engine). They are mutually exclusive and toggle from the same page.</p>
+<p>Everything here is grounded in the firmware as built — defaults, ranges, enum members, key bindings, and label strings come from the model (<code>Modulator.h</code>, <code>GeodeConfig.h</code>), the engine (<code>ModulatorEngine.h</code>, <code>GeodeEngine.h</code>), and the UI (<code>ModulatorPage.cpp</code>).</p>
+
+<h3>Prerequisites</h3>
+<ul>
+  <li>Familiarity with the xformer page model (Page+ combos, F-keys, the encoder).</li>
+  <li>Understanding of CV/gate conventions (1V/oct; the output stage where 64 = 0V).</li>
+  <li>A destination in mind — a CV output, a routing target, or a MIDI CC.</li>
+</ul>
+
+<h2 id="p1">Part 1 · Overview</h2>
+<p>The bank holds <strong>8 modulator slots</strong> (M1..M8, <code>CONFIG_MODULATOR_COUNT = 8</code>). Each slot is one <code>Modulator</code>: a shape plus its parameters, evaluated every engine tick by <code>ModulatorEngine</code> into a single output in <strong>0..127</strong> (64 = 0V at the CV stage). That value is then routed.</p>
+<p>A slot is <strong>always running</strong> — there are no steps to advance. What moves the output is the shape's own motion and the slot's <strong>gate behavior</strong> (free-run vs triggered/held).</p>
+<p>Three things define a slot:</p>
+<ul>
+  <li><span class="tag t-blue">Shape</span> which generator runs (10 choices).</li>
+  <li><span class="tag t-blue">Parameters</span> the shape's controls; one canonical 15-field table, reinterpreted per shape.</li>
+  <li><span class="tag t-amber">Routing</span> where the output goes (CV / bus CV / MIDI), plus gate source and run mode.</li>
+</ul>
+<div class="note"><strong>Two bank-wide modes.</strong> <strong>JustF</strong> (<span class="kbd">Shift+RATE</span>) makes M1 a master rate and spreads M2..M8 harmonically; M2 hosts the global INTONE. <strong>Geode</strong> (<span class="kbd">Shift+SHAPE</span>) turns the bank into a 6-voice rhythmic engine. They cannot both be active.</div>
+
+<h2 id="p2">Part 2 · The 10 Shapes</h2>
+<table>
+  <thead><tr><th>#</th><th>Enum</th><th>Label</th><th>Family</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>Sine</td><td>Sine</td><td>LFO</td></tr>
+    <tr><td>1</td><td>Triangle</td><td>Triangle</td><td>LFO</td></tr>
+    <tr><td>2</td><td>SawUp</td><td>Saw Up</td><td>LFO</td></tr>
+    <tr><td>3</td><td>SawDown</td><td>Saw Down</td><td>LFO</td></tr>
+    <tr><td>4</td><td>Square</td><td>Square</td><td>LFO</td></tr>
+    <tr><td>5</td><td>Random</td><td>Random</td><td>sample-and-hold</td></tr>
+    <tr><td>6</td><td>ADSR</td><td>ADSR</td><td>envelope</td></tr>
+    <tr><td>7</td><td>ChaosLorenz</td><td>Lorenz</td><td>chaos</td></tr>
+    <tr><td>8</td><td>ChaosLatoocarfian</td><td>Latoocarfian</td><td>chaos</td></tr>
+    <tr><td>9</td><td>Spring</td><td>Spring</td><td>physical resonator</td></tr>
+  </tbody>
+</table>
+<p>The shape is changed by focusing <strong>SHAPE</strong> (<span class="kbd">F1</span>) and turning the encoder.</p>
+
+<h3>LFO shapes (Sine / Triangle / Saw Up / Saw Down / Square)</h3>
+<p>A bipolar waveform scaled by depth and shifted by offset, with a phase control.</p>
+<table>
+  <thead><tr><th>Param</th><th>Field</th><th>Default</th><th>Range</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>RATE</td><td><code>_rate</code></td><td>0.05 Hz (Free)</td><td>Free 0.01–16 Hz; Tempo 1/64..16 bars</td><td>Speed; domain-keyed</td></tr>
+    <tr><td>DEPTH</td><td><code>_depth</code></td><td>25</td><td>0–127</td><td>Amplitude (127 = full swing)</td></tr>
+    <tr><td>PHASE</td><td><code>_phase</code></td><td>0°</td><td>0–359°</td><td>Phase offset</td></tr>
+    <tr><td>OFFSET</td><td><code>_offset</code></td><td>0</td><td>−64..+63</td><td>Baseline shift; sets rest level via <code>floorValue()</code></td></tr>
+  </tbody>
+</table>
+
+<h3>Random</h3>
+<p>A sample-and-hold of a random value, slewed between samples. <strong>MODE</strong> decides when it samples (FREE = clocked, TRIG = on gate rising, HOLD = track-and-hold while gate high).</p>
+<table>
+  <thead><tr><th>Param</th><th>Field</th><th>Default</th><th>Range</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>RATE</td><td><code>_rate</code></td><td>0.05 Hz</td><td>Free/Tempo</td><td>Sample clock</td></tr>
+    <tr><td>DEPTH</td><td><code>_depth</code></td><td>25</td><td>0–127</td><td>Amplitude</td></tr>
+    <tr><td>SLEW</td><td><code>_smooth</code></td><td>100 ms</td><td>0–5000 ms</td><td>Glide between samples</td></tr>
+    <tr><td>OFFSET</td><td><code>_offset</code></td><td>0</td><td>−64..+63</td><td>Baseline shift</td></tr>
+  </tbody>
+</table>
+
+<h3>ADSR</h3>
+<p>A gated attack/decay/sustain/release envelope. Unipolar: rests at the floor, rises toward the amplitude ceiling. Two pages.</p>
+<p><strong>Page 1</strong> — SHAPE / ATTACK / DECAY / SUSTAIN / RELEASE:</p>
+<table>
+  <thead><tr><th>Param</th><th>Field</th><th>Default</th><th>Range</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>ATTACK</td><td><code>_attack</code></td><td>100 ms</td><td>0–2000 ms</td><td>Idle → peak</td></tr>
+    <tr><td>DECAY</td><td><code>_decay</code></td><td>100 ms</td><td>0–2000 ms</td><td>Peak → sustain</td></tr>
+    <tr><td>SUSTAIN</td><td><code>_sustain</code></td><td>100</td><td>0–127</td><td>Held level</td></tr>
+    <tr><td>RELEASE</td><td><code>_release</code></td><td>200 ms</td><td>0–2000 ms</td><td>Sustain → idle after gate falls</td></tr>
+  </tbody>
+</table>
+<p><strong>Page 2</strong> — DEPTH (<span class="kbd">F3</span>) / INVERT (<span class="kbd">F4</span>) / OFFSET (<span class="kbd">F5</span>):</p>
+<table>
+  <thead><tr><th>Param</th><th>Field</th><th>Default</th><th>Range</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>DEPTH (amplitude)</td><td><code>_amplitude</code></td><td>127</td><td>0–127</td><td>Envelope peak</td></tr>
+    <tr><td>INVERT</td><td><code>_invert</code></td><td>OFF</td><td>on/off</td><td>Ducks from the top instead of rising</td></tr>
+    <tr><td>OFFSET (rest V)</td><td><code>_offset</code></td><td>0</td><td>−64..+63</td><td>Rest voltage; shown as volts</td></tr>
+  </tbody>
+</table>
+<p>State machine: Idle → Attack → Decay → Sustain → Release → Idle, driven by the gate source; output mapped through <code>unipolarOutput(env, amplitude, floor, invert)</code>.</p>
+
+<h3>Chaos (Lorenz / Latoocarfian)</h3>
+<p>A chaotic attractor sampled into CV. Two pages.</p>
+<table>
+  <thead><tr><th>Param (p1)</th><th>Field</th><th>Range</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>RATE</td><td><code>_rate</code></td><td>Free/Tempo</td><td>Integration / step rate</td></tr>
+    <tr><td>DEPTH</td><td><code>_depth</code></td><td>0–127</td><td>Amplitude</td></tr>
+    <tr><td>P1</td><td><code>_attack</code> (reused)</td><td>0–2000 → 0..1</td><td>Lorenz ρ 10..50 / Latoocarfian a,b 0.5..3.0</td></tr>
+    <tr><td>P2</td><td><code>_decay</code> (reused)</td><td>0–2000 → 0..1</td><td>Lorenz β 0.5..4.0 / Latoocarfian c,d 0.5..3.0</td></tr>
+  </tbody>
+</table>
+<p>Page 2: <strong>SLEW</strong> (<code>_smooth</code>, 0–5000 ms) on F1 and <strong>OFFSET</strong> on F5. P1/P2 reuse the ADSR attack/decay storage, curve-mapped to the attractor constants.</p>
+
+<h3>Spring</h3>
+<p>A 3-mode inharmonic resonator (a struck "spring"). Two pages. Spring <strong>relabels</strong> the reused fields.</p>
+<table>
+  <thead><tr><th>Label (p1)</th><th>Reused field</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>STRIKE</td><td><code>_rate</code></td><td>Strike (hit) clock</td></tr>
+    <tr><td>TENS</td><td><code>_attack</code></td><td>Tension → resonant frequency ω₀ (<code>0.3 × 40^(attack/2000)</code> Hz)</td></tr>
+    <tr><td>RING</td><td><code>_decay</code></td><td>Ring-out → damping ζ (<code>0.0015 × 800^(1 − decay/2000)</code>)</td></tr>
+    <tr><td>CLANG</td><td><code>_smooth</code></td><td>Clang → pickup amplitude weighting (<code>smooth / 5000</code>)</td></tr>
+  </tbody>
+</table>
+<p>Page 2: <strong>PICKUP</strong> (<code>_phase</code> 0–4: Position / Velocity / Kinetic / Potential / Total), <strong>DEPTH</strong> (strike force <code>0.7 × depth/127</code>), <strong>OFFSET</strong>. Frequency ratios [1.0, 2.76, 5.40], semi-implicit integration, <code>tanh</code> soft-saturation. See <code>docs/spring-modulator-spec.md</code>.</p>
+
+<h2 id="p3">Part 3 · Rate Domain, Mode, Invert, Offset</h2>
+<p>These four are shape-orthogonal — they apply across families.</p>
+<h3>Rate domain (Free vs Tempo)</h3>
+<p>Rate is domain-keyed. Re-pressing <strong>RATE</strong> when it is focused cycles the domain (on shapes that show RATE on F2).</p>
+<ul>
+  <li><strong>FREE</strong> — wall-time Hz, tempo-independent. Centi-Hz 1–1600 (0.01–16 Hz). Runs even when stopped.</li>
+  <li><strong>TEMPO</strong> — clock division, tempo-locked. PPQN ticks 6–6144. Freezes with the transport. (6 = 1/64 … 96 = 1/4 … 384 = 1 bar … 6144 = 16 bars.)</li>
+</ul>
+<h3>Mode (gate behavior)</h3>
+<table>
+  <thead><tr><th>Mode</th><th>Label</th><th>Behavior</th></tr></thead>
+  <tbody>
+    <tr><td>Run</td><td>FREE</td><td>Free-running; gate ignored</td></tr>
+    <tr><td>Trig</td><td>TRIG</td><td>Reset phase to offset on gate rising (offset 0 = hard sync)</td></tr>
+    <tr><td>Gate</td><td>HOLD</td><td>Advance only while gate high; reset on rising</td></tr>
+  </tbody>
+</table>
+<p>For Random, FREE/TRIG/HOLD select clocked S&amp;H / gate-triggered S&amp;H / track-and-hold.</p>
+<h3>Invert, Offset / floor, Gate source</h3>
+<ul>
+  <li><strong>INVERT</strong> — unipolar shapes duck from the top; bipolar shapes flip around the center.</li>
+  <li><strong>OFFSET</strong> — biases the value and sets the unipolar rest level via <code>floorValue()</code> = clamp(64 + offset, 0, 127).</li>
+  <li><strong>Gate source</strong> — when MODE is TRIG/HOLD (or Random is triggered): GateOut 1–8, CvIn 1–4, BusCv 1–4, Mod 1–8 (own index filtered out). Cycled in the routing overlay (F2 GATE).</li>
+</ul>
+
+<h2 id="p4" class="adv">Part 4 · JustF (Just Friends rate link)</h2>
+<p>JustF turns the bank into an <em>ochd</em> / Just Friends rate cluster: one master rate (M1) with the rest spread harmonically. It is <strong>not a shape</strong> — it is a runtime engine mode (<code>_justfActive</code>, <code>_intone</code>).</p>
+<ul>
+  <li><strong>M1</strong> is the master; its Free-domain rate is the reference.</li>
+  <li><strong>INTONE</strong> (−1..+1, hosted on M2) is the spread. Noon = unison; CW = harmonic (Mₖ = k × M1); CCW = subharmonic (Mₖ = M1 / k).</li>
+  <li><strong>M2..M8</strong> derive their rate from M1 + INTONE; on those slots the rate cell is read-only.</li>
+  <li>A <strong>B-clamp</strong> caps the master so the fastest follower stays ≤ 16 Hz.</li>
+</ul>
+<p>For <strong>ADSR</strong> followers, attack/decay/release spread by the same ratio per index; sustain is copied from M1; amplitude stays per-slot.</p>
+<div class="note"><strong>On the page.</strong> <span class="kbd">Shift+RATE</span> toggles JustF (only when M1's rate domain is Free). On M2 the F2 cell relabels to <strong>INTONE</strong> (<code>%+.2f</code>) with a tiny derived-Hz readout beneath it; on M3..M8 the rate cell shows the read-only derived rate. <strong>Leaving the page bakes JustF</strong>: the derived rates (and ADSR times) are written into each follower, then JustF turns off. Tempo-domain slots are untouched.</div>
+
+<h2 id="p5" class="geo">Part 5 · Geode (6-voice rhythmic engine)</h2>
+<p>Geode reskins the bank into a Just-Friends-style rhythmic / stochastic clock engine (<code>GeodeConfig</code> + <code>GeodeEngine</code>). Separate subsystem, mutually exclusive with JustF. <span class="kbd">Shift+SHAPE</span> toggles it; turning it on parks M2's depth to 0 so the run signal starts neutral.</p>
+<ul>
+  <li><strong>M1</strong> — the clock; its page 2 hosts the shared globals.</li>
+  <li><strong>M2</strong> — the run source.</li>
+  <li><strong>M3..M8</strong> — the six voices (<code>VoiceCount = 6</code>).</li>
+</ul>
+<h3>The five globals (M1 page 2)</h3>
+<p>Stored 0..16383; intone and curve are bipolar (8192 = centre).</p>
+<table>
+  <thead><tr><th>Label</th><th>Field</th><th>Default</th><th>Range</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>TIME</td><td><code>_time</code></td><td>8192</td><td>0–16383</td><td>Envelope base time, log-mapped, capped (≈ up to 4 s; <code>MaxTimeNorm = 0.55</code>)</td></tr>
+    <tr><td>INTONE</td><td><code>_intone</code></td><td>8192 (centre)</td><td>0–16383 → −1..+1</td><td>Voice time spread</td></tr>
+    <tr><td>RAMP</td><td><code>_ramp</code></td><td>8192</td><td>0–16383 → 0..1</td><td>Attack/decay balance</td></tr>
+    <tr><td>CURVE</td><td><code>_curve</code></td><td>8192 (centre)</td><td>STEP/LOG/LIN/EXP</td><td>Envelope shape</td></tr>
+    <tr><td>MODE</td><td><code>_mode</code></td><td>0</td><td>0–2</td><td>TRANS / SUST / CYCLE</td></tr>
+  </tbody>
+</table>
+<h3>Per-voice params (M3..M8)</h3>
+<table>
+  <thead><tr><th>Label</th><th>Field</th><th>Default</th><th>Range</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>DIVS</td><td><code>_divs[v]</code></td><td>1</td><td>1–64</td><td>Clock divisor</td></tr>
+    <tr><td>REPEAT</td><td><code>_repeats[v]</code></td><td>0</td><td>−1..255</td><td>Burst count; −1 = INF</td></tr>
+    <tr><td>TUNE</td><td><code>_tuneNum</code>:<code>_tuneDen</code></td><td>(v+1):1</td><td>num/den</td><td>INTONE-ratio override (dormant — see note)</td></tr>
+    <tr><td>TIME</td><td>derived</td><td>—</td><td>—</td><td>The voice's gesture time in ms (read-out)</td></tr>
+  </tbody>
+</table>
+<div class="warn"><strong>Tune is provisioned but dormant in this cut.</strong> The numerator/denominator fields are stored, defaulted (voice <em>v</em> → (v+1):1), and serialized, but not yet wired into editing or live engine evaluation. Setting 0/0 resets to the default ratio.</div>
+
+<h2 id="p6">Part 6 · The Modulator Page UI</h2>
+<p>The header reads <strong>MOD <em>n</em> - MODULATOR</strong> (or ROUTING / GEODE). Track buttons <span class="kbd">T1..T8</span> select the slot. The layout is a <strong>left rolling scope</strong> and a <strong>right param list</strong>.</p>
+<ul>
+  <li><strong>Left scope box</strong> (x=1, y=12, 119×40): a live rolling trace of the output, center line at the box midline.</li>
+  <li><strong>Divider</strong> at x=122.</li>
+  <li><strong>Right param list</strong> (x=124, 5 rows, Tiny font): each row is one F-key; name flush-left, value flush-right; the selected row is drawn in a bright box.</li>
+  <li><strong>CV routing label</strong> inside the scope box bottom-left (<code>-&gt; CV1,CV3</code>) when assigned.</li>
+  <li>A <strong>Pg n/m</strong> counter sits in the header's active-function slot on multi-page shapes.</li>
+</ul>
+
+<figure>
+  <img class="shot" src="../ui-preview/modulator-manual/sine.png" alt="Sine LFO modulator page">
+  <figcaption>Sine LFO: scope-left, divider, PhaseFlux param list (SHAPE/RATE/DEPTH/PHASE/OFFSET), RATE focused. CV1 assigned.</figcaption>
+</figure>
+
+<h3>F-keys (per shape)</h3>
+<ul>
+  <li><strong>LFO / Random</strong> (single page): SHAPE / RATE / DEPTH / (PHASE | SLEW) / OFFSET.</li>
+  <li><strong>ADSR</strong> p1: SHAPE / ATTACK / DECAY / SUSTAIN / RELEASE. p2: – / – / DEPTH / INVERT / OFFSET.</li>
+  <li><strong>Chaos</strong> p1: SHAPE / RATE / DEPTH / P1 / P2. p2: SLEW / – / – / – / OFFSET.</li>
+  <li><strong>Spring</strong> p1: SHAPE / STRIKE / TENS / RING / CLANG. p2: PICKUP / – / DEPTH / – / OFFSET.</li>
+  <li><strong>Geode M1</strong> p2: TIME / INTONE / RAMP / CURVE / MODE. <strong>Geode voice</strong>: VOICE / DIVS / REPEAT / TUNE / TIME.</li>
+</ul>
+<div class="gotcha"><strong>No step grid.</strong> The Modulator page does not handle step keys (S1..S16); they are ignored. Only the selected slot's track LED lights.</div>
+
+<h3>Encoder, re-press, Shift, Page+</h3>
+<ul>
+  <li><strong>Encoder turn</strong> edits the focused param; <strong>pressed + turn</strong> is fine resolution.</li>
+  <li><strong>Re-press SHAPE (F1)</strong> fires a one-shot <strong>audition</strong> pulse (ADSR / triggered-Random / Chaos-trig / Geode voice respond; a FREE-mode LFO ignores it).</li>
+  <li><strong>Re-press RATE (F2)</strong> cycles the rate domain Free ↔ Tempo.</li>
+  <li><span class="kbd">Shift+SHAPE</span> toggles <strong>Geode</strong>; <span class="kbd">Shift+RATE</span> toggles <strong>JustF</strong>.</li>
+  <li><span class="kbd">Right</span> walks the cursor: param page(s) → routing overlay; <span class="kbd">Left</span> walks back.</li>
+</ul>
+
+<figure>
+  <img class="shot" src="../ui-preview/modulator-manual/adsr.png" alt="ADSR modulator page 1">
+  <figcaption>ADSR page 1: ATTACK/DECAY/SUSTAIN/RELEASE, DECAY focused. Pg 1/2 in the header.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="../ui-preview/modulator-manual/adsr-page2.png" alt="ADSR modulator page 2">
+  <figcaption>ADSR page 2: DEPTH (amplitude) / INVERT / OFFSET (rest voltage) in the F3–F5 slots; F1/F2 empty.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="../ui-preview/modulator-manual/random.png" alt="Random modulator page">
+  <figcaption>Random: SHAPE focused; F4 is SLEW. Sampling is governed by MODE (FREE/TRIG/HOLD).</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="../ui-preview/modulator-manual/chaos.png" alt="Chaos Lorenz modulator page">
+  <figcaption>Chaos (Lorenz) page 1: RATE/DEPTH plus the two attractor params P1/P2, P1 focused.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="../ui-preview/modulator-manual/spring.png" alt="Spring modulator page">
+  <figcaption>Spring page 1: reused fields relabeled STRIKE / TENS / RING / CLANG, TENS focused.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="../ui-preview/modulator-manual/justf-intone.png" alt="JustF INTONE on M2">
+  <figcaption>JustF active, M2: the RATE cell becomes INTONE (global spread); the derived Hz reads small beneath it.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="../ui-preview/modulator-manual/justf-follower.png" alt="JustF follower M5">
+  <figcaption>JustF follower (M5): the RATE cell shows the read-only derived rate (6.00Hz), spread from M1 + INTONE.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="../ui-preview/modulator-manual/geode-globals.png" alt="Geode globals on M1 page 2">
+  <figcaption>Geode globals (M1 page 2): TIME / INTONE / RAMP / CURVE / MODE. Header reads GEODE.</figcaption>
+</figure>
+<figure>
+  <img class="shot" src="../ui-preview/modulator-manual/geode-voice.png" alt="Geode voice page">
+  <figcaption>Geode voice (M5 = voice 3): VOICE / DIVS / REPEAT / TUNE / TIME. Tune defaults to 3:1.</figcaption>
+</figure>
+
+<h2 id="p7">Part 7 · Routing the output</h2>
+<p>Press <span class="kbd">Right</span> from the last param page to open the <strong>routing overlay</strong> (header reads ROUTING). The overlay is a <strong>membership grid</strong> — a modulator can drive multiple destinations at once.</p>
+<ul>
+  <li><strong>CV row</strong> — CV 1–8. <strong>MIDI rows</strong> — MIDI 1–16.</li>
+  <li>Filled cell = assigned; the cursored cell is highlighted. Encoder turn moves the cursor; <strong>encoder push adds</strong>; <strong>F3 CLEAR</strong> removes.</li>
+</ul>
+<table>
+  <thead><tr><th>F-key</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td>F1 RUN</td><td>Focus the modulator run mode (One / Loop / Cycle); encoder edits</td></tr>
+    <tr><td>F2 GATE</td><td>Focus the gate source; encoder cycles the curated source list</td></tr>
+    <tr><td>F3 CLEAR</td><td>Remove the cursored destination</td></tr>
+    <tr><td>F4 EVENT</td><td>For a MIDI destination, cycle the continuous event (CC / Bend / Pressure)</td></tr>
+    <tr><td>F5 CC NUM</td><td>For a CC event, edit the CC number (0–127)</td></tr>
+  </tbody>
+</table>
+<p>Routing edits are staged; the context menu (<span class="kbd">Shift+Page</span>) offers <strong>CANCEL</strong> (revert) and <strong>COMMIT</strong> (apply CV / MIDI assignments).</p>
+<figure>
+  <img class="shot" src="../ui-preview/modulator-manual/routing.png" alt="Modulator routing overlay">
+  <figcaption>Routing overlay: CV 1–8 / MIDI 1–16 grid (CV1, CV3, MIDI3, MIDI10 assigned), cursor on MIDI 3 (CC 74). RUN/GATE shown bottom-right.</figcaption>
+</figure>
+<p>Beyond CV and MIDI, a modulator routes into <code>Routing::Target</code> — the routing engine's full target set: tempo, swing, mute/fill, per-track octave / transpose / probability biases, per-sequence first/last/divisor/scale, Tuesday / Stochastic / Fractal targets, the chaos and wavefolder effects, DiscreteMap, indexed modulation, and the BusCv 1–4 sinks.</p>
+
+<h2 id="p8" class="adv">Part 8 · Teletype ops (MO.* / G.*)</h2>
+<p>The bank is fully scriptable from Teletype 2. Modulator slots are addressed <strong>1-based</strong> (1..8); Geode is single-instance. Ops live in <code>TeletypeNativeOps.cpp</code>; names in <code>TT2OpNames.cpp</code>.</p>
+<h3>MO.* — modulator slot ops</h3>
+<table>
+  <thead><tr><th>Op</th><th>Args</th><th>Does</th><th>Alias</th></tr></thead>
+  <tbody>
+    <tr><td><code>MO</code></td><td>slot</td><td>read the slot's current output</td><td>—</td></tr>
+    <tr><td><code>MO.P</code></td><td>slot, addr, [val]</td><td>get/set any param by address (incl. gate source, addr 14)</td><td>—</td></tr>
+    <tr><td><code>MO.SHAPE</code></td><td>slot, [val]</td><td>get/set Shape</td><td><code>MO.S</code></td></tr>
+    <tr><td><code>MO.RATE</code></td><td>slot, [val]</td><td>get/set Rate</td><td><code>MO.R</code></td></tr>
+    <tr><td><code>MO.DEPTH</code></td><td>slot, [val]</td><td>get/set Depth</td><td><code>MO.D</code></td></tr>
+    <tr><td><code>MO.MODE</code></td><td>slot, [val]</td><td>get/set Mode (FREE/TRIG/HOLD)</td><td><code>MO.M</code></td></tr>
+    <tr><td><code>MO.OFF</code></td><td>slot, [val]</td><td>get/set Offset</td><td><code>MO.O</code></td></tr>
+    <tr><td><code>MO.TRIG</code></td><td>slot</td><td>trigger the slot (fire its envelope / gate)</td><td><code>MO.T</code></td></tr>
+  </tbody>
+</table>
+<p>The <code>MO.P</code> addresses are the <code>Modulator::Param</code> table: Shape(0), Rate(1), Depth(2), Mode(3), Offset(4), Attack(5), Decay(6), Sustain(7), Release(8), Amplitude(9), Smooth(10), Phase(11), Invert(12), RateDomain(13), GateSource(14).</p>
+<div class="note"><strong>E.* and LFO.* are shape-locked sugar over the same slots</strong> — each write forces a shape + mode. <strong>E.*</strong> force ADSR + Trig: <code>E</code> (slot, amplitude), <code>E.A</code>, <code>E.D</code>, <code>E.O</code>, <code>E.T</code> (trigger). <strong>LFO.*</strong> force Sine + Run: <code>LFO.R</code> (centi-Hz, Free), <code>LFO.C</code> (divisor → Tempo), <code>LFO.A</code> (depth), <code>LFO.O</code> (offset). <code>LFO.W / LFO.F / LFO.S</code> are reserved, not yet wired.</div>
+<h3>G.* — Geode ops</h3>
+<table>
+  <thead><tr><th>Op</th><th>Args</th><th>Does</th><th>Alias</th></tr></thead>
+  <tbody>
+    <tr><td><code>G.TIME</code></td><td>[ms]</td><td>get/set TIME</td><td><code>G.T</code></td></tr>
+    <tr><td><code>G.TONE</code></td><td>[intone]</td><td>get/set INTONE</td><td><code>G.I</code></td></tr>
+    <tr><td><code>G.RAMP</code></td><td>[ramp]</td><td>get/set RAMP</td><td><code>G.RA</code></td></tr>
+    <tr><td><code>G.CURV</code></td><td>[curve]</td><td>get/set CURVE</td><td><code>G.C</code></td></tr>
+    <tr><td><code>G.MODE</code></td><td>[mode]</td><td>get/set MODE (0=Trans/1=Sust/2=Cycle)</td><td><code>G.M</code></td></tr>
+    <tr><td><code>G.RUN</code></td><td>[state]</td><td>get/set run state (0 = stop)</td><td><code>G.N</code></td></tr>
+    <tr><td><code>G.VAL</code></td><td>—</td><td>read the live mix output</td><td><code>G.L</code></td></tr>
+    <tr><td><code>G.TUNE</code></td><td>voice, num, den</td><td>set a voice's tune ratio (voice 0 = all)</td><td>—</td></tr>
+    <tr><td><code>G.V</code></td><td>voice, divs, reps</td><td>trigger voice(s) (voice 0 = all)</td><td>—</td></tr>
+    <tr><td><code>G.S</code></td><td>time, intone, run</td><td>atomic TIME/TONE/RUN setter (no trigger)</td><td>—</td></tr>
+  </tbody>
+</table>
+<p><code>G.O</code>, <code>G.BAR</code>, <code>G.R</code> are intentionally unregistered — no live GeodeConfig field; run goes through <code>MO 2</code>, bars through the transport.</p>
+<h3>How the ops map to the params</h3>
+<ul>
+  <li><code>MO.RATE / MO.DEPTH / MO.OFF / MO.MODE / MO.SHAPE</code> set the same per-slot fields the F-keys edit; <code>MO.TRIG</code> is the script form of the SHAPE re-press audition.</li>
+  <li><code>MO.P slot 14 …</code> writes the <strong>gate source</strong> as a raw <code>Routing::Source</code> ordinal — unvalidated, no UI curation.</li>
+  <li><code>G.TIME / G.TONE / G.RAMP / G.CURV / G.MODE</code> are the five <strong>Geode globals</strong> (M1 page 2). <code>G.TUNE</code> writes a voice's tune ratio, <code>G.V</code> triggers the <strong>DIVS/REPEAT</strong> burst, and <code>G.RUN</code> / <code>G.VAL</code> drive and read the engine.</li>
+</ul>
+
+<h2 id="p9">Part 9 · Setup summary</h2>
+<p><strong>Per-slot params</strong> (the 15-field dictionary): Shape, Rate, Depth, Mode, Offset, Attack, Decay, Sustain, Release, Amplitude, Smooth, Phase, Invert, RateDomain, GateSource. Shapes reinterpret the labels (Spring → STRIKE/TENS/RING/CLANG/PICKUP; Chaos → P1/P2).</p>
+<p><strong>Defaults at clear():</strong> Shape Sine, Rate 0.05 Hz (Free), Depth 25, Mode FREE, Offset 0, Attack 900 / Decay 1240, Sustain 100, Release 200, Amplitude 127, Smooth 100, Phase 0, Invert off, gate source GateOut1.</p>
+<table>
+  <thead><tr><th>Bank mode</th><th>Toggle</th><th>M1</th><th>M2</th><th>M3..M8</th></tr></thead>
+  <tbody>
+    <tr><td>JustF</td><td><span class="kbd">Shift+RATE</span></td><td>master rate</td><td>INTONE host</td><td>derived rates (read-only)</td></tr>
+    <tr><td>Geode</td><td><span class="kbd">Shift+SHAPE</span></td><td>clock + globals</td><td>run source</td><td>6 voices</td></tr>
+  </tbody>
+</table>
+<p>Each slot → 0..127 (64 = 0V) → routed to CV outputs / bus CV / MIDI via the routing overlay, or driven from Teletype <code>MO.*</code> / <code>G.*</code>.</p>
+
+<div class="footer">Modulator Bank — xformer firmware manual. Grounded in the model, engine, and UI source.</div>
+
+</div>
+</body>
+</html>
