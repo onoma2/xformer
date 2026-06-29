@@ -12,7 +12,7 @@ void seedTeletypeV2Demo(TeletypeProgram &p) {
     // Deterministic by design: no RND, so every op's effect is self-evident on
     // the HUD / modulator page. The metro drives Mod 1 so it animates live.
     loadScriptText(p, 0,                  // S1: classic ops (fixed chord + IF/EVERY)
-        "CV 2 N 0\n"
+        "CV 2 N 60\n"
         "CV 3 N ADD 4 0\n"
         "CV 4 N MUL 2 6\n"
         "IF EQ 1 1 : TR.P 2\n"
@@ -78,15 +78,15 @@ void seedTeletypeV2Demo(TeletypeProgram &p) {
 // script (runs each tick on the active scene); script0 boots the metro once.
 void seedTeletypeMiniDemo(TT2MiniTrack &mt) {
     static const char *metro[TT2ConfigMini::SceneCount] = {
-        "M 500\nCV 2 N 0\nTR.P 4\n",     // scene 0: medium, root
-        "M 250\nCV 2 N 7\nTR.P 4\n",     // scene 1: faster, fifth
-        "M 1000\nCV 2 N 12\nTR.P 4\n",   // scene 2: slow, octave
-        "M 125\nCV 2 N 3\nTR.P 4\n",     // scene 3: fastest, minor third
+        "M 500\nCV 2 N 60\nTR.P 4\n",    // scene 0: medium, root (note 60 = 0V)
+        "M 250\nCV 2 N 67\nTR.P 4\n",    // scene 1: faster, fifth
+        "M 1000\nCV 2 N 72\nTR.P 4\n",   // scene 2: slow, octave
+        "M 125\nCV 2 N 63\nTR.P 4\n",    // scene 3: fastest, minor third
     };
     for (int s = 0; s < TT2ConfigMini::SceneCount; ++s) {
         auto &p = mt.program(s);
         loadScriptText(p, 0, "M 500\nM.ACT 1\n");                // script0/trigger1: boot the metro
-        loadScriptText(p, 1, "CV 2 N 9\nTR.P 4\n");              // script1/trigger2: manual accent
+        loadScriptText(p, 1, "CV 2 N 69\nTR.P 4\n");              // script1/trigger2: manual accent
         loadScriptText(p, TT2ConfigMini::MetroScript, metro[s]); // metro: per-scene tempo/pitch on CV2/TR4
     }
 }
@@ -112,16 +112,16 @@ void seedTeletypeCrossTrackDemo(TeletypeProgram &full, TT2MiniTrack &mini) {
         "M.ACT 1\n");
 
     static const char *sceneMetro[TT2ConfigMini::SceneCount] = {
-        "M 500\nCV 2 N 0\nTR.P 4\n",     // scene 0: medium, root
-        "M 250\nCV 2 N 7\nTR.P 4\n",     // scene 1: faster, fifth
-        "M 1000\nCV 2 N 12\nTR.P 4\n",   // scene 2: slow, octave
-        "M 125\nCV 2 N 3\nTR.P 4\n",     // scene 3: fastest, minor third
+        "M 500\nCV 2 N 60\nTR.P 4\n",    // scene 0: medium, root (note 60 = 0V)
+        "M 250\nCV 2 N 67\nTR.P 4\n",    // scene 1: faster, fifth
+        "M 1000\nCV 2 N 72\nTR.P 4\n",   // scene 2: slow, octave
+        "M 125\nCV 2 N 63\nTR.P 4\n",    // scene 3: fastest, minor third
     };
     static const char *sceneAccent[TT2ConfigMini::SceneCount] = {
-        "CV 2 N 4\nTR.P 4\n",            // per-scene accent fired by Full's WS 2 2
+        "CV 2 N 64\nTR.P 4\n",            // per-scene accent fired by Full's WS 2 2
         "CV 2 N 11\nTR.P 4\n",
         "CV 2 N 16\nTR.P 4\n",
-        "CV 2 N 7\nTR.P 4\n",
+        "CV 2 N 67\nTR.P 4\n",
     };
     for (int s = 0; s < TT2ConfigMini::SceneCount; ++s) {
         auto &p = mini.program(s);
@@ -276,9 +276,9 @@ void Project::clear() {
         loadScriptText(p, TT2_METRO_SCRIPT,
             "X ADD X 1\n"
             "X MOD X 4\n"
-            "IF EQ X 0 : CV 1 N 0\n"
+            "IF EQ X 0 : CV 1 N 60\n"     // note 60 = 0V (raw 8192); N 0 would be -5V
             "IF EQ X 0 : TR.P 1\n"
-            "IF EQ X 2 : CV 1 N 7\n"
+            "IF EQ X 2 : CV 1 N 67\n"     // fifth above the root
             "IF EQ X 2 : TR.P 1\n");
     }
 
