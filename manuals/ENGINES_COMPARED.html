@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>xformer — track engines, compared &amp; heard</title>
+<style>
+  :root{
+    --blue:#2563eb; --amber:#ca8a04; --green:#16a34a; --red:#dc2626; --purp:#7c3aed;
+    --ink:#1a1a1a; --mut:#5b5b5b; --line:#e5e5e5; --card:#ffffff; --bg:#fafafa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; line-height:1.5;}
+  .wrap{max-width:880px; margin:0 auto; padding:32px 24px 90px}
+  h1{font-size:1.75rem; line-height:1.2; margin:0 0 6px}
+  h2{font-size:1.32rem; line-height:1.25; margin:46px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--blue)}
+  h3{font-size:1.06rem; margin:0 0 4px}
+  .lede{color:var(--mut); font-size:1.05rem; margin:0 0 8px}
+  p{margin:10px 0}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#f0f0f3; padding:1px 5px; border-radius:4px; font-size:.9em}
+  .kbd{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#1a1a1a; color:#fff; padding:2px 7px; border-radius:5px; font-size:.82em; white-space:nowrap}
+  .tag{display:inline-block; font-size:.7rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:99px; vertical-align:middle}
+  .t-blue{background:#e8effe; color:var(--blue)} .t-amber{background:#fbf1d9; color:var(--amber)}
+  .t-green{background:#e3f5ea; color:var(--green)} .t-purp{background:#efe7fd; color:var(--purp)}
+  .t-red{background:#fdeeee; color:var(--red)}
+
+  .note{border-left:4px solid var(--blue); background:#f3f7ff; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:.9rem}
+  th,td{border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top}
+  thead th{background:#e8effe; color:var(--blue)}
+  tbody tr:nth-child(even){background:#fafafa}
+  tbody th{background:#fafafa; font-weight:700; white-space:nowrap}
+
+  .cards{display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin:18px 0}
+  @media(max-width:680px){.cards{grid-template-columns:1fr}}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; display:flex; flex-direction:column}
+  .card .accent{height:3px; border-radius:2px; margin:-14px -16px 12px; background:var(--blue)}
+  .card.c-blue .accent{background:var(--blue)} .card.c-green .accent{background:var(--green)}
+  .card.c-amber .accent{background:var(--amber)} .card.c-purp .accent{background:var(--purp)}
+  .card.c-red .accent{background:var(--red)}
+  .card .ess{margin:0 0 8px; font-size:.95rem}
+  .card .math{margin:0 0 14px; background:#fafbfc; border-left:3px solid var(--blue);
+    border-radius:0 6px 6px 0; padding:8px 11px}
+  .card.c-blue .math{border-left-color:var(--blue)} .card.c-green .math{border-left-color:var(--green)}
+  .card.c-amber .math{border-left-color:var(--amber)} .card.c-purp .math{border-left-color:var(--purp)}
+  .card.c-red .math{border-left-color:var(--red)}
+  .card .math .fx{display:block; font-family:ui-monospace,"SF Mono",Menlo,monospace;
+    font-size:.78rem; line-height:1.5; color:var(--ink); word-break:break-word}
+  .card .math .arch{display:block; margin-top:5px; font-size:.78rem; color:var(--mut); line-height:1.4}
+  .card canvas.scope{width:100%; max-width:248px; height:60px; display:block; margin:0 auto 12px;
+    border-radius:6px; background:#0d0d12}
+  .card .foot{margin-top:auto; display:flex; align-items:center; justify-content:space-between; gap:10px}
+  .play{appearance:none; border:none; cursor:pointer; font:inherit; font-size:.9rem; font-weight:600;
+    padding:7px 16px; border-radius:99px; background:var(--ink); color:#fff; display:inline-flex; align-items:center; gap:7px; transition:background .12s}
+  .play:hover{background:#000}
+  .play.playing{background:var(--green)}
+  .play .ic{font-size:.85em; line-height:1}
+  .card a.man{font-size:.83rem; color:var(--blue); text-decoration:none; white-space:nowrap}
+  .card a.man:hover{text-decoration:underline}
+  .audio-note{font-size:.83rem; color:var(--mut); margin:4px 0 0}
+  .footer{margin-top:48px; padding-top:14px; border-top:1px solid var(--line); color:var(--mut); font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>xformer — track engines, compared &amp; heard</h1>
+<p class="lede">xformer ships <strong>eight</strong> track engines, each a different way to turn a clock into CV and gates. This page contrasts them on the axes that actually separate them — and lets you <strong>hear</strong> each one with a short characteristic demo.</p>
+<p class="audio-note">▶ Tap any <strong>Play</strong> button to hear that engine. Audio starts on first tap (one shared Web Audio synth, no samples, no network). Demos are short and monophonic.</p>
+
+<h2>At a glance</h2>
+<table>
+  <thead>
+    <tr><th>Engine</th><th>Note source</th><th>Output</th><th>Determinism</th><th>Timing</th></tr>
+  </thead>
+  <tbody>
+    <tr><th>Note</th><td>fixed-pattern</td><td>stepped pitch</td><td>deterministic</td><td>stepped grid</td></tr>
+    <tr><th>Curve</th><td>fixed-pattern</td><td>shaped continuous CV</td><td>deterministic</td><td>stepped grid</td></tr>
+    <tr><th>Stochastic</th><td>generative</td><td>stepped pitch</td><td>probabilistic</td><td>stepped grid</td></tr>
+    <tr><th>PhaseFlux</th><td>generative</td><td>stepped pitch</td><td>seeded-generative</td><td>free-phase</td></tr>
+    <tr><th>Tuesday</th><td>generative</td><td>stepped pitch</td><td>seeded-generative</td><td>stepped grid</td></tr>
+    <tr><th>Indexed</th><td>fixed-pattern</td><td>stepped pitch</td><td>deterministic</td><td>stepped grid (irregular)</td></tr>
+    <tr><th>DiscreteMap</th><td>input-reactive</td><td>stepped pitch</td><td>deterministic</td><td>free-phase (absolute-time)</td></tr>
+    <tr><th>Fractal</th><td>sampled</td><td>replayed loop</td><td>deterministic</td><td>stepped grid</td></tr>
+  </tbody>
+</table>
+
+<h2>The eight engines</h2>
+<div class="cards">
+
+  <div class="card c-blue">
+    <div class="accent"></div>
+    <h3>Note <span class="tag t-blue">fixed-pattern</span></h3>
+    <p class="ess">The core 64-step melodic sequencer. Every step is a stack of per-step layers — pitch, gate, probability, length, retrigger, slide, condition.</p>
+    <div class="math">
+      <span class="fx">n ← runMode(step);  cv = quant(pitch[n]);  gate = g[n]·P(prob[n])</span>
+      <span class="arch">Indexed table read on a fixed grid — every layer is a function of step n.</span>
+    </div>
+    <canvas class="scope" data-scope="note"></canvas>
+    <div class="foot">
+      <button class="play" data-demo="note"><span class="ic">▶</span><span class="lbl">Play</span></button>
+      <a class="man" href="./NOTE_MANUAL.html">manual →</a>
+    </div>
+  </div>
+
+  <div class="card c-green">
+    <div class="accent"></div>
+    <h3>Curve <span class="tag t-green">fixed-pattern</span></h3>
+    <p class="ess">Shape-per-step CV: 25 curve shapes scaled between per-step min/max, with gates derived from the curve itself. Continuous, not stepped.</p>
+    <div class="math">
+      <span class="fx">φ = (t mod L[n])/L[n] ∈ [0,1);  cv = min[n] + (max[n]−min[n])·S[n](φ)</span>
+      <span class="arch">Piecewise shape interpolation over step phase (S = one of 25 shapes).</span>
+    </div>
+    <canvas class="scope" data-scope="curve"></canvas>
+    <div class="foot">
+      <button class="play" data-demo="curve"><span class="ic">▶</span><span class="lbl">Play</span></button>
+      <a class="man" href="./CURVE_MANUAL.html">manual →</a>
+    </div>
+  </div>
+
+  <div class="card c-red">
+    <div class="accent"></div>
+    <h3>Stochastic <span class="tag t-red">probabilistic</span></h3>
+    <p class="ess">Independent rhythm and melody rolled from scale-degree and duration "tickets" through a Marbles-style pitch bell. Live re-rolls; Loop locks.</p>
+    <div class="math">
+      <span class="fx">d ~ Cat(degTickets ⊙ 𝒩(bias,spread));  τ ~ Cat(durTickets);  gate ~ Bernoulli</span>
+      <span class="arch">Weighted categorical draw under a Gaussian pitch field; Live resamples, Loop fixes the draw.</span>
+    </div>
+    <canvas class="scope" data-scope="stochastic"></canvas>
+    <div class="foot">
+      <button class="play" data-demo="stochastic"><span class="ic">▶</span><span class="lbl">Play</span></button>
+      <a class="man" href="./STOCHASTIC_MANUAL.html">manual →</a>
+    </div>
+  </div>
+
+  <div class="card c-purp">
+    <div class="accent"></div>
+    <h3>PhaseFlux <span class="tag t-purp">generative</span></h3>
+    <p class="ess">A 16-cell (4×4) pulse synth. Each stage fires a burst of gate pulses along a pitch curve, walked with a swept phase.</p>
+    <div class="math">
+      <span class="fx">stage s ← traversal;  pulse t[k] = s + warpT(k/N[s]);  cv = base[s] + Δ·warpP(φ)</span>
+      <span class="arch">Phase drives a per-cell pulse schedule × a pitch curve (absolute time).</span>
+    </div>
+    <canvas class="scope" data-scope="phaseflux"></canvas>
+    <div class="foot">
+      <button class="play" data-demo="phaseflux"><span class="ic">▶</span><span class="lbl">Play</span></button>
+      <a class="man" href="./PHASEFLUX_MANUAL.html">manual →</a>
+    </div>
+  </div>
+
+  <div class="card c-purp">
+    <div class="accent"></div>
+    <h3>Tuesday <span class="tag t-purp">seeded-generative</span></h3>
+    <p class="ess">A generative algorithm sequencer — 16 algorithms driven from a seed. Same seed, same riff; nudge the seed, new riff.</p>
+    <div class="math">
+      <span class="fx">(cv,gate)[n] = 𝒜(flow, orn, n),   𝒜 ∈ {16 algorithms}</span>
+      <span class="arch">Deterministic generator — pseudo-random in the seed, fully repeatable.</span>
+    </div>
+    <canvas class="scope" data-scope="tuesday"></canvas>
+    <div class="foot">
+      <button class="play" data-demo="tuesday"><span class="ic">▶</span><span class="lbl">Play</span></button>
+      <a class="man" href="./TUESDAY_MANUAL.html">manual →</a>
+    </div>
+  </div>
+
+  <div class="card c-blue">
+    <div class="accent"></div>
+    <h3>Indexed <span class="tag t-blue">fixed-pattern</span></h3>
+    <p class="ess">Duration-indexed CV/gate: each step carries its own length and gate in ticks, notes stored as scale-degree indices. Irregular meter by design.</p>
+    <div class="math">
+      <span class="fx">t[n] = Σ[i&lt;n] len[i] (ticks);  cv = quant(degree[n]);  gate = g[n]</span>
+      <span class="arch">Step cursor advanced by accumulated per-step tick-lengths → irregular meter.</span>
+    </div>
+    <canvas class="scope" data-scope="indexed"></canvas>
+    <div class="foot">
+      <button class="play" data-demo="indexed"><span class="ic">▶</span><span class="lbl">Play</span></button>
+      <a class="man" href="./INDEXED_MANUAL.html">manual →</a>
+    </div>
+  </div>
+
+  <div class="card c-green">
+    <div class="accent"></div>
+    <h3>DiscreteMap <span class="tag t-green">input-reactive</span></h3>
+    <p class="ess">A stateless threshold map. A moving input ramp scans 32 stages; crossing a threshold fires that stage's scale-degree note.</p>
+    <div class="math">
+      <span class="fx">ramp r(t);   on r(t) ⋈ thr[s] (dir[s]):  cv = quant(deg[s])</span>
+      <span class="arch">Stateless comparator — output is a function of the input crossing 32 thresholds, no counter.</span>
+    </div>
+    <canvas class="scope" data-scope="discretemap"></canvas>
+    <div class="foot">
+      <button class="play" data-demo="discretemap"><span class="ic">▶</span><span class="lbl">Play</span></button>
+      <a class="man" href="./DISCRETE_MANUAL.html">manual →</a>
+    </div>
+  </div>
+
+  <div class="card c-amber">
+    <div class="accent"></div>
+    <h3>Fractal <span class="tag t-amber">sampled</span></h3>
+    <p class="ess">A section-sampled looper. Captures another track's loop <b>with its feel</b> — a cell per note-change (Event), keeping each onset's timing and gate length (Feel), not a quantized grid — then replays it through branches (transpose, reverse, …) and scale-snapped ornaments.</p>
+    <div class="math">
+      <span class="fx">T[c] = ⟨pitch, gate, onset⟩ ← src @ note-change;   out = (B[k]∘⋯∘B[1])(T)[i] ⊕ ornaments</span>
+      <span class="arch">Captures the source's feel (onset + gate) → composed transform chain → scale-snapped flourishes.</span>
+    </div>
+    <canvas class="scope" data-scope="fractal"></canvas>
+    <div class="foot">
+      <button class="play" data-demo="fractal"><span class="ic">▶</span><span class="lbl">Play</span></button>
+      <a class="man" href="./FRACTAL_MANUAL.html">manual →</a>
+    </div>
+  </div>
+
+</div>
+
+<div class="note">All eight engines share one clock, one scale system, and one routing matrix. The differences above are about <em>what kind of part</em> each one is built to make — a written line, a moving voltage, a roll of the dice, a captured loop.</div>
+
+<div class="footer">xformer firmware — track engines, compared. One shared Web Audio synth; eight demos; zero network.</div>
+
+</div>
+
+<script>
+/* ============================================================
+   Shared Web Audio synth — one AudioContext, one ADSR voice
+   helper, modelled on the Fractal simulator's voiceA/voiceB.
+   ============================================================ */
+let actx = null, master = null;
+function ensureAudio(){
+  if(actx) return;
+  actx = new (window.AudioContext||window.webkitAudioContext)();
+  master = actx.createGain();
+  master.gain.value = 0.85;
+  const comp = actx.createDynamicsCompressor();
+  comp.threshold.value=-12; comp.ratio.value=4; comp.attack.value=0.003; comp.release.value=0.25;
+  master.connect(comp); comp.connect(actx.destination);
+}
+
+// scale: A minor pentatonic-ish natural minor, MIDI semitone offsets from A2 (110Hz)
+const ROOT = 110; // A2
+function midiHz(semi){ return ROOT * Math.pow(2, semi/12); }
+// A natural minor degrees over two octaves (semitones from root)
+const MINOR = [0,2,3,5,7,8,10,12,14,15,17,19,20,22,24];
+function deg(d){ // scale degree -> Hz, wraps cleanly
+  const i = ((d % MINOR.length) + MINOR.length) % MINOR.length;
+  const oct = Math.floor(d / MINOR.length);
+  return midiHz(MINOR[i] + 12*oct);
+}
+
+// deterministic PRNG (mulberry32) seeded per demo where variation is wanted
+function rng(seed){ let s = seed>>>0; return function(){ s|=0; s=(s+0x6D2B79F5)|0;
+  let t=Math.imul(s^s>>>15,1|s); t=(t+Math.imul(t^t>>>7,61|t))^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+
+// when true, voice helpers no-op so demos can build event data without sound
+let MUTED = false;
+
+// pluck voice (saw, short decay) — generic ADSR voice helper
+function pluck(freq, atTime, durSec, opt){
+  if(MUTED) return;
+  opt = opt||{};
+  const peak = opt.peak!=null ? opt.peak : 0.22;
+  const a = opt.a!=null ? opt.a : 0.004;
+  const wave = opt.wave || 'sawtooth';
+  const g = actx.createGain(); g.connect(master);
+  const rel = atTime + Math.max(durSec, a+0.02);
+  g.gain.setValueAtTime(0, atTime);
+  g.gain.linearRampToValueAtTime(peak, atTime+a);
+  g.gain.exponentialRampToValueAtTime(0.0008, rel+ (opt.tail!=null?opt.tail:0.05));
+  const lp = actx.createBiquadFilter(); lp.type='lowpass';
+  lp.frequency.setValueAtTime(opt.cutHi!=null?opt.cutHi:5200, atTime);
+  lp.frequency.exponentialRampToValueAtTime(opt.cutLo!=null?opt.cutLo:900, atTime+0.18);
+  lp.connect(g);
+  [0,-7].forEach(cents=>{
+    const o=actx.createOscillator(); o.type=wave;
+    o.frequency.value=freq; o.detune.value=cents; o.connect(lp);
+    o.start(atTime); o.stop(rel+(opt.tail!=null?opt.tail:0.08));
+  });
+}
+
+// sine bell voice (softer, longer release) — used for gliding/continuous parts
+function bell(freq, atTime, durSec, opt){
+  if(MUTED) return;
+  opt = opt||{};
+  const peak = opt.peak!=null ? opt.peak : 0.24;
+  const g = actx.createGain(); g.connect(master);
+  const a = 0.006;
+  const rel = atTime + Math.max(durSec, 0.04);
+  g.gain.setValueAtTime(0.0001, atTime);
+  g.gain.linearRampToValueAtTime(peak, atTime+a);
+  g.gain.linearRampToValueAtTime(peak*0.5, atTime+a+0.10);
+  g.gain.exponentialRampToValueAtTime(0.0008, rel+0.22);
+  const o1=actx.createOscillator(); o1.type='sine'; o1.frequency.value=freq; o1.connect(g);
+  const o2=actx.createOscillator(); o2.type='sine'; o2.detune.value=4; o2.frequency.value=freq*2.01;
+  const g2=actx.createGain(); g2.gain.value=0.3; o2.connect(g2); g2.connect(g);
+  o1.start(atTime); o1.stop(rel+0.3);
+  o2.start(atTime); o2.stop(rel+0.3);
+  return {o1,o2,g};
+}
+
+// a single gliding bell voice whose pitch ramps continuously (Curve / DiscreteMap sweeps)
+function glideVoice(points, t0){ // points: [{t, freq}], absolute offsets from t0
+  if(MUTED) return;
+  const g = actx.createGain(); g.connect(master);
+  const o=actx.createOscillator(); o.type='sine';
+  const peak = 0.26;
+  const end = t0 + points[points.length-1].t;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.linearRampToValueAtTime(peak, t0+0.03);
+  g.gain.setValueAtTime(peak, end-0.25);
+  g.gain.exponentialRampToValueAtTime(0.0008, end+0.05);
+  o.frequency.setValueAtTime(points[0].freq, t0);
+  points.forEach(p=> o.frequency.linearRampToValueAtTime(p.freq, t0+p.t));
+  o.connect(g);
+  o.start(t0); o.stop(end+0.1);
+}
+
+/* ============================================================
+   Scope drawing helpers. Tiny OLED-ish 2D primitives shared by
+   the eight per-engine diagrams. Page accent colours as marks.
+   ============================================================ */
+const ACCENT = { note:'#2563eb', curve:'#16a34a', stochastic:'#dc2626', phaseflux:'#7c3aed',
+                 tuesday:'#7c3aed', indexed:'#2563eb', discretemap:'#16a34a', fractal:'#ca8a04' };
+const DIM = 'rgba(255,255,255,0.16)', GRID = 'rgba(255,255,255,0.07)';
+const PAD = 6; // inner margin in px
+
+// scale-degree -> y, log-pitch mapped so visuals agree with deg()/audio
+function pitchY(d, h){
+  const lo = Math.log2(deg(0)), hi = Math.log2(deg(13));
+  const f = (Math.log2(deg(d)) - lo) / (hi - lo);
+  return (h-PAD) - f*(h-2*PAD);
+}
+function clearScope(ctx, w, h){ ctx.clearRect(0,0,w,h); }
+function playhead(ctx, x, h, col){
+  ctx.strokeStyle = col; ctx.globalAlpha = 0.55; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x, PAD-3); ctx.lineTo(x, h-PAD+3); ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+function dot(ctx, x, y, r, col, on){
+  ctx.fillStyle = on ? col : DIM;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+}
+
+/* ============================================================
+   Eight demos. Each schedules a short distinct phrase from
+   now (t0), builds an events array, and returns {dur, draw}.
+   draw(ctx,w,h,progress) renders the engine's signature working;
+   progress null = static idle diagram, else 0..1 lights events as
+   they sound and sweeps a playhead. The SAME data drives audio
+   and visuals so they always agree (incl. Stochastic's re-roll).
+   ============================================================ */
+const DEMOS = {
+  // Note: a clear written 8-note minor melody, steady 1/8 gates
+  note(t0){
+    const line = [0,2,4,3,5,4,2,0]; const dt=0.22;
+    const ev = line.map((d,i)=>({t:i*dt, d}));
+    ev.forEach(e=> pluck(deg(e.d), t0+e.t, dt*0.7, {peak:0.22}));
+    const dur = line.length*dt + 0.4;
+    return {dur, draw:(ctx,w,h,p)=>DRAW.note(ctx,w,h,p,ev,dur)};
+  },
+  // Curve: one continuous gliding pitch tracing a ramp up then a bell down
+  curve(t0){
+    const pts = [{t:0,d:0},{t:0.9,d:7},{t:1.5,d:9},{t:2.1,d:4},{t:2.8,d:0}];
+    glideVoice(pts.map(p=>({t:p.t, freq:deg(p.d)})), t0);
+    const dur = 3.0;
+    return {dur, draw:(ctx,w,h,p)=>DRAW.curve(ctx,w,h,p,pts,dur)};
+  },
+  // Stochastic: a 6-note loop, then the SAME loop re-rolled (different pitches/rests)
+  stochastic(t0){
+    const dt=0.2; const seed = (Date.now() & 0xffff) || 1;
+    const ev = [];
+    function bar(start, roll){
+      for(let i=0;i<6;i++){
+        const gate = roll() < 0.78;          // rhythm ticket: ~78% gate
+        const d = Math.floor(roll()*7);      // melody from pitch bell, in scale
+        ev.push({t:start+i*dt, d, gate});
+        if(gate) pluck(deg(d), t0+start+i*dt, dt*0.7, {peak:0.2});
+      }
+    }
+    bar(0, rng(1234));        // fixed first pass
+    bar(6*dt+0.15, rng(seed));// re-rolled second pass (varies each play)
+    const dur = 12*dt + 0.5;
+    return {dur, draw:(ctx,w,h,p)=>DRAW.stochastic(ctx,w,h,p,ev,dur)};
+  },
+  // PhaseFlux: clusters of rapid pulses, count/spacing changes per stage, pitch rising
+  phaseflux(t0){
+    const stages = [{n:2,sp:0.10,d:0},{n:4,sp:0.06,d:3},{n:3,sp:0.08,d:5},{n:6,sp:0.045,d:9}];
+    const ev = []; let t=0;
+    stages.forEach((s,si)=>{
+      for(let i=0;i<s.n;i++){
+        ev.push({t, d:s.d+i, stage:si});
+        pluck(deg(s.d + i), t0+t, 0.05, {peak:0.18, a:0.002, cutHi:6000, cutLo:1500});
+        t += s.sp;
+      }
+      t += 0.12; // gap between stages
+    });
+    const dur = t + 0.3;
+    return {dur, draw:(ctx,w,h,p)=>DRAW.phaseflux(ctx,w,h,p,ev,stages,dur)};
+  },
+  // Tuesday: a busy evolving algorithmic riff that morphs over the bar (seeded)
+  tuesday(t0){
+    const r = rng(0xC0FFEE); const dt=0.13; const n=16; let last=0;
+    const ev = [];
+    for(let i=0;i<n;i++){
+      const morph = i/n; // density/range opens up across the bar
+      const gate = r() < 0.6 + morph*0.35;
+      const jump = Math.floor((r()-0.5)*6*(0.5+morph));
+      if(gate){
+        last = Math.max(0, Math.min(12, last+jump));
+        ev.push({t:i*dt, d:last});
+        pluck(deg(last), t0+i*dt, dt*0.6, {peak:0.18, cutHi:5500, cutLo:1200});
+      }
+    }
+    const dur = n*dt + 0.4;
+    return {dur, draw:(ctx,w,h,p)=>DRAW.tuesday(ctx,w,h,p,ev,dur)};
+  },
+  // Indexed: notes of clearly different durations — long, short-short, long (non-grid)
+  indexed(t0){
+    const seq = [ {d:0,len:0.55}, {d:3,len:0.18}, {d:4,len:0.18},
+                  {d:2,len:0.6}, {d:5,len:0.2}, {d:4,len:0.2}, {d:0,len:0.7} ];
+    const ev = []; let t=0;
+    seq.forEach(s=>{ ev.push({t, len:s.len, d:s.d}); pluck(deg(s.d), t0+t, s.len*0.85, {peak:0.2}); t += s.len; });
+    const dur = t + 0.4;
+    return {dur, draw:(ctx,w,h,p)=>DRAW.indexed(ctx,w,h,p,ev,dur)};
+  },
+  // DiscreteMap: a rising ramp triggers an accelerating arpeggio (denser/higher)
+  discretemap(t0){
+    glideVoice([{t:0,freq:deg(0)*0.5},{t:2.6,freq:deg(7)*0.5}], t0); // ramp voice underneath
+    const ev = []; let t=0.1, gap=0.34, d=0;
+    while(t < 2.6 && d < 24){
+      ev.push({t, d});
+      pluck(deg(d), t0+t, gap*0.7, {peak:0.17});
+      d += 1; t += gap; gap = Math.max(gap*0.86, 0.07); // accelerate, floored so it terminates
+    }
+    const dur = 2.9;
+    return {dur, draw:(ctx,w,h,p)=>DRAW.discretemap(ctx,w,h,p,ev,dur)};
+  },
+  // Fractal: a 4-note motif, then same motif up a 5th (branch), then reversed
+  fractal(t0){
+    // Captured cells = pitch + onset PHASE + gate length: the source's "feel"
+    // (default Event cadence + Feel fidelity). Off-grid onsets + varied gates on purpose.
+    const cells=[{d:0,on:0.00,len:0.22},{d:2,on:0.24,len:0.09},{d:3,on:0.37,len:0.09},{d:5,on:0.56,len:0.24}];
+    const segLen=0.8, gap=0.15;
+    const ev = [];
+    function play(cs, start, transpose, br){
+      cs.forEach(c=>{ ev.push({t:start+c.on, d:c.d+transpose, len:c.len, br});
+        bell(deg(c.d+transpose), t0+start+c.on, c.len, {peak:0.22}); });
+    }
+    play(cells, 0, 0, 0);                 // trunk: replay the captured feel
+    play(cells, segLen+gap, 4, 1);        // branch: same feel, up a 5th
+    const rev = cells.map((c,i)=>{ const s=cells[cells.length-1-i];
+      return {d:s.d, on:segLen-(s.on+s.len), len:s.len}; });   // groove reversed too
+    play(rev, 2*(segLen+gap), 0, 2);      // branch: reversed
+    const dur = 2*(segLen+gap)+segLen+0.3;
+    return {dur, draw:(ctx,w,h,p)=>DRAW.fractal(ctx,w,h,p,ev,dur,segLen+gap)};
+  }
+};
+
+/* ============================================================
+   Per-engine diagrams. Each draws the KEY WORKING; progress null
+   = static full diagram, else lights events up to progress and
+   sweeps a playhead. Event times are relative to t0; xt() maps
+   a time to an x-pixel using the demo duration.
+   ============================================================ */
+function lit(e, prog, dur){ return prog==null || e.t <= prog*dur + 0.02; }
+function xt(t, dur, w){ return PAD + (t/dur)*(w-2*PAD); }
+const DRAW = {
+  note(ctx,w,h,prog,ev,dur){
+    clearScope(ctx,w,h); const col=ACCENT.note; const n=ev.length;
+    const cw=(w-2*PAD)/n;
+    for(let i=0;i<n;i++){
+      const e=ev[i], x=PAD+i*cw, y=pitchY(e.d,h), on=lit(e,prog,dur);
+      ctx.fillStyle = on?col:DIM; ctx.fillRect(x+1, y-2, cw-2, 4);
+      ctx.fillStyle = GRID; ctx.fillRect(x+cw*0.5-0.5, y, 1, h-PAD-y); // gate tick to floor
+    }
+    if(prog!=null) playhead(ctx, xt(prog*dur,dur,w), h, col);
+  },
+  curve(ctx,w,h,prog,pts,dur){
+    clearScope(ctx,w,h); const col=ACCENT.curve;
+    const at=u=>{ // sample piecewise-linear pitch curve at time u (sec)
+      for(let i=1;i<pts.length;i++){ if(u<=pts[i].t){ const a=pts[i-1],b=pts[i];
+        const f=(u-a.t)/(b.t-a.t||1); return a.d+(b.d-a.d)*f; } }
+      return pts[pts.length-1].d;
+    };
+    ctx.strokeStyle=DIM; ctx.lineWidth=1.5; ctx.beginPath();
+    const span=pts[pts.length-1].t;
+    for(let i=0;i<=80;i++){ const u=i/80*span, x=PAD+(i/80)*(w-2*PAD), y=pitchY(at(u),h);
+      i?ctx.lineTo(x,y):ctx.moveTo(x,y); } ctx.stroke();
+    if(prog!=null){ const u=Math.min(prog*dur, span);
+      ctx.strokeStyle=col; ctx.beginPath();
+      for(let i=0;i<=80;i++){ const uu=i/80*span; if(uu>u) break;
+        const x=PAD+(i/80)*(w-2*PAD), y=pitchY(at(uu),h); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+      ctx.stroke();
+      const x=PAD+(u/span)*(w-2*PAD); dot(ctx,x,pitchY(at(u),h),3,col,true);
+    }
+  },
+  stochastic(ctx,w,h,prog,ev,dur){
+    clearScope(ctx,w,h); const col=ACCENT.stochastic;
+    ctx.strokeStyle=GRID; ctx.lineWidth=1; ctx.beginPath(); // faint pitch bell across axis
+    for(let i=0;i<=60;i++){ const f=i/60, d=f*13, g=Math.exp(-Math.pow((d-6)/4,2));
+      const x=PAD+f*(w-2*PAD), y=(h-PAD)-g*(h-2*PAD); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+    ctx.stroke();
+    ev.forEach(e=>{ const x=xt(e.t,dur,w), y=pitchY(e.d,h), on=lit(e,prog,dur);
+      if(e.gate) dot(ctx,x,y,2.5,col,on); else dot(ctx,x,y,1.5,GRID,false); });
+    if(prog!=null) playhead(ctx, xt(prog*dur,dur,w), h, col);
+  },
+  phaseflux(ctx,w,h,prog,ev,stages,dur){
+    clearScope(ctx,w,h); const col=ACCENT.phaseflux; const ns=stages.length;
+    const sw=(w-2*PAD)/ns;
+    for(let s=0;s<ns;s++){ // stage slot frame
+      ctx.strokeStyle=GRID; ctx.strokeRect(PAD+s*sw+1, PAD, sw-2, h-2*PAD); }
+    ev.forEach(e=>{ const s=e.stage, slot=stages[s];
+      const idx=ev.filter(x=>x.stage===s).indexOf(e), cnt=slot.n;
+      const x=PAD+s*sw + (sw)*((idx+0.5)/cnt), yTop=pitchY(e.d,h), on=lit(e,prog,dur);
+      ctx.strokeStyle=on?col:DIM; ctx.lineWidth=1.5; ctx.beginPath();
+      ctx.moveTo(x,yTop); ctx.lineTo(x,h-PAD); ctx.stroke(); });
+    if(prog!=null){ const cur=Math.min(ns-1, Math.floor(prog*dur/(dur/ns)));
+      ctx.strokeStyle=col; ctx.globalAlpha=0.5; ctx.strokeRect(PAD+cur*sw+1,PAD,sw-2,h-2*PAD); ctx.globalAlpha=1; }
+  },
+  tuesday(ctx,w,h,prog,ev,dur){
+    clearScope(ctx,w,h); const col=ACCENT.tuesday;
+    ctx.lineWidth=1.5; ctx.strokeStyle=DIM; ctx.beginPath(); // stepped generative line
+    let py=null;
+    ev.forEach((e,i)=>{ const x=xt(e.t,dur,w), y=pitchY(e.d,h);
+      if(py!=null) ctx.lineTo(x,py); i?ctx.lineTo(x,y):ctx.moveTo(x,y); py=y; });
+    ctx.stroke();
+    ev.forEach(e=>{ const on=lit(e,prog,dur); dot(ctx,xt(e.t,dur,w),pitchY(e.d,h),2,col,on); });
+    if(prog!=null) playhead(ctx, xt(prog*dur,dur,w), h, col);
+  },
+  indexed(ctx,w,h,prog,ev,dur){
+    clearScope(ctx,w,h); const col=ACCENT.indexed;
+    ev.forEach(e=>{ const x0=xt(e.t,dur,w), x1=xt(e.t+e.len,dur,w), y=pitchY(e.d,h), on=lit(e,prog,dur);
+      ctx.fillStyle=on?col:DIM; ctx.fillRect(x0, y-2.5, Math.max(2,x1-x0-2), 5); });
+    if(prog!=null) playhead(ctx, xt(prog*dur,dur,w), h, col);
+  },
+  discretemap(ctx,w,h,prog,ev,dur){
+    clearScope(ctx,w,h); const col=ACCENT.discretemap;
+    [2,5,8,11].forEach(d=>{ const y=pitchY(d,h); // threshold bands
+      ctx.strokeStyle=GRID; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(PAD,y); ctx.lineTo(w-PAD,y); ctx.stroke(); });
+    ctx.strokeStyle=DIM; ctx.lineWidth=1.5; ctx.beginPath(); // rising ramp
+    ctx.moveTo(PAD, h-PAD); ctx.lineTo(w-PAD, pitchY(11,h)); ctx.stroke();
+    ev.forEach(e=>{ const x=xt(e.t,dur,w), y=pitchY(e.d,h), on=lit(e,prog,dur); dot(ctx,x,y,2.5,col,on); });
+    if(prog!=null) playhead(ctx, xt(prog*dur,dur,w), h, col);
+  },
+  fractal(ctx,w,h,prog,ev,dur,seg){
+    clearScope(ctx,w,h); const col=ACCENT.fractal;
+    const segW=(w-2*PAD)/3, innerW=segW-8, segLen=seg-0.15;
+    for(let b=0;b<3;b++){ const x0=PAD+b*segW;
+      ctx.strokeStyle=GRID; ctx.beginPath(); ctx.moveTo(x0, h-PAD+0.5); ctx.lineTo(x0+innerW, h-PAD+0.5); ctx.stroke();
+      ctx.globalAlpha=0.3;  // faint even grid — onsets sit OFF it (= feel)
+      for(let g=1;g<4;g++){ const gx=x0+innerW*g/4; ctx.beginPath(); ctx.moveTo(gx,PAD); ctx.lineTo(gx,h-PAD); ctx.stroke(); }
+      ctx.globalAlpha=1;
+      if(b<2){ const ax=x0+segW-3; ctx.strokeStyle=DIM; ctx.beginPath();
+        ctx.moveTo(ax, h/2); ctx.lineTo(ax+5, h/2); ctx.lineTo(ax+2, h/2-2); ctx.moveTo(ax+5,h/2); ctx.lineTo(ax+2,h/2+2); ctx.stroke(); }
+    }
+    [0,1,2].forEach(b=>{ const notes=ev.filter(e=>e.br===b); const x0=PAD+b*segW;
+      let prevx=null, prevy=null;
+      notes.forEach(e=>{ const lo=e.t-b*seg, x=x0+(lo/segLen)*innerW, y=pitchY(e.d,h), on=lit(e,prog,dur);
+        const bw=Math.max(2,(e.len/segLen)*innerW);
+        ctx.fillStyle=on?col:DIM; ctx.fillRect(x, y-1.5, bw, 3);   // bar width = gate length (feel)
+        if(prevx!=null){ ctx.strokeStyle=on?col:DIM; ctx.globalAlpha=0.5; ctx.lineWidth=1;
+          ctx.beginPath(); ctx.moveTo(prevx,prevy); ctx.lineTo(x,y); ctx.stroke(); ctx.globalAlpha=1; }
+        prevx=x; prevy=y; });
+    });
+    if(prog!=null) playhead(ctx, xt(prog*dur,dur,w), h, col);
+  }
+};
+
+/* ============================================================
+   Canvas setup: devicePixelRatio-scaled for crisp marks. Each
+   scope keeps a {ctx,w,h,key,draw} record; draw is built once
+   (muted) so every scope shows its signature diagram at idle.
+   ============================================================ */
+const scopes = {};
+document.querySelectorAll('canvas.scope').forEach(cv=>{
+  const key = cv.dataset.scope;
+  const dpr = window.devicePixelRatio || 1;
+  const w = 248, h = 60;
+  cv.width = w*dpr; cv.height = h*dpr;
+  const ctx = cv.getContext('2d'); ctx.scale(dpr,dpr);
+  MUTED = true; const {draw} = DEMOS[key](0); MUTED = false; // build data, no sound
+  scopes[key] = {ctx, w, h, key, draw};
+  draw(ctx, w, h, null); // static idle diagram
+});
+
+/* ============================================================
+   Wire buttons. One shared playing state + one rAF at a time,
+   mirroring the single busy-state model.
+   ============================================================ */
+let busy = null, busyTimer = null, rafId = null, current = null;
+function setLabel(btn, txt, playing){
+  btn.querySelector('.lbl').textContent = txt;
+  btn.querySelector('.ic').textContent = playing ? '■' : '▶';
+  btn.classList.toggle('playing', !!playing);
+}
+function stopRaf(){ if(rafId){ cancelAnimationFrame(rafId); rafId=null; } }
+function clearBusy(){
+  stopRaf();
+  if(current){ // settle the scope back to its static diagram
+    const s = scopes[current.key];
+    if(s) s.draw(s.ctx, s.w, s.h, null);
+    current = null;
+  }
+  if(busy){ setLabel(busy, 'Play', false); busy=null; }
+  if(busyTimer){ clearTimeout(busyTimer); busyTimer=null; }
+}
+function animate(){
+  if(!current) return;
+  const s = scopes[current.key]; if(!s) return;
+  const p = Math.min(1, Math.max(0, (actx.currentTime - current.t0) / current.dur));
+  current.draw(s.ctx, s.w, s.h, p);
+  if(p < 1) rafId = requestAnimationFrame(animate);
+}
+document.querySelectorAll('.play').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    ensureAudio();
+    if(actx.state === 'suspended') actx.resume();
+    if(busy === btn){ clearBusy(); return; } // tapping the playing one stops
+    clearBusy();
+    const key = btn.dataset.demo;
+    const t0 = actx.currentTime + 0.06;
+    const {dur, draw} = DEMOS[key](t0); // schedules audio + binds its event data
+    current = {key, dur, draw, t0};
+    busy = btn; setLabel(btn, 'playing…', true);
+    busyTimer = setTimeout(()=>clearBusy(), dur*1000);
+    rafId = requestAnimationFrame(animate);
+  });
+});
+</script>
+</body>
+</html>
