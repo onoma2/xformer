@@ -139,6 +139,10 @@ QWEN.md
 ui-preview/*.png
 ui-preview/**/*.png
 !ui-preview/*-manual/**/*.png
+# T9type manual renders (referenced by T9type-learn.html)
+!ui-preview/tt2-io/tt2-io-grid.png
+!ui-preview/tt2-io/tt2-io-in-mini.png
+!ui-preview/tt2-script/tt2-script-mini-scene.png
 retro/
 .claude/
 .compound-engineering/
