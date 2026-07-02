@@ -3,9 +3,10 @@
 **Version 0.7.9**
 
 XFORMER is a fork of the Phazerville PER|FORMER firmware with XFORMER-specific track types and sequencing enhancements. It assumes familiarity with the standard PER|FORMER workflow.
-
+<a href="https://discord.gg/z4TPePP8Y">discord for bug tracking and discussions</a>
 
 <a href="manuals/xformer.jpeg"><img src="manuals/xformer.jpeg"/></a> <a href="manuals/xformer.jpeg"><img src="manuals/xformer6.jpg"/></a> <a href="manuals/xformer079.png"><img src="manuals/xformer079.png"/></a>
+
 
 
 ### Key Features
