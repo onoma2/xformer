@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XFORMER Routing — full manual</title>
+<style>
+  :root{
+    --blue:#2563eb; --amber:#ca8a04; --green:#16a34a; --red:#dc2626; --purp:#7c3aed;
+    --ink:#1a1a1a; --mut:#5b5b5b; --line:#e5e5e5; --card:#ffffff; --bg:#fafafa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; line-height:1.5;}
+  .wrap{max-width:880px; margin:0 auto; padding:32px 24px 90px}
+  h1{font-size:1.75rem; line-height:1.2; margin:0 0 6px}
+  h2{font-size:1.32rem; line-height:1.25; margin:46px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--blue)}
+  h2.geo{border-color:var(--green)}
+  h2.adv{border-color:var(--purp)}
+  h3{font-size:1.06rem; margin:24px 0 6px}
+  .lede{color:var(--mut); font-size:1.05rem; margin:0 0 8px}
+  p{margin:10px 0}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#f0f0f3; padding:1px 5px; border-radius:4px; font-size:.9em}
+  .kbd{font-family:ui-monospace,"SF Mono",Menlo,monospace; background:#1a1a1a; color:#fff; padding:2px 7px; border-radius:5px; font-size:.82em; white-space:nowrap}
+  .tag{display:inline-block; font-size:.7rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:99px; vertical-align:middle}
+  .t-blue{background:#e8effe; color:var(--blue)} .t-amber{background:#fbf1d9; color:var(--amber)}
+  .t-green{background:#e3f5ea; color:var(--green)} .t-purp{background:#efe7fd; color:var(--purp)}
+  .note{border-left:4px solid var(--blue); background:#f3f7ff; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .warn{border-left:4px solid var(--amber); background:#fdf8ec; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  .gotcha{border-left:4px solid var(--red); background:#fdeeee; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0}
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:.93rem}
+  th,td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top}
+  thead th{background:#e8effe; color:var(--blue)}
+  tbody tr:nth-child(even){background:#fafafa}
+  td code{white-space:nowrap}
+  figure{margin:18px 0; text-align:center}
+  figure svg{max-width:100%; height:auto}
+  figcaption{color:var(--mut); font-size:.85rem; margin-top:6px}
+  .oled{display:block; margin:14px auto 2px; border:1px solid #333; border-radius:4px; background:#000; max-width:560px; width:100%}
+  .shot{display:block; width:100%; max-width:560px; margin:14px auto 2px; image-rendering:pixelated; border:1px solid #333; border-radius:4px; background:#000}
+  .gallery{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0}
+  @media(max-width:620px){.gallery{grid-template-columns:1fr}}
+  .gallery .shot{margin:0}
+  .cap{text-align:center; color:var(--mut); font-size:.84rem; margin:0 0 6px}
+  .steps{counter-reset:step; list-style:none; padding:0; margin:14px 0}
+  .steps>li{counter-increment:step; position:relative; padding:12px 12px 12px 56px; margin:10px 0; background:var(--card); border:1px solid var(--line); border-radius:8px}
+  .steps>li::before{content:counter(step); position:absolute; left:12px; top:12px; width:30px; height:30px; border-radius:50%; background:var(--blue); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:.95rem}
+  .setup{background:var(--card); border:1px solid var(--line); border-left:4px solid var(--green); border-radius:0 8px 8px 0; padding:12px 16px; margin:14px 0}
+  .setup h3{margin-top:0} .setup .recipe{font-size:.9rem; color:var(--mut)}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  @media(max-width:620px){.grid2{grid-template-columns:1fr}}
+  .def{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 14px}
+  .def .k{font-weight:700; color:var(--blue)}
+  .toc{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:16px 0; columns:2; font-size:.93rem}
+  @media(max-width:620px){.toc{columns:1}}
+  .toc a{color:var(--blue); text-decoration:none} .toc a:hover{text-decoration:underline}
+  .footer{margin-top:48px; padding-top:14px; border-top:1px solid var(--line); color:var(--mut); font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>XFORMER Routing</h1>
+<p class="lede">The routing system is a <b>modulation matrix</b>: any <i>source</i> &mdash; a CV input, a bus, a modulator,
+a MIDI message &mdash; can drive any <i>target</i>: a track or sequence param, a play-state action, the transport, a
+global setting, or a CV bus. Routing is <b>modulate-around-a-base</b>, not overwrite &mdash; a route adds an offset on
+top of the value you set on the param's own page, so params stay editable while routed.</p>
+
+<div class="toc">
+  <a href="#overview">1 &middot; Overview</a><br>
+  <a href="#apply">2 &middot; The three apply models</a><br>
+  <a href="#editor">3 &middot; The tab editor</a><br>
+  <a href="#sources">4 &middot; Sources</a><br>
+  <a href="#targets">5 &middot; Target families</a><br>
+  <a href="#playstate">6 &middot; Play-state &amp; global transport</a><br>
+  <a href="#bus">7 &middot; BUS &amp; CV router</a><br>
+  <a href="#midi">8 &middot; MIDI routing</a>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="overview">1 &middot; Overview</h2>
+<p>A route is a wire from one source to one target. Up to 16 routes exist at once. The
+signal chain is always the same: a normalized source value is scaled, shaped, and combined, then applied to the target
+according to the target's <b>apply model</b>.</p>
+<p>The defining property is <b>modulate-around-a-base</b>. A route does not replace the value you dial on a param's own
+page &mdash; it adds a modulation offset on top of that base. Your hand-set value stays live and editable; routing
+sweeps around it. This is the core difference from legacy Performer routing, which replaced the value outright.</p>
+<div class="note">Because the base is preserved, you can leave a route wired and still tune the param by hand. The
+route rides on whatever base you set.</div>
+
+<!-- ============================================================ -->
+<h2 id="apply">2 &middot; The three apply models</h2>
+<p>A route reaches its target through one of three paths. The <b>target decides which</b> &mdash; you don't pick the
+model, the param you aim at determines it.</p>
+
+<h3>2.1 Override (base + delta) <span class="tag t-blue">continuous params</span></h3>
+<p>For continuous per-track and global params &mdash; Transpose, Scale, Divisor, Octave, Tempo. The route turns the
+source into a <b>delta</b>: scaled by the route's <b>depth&nbsp;%</b>, bent by its <b>shaper</b>, and combined per its
+<b>combine</b> mode. The effective value is your base plus that delta, clamped to the param's range. Your
+hand-set base is preserved &mdash; routing modulates around it.</p>
+<ul>
+  <li><b>Combine = Modulate</b> <span class="tag t-green">default</span> &mdash; the delta is centered: the source
+    sweeps the param up <i>and</i> down around the base.</li>
+  <li><b>Combine = Absolute</b> &mdash; the source sweeps the param across its full range from the base upward, a
+    one-directional sweep.</li>
+  <li><b>scale source</b> &mdash; an optional second source that dynamically scales the route's depth &mdash; a VCA on
+    the modulation amount. <code>None</code> = fixed depth.</li>
+</ul>
+
+<h3>2.2 Trigger (raw source) <span class="tag t-amber">actions &amp; transport</span></h3>
+<p>Run and Reset, plus the five global transport actions (Play, Play-Toggle, Record, Record-Toggle, Tap-Tempo), read
+the <b>raw</b> normalized source only:</p>
+<ul>
+  <li><b>Run</b> &mdash; threshold (on above ~0.55, hysteresis-friendly).</li>
+  <li><b>Play / Record</b> &mdash; level-following: transport / record state mirrors the source level.</li>
+  <li><b>Reset / Play-Toggle / Record-Toggle / Tap-Tempo</b> &mdash; fire on a <b>rising edge</b>.</li>
+</ul>
+<div class="warn">Depth, scale source, shaper and combine <b>do not apply</b> to trigger targets. The tab editor hides
+those views for a trigger row and shows a source only.</div>
+
+<h3>2.3 Bus (sum-then-clamp) <span class="tag t-purp">CV buses</span></h3>
+<p>Sources routed to a CV bus <b>sum</b> into the bus, clamped &plusmn;5&nbsp;V, so several modulators
+can feed one bus. Bus routes are created on the dedicated <b>BUS tab</b>, not the param bands. A bus routing to
+<i>itself</i> is blocked; cross-bus feedback (bus1&rarr;bus2&rarr;bus1) is allowed &mdash; it is bounded and behaves
+like patching a CV output back to an input.</p>
+
+<!-- ============================================================ -->
+<h2 id="editor" class="geo">3 &middot; The tab editor</h2>
+<p>The routing page is a <b>tab editor</b>: a ring of tabs across the top, each showing a column of param rows
+&times; 8 track cells.</p>
+<table>
+  <thead><tr><th>Tab</th><th>What it holds</th></tr></thead>
+  <tbody>
+    <tr><td><b>Fixed bands</b></td><td><code>Pitch</code>, <code>Clock</code>, <code>Global</code> &mdash; the cross-engine params grouped by concept.</td></tr>
+    <tr><td><b>Engine pages</b></td><td>One per track mode: that engine's own routable params.</td></tr>
+    <tr><td><b>BUS</b></td><td>The four CV bus lanes.</td></tr>
+    <tr><td><b>MIDI</b></td><td>The learned MIDI routes.</td></tr>
+  </tbody>
+</table>
+
+<h3>3.1 The three fixed bands</h3>
+<ul>
+  <li><b>Pitch</b> &mdash; Scale, Root Note, Transpose, Octave, Slide Time, Rotate.</li>
+  <li><b>Clock</b> &mdash; Divisor, Clock Multiplier, <b>Run, Reset</b>, <b>Play, Play-Toggle, Record, Record-Toggle,
+    Tap-Tempo</b>, <b>Mute, Fill, Fill Amount, Pattern</b>. (Clock plus all per-track and global transport /
+    play-state.)</li>
+  <li><b>Global</b> &mdash; Tempo, Swing, CV-Router Scan/Route, CV-Output Rotate, Gate-Output Rotate.</li>
+</ul>
+<img class="shot" src="../ui-preview/routing-manual/routing-tab-clock.png" alt="Clock band: transport rows (Play/Toggle/Record/Tap) shown as source-only global rows">
+<p class="cap">The <b>Clock</b> band. The transport rows (Play / Toggle / Record / Tap) are source-only global rows &mdash;
+no per-track cells, no depth.</p>
+
+<h3>3.2 Rows: per-track vs global</h3>
+<ul>
+  <li><b>Per-track rows</b> show 8 track cells. A track is a <i>member</i> of the route when its cell has a non-zero
+    depth. Membership is implicit &mdash; dial a cell's depth up to add the track, down to 0 to drop it.</li>
+  <li><b>Global rows</b> (project and engine-scope targets: Tempo, Swing, Play, Record) have no per-track dimension
+    &mdash; one shared value shown across the columns.</li>
+</ul>
+
+<h3>3.3 Views</h3>
+<p>Cycle with <b>VIEW (F1)</b>: <code>SOURCE &rarr; DEPTH &rarr; SCALE &rarr; SHAPER &rarr; SOURCE</code>.</p>
+<ul>
+  <li><b>SOURCE</b> &mdash; which source drives the row (one source per row).</li>
+  <li><b>DEPTH</b> &mdash; per-track depth&nbsp;% (membership plus amount).</li>
+  <li><b>SCALE</b> &mdash; the row's scale source (dynamic depth gain).</li>
+  <li><b>SHAPER</b> &mdash; the row's response curve (fold / crease variants).</li>
+</ul>
+<div class="gallery">
+  <div><img class="shot" style="margin-top:0" src="../ui-preview/routing-manual/routing-tab-global.png" alt="Global band, DEPTH view"><p class="cap">Global band, <b>DEPTH</b> view.</p></div>
+  <div><img class="shot" style="margin-top:0" src="../ui-preview/routing-manual/routing-tab-global-source.png" alt="Global band, SOURCE view showing source abbreviations per row"><p class="cap"><b>SOURCE</b> view &mdash; the source abbreviation feeding each row.</p></div>
+</div>
+<img class="shot" src="../ui-preview/routing-manual/routing-tab-shaper.png" alt="Global band, SHAPER view: fold/crease response curve per row">
+<p class="cap">Global band, <b>SHAPER</b> view &mdash; the fold / crease response curve per row.</p>
+<div class="warn"><b>Trigger rows</b> (Run / Reset / transport) offer <b>SOURCE only</b>. The VIEW cycle stays on SOURCE
+and the cells always show the source, since depth / scale / shaper are meaningless for a raw-trigger consumer.</div>
+
+<h3>3.4 Editing a route</h3>
+<ul>
+  <li>Move the cursor to a row, <b>EDIT (F2)</b> to open the draft.</li>
+  <li><b>SOURCE</b> view + encoder picks the source; <b>DEPTH</b> view + encoder dials the cell's depth.</li>
+  <li><b>COMBINE (F3)</b> toggles Modulate &harr; Absolute.</li>
+  <li><b>COMMIT (F5)</b> writes the draft to the live route; <b>CANCEL (F4)</b> discards it.</li>
+</ul>
+<div class="note">Edits are staged in a draft &mdash; nothing changes until Commit, so Cancel truly reverts.</div>
+
+<h3>3.5 MOD+ / MOD&minus; inline setup</h3>
+<p>From a track or sequence param page you can add modulation to the param under the cursor without opening the routing
+page:</p>
+<ul>
+  <li><b>MOD+</b> creates a route for that param, or <b>extends</b> the existing one onto the current track. One route
+    per param &mdash; extra tracks are added to it, not minted as a second route.</li>
+  <li><b>MOD&minus;</b> removes the current track from the param's route, freeing the route when its last track is
+    dropped.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="sources">4 &middot; Sources</h2>
+<p>Every route picks one primary source. The source abbreviations shown in the SOURCE view:</p>
+<table>
+  <thead><tr><th>Token</th><th>Source</th></tr></thead>
+  <tbody>
+    <tr><td><code>IN1&ndash;4</code></td><td>CV inputs</td></tr>
+    <tr><td><code>O1&ndash;8</code></td><td>CV outputs</td></tr>
+    <tr><td><code>B1&ndash;4</code></td><td>CV buses</td></tr>
+    <tr><td><code>G1&ndash;8</code></td><td>Gate outputs</td></tr>
+    <tr><td><code>M1&ndash;8</code></td><td>Modulators</td></tr>
+    <tr><td>MIDI</td><td>configured on the MIDI tab</td></tr>
+    <tr><td><code>None</code></td><td>inert &mdash; a route with no source does nothing</td></tr>
+  </tbody>
+</table>
+<p>A route's <b>scale source</b> picker offers the same list minus MIDI, minus the route's own primary source (no
+self-squaring), and minus any self-routing bus.</p>
+
+<!-- ============================================================ -->
+<h2 id="targets">5 &middot; Target families</h2>
+<p>Each target belongs to a family that fixes its apply model and scope:</p>
+<table>
+  <thead><tr><th>Family</th><th>Examples</th><th>Apply model</th><th>Scope</th></tr></thead>
+  <tbody>
+    <tr><td>Pitch / structural</td><td>Scale, Root Note, Transpose, Octave, Slide Time, Rotate</td><td>override</td><td>per-track</td></tr>
+    <tr><td>Clock</td><td>Divisor, Clock Multiplier</td><td>override</td><td>per-track</td></tr>
+    <tr><td>Transport (per-track)</td><td>Run, Reset</td><td>trigger</td><td>per-track</td></tr>
+    <tr><td>Transport (global)</td><td>Play, Play-Toggle, Record, Record-Toggle, Tap-Tempo</td><td>trigger</td><td>global</td></tr>
+    <tr><td>Play-state</td><td>Mute, Fill, Fill Amount, Pattern</td><td>level-driven</td><td>per-track</td></tr>
+    <tr><td>Global</td><td>Tempo, Swing, CV-Router Scan/Route, CV/Gate-Output Rotate</td><td>override</td><td>project</td></tr>
+    <tr><td>Bus</td><td>Bus CV 1&ndash;4</td><td>sum-then-clamp</td><td>&mdash;</td></tr>
+    <tr><td>Per-engine</td><td>each track mode's own params (Algorithm, Chaos, Fractal, Stochastic, DiscreteMap inlets, Indexed A/B)</td><td>override</td><td>per-track</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="playstate" class="adv">6 &middot; Play-state &amp; global transport</h2>
+
+<h3>6.1 Play-state targets <span class="tag t-purp">Mute / Fill / FillAmount / Pattern</span></h3>
+<p>Per-track and <b>level-driven</b>: re-evaluated each frame and idempotent.</p>
+<ul>
+  <li><b>Mute / Fill</b> &mdash; threshold 0.5.</li>
+  <li><b>Fill Amount</b> &mdash; source scaled to 0..100.</li>
+  <li><b>Pattern</b> &mdash; source scaled to the rounded pattern index (0..15); inert while a snapshot is active.</li>
+</ul>
+
+<h3>6.2 Global transport</h3>
+<p>The engine consumes these directly. Play and Record follow the source level; Play-Toggle, Record-Toggle and
+Tap-Tempo fire on a rising edge.</p>
+<div class="gotcha">Routing both <b>Play</b> and <b>Play-Toggle</b> (or Record + Record-Toggle) is allowed but can
+fight &mdash; prefer one transport control per action.</div>
+
+<!-- ============================================================ -->
+<h2 id="bus" class="geo">7 &middot; BUS &amp; CV router</h2>
+<p>Four CV bus lanes. Each lane shows its live bipolar volts, its one feeding route (source + depth), and CVR / TT
+activity lights. Buses are a mixing node &mdash; multiple routes sum into one bus, clamped &plusmn;5&nbsp;V.</p>
+<img class="shot" src="../ui-preview/routing-manual/routing-bus.png" alt="BUS tab: four lanes with live volts, source+depth, CVR/TT activity lights">
+<p class="cap">The <b>BUS</b> tab &mdash; four lanes, live volts, source + depth per lane, CVR / TT lights.</p>
+<p>The independent interpolating <b>CV router</b> is a 4&times;4 matrix with Scan / Route
+targets that can also feed the buses.</p>
+
+<!-- ============================================================ -->
+<h2 id="midi" class="adv">8 &middot; MIDI routing</h2>
+<p>A route whose source is MIDI is configured on the <b>MIDI tab</b> &mdash; port, channel, event, and CC-or-note.
+MIDI-learn assigns an incoming message to a route.</p>
+<div class="note">When a slot is reassigned from a CV source to MIDI, its value is cleared so it starts neutral until
+the first matching MIDI message arrives.</div>
+
+<div class="footer">
+  <b>Modulation matrix.</b> Modulate-around-a-base (override table), not overwrite. Three apply models &mdash; Override
+  (base + delta, Modulate / Absolute combine, optional scale source VCA), Trigger (raw source: Run / Reset + five global
+  transport actions), Bus (sum-then-clamp into the four CV buses, &plusmn;5&nbsp;V). Tab editor: Pitch / Clock /
+  Global fixed bands, per-engine pages, BUS, MIDI; per-track rows (implicit membership via depth) vs global rows;
+  SOURCE / DEPTH / SCALE / SHAPER views (trigger rows: SOURCE only); MOD+ / MOD&minus; inline route setup. Sources
+  <code>IN1&ndash;4 / O1&ndash;8 / B1&ndash;4 / G1&ndash;8 / M1&ndash;8 / MIDI / None</code>. Play-state Mute / Fill /
+  FillAmount / Pattern level-driven; global transport rising-edge and level-follow. BUS + interpolating 4&times;4 CV
+  router.
+</div>
+
+</div>
+</body>
+</html>
