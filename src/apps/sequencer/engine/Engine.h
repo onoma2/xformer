@@ -143,7 +143,7 @@ public:
         if (index < 0 || index >= BusCvCount) {
             return 0.f;
         }
-        return clamp(_busCv[index], -5.f, 5.f);
+        return clamp(_busCv[index] + _busCvRouting[index] + _busCvCvRouter[index], -5.f, 5.f);
     }
     uint8_t busWriters(int index) const {
         if (index < 0 || index >= BusCvCount) {
@@ -157,11 +157,15 @@ public:
             return;
         }
         _busCvWriters[index] |= writer;
-        // Sum+clamp law: per-frame writers (routing/CV-router/Teletype) accumulate
-        // UNCLAMPED onto the lane (first seeds/drops last frame, rest add); busCv()
-        // clamps once at read, so the value is the order-free sum-then-clamp, not an
-        // order-biased running clamp. _busCvWritten resets each frame in both paths.
-        if (!_busCvWritten[index]) {
+        // Routing / CV-router accumulate into their own pass-reset slots so a
+        // recompute replaces (not doubles) their contribution. Teletype keeps the
+        // sample-and-hold seed-vs-add law (first write per frame seeds, rest sum).
+        // busCv() sums all three and clamps once at read.
+        if (writer == BusWriterRouting) {
+            _busCvRouting[index] += volts;
+        } else if (writer == BusWriterCvRouter) {
+            _busCvCvRouter[index] += volts;
+        } else if (!_busCvWritten[index]) {
             _busCvWritten[index] = true;
             _busCv[index] = volts;
         } else {
@@ -373,9 +377,14 @@ private:
     // cv output overrides
     bool _cvOutputOverride = false;
     std::array<float, CvOutput::Channels> _cvOutputOverrideValues;
-    std::array<float, BusCvCount> _busCv{};
-    std::array<bool, BusCvCount> _busCvWritten{};
+    std::array<float, BusCvCount> _busCv{};            // Teletype hold value (sample-and-hold)
+    std::array<bool, BusCvCount> _busCvWritten{};      // Teletype seed flag, reset per frame
     std::array<uint8_t, BusCvCount> _busCvWriters{};
+    // Routing / CV-router contributions live in their own slots, zeroed at the
+    // start of each of their compose passes so the intentional second compose
+    // replaces rather than doubles them. busCv() sums all three.
+    std::array<float, BusCvCount> _busCvRouting{};
+    std::array<float, BusCvCount> _busCvCvRouter{};
     int16_t _tv[TvCount] = {};
     bool _busCvSafeMode = true;
     static constexpr float BusCvDecay = 0.9995f;

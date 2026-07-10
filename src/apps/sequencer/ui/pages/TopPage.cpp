@@ -69,6 +69,7 @@ void TopPage::keyPress(KeyPressEvent &event) {
                               currentPage == &pages.accumulator ||
                               currentPage == &pages.stochasticPerformance ||
                               currentPage == &pages.stochasticConfig ||
+                              currentPage == &pages.fractalSequenceList ||
                               currentPage == &pages.phaseFluxSequence);
         bool onSequenceEditView = (currentPage == &pages.noteSequenceEdit ||
                                    currentPage == &pages.curveSequenceEdit ||
@@ -77,6 +78,7 @@ void TopPage::keyPress(KeyPressEvent &event) {
                                    currentPage == &pages.indexedSequenceEdit ||
                                    (currentPage == &pages.teletypeScriptView && _mode == Mode::SequenceEdit) ||
                                    currentPage == &pages.stochasticSequenceEdit ||
+                                   currentPage == &pages.fractalSequenceEdit ||
                                    currentPage == &pages.phaseFluxEdit);
         bool onTrackView = (currentPage == &pages.track ||
                            currentPage == &pages.harmony);

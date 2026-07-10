@@ -50,6 +50,19 @@ inline Draft begin(const Routing &routing, int routeIndex) {
     return d;
 }
 
+// Extend an existing per-track route onto another track, STAGED in the draft
+// (live route untouched until commit, so cancel reverts). Adds the track bit +
+// default depth (full for inlets, else 0) to the draft copy.
+inline Draft extend(const Routing &routing, int routeIndex, Routing::Target target, int trackIndex) {
+    Draft d = begin(routing, routeIndex);
+    if (trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT) {
+        return d;
+    }
+    d.route.setTracks(d.route.tracks() | (1 << trackIndex));
+    d.route.setDepthPct(trackIndex, Routing::isInletTarget(target) ? 100 : 0);
+    return d;
+}
+
 // Source is required to commit.
 inline bool canCommit(const Draft &d) {
     return d.routeIndex >= 0 && d.routeIndex < CONFIG_ROUTE_COUNT &&

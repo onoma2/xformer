@@ -165,16 +165,18 @@ private:
     // only — ornaments are re-rolled when the entry surfaces, not stored. Cap 16
     // = max delay, so one entry per pending section can never overflow.
     struct DelayEntry {
-        int16_t cv;          // raw rel-root semitones ×256 fixed-point
-        uint8_t gatePacked;  // bits 0..3 gateLen; bit 7 ornEligible; onset nibble 0
-        uint8_t sectionsLeft;
+        int16_t cv;               // raw rel-root semitones ×256 fixed-point
+        uint16_t gateLen : 4;
+        uint16_t ornEligible : 1;
+        uint16_t sectionsM1 : 4;  // (delay sections − 1) 0..15 → 1..16 sections
+        uint16_t readPos : 7;     // sounding trunk index — playhead follows the surfaced note
     };
     // RingBuffer's modular cursor math only holds for power-of-2 sizes; 32 gives
     // capacity 31, comfortably above the 16-section max delay (one entry/section).
     static constexpr int kDelayRingSize = 32;
     RingBuffer<DelayEntry, kDelayRingSize> _delayRing;
     void clearDelayRing() { while (!_delayRing.empty()) _delayRing.read(); }
-    void pushDelay(float mainSemi, int gateLen, bool ornEligible, int sections);
+    void pushDelay(float mainSemi, int gateLen, bool ornEligible, int sections, int readPos);
     void drainDelayRing(uint32_t tick, uint32_t divisor);
 
     // KD-12 branches — one chained transform per branch, derived from branchSeed

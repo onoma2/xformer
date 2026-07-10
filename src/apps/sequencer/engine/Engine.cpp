@@ -109,7 +109,8 @@ void Engine::updateImpl() {
         _cvInput.update();
         _busCvWritten.fill(false);
         _busCvWriters.fill(0);   // re-seed bus sum each frame (CV-router writes below)
-        updateOverrides();
+        _busCvRouting.fill(0.f); // suspended: no routing compose, so drop its slot
+        updateOverrides();       // clears + refills the CV-router slot
         _cvOutput.update();
         _gateOutput.update();
         return;
@@ -124,6 +125,10 @@ void Engine::updateImpl() {
     updateBusSafetyMode();
     _busCvWritten.fill(false);
     _busCvWriters.fill(0);
+    // Clear the CV-router slot at frame start too: the first routing compose
+    // (below) can read busCv() for a BusCv source before updateOverrides()
+    // refills it, so leaving last frame's value here is a stale cross-frame read.
+    _busCvCvRouter.fill(0.f);
 
     // process clock events
     while (Clock::Event event = _clock.checkEvent()) {
@@ -135,6 +140,9 @@ void Engine::updateImpl() {
             break;
         case Clock::Stop:
             // DBG("STOP");
+            for (auto trackEngine : _trackEngines) {
+                trackEngine->stop();   // drop pending gates so none stick HIGH
+            }
             _state.setRunning(false);
             break;
         case Clock::Continue:
@@ -169,6 +177,7 @@ void Engine::updateImpl() {
     receiveKeyboard();
 
     // update routings
+    _busCvRouting.fill(0.f);   // re-seed routing's bus contribution each compose
     _routingEngine.update();
 
     uint32_t tick;
@@ -286,6 +295,7 @@ void Engine::updateImpl() {
                 trackEngine->update(0.f);
             }
             updateTrackOutputs();
+            _busCvRouting.fill(0.f);
             _routingEngine.update();
             updateOverrides();
             updateTrackOutputs();
@@ -1077,6 +1087,10 @@ void Engine::updatePlayState(bool ticked) {
 }
 
 void Engine::updateOverrides() {
+    // Re-seed the CV-router's bus contribution each compose. Cleared here (not
+    // in updateCvRouteOutputs) so it also drops to 0 when the CV-output override
+    // skips the CV-router below — otherwise busCv() would sum a stale value.
+    _busCvCvRouter.fill(0.f);
     // overrides
     if (_gateOutputOverride) {
         _gateOutput.setGates(_gateOutputOverrideValue);

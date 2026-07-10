@@ -19,6 +19,19 @@ public:
     virtual Track::TrackMode trackMode() const override { return Track::TrackMode::Tuesday; }
 
     virtual void reset() override;
+    virtual void stop() override {
+        // Drop the gate and every volatile latch update() could re-raise it from
+        // (retrigger/trill/tie), so a stopped Tuesday track stays low.
+        _microGateQueue.clear();
+        _gateOutput = false;
+        _activity = false;
+        _retriggerArmed = false;
+        _retriggerCount = 0;
+        _retriggerTimer = 0;
+        _gateTicks = 0;
+        _tieActive = false;
+        _isTrillNote = false;
+    }
     virtual void restart() override;
     virtual TickResult tick(uint32_t tick) override;
     virtual void update(float dt) override;

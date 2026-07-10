@@ -440,10 +440,7 @@ void IndexedTrackEngine::triggerStep() {
 
 float IndexedTrackEngine::noteIndexToVoltage(int8_t noteIndex) const {
     const Scale &scale = _sequence->selectedScale(_model.project().scale(), _model.project().scaleRotate());
-    int rootNote = _sequence->rootNote();
-    if (rootNote < 0) {
-        rootNote = _model.project().rootNote();
-    }
+    int rootNote = ScaleResolve::resolveRootNote(_sequence->rootNote(), _track.trackIndex(), _model.project().rootNote());
 
     int shift = _indexedTrack.octave() * scale.notesPerOctave() + _indexedTrack.transpose();
     float volts = scale.noteToVolts(noteIndex + shift);

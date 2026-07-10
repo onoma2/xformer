@@ -263,6 +263,7 @@ struct TT2RuntimeT {
     uint32_t scriptLastMs[Cfg::ScriptCount];      // clockMs at each script's last run
     uint8_t metroResetReq;                        // M.RESET -> engine zeroes the metro phase
     TT2Midi midi;                                 // MIDI event buffer for MI.* ops
+    uint32_t loopOps;                             // per-line body-eval counter (op budget)
 };
 
 using TT2Runtime = TT2RuntimeT<TT2ConfigFull>;

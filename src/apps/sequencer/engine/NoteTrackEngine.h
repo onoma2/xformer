@@ -45,6 +45,7 @@ public:
     virtual Track::TrackMode trackMode() const override { return Track::TrackMode::Note; }
 
     virtual void reset() override;
+    virtual void stop() override;
     virtual void restart() override;
     virtual TickResult tick(uint32_t tick) override;
     virtual void update(float dt) override;
@@ -69,6 +70,12 @@ public:
     int currentRecordStep() const { return _stepRecorder.stepIndex(); }
 
     void setMonitorStep(int index);
+
+    // Pulse count of the audible (rotated) step for a given sequence-state index.
+    // The pulse-hold must read this, not the raw unrotated state index. Pure +
+    // static so it can be unit-tested directly.
+    static int rotatedStepPulseCount(const NoteSequence &sequence, int stateStep,
+                                     int firstStep, int lastStep, int rotate);
 
 private:
     void triggerStep(uint32_t tick, uint32_t divisor);

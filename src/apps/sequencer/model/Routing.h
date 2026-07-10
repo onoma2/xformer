@@ -406,6 +406,12 @@ public:
         return target >= Target::EngineFirst && target <= Target::EngineLast;
     }
 
+    // Raw-trigger targets consume the source by threshold/edge only (Run/Reset +
+    // global transport). Depth / scaleSource / shaper do not apply to them.
+    static bool isTriggerTarget(Target target) {
+        return target == Target::Run || target == Target::Reset || isEngineTarget(target);
+    }
+
     static bool isProjectTarget(Target target) {
         return target >= Target::ProjectFirst && target <= Target::ProjectLast;
     }
@@ -553,6 +559,9 @@ public:
     static int busTargetIndex(Target target) {
         return isBusTarget(target) ? int(target) - int(Target::BusCv1) : -1;
     }
+    // Blocks only a bus routing to ITSELF (0-delay within-frame self-add). Cross-bus
+    // feedback (bus1->bus2->bus1) is intentionally allowed: it is clamp-bounded
+    // (+-5V, cannot run away) and behaves like patching a CV output back to an input.
     static bool isBusSelfRoute(Source source, Target target) {
         return isBusSource(source) && isBusTarget(target) &&
                busSourceIndex(source) == busTargetIndex(target);
@@ -911,7 +920,6 @@ public:
     void clear();
     int findEmptyRoute() const;
     int findRoute(Target target, int trackIndex) const;
-    int checkRouteConflict(const Route &editedRoute, const Route &existingRoute) const;
     void writeTarget(Target target, uint8_t tracks, float normalized);
     void write(VersionedSerializedWriter &writer) const;
     void read(VersionedSerializedReader &reader);

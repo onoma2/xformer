@@ -850,9 +850,6 @@ void FractalTrackEngine::replaySection(uint32_t tick, uint32_t divisor) {
     float semitonesRelRoot; int gateLen; bool valid;
     segmentCell(segment, within, semitonesRelRoot, gateLen, valid);
 
-    _readPos = uint8_t(trunkReadIndex(within));   // UI highlight = trunk index read
-    _currentSegment = uint8_t(segment);           // UI highlight = sounding branch block
-
     // Lookahead for direction-aware ornaments: the next sounding cell's raw note.
     float nextSemi; int nextGateLen; bool nextValid;
     segmentCell(segment, nextWithin, nextSemi, nextGateLen, nextValid);
@@ -872,14 +869,21 @@ void FractalTrackEngine::replaySection(uint32_t tick, uint32_t divisor) {
         onsetTicks = (uint32_t(onsetNibble(readIdx)) * divisor) / 16u;
     }
 
+    // Segment highlight tracks the read cursor; the trunk playhead (_readPos)
+    // tracks the actually-sounding cell — set immediately for the direct path, or
+    // on surface (drainDelayRing) for the delayed path.
+    _currentSegment = uint8_t(segment);
+
     int delay = _fractalTrack.trackDelay();
     if (delay <= 0) {
         // Immediate path (byte-identical to no-delay playback when onset 0).
+        _readPos = uint8_t(readIdx);
         scheduleSection(tick + onsetTicks, divisor, semitonesRelRoot, nextSemi, valid ? gateLen : 0, ornEligible);
     } else {
-        // Surface notes due this section first, then defer this section's note.
+        // Surface notes due this section first, then defer this section's note. The
+        // playhead follows the surfaced (delayed) note, set in drainDelayRing.
         drainDelayRing(tick, divisor);
-        pushDelay(semitonesRelRoot, valid ? gateLen : 0, ornEligible, delay);
+        pushDelay(semitonesRelRoot, valid ? gateLen : 0, ornEligible, delay, readIdx);
     }
 
     _globalPos = uint16_t((gp + 1) % total);
@@ -973,8 +977,10 @@ void FractalTrackEngine::scheduleSection(uint32_t tick, uint32_t divisor, float 
     };
 
     if (gateLen <= 0) {
-        // Rest: hold CV, gate stays low. Still set CV so glides/scope track it.
-        pushCv(tick, fractalPlaybackCv(mainSemi, _fractalTrack));
+        // Rest: gate stays low. In Always mode still set CV so glides/scope
+        // track it; in Gate mode hold the previous pitch (mirrors NoteTrack).
+        if (_fractalTrack.cvUpdateMode() == FractalTrack::CvUpdateMode::Always)
+            pushCv(tick, fractalPlaybackCv(mainSemi, _fractalTrack));
         pushGate(tick, false);
         return;
     }
@@ -1070,12 +1076,14 @@ void FractalTrackEngine::scheduleSection(uint32_t tick, uint32_t divisor, float 
 // KD-15: defer a resolved main note by `sections`. Stores the note only — raw
 // rel-root semitone (×256 fixed-point) + gateLen + ornEligible bit; ornaments are
 // re-rolled when the entry surfaces. Cap is the max delay, so never overflows.
-void FractalTrackEngine::pushDelay(float mainSemi, int gateLen, bool ornEligible, int sections) {
+void FractalTrackEngine::pushDelay(float mainSemi, int gateLen, bool ornEligible, int sections, int readPos) {
     if (_delayRing.full()) return;
     DelayEntry e;
     e.cv = int16_t(clamp(int(std::lround(mainSemi * 256.f)), -32768, 32767));
-    e.gatePacked = uint8_t((gateLen & 0xf) | (ornEligible ? 0x80 : 0));
-    e.sectionsLeft = uint8_t(clamp(sections, 0, 255));
+    e.gateLen = gateLen & 0xf;
+    e.ornEligible = ornEligible ? 1 : 0;
+    e.sectionsM1 = clamp(sections - 1, 0, 15);
+    e.readPos = readPos & 0x7f;
     _delayRing.write(e);
 }
 
@@ -1086,13 +1094,12 @@ void FractalTrackEngine::drainDelayRing(uint32_t tick, uint32_t divisor) {
     size_t pending = _delayRing.readable();
     for (size_t i = 0; i < pending; ++i) {
         DelayEntry e = _delayRing.read();
-        if (e.sectionsLeft > 0) e.sectionsLeft--;
-        if (e.sectionsLeft == 0) {
+        if (e.sectionsM1 == 0) {
             float semi = float(e.cv) * (1.f / 256.f);
-            int gateLen = e.gatePacked & 0xf;
-            bool ornEligible = (e.gatePacked & 0x80) != 0;
-            scheduleSection(tick, divisor, semi, semi, gateLen, ornEligible);
+            _readPos = e.readPos;                 // playhead tracks the note now sounding
+            scheduleSection(tick, divisor, semi, semi, int(e.gateLen), e.ornEligible != 0);
         } else {
+            e.sectionsM1--;
             _delayRing.write(e);
         }
     }

@@ -18,6 +18,7 @@ public:
     virtual Track::TrackMode trackMode() const override { return Track::TrackMode::DiscreteMap; }
 
     virtual void reset() override;
+    virtual void stop() override { _gateTimer = 0; _activity = false; _activityTimer = 0; }
     virtual void restart() override;
     virtual TickResult tick(uint32_t tick) override;
     virtual void update(float dt) override;

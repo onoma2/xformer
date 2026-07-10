@@ -128,6 +128,7 @@ TT2EvalResult TT2TrackEngine::runLiveCommand(const TT2Command &cmd) {
     TT2EvalResult result;
     {
         ScopedHost host(this);
+        _tt2Track.runtime().loopOps = 0;   // fresh op budget for the live line
         result = evaluateCommand(cmd, _tt2Track.runtime(), _output, &_tt2Track.program());
     }
     _engine.unlock();

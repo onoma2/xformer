@@ -40,12 +40,19 @@ CASE("bandParams: PITCH lists pitch keys plus folded SlideTime + Rotate") {
     expectEqual(int(keys[5]), int(ParamKey::Rotate), "Rotate folded in");
 }
 
-CASE("bandParams: CLOCK folds in Run + Reset") {
-    uint8_t keys[8];
-    int n = RouteBrowse::bandParams(Band::Clock, keys, 8);
-    expectEqual(n, 4, "Divisor, ClockMult, Run, Reset");
+CASE("bandParams: CLOCK folds in Run/Reset, transport, and PlayState targets") {
+    uint8_t keys[16];
+    int n = RouteBrowse::bandParams(Band::Clock, keys, 16);
+    expectEqual(n, 13, "Divisor, ClockMult, Run, Reset, Play, PlayToggle, Record, RecordToggle, TapTempo, Mute, Fill, FillAmount, Pattern");
     expectTrue(hasKey(keys, n, ParamKey::Run), "Run folded into Clock");
     expectTrue(hasKey(keys, n, ParamKey::Reset), "Reset folded into Clock");
+    expectTrue(hasKey(keys, n, ParamKey::Play), "Play folded into Clock");
+    expectTrue(hasKey(keys, n, ParamKey::PlayToggle), "PlayToggle folded into Clock");
+    expectTrue(hasKey(keys, n, ParamKey::Record), "Record folded into Clock");
+    expectTrue(hasKey(keys, n, ParamKey::RecordToggle), "RecordToggle folded into Clock");
+    expectTrue(hasKey(keys, n, ParamKey::TapTempo), "TapTempo folded into Clock");
+    expectTrue(hasKey(keys, n, ParamKey::Mute), "Mute folded into Clock");
+    expectTrue(hasKey(keys, n, ParamKey::Pattern), "Pattern folded into Clock");
 }
 
 CASE("bandParams: GLOBAL folds in CV/Gate output rotate") {

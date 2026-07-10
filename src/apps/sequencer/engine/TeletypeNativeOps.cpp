@@ -3270,7 +3270,7 @@ static void opQI(TT2RuntimeT<Cfg> &runtime, TT2OutputState &, const TeletypeProg
 // ---------------------------------------------------------------------------
 
 template<typename Cfg>
-static void runStoredCommand(const TT2RuntimeCommand &body, TT2RuntimeT<Cfg> &runtime,
+static TT2EvalError runStoredCommand(const TT2RuntimeCommand &body, TT2RuntimeT<Cfg> &runtime,
                              TT2OutputState &output, const TeletypeProgramT<Cfg> *program) {
     TT2Command cmd;
     cmd.length = body.length;
@@ -3278,17 +3278,19 @@ static void runStoredCommand(const TT2RuntimeCommand &body, TT2RuntimeT<Cfg> &ru
         cmd.tag[k] = body.tag[k];
         cmd.value[k] = body.value[k];
     }
-    evaluateCommand(cmd, runtime, output, program);
+    return evaluateCommand(cmd, runtime, output, program).error;
 }
 
-// S.ALL — run every stacked command (most-recent first), then clear.
+// S.ALL — run every stacked command (most-recent first), then clear. Stops and
+// surfaces the first error (e.g. BudgetExceeded) instead of swallowing it.
 template<typename Cfg>
 static void opSAll(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
                    const TeletypeProgramT<Cfg> *program, int16_t *, uint8_t &, bool,
-                   TT2EvalError &) {
+                   TT2EvalError &error) {
     uint8_t n = runtime.stack.top;
     for (uint8_t i = 0; i < n; ++i) {
-        runStoredCommand(runtime.stack.commands[n - 1 - i], runtime, output, program);
+        TT2EvalError e = runStoredCommand(runtime.stack.commands[n - 1 - i], runtime, output, program);
+        if (e != TT2EvalError::None) { error = e; break; }
     }
     runtime.stack.top = 0;
 }
@@ -3297,10 +3299,11 @@ static void opSAll(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
 template<typename Cfg>
 static void opSPop(TT2RuntimeT<Cfg> &runtime, TT2OutputState &output,
                    const TeletypeProgramT<Cfg> *program, int16_t *, uint8_t &, bool,
-                   TT2EvalError &) {
+                   TT2EvalError &error) {
     if (runtime.stack.top > 0) {
         runtime.stack.top--;
-        runStoredCommand(runtime.stack.commands[runtime.stack.top], runtime, output, program);
+        TT2EvalError e = runStoredCommand(runtime.stack.commands[runtime.stack.top], runtime, output, program);
+        if (e != TT2EvalError::None) error = e;
     }
 }
 

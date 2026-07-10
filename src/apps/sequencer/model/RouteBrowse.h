@@ -20,13 +20,16 @@ namespace RouteBrowse {
         static const uint8_t pitch[]  = { ParamKey::Scale, ParamKey::RootNote, ParamKey::Transpose,
                                           ParamKey::Octave, ParamKey::SlideTime, ParamKey::Rotate };
         static const uint8_t clock[]  = { ParamKey::Divisor, ParamKey::ClockMultiplier,
-                                          ParamKey::Run, ParamKey::Reset };
+                                          ParamKey::Run, ParamKey::Reset,
+                                          ParamKey::Play, ParamKey::PlayToggle, ParamKey::Record,
+                                          ParamKey::RecordToggle, ParamKey::TapTempo,
+                                          ParamKey::Mute, ParamKey::Fill, ParamKey::FillAmount, ParamKey::Pattern };
         static const uint8_t global[] = { ParamKey::Tempo, ParamKey::Swing, ParamKey::CvRouteScan,
                                           ParamKey::CvRouteRoute, ParamKey::CvOutputRotate, ParamKey::GateOutputRotate };
         const uint8_t *src; int n;
         switch (band) {
         case Band::Pitch:     src = pitch;  n = 6; break;
-        case Band::Clock:     src = clock;  n = 4; break;
+        case Band::Clock:     src = clock;  n = 13; break;
         case Band::Global:    src = global; n = 6; break;
         default:              return 0;
         }
@@ -81,6 +84,10 @@ namespace RouteBrowse {
         case ParamKey::Reset:                    return "Reset";
         case ParamKey::CvOutputRotate:           return "CV Rot";
         case ParamKey::GateOutputRotate:         return "Gate Rot";
+        case ParamKey::FillAmount:               return "Fill Amt";
+        case ParamKey::PlayToggle:               return "Ply Tgl";
+        case ParamKey::RecordToggle:             return "Rec Tgl";
+        case ParamKey::TapTempo:                 return "Tap Tmp";
         default:                                 return nullptr;
         }
     }

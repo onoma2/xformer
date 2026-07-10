@@ -10,6 +10,7 @@
 #include "ProjectVersion.h"
 #include "Routing.h"
 #include "RouteParamKey.h"
+#include "ScaleResolve.h"
 
 #include "core/math/Math.h"
 #include "core/utils/StringBuilder.h"
@@ -320,7 +321,7 @@ public:
 
     // scale selection (-1 = Project scale, 0..N = Track scale)
     int rawScale() const { return int(_scaleGroup.scale) - 1; }
-    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, rawScale(), 0, Scale::Count - 1); }
+    int scale() const { int raw = rawScale(); return raw < 0 ? raw : Routing::routedValueInt(ParamKey::Scale, _trackIndex, raw, 0, Scale::Count - 1); }
     void setScale(int scale) {
         _scaleGroup.scale = clamp(scale, -1, Scale::Count - 1) + 1;
     }
@@ -356,7 +357,7 @@ public:
 
     // root note (0-11: C-B)
     int rawRootNote() const { return int(_scaleGroup.rootNote) - 1; }
-    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, rawRootNote(), 0, 11); }
+    int rootNote() const { int raw = rawRootNote(); return raw < 0 ? raw : Routing::routedValueInt(ParamKey::RootNote, _trackIndex, raw, 0, 11); }
     void setRootNote(int rootNote) {
         _scaleGroup.rootNote = clamp(rootNote, -1, 11) + 1;
     }
@@ -659,7 +660,7 @@ public:
     void setTrackIndex(int trackIndex) { _trackIndex = trackIndex; }
 
     RotatedScaleView selectedScale(int projectScale, int projectRotate) const {
-        int idx    = scale()       < 0 ? projectScale  : scale();
+        int idx    = ScaleResolve::resolveScale(scale(), _trackIndex, projectScale);
         int rotate = scaleRotate() < 0 ? projectRotate : scaleRotate();
         return RotatedScaleView(Scale::get(idx), rotate);
     }

@@ -368,43 +368,10 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
         expectEqual(runtime.variables.cv[0], int16_t(1000), "CV[0] = 1000");
     }
 
-    CASE("unsupported_mod_rejected_before_prefix_side_effects") {
-        TeletypeProgram program = {};
-        init(program);
-        writeLine(program.scripts[0], 0, "W CV 1 100: B 2");
-        program.scripts[0].length = 1;
-
-        TT2Runtime runtime = {};
-        init(runtime);
-        TT2OutputState output = {};
-        init(output);
-
-        auto result = runScript(program, runtime, output, 0);
-        expectEqual(int(result.error), int(TT2EvalError::UnsupportedMod),
-                    "W rejected");
-        expectEqual(runtime.variables.cv[0], int16_t(0),
-                    "CV[0] not set by prefix");
-        expectEqual(runtime.variables.b, int16_t(2),
-                    "B not set by body");
-    }
-
-    CASE("unsupported_mod_rejected_before_body_side_effects") {
-        TeletypeProgram program = {};
-        init(program);
-        writeLine(program.scripts[0], 0, "W 1: B 2");
-        program.scripts[0].length = 1;
-
-        TT2Runtime runtime = {};
-        init(runtime);
-        TT2OutputState output = {};
-        init(output);
-
-        auto result = runScript(program, runtime, output, 0);
-        expectEqual(int(result.error), int(TT2EvalError::UnsupportedMod),
-                    "W rejected");
-        expectEqual(runtime.variables.b, int16_t(2),
-                    "B not set by body");
-    }
+    // (Removed two "unsupported_mod_rejected_*" cases that used W as the example
+    // unsupported mod — W is now implemented, and all 18 mods are supported, so
+    // no parseable mod reaches the UnsupportedMod guard. W coverage lives in
+    // TestTeletypeV2Mods.cpp.)
 
     CASE("if_empty_prefix_invalid_arity") {
         TeletypeProgram program = {};

@@ -71,7 +71,7 @@ inline void paintGlyph5x5(Canvas &canvas, int x, int y, const uint8_t pattern[5]
 }
 
 // PITCH scope — label column (left) + trace zone (right).
-static constexpr int PitchLabelColW = 22;
+static constexpr int PitchLabelColW = 24;
 
 inline float pitchRangeToOctaves_local(PhaseFluxSequence::PitchRangeType v) {
     switch (v) {
@@ -1166,7 +1166,11 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
     const int transpose = phaseFluxTrack().transpose();
     const float rangeOctaves = pitchRangeToOctaves_local(stage.pitchRange());
     const int rangeDegrees = std::max(1, int(std::round(rangeOctaves * scale.notesPerOctave())));
-    const int baseDegree = stage.basePitch() + octave * scale.notesPerOctave() + transpose;
+    // Note-accum offset (mirrors engine baseDegree) so labels track the played pitch.
+    const auto &noteCfg = seq.noteAccumConfig();
+    const int noteCounterIdx = (noteCfg.scope() == AccumulatorConfig::Scope::Local) ? stageIdx : 0;
+    const int noteAccOffset = te ? te->noteAccumCounter(noteCounterIdx) : 0;
+    const int baseDegree = stage.basePitch() + noteAccOffset + octave * scale.notesPerOctave() + transpose;
 
     // §6.2.1 MaskM/TiltM filter — mirrors PhaseFluxTrackEngine.cpp. Returns
     // true if the absolute degree survives the centrality threshold.
@@ -1253,34 +1257,49 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
     };
 
     const int loOff = loBin - kHistBias, hiOff = hiBin - kHistBias, dwOff = dwBin - kHistBias;
-    const int blLo = clampBaseline(yForOffset(loOff) + 2);   // bottom edge
-    const int blHi = clampBaseline(yForOffset(hiOff) + 2);   // top edge
-    int blDw;
-    if (dwOff == loOff)      blDw = blLo;
-    else if (dwOff == hiOff) blDw = blHi;
-    else {
-        blDw = clampBaseline(yForOffset(dwOff) + 2);
-        if (blDw > blLo - 7) blDw = blLo - 7;   // keep above the low label
-        if (blDw < blHi + 7) blDw = blHi + 7;   // keep below the high label
-    }
 
-    // Span pool — plain labels (low / dwelt / high).
-    if (dwOff != loOff) drawNoteAt(loOff, blLo, false);
-    if (dwOff != hiOff) drawNoteAt(hiOff, blHi, false);
-    drawNoteAt(dwOff, blDw, false);
-
-    // Live current note — inverted box, follows the playhead (original behavior).
+    // Collect the labels to draw (low / dwell / high span + live current
+    // note), dedup by degree, then spread vertically so a narrow reachable
+    // span or the moving current note never stacks names on top of each other.
+    struct Label { int off; int bl; bool highlight; };
+    Label labels[4];
+    int nLabels = 0;
+    auto addLabel = [&](int off, bool highlight) {
+        for (int i = 0; i < nLabels; ++i)
+            if (labels[i].off == off) { labels[i].highlight |= highlight; return; }
+        labels[nLabels++] = { off, yForOffset(off) + 2, highlight };
+    };
+    addLabel(dwOff, false);
+    if (hiOff != dwOff) addLabel(hiOff, false);
+    if (loOff != dwOff) addLabel(loOff, false);
     if (isActiveCell && stagePhase >= 0.f) {
         float pf = evalPitchFull(stage, stagePhase, pitchRep, pitchWindowType);
         int curOff = int(std::round(directionOffset(stage.pitchDirection(), pf, rangeDegrees)));
-        if (passesMelodyMask(baseDegree + curOff)) {
-            int blCur = (curOff == dwOff) ? blDw
-                      : (curOff == loOff) ? blLo
-                      : (curOff == hiOff) ? blHi
-                      : clampBaseline(yForOffset(curOff) + 2);
-            drawNoteAt(curOff, blCur, true);
-        }
+        if (passesMelodyMask(baseDegree + curOff)) addLabel(curOff, true);
     }
+
+    // Sort top -> bottom by pitch baseline, then clamp + enforce a 7px gap;
+    // if the stack overran the bottom, shift the whole column up.
+    for (int i = 1; i < nLabels; ++i) {
+        Label key = labels[i];
+        int j = i - 1;
+        while (j >= 0 && labels[j].bl > key.bl) { labels[j + 1] = labels[j]; --j; }
+        labels[j + 1] = key;
+    }
+    const int kLabelGap = 7;
+    const int blBot = y + ScopeH - 2;
+    for (int i = 0; i < nLabels; ++i) {
+        labels[i].bl = clampBaseline(labels[i].bl);
+        if (i > 0 && labels[i].bl < labels[i - 1].bl + kLabelGap)
+            labels[i].bl = labels[i - 1].bl + kLabelGap;
+    }
+    if (nLabels > 0 && labels[nLabels - 1].bl > blBot) {
+        const int shift = labels[nLabels - 1].bl - blBot;
+        for (int i = 0; i < nLabels; ++i) labels[i].bl -= shift;
+    }
+
+    for (int i = 0; i < nLabels; ++i)
+        drawNoteAt(labels[i].off, labels[i].bl, labels[i].highlight);
 }
 
 void PhaseFluxEditPage::drawMacroScope(Canvas &canvas) {

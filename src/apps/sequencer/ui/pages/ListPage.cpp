@@ -385,6 +385,16 @@ bool ListPage::modulatedRow(int row, int &routeIndex) const {
 
     int trackIndex = _project.selectedTrackIndex();
     const auto &routing = _project.routing();
+
+    // An active mod edit owns this row through the draft. During an extend the
+    // added track lives only in the draft until commit, so live membership would
+    // hide the CANCEL/COMMIT footer — recognise the draft's route here.
+    if (gModEditActive && gModEditOwner == this && gModDraft.routeIndex >= 0 &&
+        gModDraft.route.target() == target) {
+        routeIndex = gModDraft.routeIndex;
+        return true;
+    }
+
     if (!RouteDraft::isTrackModulated(routing, target, trackIndex)) {
         return false;
     }
@@ -397,13 +407,11 @@ void ListPage::beginNewModulation(Routing::Target target, int trackIndex) {
     auto &routing = _project.routing();
     int existing = RouteDraft::findRouteForTarget(routing, target);
     if (existing >= 0 && Routing::isPerTrackTarget(target)) {
-        // EXTEND the param's single route: add this track to the LIVE route (membership is a live
-        // op, like MOD-), inheriting the route's shared source. Depth defaults 0, or full for inlets
-        // (base-0 sinks). Then open depth edit (draft) so the edit gates see it modulated.
-        auto &route = routing.route(existing);
-        route.setTracks(route.tracks() | (1 << trackIndex));
-        route.setDepthPct(trackIndex, Routing::isInletTarget(target) ? 100 : 0);
-        gModDraft = RouteDraft::begin(routing, existing);
+        // EXTEND the param's single route: stage the added track in the draft
+        // (live route untouched until commit, so CANCEL reverts), inheriting the
+        // route's shared source. Depth defaults 0, or full for inlets (base-0
+        // sinks). Then open depth edit; the edit reads/writes the draft.
+        gModDraft = RouteDraft::extend(routing, existing, target, trackIndex);
         gModEditActive = true;
         gModEditOwner = this;
         gModEditTarget = ModEditTarget::Depth;

@@ -205,13 +205,19 @@ void RoutingEngine::updateSinks() {
         const auto &route = _routing.route(routeIndex);
         auto &routeState = _routeStates[routeIndex];
 
-        bool routeChanged = route.target() != routeState.target || route.tracks() != routeState.tracks;
+        bool routeChanged = route.target() != routeState.target || route.tracks() != routeState.tracks ||
+                            route.source() != routeState.source;
 
         if (routeChanged) {
             // disable previous routing
             Routing::setRouted(routeState.target, routeState.tracks, false);
             // re-arm trigger edge state (Reset / PlayToggle / RecordToggle / TapTempo)
             routeState.gateMask = 0;
+            // A slot switched TO MIDI keeps its stale source value otherwise:
+            // updateSources() skips MIDI (set only in receiveMidi), so clear it here.
+            if (route.source() == Routing::Source::Midi) {
+                _sourceValues[routeIndex] = 0.f;
+            }
         }
 
         if (route.active()) {
@@ -253,6 +259,20 @@ void RoutingEngine::updateSinks() {
                     _cvRotateMask = route.tracks();
                     _cvRotateAmount = gateRotationFromSource(_sourceValues[routeIndex], route.depthPct(firstMaskedSlot(route.tracks())), route.combine());
                 }
+            } else if (Routing::isPlayStateTarget(target)) {
+                // Per-track PlayState (Mute/Fill/FillAmount/Pattern): level-driven,
+                // no rising edge, whole-mask, idempotent (writeRouted equality-guards).
+                // Raw source -> per-target int, like Run/Reset (no depth/shaper).
+                float src = clamp(_sourceValues[routeIndex], 0.f, 1.f);
+                int intValue = 0;
+                switch (target) {
+                case Routing::Target::Mute:
+                case Routing::Target::Fill:       intValue = src >= 0.5f ? 1 : 0; break;
+                case Routing::Target::FillAmount: intValue = int(src * 100.f + 0.5f); break;
+                case Routing::Target::Pattern:    intValue = int(src * float(CONFIG_PATTERN_COUNT - 1) + 0.5f); break;
+                default: break;
+                }
+                _project.playState().writeRouted(target, route.tracks(), intValue, 0.f);
             } else if (Routing::isPerTrackTarget(target)) {
                 uint8_t tracks = route.tracks();
                 for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
@@ -311,6 +331,7 @@ void RoutingEngine::updateSinks() {
             // save state
             routeState.target = route.target();
             routeState.tracks = route.tracks();
+            routeState.source = route.source();
         }
     }
 }

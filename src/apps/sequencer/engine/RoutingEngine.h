@@ -38,6 +38,7 @@ public:
     struct RouteState {
         Routing::Target target = Routing::Target::None;
         uint8_t tracks = 0;
+        Routing::Source source = Routing::Source::None;
 
         // Rising-edge state for Trigger-kind targets: one "was high" bit per
         // track (bit 0 for global triggers). Unifies the former per-target

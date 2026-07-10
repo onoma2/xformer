@@ -333,7 +333,7 @@ CASE("Tuesday scale: Default(-1) preserved unrouted, clamps to 0..23 under route
     expectEqual(seq.scale(), -1, "Default passes through when no override");
 
     Routing::writeRouteOverride(ParamKey::Scale, 0, 5.f);
-    expectEqual(seq.scale(), 4, "under route effective = clamp(base(-1) + delta(5), 0, 23)");
+    expectEqual(seq.scale(), -1, "Default preserved under a route; delta resolves at selectedScale (3.1)");
 
     seq.setScale(20);
     Routing::writeRouteOverride(ParamKey::Scale, 0, 10.f);
@@ -453,7 +453,7 @@ CASE("Stochastic scale: Default(-1) preserved unrouted, clamps to 0..23 under ro
     expectEqual(seq.scale(), -1, "Default passes through when no override");
 
     Routing::writeRouteOverride(ParamKey::Scale, 0, 5.f);
-    expectEqual(seq.scale(), 4, "under route effective = clamp(base(-1) + delta(5), 0, 23)");
+    expectEqual(seq.scale(), -1, "Default preserved under a route; delta resolves at selectedScale (3.1)");
 
     seq.setScale(20);
     Routing::writeRouteOverride(ParamKey::Scale, 0, 10.f);
@@ -560,7 +560,7 @@ CASE("Indexed scale: Default(-1) preserved unrouted, clamps to 0..23 under route
     expectEqual(seq.scale(), -1, "Default passes through when no override");
 
     Routing::writeRouteOverride(ParamKey::Scale, 0, 5.f);
-    expectEqual(seq.scale(), 4, "under route effective = clamp(base(-1) + delta(5), 0, 23)");
+    expectEqual(seq.scale(), -1, "Default preserved under a route; delta resolves at selectedScale (3.1)");
 
     seq.setScale(20);
     Routing::writeRouteOverride(ParamKey::Scale, 0, 10.f);

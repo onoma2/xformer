@@ -170,37 +170,42 @@ def draw_pitch_scope_redesign(canvas: Canvas, stage: Stage, *,
             canvas.set_color(Color.Medium)
             canvas.draw_text(tx, baseline, note_str)
 
-    bl_lo = clamp_baseline(y_for_offset(lo) + 2)   # bottom edge
-    bl_hi = clamp_baseline(y_for_offset(hi) + 2)   # top edge
-    if dw == lo:
-        bl_dw = bl_lo
-    elif dw == hi:
-        bl_dw = bl_hi
-    else:
-        bl_dw = clamp_baseline(y_for_offset(dw) + 2)
-        bl_dw = min(bl_dw, bl_lo - 7)   # keep above the low label
-        bl_dw = max(bl_dw, bl_hi + 7)   # keep below the high label
+    # Collect labels (span lo/dw/hi + live current note), dedup by degree,
+    # then spread vertically with a 7px gap so narrow spans / the moving
+    # current note never stack names on top of each other.
+    labels = []  # [offset, baseline, highlight]
 
-    # span pool — plain labels (low / dwelt / high)
-    if dw != lo:
-        draw_note_at(lo, bl_lo, False)
-    if dw != hi:
-        draw_note_at(hi, bl_hi, False)
-    draw_note_at(dw, bl_dw, False)
+    def add_label(off, highlight):
+        for L in labels:
+            if L[0] == off:
+                L[2] = L[2] or highlight
+                return
+        labels.append([off, y_for_offset(off) + 2, highlight])
 
-    # live current note — inverted box, follows the playhead (original behavior)
+    add_label(dw, False)
+    if hi != dw:
+        add_label(hi, False)
+    if lo != dw:
+        add_label(lo, False)
     if selected_is_active:
         cur = current_degree(stage, stage_phase, range_degrees, direction)
         if cur in counts:
-            if cur == dw:
-                bl_cur = bl_dw
-            elif cur == lo:
-                bl_cur = bl_lo
-            elif cur == hi:
-                bl_cur = bl_hi
-            else:
-                bl_cur = clamp_baseline(y_for_offset(cur) + 2)
-            draw_note_at(cur, bl_cur, True)
+            add_label(cur, True)
+
+    labels.sort(key=lambda L: L[1])
+    LABEL_GAP = 7
+    bl_bot = y + h - 2
+    for i, L in enumerate(labels):
+        L[1] = clamp_baseline(L[1])
+        if i > 0 and L[1] < labels[i - 1][1] + LABEL_GAP:
+            L[1] = labels[i - 1][1] + LABEL_GAP
+    if labels and labels[-1][1] > bl_bot:
+        shift = labels[-1][1] - bl_bot
+        for L in labels:
+            L[1] -= shift
+
+    for off, baseline, highlight in labels:
+        draw_note_at(off, baseline, highlight)
 
 
 def render_pitch_scope_redesign(canvas: Canvas, stages, *,

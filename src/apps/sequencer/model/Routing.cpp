@@ -187,35 +187,6 @@ int Routing::findRoute(Target target, int trackIndex) const {
     return -1;
 }
 
-int Routing::checkRouteConflict(const Route &editedRoute, const Route &existingRoute) const {
-    for (size_t i = 0; i < _routes.size(); ++i) {
-        const auto &route = _routes[i];
-        // skip inactive routes and the one we're currently editing
-        if (!route.active() || &route == &existingRoute) {
-            continue;
-        }
-        // reject routes with mutually exclusive targets
-        if ((route.target() == Target::Play && editedRoute.target() == Target::PlayToggle) ||
-            (route.target() == Target::PlayToggle && editedRoute.target() == Target::Play) ||
-            (route.target() == Target::Record && editedRoute.target() == Target::RecordToggle) ||
-            (route.target() == Target::RecordToggle && editedRoute.target() == Target::Record)) {
-            return i;
-        }
-        // reject routes with same target
-        if (route.target() == editedRoute.target()) {
-            if (isPerTrackTarget(route.target())) {
-                if ((route.tracks() & editedRoute.tracks()) != 0) {
-                    return i;
-                }
-            } else {
-                return i;
-            }
-        }
-    }
-
-    return -1;
-}
-
 void Routing::writeTarget(Target target, uint8_t tracks, float normalized) {
     float floatValue = denormalizeTargetValue(target, normalized);
     int intValue = std::round(floatValue);

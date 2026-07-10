@@ -32,6 +32,8 @@ void Clock::setListener(Listener *listener) {
 }
 
 void Clock::setMode(Mode mode) {
+    os::InterruptLock lock;
+
     if (mode != _mode) {
         if (mode == Mode::Master && _state == State::SlaveRunning) {
             slaveStop(_activeSlave);
@@ -331,7 +333,7 @@ void Clock::onClockTimerTick() {
     case State::SlaveRunning: {
         _elapsedUs += _timer.period();
 
-        if (_slaveSubTicksPending > 0 && _elapsedUs >= _nextSlaveSubTickUs) {
+        if (_slaveSubTicksPending > 0 && slaveSubTickDue(_elapsedUs, _nextSlaveSubTickUs)) {
             outputTick(_tick);
             ++_tick;
             --_slaveSubTicksPending;
@@ -435,7 +437,10 @@ void Clock::outputTick(uint32_t tick) {
         // Minimum 1ms pulse width to avoid glitches at high BPM / low pulse settings
         uint32_t periodUs = tickPeriodUs();
         uint32_t minTicks = periodUs > 0 ? std::max(uint32_t(1), 1000u / periodUs) : 1;
-        uint32_t clockDuration = std::max(minTicks, uint32_t(_masterBpm * _ppqn * _output.pulse / (60 * 1000)));
+        // _slaveBpm is 0 until the first slave period is measured; fall back to the
+        // master tempo so the first slaved pulse isn't collapsed to minTicks.
+        float pulseBpm = bpm() > 0.f ? bpm() : _masterBpm;
+        uint32_t clockDuration = clockPulseTicks(pulseBpm, _ppqn, _output.pulse, minTicks);
 
         _output.nextTickOn = applySwing(_output.nextTick);
         _output.nextTickOff = std::min(_output.nextTickOn + clockDuration, applySwing(_output.nextTick + divisor) - 1);

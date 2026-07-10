@@ -165,7 +165,7 @@ void RoutingPage::encoder(EncoderEvent &event) {
             int n = tabParams(_tabEditorTab, keys, 16);
             paramKey = (n > 0) ? keys[clamp(_tabEditorRow, 0, n - 1)] : 0;
         }
-        bool global = Routing::isProjectTarget(RouteBrowse::paramKeyToTarget(paramKey));
+        bool global = !Routing::isPerTrackTarget(RouteBrowse::paramKeyToTarget(paramKey));
         if (tabCellEligible(track, paramKey)) {   // only eligible cells are editable
             int slot = global ? 0 : _tabCol;
             int newDepth = clamp(_matrixDraft.route.depthPct(slot) + event.value(), -100, 100);
@@ -450,7 +450,8 @@ static bool tabCellEligible(const Track &track, uint8_t paramKey) {
     // Output/transport shell targets apply to any track regardless of engine mode — they
     // aren't migrated param-table params, so the overrideParam() gate would wrongly reject them.
     if (target == Routing::Target::Run || target == Routing::Target::Reset ||
-        target == Routing::Target::CvOutputRotate || target == Routing::Target::GateOutputRotate) {
+        target == Routing::Target::CvOutputRotate || target == Routing::Target::GateOutputRotate ||
+        Routing::isEngineTarget(target)) {   // Play/PlayToggle/Record/RecordToggle/TapTempo
         return true;
     }
     uint8_t key; RouteParam::Range range;
@@ -475,7 +476,8 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     canvas.setColor(Color::Bright);
     canvas.drawText(2, 7, tabName(_tabEditorTab));
     canvas.setColor(Color::Medium);
-    const char *viewTag = _matrixView == MatrixView::Source ? "SOURCE"
+    bool cursorTrigger = Routing::isTriggerTarget(RouteBrowse::paramKeyToTarget(cursorKey));
+    const char *viewTag = (cursorTrigger || _matrixView == MatrixView::Source) ? "SOURCE"
                         : _matrixView == MatrixView::Scale ? "SCALE"
                         : _matrixView == MatrixView::Shaper ? "SHAPER" : "DEPTH";
     canvas.drawText((CONFIG_LCD_WIDTH - canvas.textWidth(viewTag)) / 2, 7, viewTag);
@@ -538,7 +540,11 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
         uint8_t key = keys[r];
         bool cursorRowSel = r == cursorRow;
         bool draftRow = _matrixEditActive && r == _matrixEditRow;
-        bool globalKey = Routing::isProjectTarget(RouteBrowse::paramKeyToTarget(key));
+        bool globalKey = !Routing::isPerTrackTarget(RouteBrowse::paramKeyToTarget(key));
+        // Trigger rows (Run/Reset/transport) ignore depth/scale/shaper — always render
+        // them SOURCE-style regardless of the page view.
+        bool triggerRow = Routing::isTriggerTarget(RouteBrowse::paramKeyToTarget(key));
+        MatrixView rowView = triggerRow ? MatrixView::Source : _matrixView;
         canvas.setColor(cursorRowSel ? Color::Bright : Color::Medium);
         drawClippedName(canvas, 2, y + 6, nameW - 2, tabParamName(_tabEditorTab, key));
         // SOURCE view paints the row's single source on EVERY eligible cell (one source per row);
@@ -574,7 +580,7 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
                 canvas.drawText(cx - 2, y + 6, "-");
                 continue;
             }
-            if (_matrixView == MatrixView::Source) {
+            if (rowView == MatrixView::Source) {
                 FixedStringBuilder<6> txt;
                 if (rowHasRoute) {
                     Routing::printSourceAbbrev(rowSource, txt);
@@ -585,7 +591,7 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
                 canvas.drawText(cx - canvas.textWidth(txt) / 2, y + 6, txt);
                 continue;
             }
-            if (_matrixView == MatrixView::Scale) {   // row's scaleSource on every eligible cell
+            if (rowView == MatrixView::Scale) {   // row's scaleSource on every eligible cell
                 FixedStringBuilder<6> txt;
                 if (rowHasRoute && rowScale != Routing::Source::None) {
                     Routing::printSourceAbbrev(rowScale, txt);
@@ -596,7 +602,7 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
                 canvas.drawText(cx - canvas.textWidth(txt) / 2, y + 6, txt);
                 continue;
             }
-            if (_matrixView == MatrixView::Shaper) {   // row's shaper on every eligible cell
+            if (rowView == MatrixView::Shaper) {   // row's shaper on every eligible cell
                 FixedStringBuilder<6> txt;
                 if (rowHasRoute) {
                     txt(shaperToken(rowShaper));
@@ -639,7 +645,7 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     // the cursor column's engine (the group a Shift+T on this column would toggle).
     // Per-track bands only; global rows have no per-track membership.
     bool cursorVisible = n > 0 && cursorRow >= scroll && cursorRow < scroll + visible;
-    if (cursorVisible && !Routing::isProjectTarget(RouteBrowse::paramKeyToTarget(cursorKey))) {
+    if (cursorVisible && Routing::isPerTrackTarget(RouteBrowse::paramKeyToTarget(cursorKey))) {
         Track::TrackMode cursorMode = _project.track(cursorCol).trackMode();
         int uy = top + (cursorRow - scroll) * rowH + 7;
         canvas.setColor(Color::Low);
@@ -681,7 +687,7 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
             uint8_t keys[16];
             int en = tabParams(_tabEditorTab, keys, 16);
             uint8_t editKey = (en > 0) ? keys[clamp(_matrixEditRow, 0, en - 1)] : 0;
-            if (!Routing::isProjectTarget(RouteBrowse::paramKeyToTarget(editKey))) {
+            if (Routing::isPerTrackTarget(RouteBrowse::paramKeyToTarget(editKey))) {
                 int srcDepth = _matrixDraft.route.depthPct(_tabCol);
                 Track::TrackMode groupMode = _project.track(tn).trackMode();
                 for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
@@ -724,12 +730,20 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
                 matrixEnterEdit();
             }
             break;
-        case Function::View: // cycle the cell view: source -> depth -> scale -> shaper
+        case Function::View: { // cycle the cell view: source -> depth -> scale -> shaper
+            uint8_t vkeys[16];
+            int vn = tabParams(_tabEditorTab, vkeys, 16);
+            uint8_t curKey = (vn > 0) ? vkeys[clamp(_tabEditorRow, 0, vn - 1)] : 0;
+            if (Routing::isTriggerTarget(RouteBrowse::paramKeyToTarget(curKey))) {
+                _matrixView = MatrixView::Source;   // trigger rows have only a source
+                break;
+            }
             _matrixView = _matrixView == MatrixView::Source ? MatrixView::Depth
                         : _matrixView == MatrixView::Depth ? MatrixView::Scale
                         : _matrixView == MatrixView::Scale ? MatrixView::Shaper
                         : MatrixView::Source;
             break;
+        }
         case Function::Combine: // toggle Modulate <-> Absolute on the draft
             if (_matrixEditActive) {
                 _matrixDraft.route.setCombine(

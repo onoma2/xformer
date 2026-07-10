@@ -42,6 +42,13 @@ bool UserScale::read(VersionedSerializedReader &reader) {
     reader.read(_mode);
     reader.read(_size);
 
+    // Reject a corrupt/oversized count before the loop — otherwise it writes
+    // past _items (CONFIG_USER_SCALE_SIZE).
+    if (_size > CONFIG_USER_SCALE_SIZE) {
+        clear();
+        return false;
+    }
+
     for (int i = 0; i < _size; ++i) {
         reader.read(_items[i]);
     }

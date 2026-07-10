@@ -88,6 +88,19 @@ public:
         return lastRaw != 0 && candidate >= lastRaw / 2 && candidate <= lastRaw * 2;
     }
 
+    // Has the next slave sub-tick deadline arrived? The microsecond counters are
+    // uint32 and wrap (~71 min), so compare by signed difference, not >=.
+    static bool slaveSubTickDue(uint32_t elapsedUs, uint32_t nextSubTickUs) {
+        return int32_t(elapsedUs - nextSubTickUs) >= 0;
+    }
+
+    // Clock pulse width in ticks from the EFFECTIVE tempo (pass bpm(), which is the
+    // slave tempo while slaved — using the master BPM there gave the wrong width).
+    static uint32_t clockPulseTicks(float bpm, uint32_t ppqn, uint32_t pulse, uint32_t minTicks) {
+        uint32_t ticks = uint32_t(bpm * ppqn * pulse / (60 * 1000));
+        return ticks > minTicks ? ticks : minTicks;
+    }
+
     void slaveConfigure(int slave, int divisor, bool enabled);
     void slaveTick(int slave);
     void slaveStart(int slave);

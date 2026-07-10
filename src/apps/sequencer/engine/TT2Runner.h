@@ -44,6 +44,7 @@ inline TT2EvalResult runScript(const TeletypeProgramT<Cfg> &program,
         }
 
         frame.line_number = line;
+        runtime.loopOps = 0;   // fresh op budget per line (shared by nested loops)
         TT2EvalResult result = evaluateCommand(cmd, runtime, output, &program);
         if (result.error != TT2EvalError::None) {
             runtime.exec.depth--;
@@ -79,6 +80,7 @@ inline int16_t tt2RunFunction(const TeletypeProgramT<Cfg> &program, TT2RuntimeT<
         const TT2Command &cmd = script.commands[line];
         if (cmd.length == 0 || cmd.commented) continue;
         frame.line_number = line;
+        runtime.loopOps = 0;
         TT2EvalResult result = evaluateCommand(cmd, runtime, output, &program);
         if (result.error != TT2EvalError::None) break;
     }
@@ -108,6 +110,7 @@ inline int16_t tt2RunFunctionLine(const TeletypeProgramT<Cfg> &program, TT2Runti
 
     const TT2Command &cmd = script.commands[line];
     if (cmd.length != 0 && !cmd.commented) {
+        runtime.loopOps = 0;
         evaluateCommand(cmd, runtime, output, &program);
     }
 
@@ -162,6 +165,7 @@ inline void tt2AdvanceDelays(const TeletypeProgramT<Cfg> &program, TT2RuntimeT<C
                 cmd.tag[k] = body.tag[k];
                 cmd.value[k] = body.value[k];
             }
+            runtime.loopOps = 0;
             evaluateCommand(cmd, runtime, output, &program);
             --runtime.exec.depth;
         }

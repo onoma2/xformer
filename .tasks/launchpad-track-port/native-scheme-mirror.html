@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launchpad Mini MK1 — native-scheme mirror (interactive)</title>
+<style>
+  :root{
+    --amber:#f0a020; --amberdim:#7a5410;
+    --green:#2ea043; --greendim:#17431f;
+    --red:#e5484d; --off:#262626;
+    --ink:#1a1a1a; --mut:#6b7280; --line:#e5e5e5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#fafafa;color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    line-height:1.5;padding:24px}
+  main{max-width:960px;margin:0 auto}
+  h1{font-size:1.5rem;line-height:1.3;margin:0 0 4px}
+  h2{font-size:1.25rem;line-height:1.3;margin:32px 0 10px;padding-bottom:5px;border-bottom:2px solid var(--line)}
+  .sub{color:var(--mut);margin:0 0 16px}
+  p{margin:8px 0}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.85em;background:#f0f0f0;padding:1px 5px;border-radius:3px}
+  .mut{color:var(--mut)}
+
+  .legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:12px 0 6px;font-size:.9rem}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .sw{width:15px;height:15px;border-radius:3px;display:inline-block;border:1px solid rgba(0,0,0,.15)}
+
+  .lp{display:inline-block;background:#0d0d0d;padding:9px;border-radius:11px}
+  .funcrow{display:grid;grid-template-columns:repeat(8,26px) 32px;gap:5px;margin-bottom:5px}
+  .mid{display:flex;gap:5px;align-items:flex-start}
+  .scenecol{display:grid;grid-auto-rows:26px;gap:5px}
+  .gr{display:grid;grid-template-columns:repeat(8,26px);grid-auto-rows:26px;gap:5px}
+  .p{width:26px;height:26px;border-radius:4px;background:var(--off);transition:background .12s}
+  .a{background:var(--amber)}.ad{background:var(--amberdim)}
+  .g{background:var(--green)}.gd{background:var(--greendim)}
+  .r{background:var(--red);box-shadow:0 0 6px 1px rgba(229,72,77,.7)}
+  .o{background:var(--off)}
+  .rnd{width:26px;height:26px;border-radius:50%;background:var(--amberdim);
+    display:flex;align-items:center;justify-content:center;color:#ffe;font-size:.48rem;
+    font-weight:700;text-align:center;line-height:1;padding:1px;font-family:ui-monospace,Menlo,monospace}
+  .rnd.lit{background:var(--amber);color:#3a2600}
+  .rnd.sp{background:transparent}
+  .rnd.gr8{background:var(--green);color:#052e10}
+
+  .fam{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;
+    border:1px solid var(--line);border-left:4px solid var(--amber);background:#fff;
+    border-radius:6px;padding:14px 16px;margin:14px 0}
+  .fam .body{flex:1;min-width:260px}
+  .fam h3{margin:0 0 1px;font-size:1.1rem}
+  .fam .src{font-size:.74rem;color:#7a4a00;font-weight:700;margin:0 0 8px;text-transform:uppercase;letter-spacing:.03em}
+  .fam .key{font-size:.85rem;margin:4px 0}
+  .fam .key ul{margin:3px 0;padding-left:0;list-style:none}
+  .fam .key li{margin:2px 0;display:flex;gap:8px;align-items:baseline}
+  .fam .key .zc{width:12px;height:12px;border-radius:3px;flex:none;position:relative;top:2px}
+  .fam .stay{font-size:.8rem;color:var(--mut);margin-top:6px}
+  .fam .stay b{color:#8a1c1f}
+
+  .banner{background:#111;color:#f3ede2;border-radius:8px;padding:14px 16px;margin:10px 0 4px;font-size:.92rem}
+  .banner b{color:var(--amber)}
+  .callout{border:1px solid #f0c9c9;background:#fdf3f3;border-left:4px solid var(--red);
+    border-radius:6px;padding:10px 14px;margin:10px 0;font-size:.9rem}
+  .callout b{color:#8a1c1f}
+
+  .tabs{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 6px}
+  .tab{font-size:.66rem;font-weight:700;padding:4px 9px;border-radius:5px;background:#efe6d6;color:#7a4a00;
+    border:1px solid #e0d0b4;cursor:pointer;font-family:inherit;line-height:1}
+  .tab:hover{background:#e6d6bd}
+  .tab.cur{background:var(--amber);color:#3a2600;border-color:var(--amber)}
+  .pgnote{font-size:.72rem;color:var(--mut);margin:0 0 8px}
+</style>
+</head>
+<body>
+<main>
+
+<h1>Launchpad Mini MK1 — mirror each engine's native scheme</h1>
+<p class="sub">Interactive: <b>click a page tab</b> to repaint that track's grid. The pads carry each engine's own control language; the encoder + OLED stay the editor.</p>
+
+<div class="legend">
+  <span><i class="sw" style="background:var(--green)"></i> green — up / select / action</span>
+  <span><i class="sw" style="background:var(--amber)"></i> amber — down / value readout</span>
+  <span><i class="sw" style="background:var(--red)"></i> red — playhead / cursor</span>
+  <span><i class="sw" style="background:var(--off)"></i> off</span>
+</div>
+
+<div class="banner">Every track is <b>multi-page</b> — the pads only ever show one page. Note/Curve page through <b>layers</b>; the engine tracks page through param-slots / sub-pages / topics. Click the tabs below to page through them.</div>
+
+<h2>The shared core — what the pads can and can't carry</h2>
+<div class="lp">
+  <div class="funcrow">
+    <div class="rnd lit">F1</div><div class="rnd lit">F2</div><div class="rnd lit">F3</div><div class="rnd lit">F4</div>
+    <div class="rnd lit">NEXT</div><div class="rnd lit">◄</div><div class="rnd lit">►</div><div class="rnd lit">·</div>
+    <div class="rnd sp"></div>
+  </div>
+  <div class="mid">
+    <div class="gr" id="core-grid"></div>
+    <div class="scenecol">
+      <div class="rnd gr8">T1</div><div class="rnd gr8">T2</div><div class="rnd gr8">T3</div><div class="rnd gr8">T4</div>
+      <div class="rnd gr8">T5</div><div class="rnd gr8">T6</div><div class="rnd gr8">T7</div><div class="rnd gr8">T8</div>
+    </div>
+  </div>
+</div>
+<p style="margin-top:10px;font-size:.9rem"><b>Carried by the pads:</b> engine F1–F5 slot-select + page cycle (top row) · prev/next (◄ ►) · the 8×8 as the engine's step-shortcut layer · scene column = the 8 tracks.</p>
+<div class="callout"><b>Not on the Launchpad:</b> the <b>encoder</b> (continuous values) and the <b>OLED param fields</b> (the extensive params) — half of each engine's scheme, staying on the panel. The pads mirror the shortcut / nav / select layer and read values back, but don't set them precisely.</div>
+
+<h2>Per-engine native mirror — click a tab to page</h2>
+
+<!-- NOTE -->
+<div class="fam">
+  <div class="lp"><div class="gr" id="note-grid"></div></div>
+  <div class="body">
+    <h3>Note · Curve · Indexed — a stack of layer-pages</h3>
+    <p class="src">semantic step grid, paged by F-keys — Note ≈ 19 layers, Curve 7, Indexed 3+</p>
+    <div class="tabs" data-track="note"></div>
+    <p class="pgnote">each layer is a full-height page; F1–F5 (+ re-press for sub-layers) page through all of them. CIRCUIT is the one added page (vinx B1) for live note entry.</p>
+    <p class="stay">Steps mean steps here — mirror is 1:1. <b>Encoder</b> does the fine per-step edit.</p>
+  </div>
+</div>
+
+<!-- TUESDAY -->
+<div class="fam">
+  <div class="lp"><div class="gr" id="tuesday-grid"></div></div>
+  <div class="body">
+    <h3>Tuesday — ± keypad + param-slot pages</h3>
+    <p class="src">mirrors S1–8 up / S9–16 down</p>
+    <div class="tabs" data-track="tuesday"></div>
+    <p class="pgnote">±keypad rows are constant; NEXT cycles the 3 param-slot pages (only the readout changes).</p>
+    <p class="stay">First/Last/RunMode/Fill remap to Reseed/Reset/cycle-algo/Jam. <b>Encoder edits the slot values.</b></p>
+  </div>
+</div>
+
+<!-- FRACTAL -->
+<div class="fam">
+  <div class="lp"><div class="gr" id="fractal-grid"></div></div>
+  <div class="body">
+    <h3>Fractal — 4 sub-pages</h3>
+    <p class="src">mirrors the Trunk/Branch/Ornament/Source sub-pages</p>
+    <div class="tabs" data-track="fractal"></div>
+    <p class="pgnote">NEXT cycles the sub-pages; each has its own pad map (±brackets, queue-jumps, punch, logic modes).</p>
+    <p class="stay"><b>Encoder edits the focused edge / value.</b></p>
+  </div>
+</div>
+
+<!-- DISCRETEMAP -->
+<div class="fam">
+  <div class="lp"><div class="gr" id="discretemap-grid"></div></div>
+  <div class="body">
+    <h3>DiscreteMap — 4 sections + edit modes</h3>
+    <p class="src">top row = select stage, bottom row = cycle direction</p>
+    <div class="tabs" data-track="discretemap"></div>
+    <p class="pgnote">◄► page the 4 sections of 32 stages; encoder-click toggles THRESH / NOTE edit mode.</p>
+    <p class="stay"><b>Encoder edits threshold / note.</b></p>
+  </div>
+</div>
+
+<!-- STOCHASTIC -->
+<div class="fam">
+  <div class="lp"><div class="gr" id="stochastic-grid"></div></div>
+  <div class="body">
+    <h3>Stochastic — 4 mask pages</h3>
+    <p class="src">mirrors the hero-mask model</p>
+    <div class="tabs" data-track="stochastic"></div>
+    <p class="pgnote">NEXT cycles Live/Loop/Pitch/Duration, each its own selection mask + F-keys.</p>
+    <p class="stay"><b>Encoder edits the masked cells' degree / octave / duration.</b></p>
+  </div>
+</div>
+
+<!-- PHASEFLUX -->
+<div class="fam">
+  <div class="lp"><div class="gr" id="phaseflux-grid"></div></div>
+  <div class="body">
+    <h3>PhaseFlux — 16 stages, 5 topics</h3>
+    <p class="src">mirrors the stage grid + topic/slot pages</p>
+    <div class="tabs" data-track="phaseflux"></div>
+    <p class="pgnote">◄► cycle the 5 topics, each with 2–3 slot sub-pages via NEXT.</p>
+    <p class="stay"><b>Encoder edits the slot.</b></p>
+  </div>
+</div>
+
+<!-- TT2 -->
+<div class="fam">
+  <div class="lp"><div class="gr" id="tt2-grid"></div></div>
+  <div class="body">
+    <h3>TT2 — 4 patterns + script</h3>
+    <p class="src">mirrors the pattern-view keypad</p>
+    <div class="tabs" data-track="tt2"></div>
+    <p class="pgnote">F1–4 select the 4 tt-patterns; SCRIPT is the separate text keypad.</p>
+    <p class="stay"><b>Exact int16 values are typed on the panel keypad.</b></p>
+  </div>
+</div>
+
+<p class="mut" style="margin-top:24px;font-size:.82rem">Every pad is a real MK1 LED state: red, green, amber, or off. Click tabs to page. The pads mirror each engine's shortcut / nav / select language; the encoder + OLED remain the editor. Not in firmware — a proposal render.</p>
+
+<script>
+const M={o:'o',a:'a',d:'ad',g:'g',G:'gd',r:'r'};
+function bars(h,ph,ch){let s='';for(let r=0;r<8;r++)for(let c=0;c<8;c++){const lit=(8-r)<=h[c];s+=(c===ph)?(lit?'r':'o'):(lit?ch:'o');}return s;}
+function keypad(h){let s='gggggggg'+'aaaaaaaa'+'oooooooo';for(let r=0;r<5;r++)for(let c=0;c<8;c++)s+=((5-r)<=h[c]?'d':'o');return s;}
+function dm(sel){let s='';for(let c=0;c<8;c++)s+=(c===sel?'r':(c%2?'o':'g'));s+='ggGoggGo';s+='oooooooo';const h=[3,4,2,5,4,2,4,3];for(let r=0;r<5;r++)for(let c=0;c<8;c++)s+=((5-r)<=h[c]?'d':'o');return s;}
+function stoch(seed){let s='';for(let r=0;r<2;r++)for(let c=0;c<8;c++)s+=(c===3?'r':(((r*3+c+seed)%2)?'o':'g'));s+='oooooooo';const h=[3,2,4,1,3,4,2,3];for(let r=0;r<4;r++)for(let c=0;c<8;c++)s+=((4-r)<=h[c]?'d':'o');s+='oooooooo';return s;}
+function pf(cur){let s='';for(let i=0;i<16;i++)s+=(i===cur?'r':(i%5===2?'o':'a'));s+='oooooooo';const h=[3,4,2,3,4,2,4,3];for(let r=0;r<5;r++)for(let c=0;c<8;c++)s+=((5-r)<=h[c]?'d':'o');return s;}
+function pat(ph,seed){let s='';for(let r=0;r<8;r++)for(let c=0;c<8;c++)s+=(c===ph?'r':(((r*7+c*3+seed)%3)===0?'o':'a'));return s;}
+function strip(x){return x.replace(/\s/g,'');}
+
+const G_GATE=strip('oooroooo oooroooo oooroooo oooroooo oooroooo ggorogog ggorogog ggorogog');
+const G_CIRCUIT=strip('aaorooao oooooooo oggooggg gggggggg oggoogrg gggggggg oogooooo dddddddd');
+const F_BRANCH=strip('gggggggg gogoggoo oooooooo dddddddd oooooooo oooooooo oooooooo oooooooo');
+const F_ORN=strip('gggggggg gggggggo oooooooo oooooooo oooooooo oooooooo oooooooo oooooooo');
+const F_SRC=strip('ggggggoo oooooooo oooooooo oooooooo aaaaaaao oooooooo oooooooo oooooooo');
+const TT_SCRIPT=strip('gggggggg gggggggg ggggggoo oooooooo oooooooo oooooooo oooooooo ggggoooo');
+
+const PAGES={
+  core:{cur:0,tabs:[],grids:[strip('oooooooo oooooooo oooooooo oooooooo oooooooo oooooooo oooooooo oooooooo')]},
+  note:{cur:0,tabs:['NOTE','GATE','RETRIG','LENGTH','CIRCUIT'],grids:[
+    bars([5,7,2,6,7,1,4,3],3,'a'), G_GATE, bars([2,3,1,4,3,1,2,4],3,'a'), bars([4,5,6,5,7,6,5,8],3,'a'), G_CIRCUIT]},
+  tuesday:{cur:0,tabs:['±KEYPAD','P1 ALGO','P2 LOOP','P3 GATE'],grids:[
+    keypad([2,4,1,3,4,2,4,3]), keypad([1,3,2,4,1,3,2,2]), keypad([3,2,4,1,2,4,3,1]), keypad([2,2,3,3,4,1,2,4])]},
+  fractal:{cur:0,tabs:['TRUNK','BRANCH','ORNAMENT','SOURCE'],grids:[
+    keypad([2,3,1,1,3,3,1,2]), F_BRANCH, F_ORN, F_SRC]},
+  discretemap:{cur:0,tabs:['SEC 1-8','9-16','17-24','25-32','THRESH','NOTE'],grids:[
+    dm(0), dm(2), dm(4), dm(6), dm(1), dm(5)]},
+  stochastic:{cur:0,tabs:['LIVE','LOOP','PITCH','DURATION'],grids:[stoch(0),stoch(1),stoch(2),stoch(3)]},
+  phaseflux:{cur:0,tabs:['TEMP','PITCH','ACCUM-N','ACCUM-P','MACRO'],grids:[pf(2),pf(6),pf(9),pf(12),pf(4)]},
+  tt2:{cur:0,tabs:['PAT 1','PAT 2','PAT 3','PAT 4','SCRIPT'],grids:[pat(2,0),pat(2,1),pat(2,2),pat(2,3),TT_SCRIPT]}
+};
+
+function paint(id){
+  const t=PAGES[id], g=document.getElementById(id+'-grid');
+  const s=strip(t.grids[t.cur]);
+  g.innerHTML=[...s].map(c=>'<i class="p '+(M[c]||'o')+'"></i>').join('');
+  const strip_el=document.querySelector('[data-track="'+id+'"]');
+  if(strip_el){strip_el.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('cur',i===t.cur));}
+}
+function go(id,i){PAGES[id].cur=i;paint(id);}
+
+Object.keys(PAGES).forEach(id=>{
+  const strip_el=document.querySelector('[data-track="'+id+'"]');
+  if(strip_el){
+    strip_el.innerHTML=PAGES[id].tabs.map((label,i)=>'<button class="tab" onclick="go(\''+id+'\','+i+')">'+label+'</button>').join('');
+  }
+  paint(id);
+});
+</script>
+
+</main>
+</body>
+</html>

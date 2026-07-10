@@ -29,7 +29,14 @@ enum class TT2EvalError : uint8_t {
     OrphanElif,
     DuplicateElse,
     ExecDepthOverflow,
+    BudgetExceeded,
 };
+
+// Per-line body-eval ceiling shared by the iterating mods (L/W/P.MAP/PN.MAP).
+// Frame-safety net so a runaway loop can't starve audio on the ~1 ms engine
+// frame — well above any musical loop, below any runaway. Conservative default;
+// tune against a hardware per-op measurement.
+static constexpr uint32_t TT2_OP_BUDGET = 4096;
 
 // Guarded stack helpers used by the native v2 evaluator and op handlers.
 inline bool pushStack(int16_t *stack, uint8_t &stackSize, int16_t value,
@@ -230,6 +237,19 @@ inline int16_t tt2ClampDelayMs(int32_t ms) {
     return int16_t(ms);
 }
 
+// Scale a DEL.G geometric delay interval by num/denom for the next step, in
+// 64-bit so repeated acceleration can't overflow int32, then saturate into the
+// [1, 32767] delay range. denom 0 leaves the interval unchanged.
+inline int32_t tt2ScaleDelayInterval(int32_t interval, int32_t num, int32_t denom) {
+    if (denom == 0) {
+        return interval;
+    }
+    int64_t scaled = int64_t(interval) * num / denom;
+    if (scaled > 32767) scaled = 32767;
+    if (scaled < 1) scaled = 1;
+    return int32_t(scaled);
+}
+
 // Evaluate one flat TT2Command through the native v2 op table.
 //
 // - Splits the command at SUB_SEP (`;`) into segments, executes left-to-right.
@@ -346,6 +366,18 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                         return lastResult;
                     }
                 }
+            } else if (modValue == E_MOD_OTHER) {
+                // OTHER: body — run the body if the preceding chain conditional
+                // (IF/ELIF/ELSE or EVERY/SKIP) did NOT fire. No prefix. Reads the
+                // shared if_else_condition flag, like ELSE. (upstream mod_OTHER_func)
+                if (!tt2ActiveIfElse(runtime)) {
+                    tt2ActiveIfElse(runtime) = 1;
+                    lastResult = evaluateSegment(cmd, preSepPos + 1, e,
+                                                 runtime, output, program);
+                    if (lastResult.error != TT2EvalError::None) {
+                        return lastResult;
+                    }
+                }
             } else if (modValue == E_MOD_PROB) {
                 // PROB n: body — standalone probability, NOT part of the IF/ELSE
                 // chain (upstream mod_PROB_func never touches if_else_condition).
@@ -402,6 +434,9 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                     bool shouldRun = isSkip
                         ? tt2SkipIsNow(every)
                         : tt2EveryIsNow(every);
+                    // Publish the fire result to the shared chain flag so a
+                    // following OTHER can complement it (upstream EVERY/SKIP).
+                    tt2ActiveIfElse(runtime) = shouldRun ? 1 : 0;
                     if (shouldRun) {
                         lastResult = evaluateSegment(cmd, preSepPos + 1, e,
                                                      runtime, output, program);
@@ -453,6 +488,10 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                             return lastResult;
                         }
                         if (tt2ActiveBreaking(runtime)) break; // BREAK
+                        if (++runtime.loopOps > TT2_OP_BUDGET) {
+                            tt2ActiveBreaking(runtime) = 0;
+                            return {TT2EvalError::BudgetExceeded, 0, 0, 0};
+                        }
                         tt2ActiveI(runtime) += step;
                     }
                 } else {
@@ -463,6 +502,10 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                             return lastResult;
                         }
                         if (tt2ActiveBreaking(runtime)) break; // BREAK
+                        if (++runtime.loopOps > TT2_OP_BUDGET) {
+                            tt2ActiveBreaking(runtime) = 0;
+                            return {TT2EvalError::BudgetExceeded, 0, 0, 0};
+                        }
                         tt2ActiveI(runtime) += step;
                     }
                 }
@@ -475,6 +518,40 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 tt2ActiveBreaking(runtime) = 0;
 
                 // L consumed all remaining segments; return directly.
+                return lastResult;
+            } else if (modValue == E_MOD_W) {
+                // W cond: body — run body while cond (re-evaluated each pass) is
+                // non-zero, capped at 10000 iterations. Honors BREAK; leaves I
+                // alone. Body consumes remaining segments. (upstream mod_W_func)
+                TT2Command bodyCmd = {};
+                uint8_t bodyLen = 0;
+                for (uint8_t pos = preSepPos + 1;
+                     pos < cmd.length && bodyLen < TT2_COMMAND_MAX_LENGTH;
+                     ++pos) {
+                    bodyCmd.tag[bodyLen] = cmd.tag[pos];
+                    bodyCmd.value[bodyLen] = cmd.value[pos];
+                    bodyLen++;
+                }
+                bodyCmd.length = bodyLen;
+
+                for (int32_t iter = 0; iter < 10000; ++iter) {
+                    auto cond = evaluateModPrefix(cmd, s + 1, preSepPos,
+                                                  runtime, output, program);
+                    if (cond.error != TT2EvalError::None) return cond;
+                    if (cond.stackSize != 1) {
+                        return {TT2EvalError::InvalidModArity, 0, 0, 0};
+                    }
+                    if (cond.value == 0) break;
+                    lastResult = evaluateCommand(bodyCmd, runtime,
+                                                 output, program);
+                    if (lastResult.error != TT2EvalError::None) return lastResult;
+                    if (tt2ActiveBreaking(runtime)) break; // BREAK
+                    if (++runtime.loopOps > TT2_OP_BUDGET) {
+                        tt2ActiveBreaking(runtime) = 0;
+                        return {TT2EvalError::BudgetExceeded, 0, 0, 0};
+                    }
+                }
+                tt2ActiveBreaking(runtime) = 0;
                 return lastResult;
             } else if (modValue == E_MOD_DEL) {
                 // DEL n: body — schedule body n ms later, once.
@@ -500,6 +577,9 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 int32_t interval = prefix.underTop; // delay_time
                 if (interval < 1) interval = 1;    // upstream clamps the operand
                 for (int16_t k = 1; k <= count; ++k) {
+                    if (++runtime.loopOps > TT2_OP_BUDGET) {
+                        return {TT2EvalError::BudgetExceeded, 0, 0, 0};
+                    }
                     tt2EnqueueDelayBody(cmd, preSepPos, runtime,
                                         tt2ClampDelayMs(int32_t(k) * interval));
                 }
@@ -516,6 +596,9 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 int32_t interval = prefix.underTop; // x
                 if (interval < 1) interval = 1;    // upstream clamps the operand
                 for (int16_t k = 0; k < count; ++k) {
+                    if (++runtime.loopOps > TT2_OP_BUDGET) {
+                        return {TT2EvalError::BudgetExceeded, 0, 0, 0};
+                    }
                     tt2EnqueueDelayBody(cmd, preSepPos, runtime,
                                         tt2ClampDelayMs(1 + int32_t(k) * interval));
                 }
@@ -561,13 +644,14 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 if (interval < 1) interval = 1;
                 int32_t deadline = 1;         // first fires immediately
                 for (int32_t k = 0; k < count; ++k) {
+                    if (++runtime.loopOps > TT2_OP_BUDGET) {
+                        return {TT2EvalError::BudgetExceeded, 0, 0, 0};
+                    }
                     tt2EnqueueDelayBody(cmd, preSepPos, runtime,
                                         tt2ClampDelayMs(deadline));
                     deadline += interval;
                     if (deadline > 32767) deadline = 32767;
-                    if (multDenom != 0) {
-                        interval = (interval * multNum) / multDenom;
-                    }
+                    interval = tt2ScaleDelayInterval(interval, multNum, multDenom);
                 }
                 return {TT2EvalError::None, 0, 0, 0};
             } else if (modValue == E_MOD_S) {
@@ -575,6 +659,54 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 // execution via S.ALL / S.POP. No prefix args. (upstream mod_S)
                 tt2PushStackBody(cmd, preSepPos, runtime);
                 return {TT2EvalError::None, 0, 0, 0};
+            } else if (modValue == E_MOD_P_MAP || modValue == E_MOD_PN_MAP) {
+                // P.MAP: body — map body over the working pattern's [start,end]
+                // window: I = cell, body result written back. PN.MAP x: body —
+                // same on pattern x (prefix arg). (upstream mod_P_MAP/PN_MAP)
+                int16_t pn = runtime.variables.p_n;
+                if (modValue == E_MOD_PN_MAP) {
+                    auto prefix = evaluateModPrefix(cmd, s + 1, preSepPos,
+                                                    runtime, output, program);
+                    if (prefix.error != TT2EvalError::None) return prefix;
+                    if (prefix.stackSize != 1) {
+                        return {TT2EvalError::InvalidModArity, 0, 0, 0};
+                    }
+                    pn = prefix.value;
+                }
+                if (!program) return {TT2EvalError::None, 0, 0, 0};
+                if (pn < 0) pn = 0;
+                if (pn >= Cfg::PatternCount) pn = Cfg::PatternCount - 1;
+
+                TT2Command bodyCmd = {};
+                uint8_t bodyLen = 0;
+                for (uint8_t pos = preSepPos + 1;
+                     pos < cmd.length && bodyLen < TT2_COMMAND_MAX_LENGTH;
+                     ++pos) {
+                    bodyCmd.tag[bodyLen] = cmd.tag[pos];
+                    bodyCmd.value[bodyLen] = cmd.value[pos];
+                    bodyLen++;
+                }
+                bodyCmd.length = bodyLen;
+
+                auto *pat =
+                    &const_cast<TeletypeProgramT<Cfg> *>(program)->patterns[pn];
+                int start = pat->start, end = pat->end;
+                if (start < 0) start = 0;
+                if (end > Cfg::PatternLength - 1) end = Cfg::PatternLength - 1;
+                for (int idx = start; idx <= end; ++idx) {
+                    tt2ActiveI(runtime) = pat->val[idx];
+                    lastResult = evaluateCommand(bodyCmd, runtime,
+                                                 output, program);
+                    if (lastResult.error != TT2EvalError::None) return lastResult;
+                    pat->val[idx] = lastResult.value;
+                    if (tt2ActiveBreaking(runtime)) break; // BREAK
+                    if (++runtime.loopOps > TT2_OP_BUDGET) {
+                        tt2ActiveBreaking(runtime) = 0;
+                        return {TT2EvalError::BudgetExceeded, 0, 0, 0};
+                    }
+                }
+                tt2ActiveBreaking(runtime) = 0;
+                return lastResult;
             } else {
                 // Unsupported mod — reject before prefix side effects.
                 return {TT2EvalError::UnsupportedMod, 0, 0, 0};

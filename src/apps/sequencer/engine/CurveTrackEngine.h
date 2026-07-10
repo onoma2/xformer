@@ -22,6 +22,7 @@ public:
     virtual Track::TrackMode trackMode() const override { return Track::TrackMode::Curve; }
 
     virtual void reset() override;
+    virtual void stop() override { _gateQueue.clear(); _gateTimer = 0; _gateOutput = false; _activity = false; }
     virtual void restart() override;
     virtual TickResult tick(uint32_t tick) override;
     virtual void update(float dt) override;

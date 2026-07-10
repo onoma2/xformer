@@ -144,6 +144,21 @@ void NoteTrackEngine::reset() {
     changePattern();
 }
 
+int NoteTrackEngine::rotatedStepPulseCount(const NoteSequence &sequence, int stateStep,
+                                           int firstStep, int lastStep, int rotate) {
+    int idx = SequenceUtils::rotateStep(stateStep, firstStep, lastStep, rotate);
+    return sequence.step(idx).pulseCount();
+}
+
+void NoteTrackEngine::stop() {
+    // Drop pending gates so a stop mid-gate doesn't leave the gate stuck HIGH
+    // (the clock stops ticking, so the queued gate-off would never fire).
+    _gateQueue.clear();
+    _cvQueue.clear();
+    _gateOutput = false;
+    _activity = false;
+}
+
 void NoteTrackEngine::restart() {
     _lastFreeStepIndex = -1;
     _lastNoteFreeStepIndex = -1;
@@ -190,9 +205,12 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
                     _sequenceState.advanceFree(sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
                     _pulseCounter = 0;
                 } else {
-                    // Check if current step's pulses are complete
-                    int currentStepIndex = _sequenceState.step();
-                    int stepPulseCount = sequence.step(currentStepIndex).pulseCount();
+                    // Check if current step's pulses are complete. Read the pulse
+                    // count from the audible ROTATED step, not the raw state index
+                    // (with rotate != 0 they diverge).
+                    int stepPulseCount = rotatedStepPulseCount(sequence, _sequenceState.step(),
+                                                               sequence.firstStep(), sequence.lastStep(),
+                                                               _noteTrack.rotate());
                     if (_pulseCounter > stepPulseCount) {
                         _pulseCounter = 0;
                         _sequenceState.advanceAligned(relativeTick / divisor, sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);

@@ -32,12 +32,20 @@ struct ParamKey {
         Swing        = 2,
         CvRouteScan  = 3,
         CvRouteRoute = 4,
-        // reserve 5..19: Play/PlayToggle/Record/RecordToggle/TapTempo, BusCv1-4
+        Play         = 5,
+        PlayToggle   = 6,
+        Record       = 7,
+        RecordToggle = 8,
+        TapTempo     = 9,
+        // reserve 10..19: BusCv1-4
 
         // --- Tier 1: universal per-track (20..39) ---
         Divisor         = 20,
         ClockMultiplier = 21,
-        // reserve 22..25: Mute/Fill/FillAmount/Pattern
+        Mute            = 22,
+        Fill            = 23,
+        FillAmount      = 24,
+        Pattern         = 25,
         Run              = 26,
         Reset            = 27,
         CvOutputRotate   = 28,

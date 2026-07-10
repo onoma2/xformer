@@ -53,9 +53,18 @@ namespace RouteResolve {
         case Routing::Target::RootNote:                  return ParamKey::RootNote;
         case Routing::Target::Divisor:                   return ParamKey::Divisor;
         case Routing::Target::ClockMult:                 return ParamKey::ClockMultiplier;
+        case Routing::Target::Mute:                      return ParamKey::Mute;
+        case Routing::Target::Fill:                      return ParamKey::Fill;
+        case Routing::Target::FillAmount:                return ParamKey::FillAmount;
+        case Routing::Target::Pattern:                   return ParamKey::Pattern;
         case Routing::Target::Phase:                     return ParamKey::Phase;
         case Routing::Target::Run:                       return ParamKey::Run;
         case Routing::Target::Reset:                     return ParamKey::Reset;
+        case Routing::Target::Play:                      return ParamKey::Play;
+        case Routing::Target::PlayToggle:                return ParamKey::PlayToggle;
+        case Routing::Target::Record:                    return ParamKey::Record;
+        case Routing::Target::RecordToggle:              return ParamKey::RecordToggle;
+        case Routing::Target::TapTempo:                  return ParamKey::TapTempo;
         case Routing::Target::CvOutputRotate:            return ParamKey::CvOutputRotate;
         case Routing::Target::GateOutputRotate:          return ParamKey::GateOutputRotate;
         case Routing::Target::RunMode:                   return ParamKey::RunMode;

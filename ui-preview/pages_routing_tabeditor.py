@@ -56,7 +56,8 @@ def _tab(canvas, tab, layout, rows, view="depth", cursor_row=0, cursor_col=0,
     canvas.set_color(Color.Bright)
     canvas.draw_text(2, 7, tab)
     canvas.set_color(Color.Medium)
-    vtag = {"source": "SOURCE", "shaper": "SHAPER"}.get(view, "DEPTH")
+    cursor_trigger = rows[cursor_row][0] in ("Run", "Reset", "Play", "Ply Tgl", "Record", "Rec Tgl", "Tap Tmp")
+    vtag = "SOURCE" if cursor_trigger else {"source": "SOURCE", "shaper": "SHAPER"}.get(view, "DEPTH")
     canvas.draw_text((PW - canvas.text_width(vtag)) // 2, 7, vtag)
     sx = PW - canvas.text_width(slots) - 2
     canvas.draw_text(sx, 7, slots)
@@ -99,14 +100,17 @@ def _tab(canvas, tab, layout, rows, view="depth", cursor_row=0, cursor_col=0,
         y = top + vi * rowH
         name, is_global, routed, source, depths, rcombine, shaper = rows[r]
         cursorRowSel = (r == cursor_row)
+        # Trigger rows (Run/Reset/transport) ignore depth/scale/shaper -> always SOURCE-style.
+        trigger = name in ("Run", "Reset", "Play", "Ply Tgl", "Record", "Rec Tgl", "Tap Tmp")
+        row_view = "source" if trigger else view
         canvas.set_color(Color.Bright if cursorRowSel else Color.Medium)
         canvas.draw_text(2, y + 6, _clip(canvas, name, nameW - 2))
         for t in range(8):
             cx = gridL + t * colW + colW // 2
             isCursor = cursorRowSel and t == cursor_col
-            if view == "source":
+            if row_view == "source":
                 txt = source if routed else "."
-            elif view == "shaper":
+            elif row_view == "shaper":
                 txt = (shaper if routed else ".")
             else:
                 if is_global:
@@ -155,6 +159,15 @@ _CLOCK_ROWS = [
     ("Clk Mult", False, False, "",    {},      "MODULATE", "-"),
     ("Run",      False, True,  "G1",  {2: 100}, "ABSOLUTE", "-"),
     ("Reset",    False, False, "",    {},      "MODULATE", "-"),
+    ("Play",     True,  True,  "IN1", {0: 100}, "ABSOLUTE", "-"),
+    ("Ply Tgl",  True,  False, "",    {},      "ABSOLUTE", "-"),
+    ("Record",   True,  False, "",    {},      "ABSOLUTE", "-"),
+    ("Rec Tgl",  True,  False, "",    {},      "ABSOLUTE", "-"),
+    ("Tap Tmp",  True,  True,  "G2",  {0: 100}, "ABSOLUTE", "-"),
+    ("Mute",     False, True,  "IN1", {3: 100}, "ABSOLUTE", "-"),
+    ("Fill",     False, False, "",    {},      "MODULATE", "-"),
+    ("Fill Amt", False, True,  "IN1", {1: 60}, "ABSOLUTE", "-"),
+    ("Pattern",  False, False, "",    {},      "MODULATE", "-"),
 ]
 
 
@@ -163,7 +176,7 @@ def render_routing_tabeditor(canvas):
 
 
 def render_routing_tabeditor_clock(canvas):
-    _tab(canvas, "CLOCK", _LAYOUT, _CLOCK_ROWS, view="depth", cursor_row=2, cursor_col=2, slots="2/16")
+    _tab(canvas, "CLOCK", _LAYOUT, _CLOCK_ROWS, view="depth", cursor_row=4, cursor_col=0, scroll=4, slots="6/16")
 
 
 def render_routing_tabeditor_source(canvas):

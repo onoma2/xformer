@@ -8,6 +8,7 @@
 #include "RotatedScale.h"
 #include "Routing.h"
 #include "RouteParamKey.h"
+#include "ScaleResolve.h"
 #include "Bitfield.h"
 
 #include "core/math/Math.h"
@@ -197,7 +198,7 @@ public:
 
     // Track-scale selection (-1 = Default/Project, 0..N = Track Scale)
     int rawScale() const { return int(_scaleGroup.scale) - 1; }
-    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, rawScale(), 0, Scale::Count - 1); }
+    int scale() const { int raw = rawScale(); return raw < 0 ? raw : Routing::routedValueInt(ParamKey::Scale, _trackIndex, raw, 0, Scale::Count - 1); }
     void setScale(int scale) {
         _scaleGroup.scale = clamp(scale, -1, Scale::Count - 1) + 1;
     }
@@ -373,7 +374,7 @@ public:
 
     void setTrackIndex(int trackIndex) { _trackIndex = trackIndex; }
     RotatedScaleView selectedScale(int projectScale, int projectRotate) const {
-        int idx    = scale()       < 0 ? projectScale  : scale();
+        int idx    = ScaleResolve::resolveScale(scale(), _trackIndex, projectScale);
         int rotate = scaleRotate() < 0 ? projectRotate : scaleRotate();
         return RotatedScaleView(Scale::get(idx), rotate);
     }

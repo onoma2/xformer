@@ -1654,9 +1654,8 @@ float TuesdayTrackEngine::scaleToVolts(int noteIndex, int octave) const {
     // 1. Resolve which Scale to use (track override falls back to project, rotation applied)
     const auto scale = sequence.selectedScale(project.scale(), project.scaleRotate());
 
-    // 2. Resolve Root Note
-    int trackRoot = sequence.rootNote();
-    int rootNote = (trackRoot < 0) ? project.rootNote() : trackRoot;
+    // 2. Resolve Root Note (Default modulates around the project root)
+    int rootNote = ScaleResolve::resolveRootNote(sequence.rootNote(), _track.trackIndex(), project.rootNote());
 
     // 3. Quantization is always applied
     // Scale 0 (Semitones) naturally provides chromatic quantization (all 12 notes)
