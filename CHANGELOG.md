@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+## [0.8.0]
+
+Bug-fix + hardening release on top of 0.7.9, with a few routing completeness additions.
+
+### Added
+- **Teletype core mods**: `W` (while), `OTHER`, `P.MAP` / `PN.MAP` — the last unported v2 pre-command modifiers, now complete
+- **Play-state routing targets**: route any source to per-track **Mute / Fill / Fill Amount / Pattern**
+- **Global transport routing**: route **Play / Play-Toggle / Record / Record-Toggle / Tap-Tempo** (in the Clock tab) — Play/Record follow the source level, the toggles + Tap fire on a rising edge
+
+### Fixed
+- **Stuck gates on stop**: pending gate-offs are dropped when the transport stops, across every clock-driven engine (Note, Curve, Stochastic, Tuesday, DiscreteMap, Fractal, PhaseFlux, Indexed) — no more notes held on forever after Stop
+- **Scale / Root Note routing**: a route on a "follow project scale" (Default) track no longer snaps it to a fixed scale — Default is preserved, and modulation moves relative to the resolved project scale
+- **Pulse-hold under rotation**: a held/retriggered step now uses the *audible* (rotated) step's pulse count, not the pre-rotation one
+- **MIDI route re-assignment**: switching a route slot from a CV source to MIDI no longer applies the old CV value until the first MIDI message
+- **MOD+ extend**: extending a modulation onto another track now stages in the draft, so Cancel truly reverts it
+- **Routing bus double-count**: a constant bus route no longer jumps to ~2× on ticking frames; CV-router bus contribution clears correctly under output overrides
+- **Teletype safety**: `DEL.G` geometric-interval integer overflow fixed; a shared per-line op budget stops runaway iterating mods (`L`/`W`/`P.MAP`/`PN.MAP`/`DEL.*`) from starving audio
+- **Clock timing**: fixed microsecond-counter wrap in slave sub-tick timing and in the update reducer; slaved pulse width now derives from the effective (slave) tempo; added the missing interrupt lock in `setMode`
+- **Fractal**: step-LED flicker fixed (steady on/off), `cvUpdateMode` honored on rest steps, sequence pages classified correctly on the top page, playhead tracks the sounding cell under track delay
+- **PhaseFlux**: pitch scope tracks the accumulator; pitch labels no longer collide vertically
+- **UserScale**: reject an oversized size byte before reading (out-of-bounds read guard)
+- Trigger routes (Run / Reset / transport) now show a source only — no meaningless depth/scale/shaper controls
+
+### Changed
+- Firmware version display to 0.8.0
+- Removed the dead route-conflict guard (unreachable under the one-route-per-param editor)
+
 ## [0.7.9]
 
 > **⚠️ BREAKING CHANGE — projects are NOT backward compatible.**
